@@ -1,0 +1,29 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    Installation Complete - Thank You!                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+WinDeploy Studio has been successfully installed!
+
+────────────────────────────────────────────────────────────────────────────────
+
+WHAT'S NEXT:
+
+  ✓ Launch WinDeploy Studio from the Start menu or desktop shortcut
+  
+  ✓ Explore the Image Library to browse Windows images
+  
+  ✓ Create your first bootable USB or Windows To Go drive
+  
+  ✓ Share your feedback to help us improve!
+
+────────────────────────────────────────────────────────────────────────────────
+
+Thank you for choosing WinDeploy Studio!
+
+We value your feedback and are committed to making WinDeploy Studio better.
+
+────────────────────────────────────────────────────────────────────────────────
+
+© 2026 Bob Steve. All rights reserved.
+
+Website: https://xueyanzhang.top/contact/

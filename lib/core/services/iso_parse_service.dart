@@ -1,0 +1,320 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import '../../features/logs/services/log_center_service.dart';
+
+class IsoMetadata {
+  final String filePath;
+  final String fileName;
+  final int fileSize;
+  final String? windowsVersion;
+  final String? buildNumber;
+  final String? architecture;
+  final String? language;
+  final String? edition;
+  final bool isValidWindowsIso;
+
+  const IsoMetadata({
+    required this.filePath,
+    required this.fileName,
+    required this.fileSize,
+    this.windowsVersion,
+    this.buildNumber,
+    this.architecture,
+    this.language,
+    this.edition,
+    this.isValidWindowsIso = false,
+  });
+
+  String get displaySize {
+    if (fileSize < 1024 * 1024) {
+      return '${(fileSize / 1024).toStringAsFixed(0)} KB';
+    }
+    if (fileSize < 1024 * 1024 * 1024) {
+      return '${(fileSize / (1024 * 1024)).toStringAsFixed(0)} MB';
+    }
+    return '${(fileSize / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+}
+
+final isoParseServiceProvider = Provider<IsoParseService>((ref) {
+  return IsoParseService();
+});
+
+typedef ProgressCallback = void Function(String step, int percent);
+
+class IsoParseService {
+  bool _cancelled = false;
+
+  Future<IsoMetadata?> parseIso(
+    String isoPath, {
+    ProgressCallback? onProgress,
+  }) async {
+    _cancelled = false;
+    final file = File(isoPath);
+    if (!await file.exists()) return null;
+
+    final fileSize = await file.length();
+    final fileName = p.basename(isoPath);
+
+    debugPrint('=== ISO Parse Start ===');
+    debugPrint('File: $isoPath');
+    debugPrint('Size: $fileSize bytes');
+
+    final logCenter = LogCenterService();
+    await logCenter.logIso('ISO 解析开始 | 文件: $fileName | 大小: ${_formatSize(fileSize)}');
+
+    // Step 1: Filename detection (instant)
+    _report(onProgress, 'detect', 50);
+    final fastResult = _detectFromFileName(fileName, isoPath, fileSize);
+    debugPrint('Filename detection: ${fastResult.windowsVersion}');
+
+    if (_cancelled) return null;
+    _report(onProgress, 'detect', 100);
+
+    // Step 2: Mount ISO
+    _report(onProgress, 'mount', 0);
+    final mountPoint = await _mountIso(isoPath);
+    if (_cancelled || mountPoint == null) {
+      debugPrint('Mount failed or cancelled');
+      return fastResult;
+    }
+    _report(onProgress, 'mount', 100);
+    debugPrint('Mounted at: $mountPoint');
+
+    // Step 3: Check for install.wim/esd
+    if (_cancelled) { await _unmount(isoPath); return null; }
+    _report(onProgress, 'detect', 0);
+
+    final wimPath = '${mountPoint}sources\\install.wim';
+    final esdPath = '${mountPoint}sources\\install.esd';
+    final hasWim = await File(wimPath).exists();
+    final hasEsd = await File(esdPath).exists();
+
+    if (!hasWim && !hasEsd) {
+      debugPrint('No install.wim/esd found');
+      await _unmount(isoPath);
+      return fastResult;
+    }
+    _report(onProgress, 'detect', 100);
+    debugPrint('Found: ${hasWim ? "install.wim" : "install.esd"}');
+
+    // Step 4: DISM info with timeout
+    if (_cancelled) { await _unmount(isoPath); return null; }
+    _report(onProgress, 'info', 0);
+
+    final sourcePath = hasWim ? wimPath : esdPath;
+    Map<String, String>? dismInfo;
+
+    try {
+      debugPrint('Starting DISM...');
+      _report(onProgress, 'info', 30);
+
+      dismInfo = await _runDismWithTimeout(sourcePath);
+
+      if (_cancelled) {
+        await _unmount(isoPath);
+        return null;
+      }
+
+      _report(onProgress, 'info', 100);
+      debugPrint('DISM result: $dismInfo');
+    } catch (e) {
+      debugPrint('DISM failed: $e');
+      _report(onProgress, 'info', 100);
+    }
+
+    // Unmount ISO — must always complete regardless of cancel
+    onProgress?.call('cleanup', 0);
+    await _unmount(isoPath);
+    onProgress?.call('cleanup', 100);
+
+    if (_cancelled) return null;
+
+    // Build result
+    if (dismInfo != null && dismInfo.isNotEmpty) {
+      final version = dismInfo['version'] ?? fastResult.windowsVersion;
+      final build = dismInfo['build'] ?? fastResult.buildNumber;
+      final arch = dismInfo['architecture'];
+      await logCenter.logIso('ISO 解析成功 | 文件: $fileName | 版本: $version | 构建: $build | 架构: $arch');
+      return IsoMetadata(
+        filePath: isoPath,
+        fileName: fileName,
+        fileSize: fileSize,
+        windowsVersion: dismInfo['version'] ?? fastResult.windowsVersion,
+        buildNumber: dismInfo['build'] ?? fastResult.buildNumber,
+        architecture: dismInfo['architecture'],
+        language: dismInfo['language'],
+        edition: dismInfo['edition'],
+        isValidWindowsIso: true,
+      );
+    }
+
+    return IsoMetadata(
+      filePath: isoPath,
+      fileName: fileName,
+      fileSize: fileSize,
+      windowsVersion: fastResult.windowsVersion,
+      buildNumber: fastResult.buildNumber,
+      isValidWindowsIso: true,
+    );
+  }
+
+  void cancel() {
+    _cancelled = true;
+    debugPrint('=== ISO Parse Cancelled ===');
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  void _report(ProgressCallback? cb, String step, int percent) {
+    if (!_cancelled) {
+      cb?.call(step, percent);
+    }
+  }
+
+  // --- DISM with reliable timeout ---
+
+  Future<Map<String, String>?> _runDismWithTimeout(String wimPath) async {
+    // Use Process.run with a hard timeout
+    final result = await Process.run('dism', [
+      '/Get-WimInfo',
+      '/WimFile:$wimPath',
+      '/Index:1',
+    ]).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        debugPrint('DISM timed out after 30s');
+        // Kill DISM process
+        Process.run('taskkill', ['/f', '/im', 'dism.exe']).ignore();
+        return ProcessResult(0, -1, '', 'timeout');
+      },
+    );
+
+    if (_cancelled) return null;
+    if (result.exitCode != 0) return null;
+
+    final output = result.stdout.toString();
+    if (output.isEmpty) return null;
+
+    final map = <String, String>{};
+    final versionMatch = RegExp(r'Version\s*:\s*([\d.]+)').firstMatch(output);
+    final buildMatch = RegExp(r'Build\s*:\s*(\d+)').firstMatch(output);
+    final archMatch = RegExp(r'Architecture\s*:\s*(\S+)').firstMatch(output);
+    final langMatch = RegExp(r'Languages?\s*:\s*(.+)').firstMatch(output);
+    final nameMatch = RegExp(r'Name\s*:\s*(.+)').firstMatch(output);
+
+    if (versionMatch != null) map['version'] = versionMatch.group(1)!;
+    if (buildMatch != null) map['build'] = buildMatch.group(1)!;
+    if (archMatch != null) map['architecture'] = archMatch.group(1)!;
+    if (langMatch != null) {
+      map['language'] = langMatch.group(1)!.trim().split('\n').first.trim();
+    }
+    if (nameMatch != null) map['edition'] = nameMatch.group(1)!.trim();
+
+    if (map.containsKey('build')) {
+      final build = int.tryParse(map['build']!) ?? 0;
+      if (build >= 22000) {
+        map['version'] = 'Windows 11 (Build ${map['build']})';
+      } else if (build >= 10240) {
+        map['version'] = 'Windows 10 (Build ${map['build']})';
+      }
+    }
+
+    return map;
+  }
+
+  // --- Mount ---
+
+  Future<String?> _mountIso(String isoPath) async {
+    try {
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-Command',
+        "Mount-DiskImage -ImagePath '$isoPath'",
+      ]).timeout(const Duration(seconds: 15));
+
+      if (_cancelled) return null;
+      if (result.exitCode != 0) return null;
+
+      // Retry getting drive letter
+      for (int i = 0; i < 5; i++) {
+        if (_cancelled) return null;
+        await Future.delayed(const Duration(milliseconds: 500));
+        final r = await Process.run('powershell', [
+          '-NoProfile',
+          '-Command',
+          "Get-DiskImage -ImagePath '$isoPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
+        ]);
+        if (r.exitCode == 0) {
+          final letter = r.stdout.toString().trim();
+          if (letter.isNotEmpty) return '$letter:\\';
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Mount error: $e');
+      return null;
+    }
+  }
+
+  Future<void> _unmount(String isoPath) async {
+    try {
+      final process = await Process.start('powershell', [
+        '-NoProfile',
+        '-Command',
+        "Dismount-DiskImage -ImagePath '$isoPath' -ErrorAction SilentlyContinue",
+      ]);
+      final exited = await process.exitCode.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('Unmount timed out, killing PID ${process.pid}');
+          process.kill(ProcessSignal.sigterm);
+          return -1;
+        },
+      );
+      debugPrint('Unmount exited: $exited');
+    } catch (e) {
+      debugPrint('Unmount error: $e');
+    }
+  }
+
+  // --- Filename detection ---
+
+  IsoMetadata _detectFromFileName(
+      String fileName, String filePath, int fileSize) {
+    String? windowsVersion;
+    String? buildNumber;
+    final lower = fileName.toLowerCase();
+
+    if (lower.contains('win11') || lower.contains('windows11') ||
+        lower.contains('26100') || lower.contains('22621') ||
+        lower.contains('22000')) {
+      windowsVersion = 'Windows 11';
+    } else if (lower.contains('win10') || lower.contains('windows10') ||
+        lower.contains('19045') || lower.contains('19044') ||
+        lower.contains('19043')) {
+      windowsVersion = 'Windows 10';
+    } else if (lower.contains('server')) {
+      windowsVersion = 'Windows Server';
+    }
+
+    final buildMatch = RegExp(r'(\d{5})').firstMatch(lower);
+    if (buildMatch != null) buildNumber = buildMatch.group(1);
+
+    return IsoMetadata(
+      filePath: filePath,
+      fileName: fileName,
+      fileSize: fileSize,
+      windowsVersion: windowsVersion,
+      buildNumber: buildNumber,
+    );
+  }
+}

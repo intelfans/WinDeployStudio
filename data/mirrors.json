@@ -1,0 +1,251 @@
+{
+  "lastUpdate": "2026-06-22",
+  "items": [
+    {
+      "id": "official-win10",
+      "name": {"zh": "官方原版 Windows 10", "en": "Official Windows 10", "ru": "Официальная Windows 10", "fr": "Windows 10 Officielle", "ja": "公式 Windows 10"},
+      "category": "Official Original",
+      "type": {"zh": "微软官方镜像", "en": "Microsoft Official", "ru": "Официальная Microsoft", "fr": "Microsoft Officiel", "ja": "Microsoft公式"},
+      "version": "Windows 10",
+      "build": "22H2",
+      "architecture": "x64",
+      "audience": {"zh": "普通用户、办公、学习、老电脑", "en": "General users, office, study, older PCs", "ru": "Обычные пользователи, офис, учёба, старые ПК", "fr": "Utilisateurs généraux, bureau, étude, anciens PC", "ja": "一般ユーザー、オフィス、学習、古いPC"},
+      "pros": {
+        "zh": ["兼容性最好", "驱动支持完整", "软件支持完整", "稳定可靠", "适合作为长期主力系统"],
+        "en": ["Best compatibility", "Full driver support", "Full software support", "Stable and reliable", "Suitable as daily driver"],
+        "ru": ["Лучшая совместимость", "Полная поддержка драйверов", "Полная поддержка ПО", "Стабильность и надёжность", "Подходит как основная система"],
+        "fr": ["Meilleure compatibilité", "Support complet des pilotes", "Support complet des logiciels", "Stable et fiable", "Adapté comme système principal"],
+        "ja": ["最高の互換性", "完全なドライバー対応", "完全なソフトウェア対応", "安定性と信頼性", "日常使用に最適"]
+      },
+      "notes": {
+        "zh": ["体积较大", "更新较多", "占用空间相对较高"],
+        "en": ["Larger file size", "More updates", "Higher disk usage"],
+        "ru": ["Большой размер файла", "Много обновлений", "Высокое использование диска"],
+        "fr": ["Fichier de grande taille", "Nombreuses mises à jour", "Utilisation élevée du disque"],
+        "ja": ["ファイルサイズが大きい", "更新が多い", "ディスク使用量が多い"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-KMR0h",
+      "sha256": "",
+      "size": "6.68 GB",
+      "needsFontPack": false,
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-KMR0h",
+      "globalUrl": "https://gofile.io/d/2fIV8u"
+    },
+    {
+      "id": "official-win11",
+      "name": {"zh": "官方原版 Windows 11", "en": "Official Windows 11", "ru": "Официальная Windows 11", "fr": "Windows 11 Officielle", "ja": "公式 Windows 11"},
+      "category": "Official Original",
+      "type": {"zh": "微软官方镜像", "en": "Microsoft Official", "ru": "Официальная Microsoft", "fr": "Microsoft Officiel", "ja": "Microsoft公式"},
+      "version": "Windows 11",
+      "build": "25H2",
+      "architecture": "x64",
+      "audience": {"zh": "新电脑、游戏玩家、开发者", "en": "New PCs, gamers, developers", "ru": "Новые ПК, геймеры, разработчики", "fr": "Nouveaux PC, joueurs, développeurs", "ja": "新しいPC、ゲーマー、開発者"},
+      "pros": {
+        "zh": ["最新功能", "最佳安全性", "长期支持", "Windows 11 完整体验"],
+        "en": ["Latest features", "Best security", "Long-term support", "Full Windows 11 experience"],
+        "ru": ["Последние функции", "Лучшая безопасность", "Долгосрочная поддержка", "Полный опыт Windows 11"],
+        "fr": ["Dernières fonctionnalités", "Meilleure sécurité", "Support à long terme", "Expérience Windows 11 complète"],
+        "ja": ["最新機能", "最高のセキュリティ", "長期サポート", "Windows 11の完全な体験"]
+      },
+      "notes": {
+        "zh": ["对硬件要求较高", "占用空间较大"],
+        "en": ["Higher hardware requirements", "Larger disk usage"],
+        "ru": ["Высокие требования к оборудованию", "Большое использование диска"],
+        "fr": ["Configuration matérielle élevée requise", "Utilisation élevée du disque"],
+        "ja": ["ハードウェア要件が高い", "ディスク使用量が多い"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-FjXKh",
+      "sha256": "",
+      "size": "7.96 GB",
+      "needsFontPack": false,
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-FjXKh",
+      "globalUrl": "https://gofile.io/d/2fIV8u"
+    },
+    {
+      "id": "tiny10",
+      "name": {"zh": "Tiny10", "en": "Tiny10", "ru": "Tiny10", "fr": "Tiny10", "ja": "Tiny10"},
+      "category": "TinyOS",
+      "type": {"zh": "精简版系统", "en": "Lite OS", "ru": "Облегчённая ОС", "fr": "OS Léger", "ja": "軽量OS"},
+      "version": "Windows 10",
+      "build": "22H2",
+      "architecture": "x64",
+      "audience": {"zh": "低配置电脑、虚拟机、测试环境", "en": "Low-end PCs, VMs, testing", "ru": "Слабые ПК, виртуальные машины, тестирование", "fr": "PC bas de gamme, machines virtuelles, test", "ja": "低スペックPC、仮想マシン、テスト環境"},
+      "pros": {
+        "zh": ["占用极低", "内存占用少", "启动速度快"],
+        "en": ["Minimal footprint", "Low memory usage", "Fast boot"],
+        "ru": ["Минимальный объём", "Низкое потребление памяти", "Быстрая загрузка"],
+        "fr": ["Empreinte minimale", "Faible utilisation mémoire", "Démarrage rapide"],
+        "ja": ["最小限のフットプリント", "メモリ使用量が少ない", "高速起動"]
+      },
+      "notes": {
+        "zh": ["部分组件已移除", "某些软件可能无法运行", "建议安装字体包"],
+        "en": ["Some components removed", "Some software may not work", "Font pack recommended"],
+        "ru": ["Некоторые компоненты удалены", "Некоторые программы могут не работать", "Рекомендуется установить пакет шрифтов"],
+        "fr": ["Certains composants supprimés", "Certains logiciels peuvent ne pas fonctionner", "Pack de polices recommandé"],
+        "ja": ["一部のコンポーネントが削除されています", "一部のソフトウェアが動作しない場合があります", "フォントパックのインストールをお勧めします"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-NRSKh",
+      "sha256": "",
+      "size": "3.58 GB",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-NRSKh",
+      "globalUrl": "https://gofile.io/d/cd488a"
+    },
+    {
+      "id": "tiny11",
+      "name": {"zh": "Tiny11", "en": "Tiny11", "ru": "Tiny11", "fr": "Tiny11", "ja": "Tiny11"},
+      "category": "TinyOS",
+      "type": {"zh": "精简版系统", "en": "Lite OS", "ru": "Облегчённая ОС", "fr": "OS Léger", "ja": "軽量OS"},
+      "version": "Windows 11",
+      "build": "25H2",
+      "architecture": "x64",
+      "audience": {"zh": "低配置电脑、虚拟机、测试环境", "en": "Low-end PCs, VMs, testing", "ru": "Слабые ПК, виртуальные машины, тестирование", "fr": "PC bas de gamme, machines virtuelles, test", "ja": "低スペックPC、仮想マシン、テスト環境"},
+      "pros": {
+        "zh": ["占用极低", "系统更轻量", "更新负担更小"],
+        "en": ["Minimal footprint", "Lighter system", "Less update overhead"],
+        "ru": ["Минимальный объём", "Более лёгкая система", "Меньше обновлений"],
+        "fr": ["Empreinte minimale", "Système plus léger", "Moins de mises à jour"],
+        "ja": ["最小限のフットプリント", "より軽いシステム", "更新の負担が少ない"]
+      },
+      "notes": {
+        "zh": ["部分功能已移除", "可能缺少中文字体", "强烈建议安装字体包"],
+        "en": ["Some features removed", "May lack CJK fonts", "Font pack strongly recommended"],
+        "ru": ["Некоторые функции удалены", "Могут отсутствовать шрифты CJK", "Настоятельно рекомендуется установить пакет шрифтов"],
+        "fr": ["Certaines fonctionnalités supprimées", "Polices CJK possiblement manquantes", "Pack de polices fortement recommandé"],
+        "ja": ["一部の機能が削除されています", "CJKフォントが不足している可能性があります", "フォントパックのインストールを強くお勧めします"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-uMR0h",
+      "sha256": "",
+      "size": "5.14 GB",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-uMR0h",
+      "globalUrl": "https://gofile.io/d/cd488a"
+    },
+    {
+      "id": "xlite10",
+      "name": {"zh": "Windows X-Lite 10", "en": "Windows X-Lite 10", "ru": "Windows X-Lite 10", "fr": "Windows X-Lite 10", "ja": "Windows X-Lite 10"},
+      "category": "X-Lite",
+      "type": {"zh": "深度优化版系统", "en": "Deep optimized OS", "ru": "Глубоко оптимизированная ОС", "fr": "OS profondément optimisé", "ja": "深く最適化されたOS"},
+      "version": "Windows 10",
+      "architecture": "x64",
+      "audience": {"zh": "游戏玩家、性能爱好者", "en": "Gamers, performance enthusiasts", "ru": "Геймеры, энтузиасты производительности", "fr": "Joueurs, passionnés de performance", "ja": "ゲーマー、パフォーマンス愛好家"},
+      "pros": {
+        "zh": ["后台进程更少", "更流畅", "更低资源占用"],
+        "en": ["Fewer background processes", "Smoother", "Lower resource usage"],
+        "ru": ["Меньше фоновых процессов", "Более плавная работа", "Низкое потребление ресурсов"],
+        "fr": ["Moins de processus arrière-plan", "Plus fluide", "Utilisation réduite des ressources"],
+        "ja": ["バックグラウンドプロセスの削減", "よりスムーズ", "リソース使用量の削減"]
+      },
+      "notes": {
+        "zh": ["非微软官方系统", "可能缺少部分组件", "建议安装字体包"],
+        "en": ["Unofficial system", "May lack some components", "Font pack recommended"],
+        "ru": ["Неофициальная система", "Могут отсутствовать некоторые компоненты", "Рекомендуется установить пакет шрифтов"],
+        "fr": ["Système non officiel", "Certains composants peuvent manquer", "Pack de polices recommandé"],
+        "ja": ["非公式システム", "一部のコンポーネントが不足している可能性があります", "フォントパックのインストールをお勧めします"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-1ZRKh",
+      "sha256": "",
+      "size": "3.78 GB",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-1ZRKh",
+      "globalUrl": "https://gofile.io/d/atygX7"
+    },
+    {
+      "id": "xlite11",
+      "name": {"zh": "Windows X-Lite 11", "en": "Windows X-Lite 11", "ru": "Windows X-Lite 11", "fr": "Windows X-Lite 11", "ja": "Windows X-Lite 11"},
+      "category": "X-Lite",
+      "type": {"zh": "深度优化版系统", "en": "Deep optimized OS", "ru": "Глубоко оптимизированная ОС", "fr": "OS profondément optimisé", "ja": "深く最適化されたOS"},
+      "version": "Windows 11",
+      "architecture": "x64",
+      "audience": {"zh": "游戏玩家、性能爱好者", "en": "Gamers, performance enthusiasts", "ru": "Геймеры, энтузиасты производительности", "fr": "Joueurs, passionnés de performance", "ja": "ゲーマー、パフォーマンス愛好家"},
+      "pros": {
+        "zh": ["精简优化", "更低资源占用", "更适合游戏"],
+        "en": ["Optimized", "Lower resource usage", "Better for gaming"],
+        "ru": ["Оптимизирована", "Низкое потребление ресурсов", "Лучше для игр"],
+        "fr": ["Optimisé", "Utilisation réduite des ressources", "Meilleur pour le jeu"],
+        "ja": ["最適化済み", "リソース使用量の削減", "ゲーミングに最適"]
+      },
+      "notes": {
+        "zh": ["非微软官方系统", "可能缺少部分功能", "强烈建议安装字体包"],
+        "en": ["Unofficial system", "May lack some features", "Font pack strongly recommended"],
+        "ru": ["Неофициальная система", "Могут отсутствовать некоторые функции", "Настоятельно рекомендуется установить пакет шрифтов"],
+        "fr": ["Système non officiel", "Certaines fonctionnalités peuvent manquer", "Pack de polices fortement recommandé"],
+        "ja": ["非公式システム", "一部の機能が不足している可能性があります", "フォントパックのインストールを強くお勧めします"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-UMR0h",
+      "sha256": "",
+      "size": "3.67 GB",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-UMR0h",
+      "globalUrl": "https://gofile.io/d/atygX7"
+    },
+    {
+      "id": "starvalleyx",
+      "name": {"zh": "StarValleyX", "en": "StarValleyX", "ru": "StarValleyX", "fr": "StarValleyX", "ja": "StarValleyX"},
+      "category": "Custom",
+      "type": {"zh": "美化增强版 Windows 10", "en": "Beautified Windows 10", "ru": "Украшенная Windows 10", "fr": "Windows 10 Embelli", "ja": "カスタマイズされたWindows 10"},
+      "version": "Windows 10",
+      "architecture": "x64",
+      "audience": {"zh": "桌面美化爱好者", "en": "Desktop customization enthusiasts", "ru": "Энтузиасты настройки рабочего стола", "fr": "Passionnés de personnalisation du bureau", "ja": "デスクトップカスタマイズ愛好家"},
+      "pros": {
+        "zh": ["预置动画效果", "视觉风格增强", "开箱即用"],
+        "en": ["Pre-configured animations", "Enhanced visual style", "Ready to use"],
+        "ru": ["Предустановленные анимации", "Улучшенный визуальный стиль", "Готов к использованию"],
+        "fr": ["Animations préconfigurées", "Style visuel amélioré", "Prêt à l'emploi"],
+        "ja": ["プリコンフィグ済みアニメーション", "ビジュアルスタイルの強化", "すぐに使用可能"]
+      },
+      "notes": {
+        "zh": ["非微软官方系统", "建议提前备份数据", "推荐安装字体包"],
+        "en": ["Unofficial system", "Backup data recommended", "Font pack recommended"],
+        "ru": ["Неофициальная система", "Рекомендуется сделать резервную копию", "Рекомендуется установить пакет шрифтов"],
+        "fr": ["Système non officiel", "Sauvegarde des données recommandée", "Pack de polices recommandé"],
+        "ja": ["非公式システム", "データのバックアップをお勧めします", "フォントパックのインストールをお勧めします"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
+      "sha256": "",
+      "size": "9.64 GB",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
+      "globalUrl": "https://gofile.io/d/Cxz53k"
+    },
+    {
+      "id": "font-pack",
+      "name": {"zh": "中文字体补充包", "en": "CJK Font Pack", "ru": "Пакет шрифтов CJK", "fr": "Pack de polices CJK", "ja": "CJKフォントパック"},
+      "category": "Tools",
+      "type": {"zh": "字体包", "en": "Font Pack", "ru": "Пакет шрифтов", "fr": "Pack de polices", "ja": "フォントパック"},
+      "description": {
+        "zh": "为 TinyOS、Windows X-Lite、StarValleyX 补充缺失中文字体。安装方式：打开字体包目录，全选字体文件，右键选择「为所有用户安装」。",
+        "en": "Adds missing CJK fonts for TinyOS, Windows X-Lite, and StarValleyX. Installation: open the font pack folder, select all font files, right-click and choose 'Install for all users'.",
+        "ru": "Добавляет отсутствующие шрифты CJK для TinyOS, Windows X-Lite и StarValleyX. Установка: откройте папку со шрифтами, выберите все файлы шрифтов, щёлкните правой кнопкой мыши и выберите «Установить для всех пользователей».",
+        "fr": "Ajoute les polices CJK manquantes pour TinyOS, Windows X-Lite et StarValleyX. Installation : ouvrez le dossier des polices, sélectionnez tous les fichiers de polices, faites un clic droit et choisissez « Installer pour tous les utilisateurs ».",
+        "ja": "TinyOS、Windows X-Lite、StarValleyXに不足しているCJKフォントを追加します。インストール方法：フォントパックフォルダを開き、すべてのフォントファイルを選択、右クリックして「すべてのユーザーにインストール」を選択してください。"
+      },
+      "audience": {"zh": "TinyOS / X-Lite / StarValleyX 用户", "en": "TinyOS / X-Lite / StarValleyX users", "ru": "Пользователи TinyOS / X-Lite / StarValleyX", "fr": "Utilisateurs TinyOS / X-Lite / StarValleyX", "ja": "TinyOS / X-Lite / StarValleyXユーザー"},
+      "pros": {
+        "zh": ["补充缺失中文字体", "解决乱码问题", "安装简单"],
+        "en": ["Adds missing CJK fonts", "Fixes garbled text", "Easy to install"],
+        "ru": ["Добавляет отсутствующие шрифты CJK", "Исправляет иероглифы", "Простая установка"],
+        "fr": ["Ajoute les polices CJK manquantes", "Corrige le texte illisible", "Installation facile"],
+        "ja": ["不足しているCJKフォントを追加", "文字化けを修正", "簡単なインストール"]
+      },
+      "notes": {
+        "zh": ["下载后请手动安装", "建议为所有用户安装"],
+        "en": ["Manual installation required", "Install for all users recommended"],
+        "ru": ["Требуется ручная установка", "Рекомендуется установить для всех пользователей"],
+        "fr": ["Installation manuelle requise", "Installation pour tous les utilisateurs recommandée"],
+        "ja": ["手動インストールが必要", "すべてのユーザーへのインストールをお勧めします"]
+      },
+      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "sha256": "",
+      "size": "244 MB",
+      "needsFontPack": false,
+      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "globalUrl": "https://gofile.io/d/dzQLam"
+    }
+  ]
+}

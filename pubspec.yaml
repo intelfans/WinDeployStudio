@@ -1,0 +1,91 @@
+name: win_deploy_studio
+description: "Modern Windows deployment tool - Bootable USB & Windows To Go creator"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+
+  # Database
+  sqflite_common_ffi: ^2.3.4+4
+
+  # Routing
+  go_router: ^14.8.1
+
+  # Storage & Paths
+  shared_preferences: ^2.3.4
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # Logging
+  logger: ^2.4.0
+
+  # File Picker (local ISO import)
+  file_picker: ^8.1.7
+
+  # Open browser for mirror downloads
+  url_launcher: ^6.3.1
+
+  # Crypto (SHA256 verification)
+  crypto: ^3.0.6
+
+  # HTTP (AI API)
+  http: ^1.2.0
+
+  # Markdown rendering
+  flutter_markdown: ^0.7.4+3
+
+  # WebView (in-app browser)
+  webview_windows: ^0.4.0
+
+  # UI
+  fluentui_system_icons: ^1.1.256
+
+  # Utilities
+  intl: ^0.20.2
+  collection: ^1.19.1
+  uuid: ^4.5.1
+  filesize: ^2.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: HarmonyOSSans
+      fonts:
+        - asset: assets/fonts/HarmonyOS_Sans_SC_Thin.ttf
+          weight: 100
+        - asset: assets/fonts/HarmonyOS_Sans_SC_Light.ttf
+          weight: 300
+        - asset: assets/fonts/HarmonyOS_Sans_SC_Regular.ttf
+          weight: 400
+        - asset: assets/fonts/HarmonyOS_Sans_SC_Medium.ttf
+          weight: 500
+        - asset: assets/fonts/HarmonyOS_Sans_SC_Bold.ttf
+          weight: 700
+        - asset: assets/fonts/HarmonyOS_Sans_SC_Black.ttf
+          weight: 900
+
+  assets:
+    - data/mirrors.json
+    - data/tools.json
+    - assets/intel.ico
+    - assets/easter_egg/easter_egg.png
+    - assets/intel-1.jpg
+    - assets/adblock/ad_domains.txt
+    - assets/adblock/tracking_domains.txt
+    - assets/adblock/whitelist_domains.txt

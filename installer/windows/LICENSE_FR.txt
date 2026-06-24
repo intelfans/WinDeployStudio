@@ -1,0 +1,101 @@
+ACCORD DE LICENCE UTILISATEUR FINAL (EULA)
+
+WinDeploy Studio - Outil de déploiement Windows
+Version 1.0.0.0
+
+Copyright (c)2026 Bob Steve. Tous droits réservés.
+
+────────────────────────────────────────────────────────────────────────────────
+
+IMPORTANT - LISEZ ATTENTIVEMENT : Le présent Accord de licence utilisateur final
+("Accord") est un contrat légal entre vous (personne physique ou morale) et
+Bob Steve ("Concédant") pour le produit logiciel identifié ci-dessus, comprenant
+le logiciel informatique et les supports associés, les documents imprimés et la
+documentation électronique ("Logiciel").
+
+En installant, copiant ou utilisant le Logiciel, vous acceptez les termes du
+présent Accord. Si vous n'acceptez pas les termes du présent Accord, n'installez
+pas et n'utilisez pas le Logiciel.
+
+────────────────────────────────────────────────────────────────────────────────
+
+1. CONCESSION DE LICENCE
+
+   Bob Steve vous accorde par la présente une licence non exclusive, non
+   transférable et révocable pour :
+
+   a) Installer et utiliser le Logiciel sur un seul ordinateur ;
+
+   b) Effectuer une copie du Logiciel uniquement à des fins d'archivage ;
+
+   c) Utiliser le Logiciel à des fins personnelles, éducatives ou commerciales.
+
+2. DESCRIPTION DES DROITS ET LIMITATIONS
+
+   a) Vous NE POUVEZ PAS distribuer, sous-licencier, louer, prêter le Logiciel ;
+
+   b) Vous NE POUVEZ PAS modifier, adapter, traduire, désassembler ou
+      décompiler le Logiciel ;
+
+   c) Vous NE POUVEZ PAS créer d'œuvres dérivées basées sur le Logiciel ;
+
+   d) Vous NE POUVEZ PAS supprimer ou modifier les avis, étiquettes ou marques
+      sur le Logiciel ;
+
+   e) Vous NE POUVEZ PAS utiliser le Logiciel à des fins illégales.
+
+3. PROPRIÉTÉ INTELLECTUELLE
+
+   Le Logiciel est protégé par les lois sur le droit d'auteur et les traités
+   internationaux sur le droit d'auteur, ainsi que par d'autres lois et traités
+   sur la propriété intellectuelle. Le Logiciel est concédé sous licence, non
+   vendu. Bob Steve conserve tous les droits, titres et intérêts relatifs au
+   Logiciel, y compris tous les droits de propriété intellectuelle.
+
+4. EXCLUSION DE GARANTIE
+
+   LE LOGICIEL EST FOURNI "TEL QUEL" SANS AUCUNE GARANTIE, EXPRESSE OU IMPLICITE,
+   Y COMPRIS, MAIS SANS S'Y LIMITER, LES GARANTIES DE QUALITÉ MARCHANDE,
+   D'ADÉQUATION À UN USAGE PARTICULIER ET DE NON-VIOLATION. EN AUCUN CAS,
+   LES AUTEURS OU LES TITULAIRES DE DROITS D'AUTEUR NE SERONT RESPONSABLES
+   DE TOUTE RÉCLAMATION, DOMMAGE OU AUTRE RESPONSABILITÉ.
+
+5. LIMITATION DE RESPONSABILITÉ
+
+   DANS LA MESURE MAXIMALE AUTORISÉE PAR LA LOI APPLICABLE, EN AUCUN CAS
+   BOB STEVE NE SERA RESPONSABLE DES DOMMAGES INDIRECTS, ACCESSOIRES,
+   SPÉCIAUX, CONSÉCUTIFS OU PUNITIFS, NI DE TOUTE PERTE DE BÉNÉFICES OU
+   DE REVENUS.
+
+6. RÉSILIATION
+
+   Le présent Accord est effectif jusqu'à sa résiliation. Bob Steve peut
+   résilier le présent Accord à tout moment sans préavis si vous ne respectez
+   pas l'une des conditions. En cas de résiliation, vous devez détruire toutes
+   les copies du Logiciel en votre possession.
+
+7. DROIT APPLICABLE
+
+   Le présent Accord sera régi et interprété conformément aux lois de la
+   République populaire de Chine.
+
+8. ACCORD INTÉGRAL
+
+   Le présent Accord constitue l'intégralité de l'accord entre vous et Bob Steve
+   concernant le Logiciel et remplace tous les accords et compréhensions
+   antérieurs.
+
+────────────────────────────────────────────────────────────────────────────────
+
+COORDONNÉES
+
+   Bob Steve
+   Email : bob_0910@qq.com
+   Site web : https://xueyanzhang.top/contact/
+
+────────────────────────────────────────────────────────────────────────────────
+
+En cliquant sur "J'accepte" ou en installant le Logiciel, vous reconnaissez avoir
+lu le présent Accord, le comprendre et accepter d'être lié par ses termes.
+
+©2026 Bob Steve. Tous droits réservés.

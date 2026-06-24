@@ -1,0 +1,36 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          WinDeploy Studio                                    ║
+║                         Windows Deployment Tool                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Thank you for choosing WinDeploy Studio! We appreciate your support.
+
+────────────────────────────────────────────────────────────────────────────────
+
+MAIN FEATURES:
+
+  ◆ Image Library
+    Browse curated Windows images with download links
+    
+  ◆ Bootable USB Creator  
+    Create Windows installation media from ISO files
+    
+  ◆ Windows To Go
+    Build portable Windows workspaces on USB drives
+    
+  ◆ Multi-language Support
+    Full Chinese and English interface
+
+────────────────────────────────────────────────────────────────────────────────
+
+SYSTEM REQUIREMENTS:
+
+  • Windows 10/11 (64-bit)
+  • USB 3.0+ drive (recommended)
+  • Administrator privileges required
+
+────────────────────────────────────────────────────────────────────────────────
+
+Click Next to continue installation.
+
+© 2026 Bob Steve. All rights reserved.

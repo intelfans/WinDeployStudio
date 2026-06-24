@@ -1,0 +1,29 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    Installation abgeschlossen – Vielen Dank!                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+WinDeploy Studio wurde erfolgreich installiert!
+
+────────────────────────────────────────────────────────────────────────────────
+
+WEITERE SCHRITTE:
+
+  ✓ Starten Sie WinDeploy Studio über das Startmenü oder die Desktop-Verknüpfung
+
+  ✓ Erkunden Sie die Abbildbibliothek, um Windows-Abbilder anzuzeigen
+
+  ✓ Erstellen Sie Ihren ersten bootfähigen USB oder Windows To Go
+
+  ✓ Teilen Sie Ihr Feedback, um uns bei der Verbesserung zu unterstützen!
+
+────────────────────────────────────────────────────────────────────────────────
+
+Vielen Dank für die Wahl von WinDeploy Studio!
+
+Wir schätzen Ihr Feedback und setzen uns für die Verbesserung von WinDeploy Studio ein.
+
+────────────────────────────────────────────────────────────────────────────────
+
+© 2026 Bob Steve. Alle Rechte vorbehalten.
+
+Website: https://xueyanzhang.top/contact/

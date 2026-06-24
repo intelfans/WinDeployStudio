@@ -1,0 +1,29 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    ¡Instalación completada - Gracias!                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+¡WinDeploy Studio se ha instalado correctamente!
+
+────────────────────────────────────────────────────────────────────────────────
+
+QUÉ HACER A CONTINUACIÓN:
+
+  ✓ Inicie WinDeploy Studio desde el menú Inicio o el acceso directo del escritorio
+
+  ✓ Explore la biblioteca de imágenes para ver las imágenes de Windows
+
+  ✓ Cree su primera memoria USB booteable o Windows To Go
+
+  ✓ ¡Comparta sus comentarios para ayudarnos a mejorar!
+
+────────────────────────────────────────────────────────────────────────────────
+
+¡Gracias por elegir WinDeploy Studio!
+
+Valoramos sus comentarios y nos comprometemos a mejorar WinDeploy Studio.
+
+────────────────────────────────────────────────────────────────────────────────
+
+© 2026 Bob Steve. Todos los derechos reservados.
+
+Sitio web: https://xueyanzhang.top/contact/

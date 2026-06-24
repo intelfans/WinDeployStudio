@@ -1,0 +1,103 @@
+ENDNUTZER-LIZENZVERTRAG (EULA)
+
+WinDeploy Studio - Windows-Bereitstellungstool
+Version 1.0.0.0
+
+Copyright (c) 2026 Bob Steve. Alle Rechte vorbehalten.
+
+────────────────────────────────────────────────────────────────────────────────
+
+WICHTIG – BITTE LESEN SIE DIESES DOKUMENT SORGFÄLTIG DURCH: Dieser
+Endnutzer-Lizenzvertrag („Vertrag") ist eine rechtliche Vereinbarung zwischen
+Ihnen (einzelperson oder juristische Person) und Bob Steve („Lizenzgeber")
+für das oben genannte Softwareprodukt, einschließlich der Computersoftware und
+zugehöriger Medien, Druckerzeugnisse und Online- oder elektronischen
+Dokumentation („Software").
+
+Durch Installieren, Kopieren oder andere Nutzung der Software erklären Sie
+sich mit den Bedingungen dieses Vertrags einverstanden. Wenn Sie den
+Bedingungen nicht zustimmen, installieren oder nutzen Sie die Software nicht.
+
+────────────────────────────────────────────────────────────────────────────────
+
+1. LIZENZGEWÄHRUNG
+
+   Bob Steve gewährt Ihnen hiermit eine nicht ausschließliche, nicht
+   übertragbare, widerrufliche Lizenz zur:
+
+   a) Installation und Nutzung der Software auf einem einzelnen Computer;
+
+   b) Erstellung einer Kopie der Software ausschließlich zu Archivierungszwecken;
+
+   c) Nutzung der Software für persönliche, Bildungs- oder Geschäftszwecke.
+
+2. BESCHREIBUNG DER RECHTE UND EINSCHRÄNKUNGEN
+
+   a) Sie dürfen die Software NICHT verteilen, unterlizenzieren, vermieten,
+      verleihen;
+
+   b) Sie dürfen die Software NICHT ändern, anpassen, übersetzen, dekompilieren
+      oder disassemblieren;
+
+   c) Sie dürfen KEINE abgeleiteten Werke auf Basis der Software erstellen;
+
+   d) Sie dürfen KEINE Eigentumshinweise, Etiketten oder Markierungen auf der
+      Software entfernen oder ändern;
+
+   e) Sie dürfen die Software NICHT für rechtswidrige Zwecke nutzen.
+
+3. GEISTIGES EIGENTUM
+
+   Die Software ist durch Urheberrechtsgesetze und internationale
+   Urheberrechtsverträge sowie andere Gesetze und Verträge zum Schutz des
+   geistigen Eigentums geschützt. Die Software wird lizenziert, nicht verkauft.
+   Bob Steve behält alle Rechte, Titel und Interessen an der Software,
+   einschließlich aller Rechte des geistigen Eigentums.
+
+4. GARANTIEAUSSCHLUSS
+
+   DIE SOFTWARE WIRD „WIE BESEHEN" OHNE JEGLICHE GARANTIE BEREITGESTELLT,
+   AUSDRÜCKLICH ODER IMPLIZIT, EINSCHLIESSLICH, ABER NICHT BESCHRÄNKT AUF,
+   GARANTIEN DER MARKTFÄHIGKEIT, EIGNUNG FÜR EINEN BESTIMMTEN ZWECK UND
+   NICHTVERLETZUNG. IN KEINEM FALL SIND DIE AUTOREN ODER INHABER DER
+   URHEBERREchte FÜR ANSPRÜCHE, SCHÄDEN ODER ANDERE HAFTUNGSANSPRÜCHE
+   VERANTWORTLICH.
+
+5. HAFTUNGSBESCHRÄNKUNG
+
+   SOWEIT NACH GELTENDEM RECHT ZULÄSSIG, HAFTET BOB STEVE IN KEINEM FALL
+   FÜR MITTELBARE, BESONDERE, FOLGE- ODER STRAFSCHÄDEN ODER ENTGANGENEN
+   GEWINN.
+
+6. KÜNDIGUNG
+
+   Dieser Vertrag bleibt bis zu seiner Kündigung wirksam. Bob Steve kann diesen
+   Vertrag jederzeit ohne vorherige Ankündigung kündigen, wenn Sie eine
+   Bedingung nicht einhalten. Bei Kündigung müssen Sie alle Kopien der Software
+   in Ihrem Besitz vernichten.
+
+7. ANWENDBARES RECHT
+
+   Dieser Vertrag unterliegt den Gesetzen der Volksrepublik China und wird
+   nach diesen ausgelegt.
+
+8. GESAMTE VEREINBARUNG
+
+   Dieser Vertrag stellt die gesamte Vereinbarung zwischen Ihnen und Bob Steve
+   bezüglich der Software dar und ersetzt alle früheren Vereinbarungen.
+
+────────────────────────────────────────────────────────────────────────────────
+
+KONTAKTINFORMATIONEN
+
+   Bob Steve
+   E-Mail: bob_0910@qq.com
+   Website: https://xueyanzhang.top/contact/
+
+────────────────────────────────────────────────────────────────────────────────
+
+Durch Klicken auf „Ich stimme zu" oder durch Installieren oder Nutzen der
+Software bestätigen Sie, dass Sie diesen Vertrag gelesen haben, ihn verstehen
+und sich an seine Bedingungen gebunden fühlen.
+
+© 2026 Bob Steve. Alle Rechte vorbehalten.
