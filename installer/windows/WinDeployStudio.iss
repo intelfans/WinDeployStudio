@@ -41,7 +41,7 @@ VersionInfoProductVersion={#MyAppVersion}
 
 [Languages]
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"; LicenseFile: "LICENSE_ZH.txt"; InfoBeforeFile: "WELCOME_ZH.txt"; InfoAfterFile: "FINISH_ZH.txt"
-Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"; LicenseFile: "LICENSE_ZH_TW.txt"; InfoBeforeFile: "WELCOME_ZH_TW.txt"; InfoAfterFile: "FINISH_ZH_TW.txt"
+Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"; LicenseFile: "LICENSE_ZH_TW.txt"; InfoBeforeFile: "WELCOME_ZH_TW.txt"; InfoAfterFile: "FINISH_ZH_TW.txt"
 Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "LICENSE_EN.txt"; InfoBeforeFile: "WELCOME_EN.txt"; InfoAfterFile: "FINISH_EN.txt"
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"; LicenseFile: "LICENSE_FR.txt"; InfoBeforeFile: "WELCOME_FR.txt"; InfoAfterFile: "FINISH_FR.txt"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"; LicenseFile: "LICENSE_DE.txt"; InfoBeforeFile: "WELCOME_DE.txt"; InfoAfterFile: "FINISH_DE.txt"

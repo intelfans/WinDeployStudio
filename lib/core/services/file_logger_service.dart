@@ -36,6 +36,7 @@ final fileLoggerServiceProvider = Provider<FileLoggerService>((ref) {
 class FileLoggerService {
   Directory? _logDir;
   final List<LogEntry> _entries = [];
+  static const _maxEntries = 1000;
 
   List<LogEntry> get entries => List.unmodifiable(_entries);
 
@@ -64,6 +65,9 @@ class FileLoggerService {
     );
 
     _entries.add(entry);
+    if (_entries.length > _maxEntries) {
+      _entries.removeRange(0, _entries.length - _maxEntries);
+    }
 
     try {
       final dir = await logDir;
@@ -108,11 +112,27 @@ class FileLoggerService {
 
       final lines = await logFile.readAsLines();
       return lines.where((l) => l.isNotEmpty).map((line) {
+        final timestampMatch = RegExp(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]').firstMatch(line);
+        final timestamp = timestampMatch != null
+            ? (DateTime.tryParse(timestampMatch.group(1)!) ?? DateTime.now())
+            : DateTime.now();
+
+        String action = '';
+        String target = '';
+        String result = line;
+
+        final parts = RegExp(r'^\[.*?\]\s*\[\w+\]\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$').firstMatch(line);
+        if (parts != null) {
+          action = parts.group(1) ?? '';
+          target = parts.group(2) ?? '';
+          result = parts.group(3) ?? '';
+        }
+
         return LogEntry(
-          timestamp: DateTime.now(),
-          action: '',
-          target: '',
-          result: line,
+          timestamp: timestamp,
+          action: action,
+          target: target,
+          result: result,
         );
       }).toList();
     } catch (_) {

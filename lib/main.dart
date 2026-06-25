@@ -7,7 +7,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final dbService = DatabaseService();
-  await dbService.database;
+  try {
+    await dbService.database;
+  } catch (_) {}
 
   runApp(
     ProviderScope(

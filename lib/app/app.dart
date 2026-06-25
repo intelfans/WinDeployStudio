@@ -102,7 +102,7 @@ class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
               maxScaleFactor: 2.0,
             ),
           ),
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );

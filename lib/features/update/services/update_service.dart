@@ -14,8 +14,9 @@ class UpdateService {
   static const _apiUrl =
       'https://api.github.com/repos/$_repoOwner/$_repoName/releases/latest';
   static const _releasePageUrl =
-      'https://github.com/$_repoOwner/$_repoName/releases';
+      'https://github.com/$_repoOwner/$_repoName/releases/latest';
   static const _cacheDuration = Duration(hours: 6);
+  static const _maxRetries = 2;
 
   static const _allowedHosts = {
     'github.com',
@@ -87,18 +88,18 @@ class UpdateService {
 
   Future<UpdateInfo?> checkForUpdate({bool forceRefresh = false}) async {
     final log = LogCenterService();
+    final current = getCurrentVersion();
 
-    log.logUpdate(
-      '[Update] Checking for updates...\n'
-      'Current=${getCurrentVersion()}',
-    );
+    log.logUpdate('[Update] CheckStart=true\nCurrent=$current');
 
     if (!forceRefresh) {
       final cached = await _loadCachedInfo();
       if (cached != null) {
+        final hasUpdate = cached.version > current;
         log.logUpdate(
-          '[Update] Using cached info\n'
-          'Latest=${cached.version}',
+          '[Update] Using cached\n'
+          'Latest=${cached.version}\n'
+          'CompareResult=$hasUpdate',
         );
         return cached;
       }
@@ -114,10 +115,7 @@ class UpdateService {
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
-        log.logUpdate(
-          '[Update] API request failed\n'
-          'StatusCode=${response.statusCode}',
-        );
+        log.logUpdate('[Update] API failed: ${response.statusCode}');
         return null;
       }
 
@@ -127,10 +125,10 @@ class UpdateService {
       await _saveCachedInfo(info);
       await _saveLastCheckTime();
 
+      final hasUpdate = info.version > current;
       log.logUpdate(
-        '[Update] Check complete\n'
-        'Current=${getCurrentVersion()}\n'
-        'Latest=${info.version}',
+        '[Update] LatestVersion=${info.version}\n'
+        'CompareResult=$hasUpdate',
       );
 
       return info;
@@ -196,33 +194,72 @@ class UpdateService {
 
   Future<String?> downloadUpdate(
     UpdateInfo info,
-    void Function(double progress, String speed) onProgress,
+    void Function(double progress, String speed, String remaining, DownloadPhase phase) onProgress,
     CancelToken cancelToken,
   ) async {
     final asset = info.bestAsset;
     if (asset == null) {
-      LogCenterService().logUpdate('[Update] No suitable asset found');
+      LogCenterService().logUpdate('[Download] State=Failed\nReason=No asset found');
       return null;
     }
 
-    if (!isUrlAllowed(asset.url)) {
-      LogCenterService().logUpdate(
-        '[Update] Blocked download from untrusted host: ${Uri.parse(asset.url).host}',
-      );
+    final downloadUrl = info.generateDownloadUrl();
+    if (!isUrlAllowed(downloadUrl)) {
+      LogCenterService().logUpdate('[Download] State=Failed\nReason=Blocked URL');
       return null;
     }
 
     final log = LogCenterService();
     log.logUpdate(
-      '[Update] Downloading update\n'
+      '[Download] State=Connecting\n'
       'Asset=${asset.name}\n'
       'Size=${asset.formattedSize}\n'
-      'URL=${asset.url}',
+      'CDN=GitHub',
     );
 
+    onProgress(0.0, '0 KB/s', '--', DownloadPhase.connecting);
+
+    for (int attempt = 0; attempt <= _maxRetries; attempt++) {
+      if (attempt > 0) {
+        log.logUpdate('[Download] State=Retrying\nAttempt=$attempt');
+        onProgress(0.0, '0 KB/s', '--', DownloadPhase.retrying);
+        await Future.delayed(Duration(seconds: attempt * 2));
+      }
+
+      final result = await _doDownload(
+        downloadUrl,
+        asset,
+        (progress, speed, remaining, phase) {
+          log.logUpdate('[Download] State=$phase\nSpeed=$speed');
+          onProgress(progress, speed, remaining, phase);
+        },
+        cancelToken,
+      );
+
+      if (result != null) {
+        log.logUpdate('[Download] State=Stable\nPath=$result');
+        return result;
+      }
+
+      if (cancelToken.cancelled) {
+        log.logUpdate('[Download] State=Failed\nReason=Cancelled');
+        return null;
+      }
+    }
+
+    log.logUpdate('[Download] State=Failed\nReason=Max retries exceeded');
+    return null;
+  }
+
+  Future<String?> _doDownload(
+    String url,
+    UpdateAsset asset,
+    void Function(double progress, String speed, String remaining, DownloadPhase phase) onProgress,
+    CancelToken cancelToken,
+  ) async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final updateDir = Directory('${tempDir.path}\\WinDeployStudioUpdate');
+      final updateDir = Directory('${tempDir.path}\\WinDeployStudio\\update');
       if (!await updateDir.exists()) {
         await updateDir.create(recursive: true);
       }
@@ -231,55 +268,81 @@ class UpdateService {
       final file = File(filePath);
       final sink = file.openWrite();
 
-      final request = http.Request('GET', Uri.parse(asset.url));
-      request.headers['User-Agent'] = 'WinDeployStudio/${AppConstants.appVersion}';
-
       final client = http.Client();
       cancelToken.client = client;
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers['User-Agent'] = 'WinDeployStudio/${AppConstants.appVersion}';
 
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
         await sink.close();
         client.close();
-        log.logUpdate('[Update] Download failed: HTTP ${response.statusCode}');
         return null;
       }
 
-      final totalBytes = response.contentLength ?? asset.sizeBytes;
+      final totalBytes = (response.contentLength ?? 0) > 0
+          ? response.contentLength!
+          : asset.sizeBytes;
       int downloadedBytes = 0;
+      int lastReportedBytes = 0;
       final stopwatch = Stopwatch()..start();
-      final speedBuffer = <int>[];
-      final timeBuffer = <DateTime>[];
+      final speedStopwatch = Stopwatch()..start();
+      double currentSpeed = 0;
+      DownloadPhase currentPhase = DownloadPhase.connecting;
 
       await for (final chunk in response.stream) {
         if (cancelToken.cancelled) {
           await sink.close();
           client.close();
-          log.logUpdate('[Update] Download cancelled by user');
           return null;
         }
 
         sink.add(chunk);
         downloadedBytes += chunk.length;
 
-        speedBuffer.add(downloadedBytes);
-        timeBuffer.add(DateTime.now());
-
-        while (timeBuffer.length > 1 &&
-            DateTime.now().difference(timeBuffer.first).inSeconds > 1) {
-          speedBuffer.removeAt(0);
-          timeBuffer.removeAt(0);
-        }
-
         if (totalBytes > 0) {
           final progress = downloadedBytes / totalBytes;
           final elapsed = stopwatch.elapsedMilliseconds;
-          final speed = elapsed > 0
-              ? _formatSpeed(downloadedBytes * 1000 / elapsed)
-              : '--';
 
-          onProgress(progress, speed);
+          if (downloadedBytes - lastReportedBytes > 65536 ||
+              speedStopwatch.elapsedMilliseconds > 500) {
+            final speed = elapsed > 0
+                ? downloadedBytes * 1000.0 / elapsed
+                : 0.0;
+            currentSpeed = speed;
+
+            DownloadPhase newPhase;
+            if (elapsed < 5000) {
+              newPhase = DownloadPhase.connecting;
+            } else if (speed < 512000) {
+              newPhase = DownloadPhase.optimizing;
+            } else {
+              newPhase = DownloadPhase.stable;
+            }
+
+            if (newPhase != currentPhase) {
+              currentPhase = newPhase;
+            }
+
+            String remaining = '--';
+            if (speed > 0 && totalBytes > downloadedBytes) {
+              final remainingBytes = totalBytes - downloadedBytes;
+              final remainingSec = remainingBytes / speed;
+              if (remainingSec < 60) {
+                remaining = '${remainingSec.ceil()}s';
+              } else if (remainingSec < 3600) {
+                remaining = '${(remainingSec / 60).ceil()}m';
+              } else {
+                remaining = '${(remainingSec / 3600).ceil()}h';
+              }
+            }
+
+            onProgress(progress, _formatSpeed(speed), remaining, currentPhase);
+            lastReportedBytes = downloadedBytes;
+            speedStopwatch.reset();
+          }
         }
       }
 
@@ -287,15 +350,8 @@ class UpdateService {
       client.close();
       stopwatch.stop();
 
-      log.logUpdate(
-        '[Update] Download complete\n'
-        'Path=$filePath\n'
-        'Size=${asset.formattedSize}',
-      );
-
       return filePath;
     } catch (e) {
-      log.logUpdate('[Update] Download error: $e');
       return null;
     }
   }
@@ -310,12 +366,12 @@ class UpdateService {
 
   Future<bool> installUpdate(String filePath) async {
     final log = LogCenterService();
-    log.logUpdate('[Update] Installing update\nPath=$filePath');
+    log.logUpdate('[Update] InstallStart\nPath=$filePath');
 
     try {
       final file = File(filePath);
       if (!await file.exists()) {
-        log.logUpdate('[Update] Installer file not found');
+        log.logUpdate('[Update] InstallFail: File not found');
         return false;
       }
 
@@ -324,16 +380,16 @@ class UpdateService {
       if (isExe) {
         try {
           await Process.start(filePath, ['/silent'], mode: ProcessStartMode.detached);
-          log.logUpdate('[Update] Started installer with /silent');
+          log.logUpdate('[Update] Started with /silent');
           return true;
         } catch (_) {
-          log.logUpdate('[Update] Silent install failed, trying normal mode');
+          log.logUpdate('[Update] Silent failed, trying normal');
           await Process.start(filePath, [], mode: ProcessStartMode.detached);
-          log.logUpdate('[Update] Started installer in normal mode');
+          log.logUpdate('[Update] Started in normal mode');
           return true;
         }
       } else {
-        log.logUpdate('[Update] Non-exe download, manual installation required');
+        log.logUpdate('[Update] Non-exe, manual install required');
         return false;
       }
     } catch (e) {

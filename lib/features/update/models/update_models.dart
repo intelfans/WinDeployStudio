@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 enum UpdateChannel {
   stable,
   beta,
@@ -128,26 +130,63 @@ class UpdateInfo {
     );
   }
 
-  UpdateAsset? get setupAsset {
-    for (final asset in assets) {
-      if (asset.name.toLowerCase().contains('setup') &&
-          asset.name.toLowerCase().endsWith('.exe')) {
-        return asset;
+  UpdateAsset? get bestAsset {
+    if (assets.isEmpty) return null;
+
+    final exeAssets = assets.where((a) => a.name.toLowerCase().endsWith('.exe')).toList();
+    final zipAssets = assets.where((a) => a.name.toLowerCase().endsWith('.zip')).toList();
+
+    UpdateAsset? setupExe;
+    for (final asset in exeAssets) {
+      final name = asset.name.toLowerCase();
+      if (name.contains('setup') || name.contains('install')) {
+        if (setupExe == null || asset.sizeBytes > setupExe.sizeBytes) {
+          setupExe = asset;
+        }
       }
     }
-    return null;
-  }
 
-  UpdateAsset? get zipAsset {
-    for (final asset in assets) {
-      if (asset.name.toLowerCase().endsWith('.zip')) {
-        return asset;
-      }
+    if (setupExe != null) return setupExe;
+    if (exeAssets.isNotEmpty) {
+      exeAssets.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+      return exeAssets.first;
     }
-    return null;
+    if (zipAssets.isNotEmpty) {
+      zipAssets.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+      return zipAssets.first;
+    }
+
+    return assets.first;
   }
 
-  UpdateAsset? get bestAsset => setupAsset ?? zipAsset;
+  String generateDownloadUrl() {
+    final asset = bestAsset;
+    if (asset == null) return '';
+    return 'https://github.com/intelfans/WinDeployStudio/releases/download/$tagName/${asset.name}';
+  }
+}
+
+enum DownloadPhase {
+  connecting,
+  optimizing,
+  stable,
+  retrying,
+  failed;
+
+  String get labelKey {
+    switch (this) {
+      case DownloadPhase.connecting:
+        return 'download_connecting';
+      case DownloadPhase.optimizing:
+        return 'download_optimizing';
+      case DownloadPhase.stable:
+        return 'download_stable';
+      case DownloadPhase.retrying:
+        return 'download_retrying';
+      case DownloadPhase.failed:
+        return 'download_failed';
+    }
+  }
 }
 
 enum UpdateStatus {
@@ -166,6 +205,9 @@ class UpdateState {
   final UpdateInfo? info;
   final double downloadProgress;
   final String downloadSpeed;
+  final String downloadRemaining;
+  final DownloadPhase downloadPhase;
+  final int retryCount;
   final String? error;
   final DateTime? lastCheckTime;
   final bool autoCheckEnabled;
@@ -177,6 +219,9 @@ class UpdateState {
     this.info,
     this.downloadProgress = 0.0,
     this.downloadSpeed = '',
+    this.downloadRemaining = '',
+    this.downloadPhase = DownloadPhase.connecting,
+    this.retryCount = 0,
     this.error,
     this.lastCheckTime,
     this.autoCheckEnabled = true,
@@ -189,6 +234,9 @@ class UpdateState {
     UpdateInfo? info,
     double? downloadProgress,
     String? downloadSpeed,
+    String? downloadRemaining,
+    DownloadPhase? downloadPhase,
+    int? retryCount,
     String? error,
     DateTime? lastCheckTime,
     bool? autoCheckEnabled,
@@ -200,6 +248,9 @@ class UpdateState {
       info: info ?? this.info,
       downloadProgress: downloadProgress ?? this.downloadProgress,
       downloadSpeed: downloadSpeed ?? this.downloadSpeed,
+      downloadRemaining: downloadRemaining ?? this.downloadRemaining,
+      downloadPhase: downloadPhase ?? this.downloadPhase,
+      retryCount: retryCount ?? this.retryCount,
       error: error ?? this.error,
       lastCheckTime: lastCheckTime ?? this.lastCheckTime,
       autoCheckEnabled: autoCheckEnabled ?? this.autoCheckEnabled,

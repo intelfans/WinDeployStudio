@@ -204,8 +204,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   bool _isChineseLocale(BuildContext context) {
-    final code = Localizations.localeOf(context).languageCode;
-    return code == 'zh';
+    final locale = Localizations.localeOf(context);
+    return locale.languageCode == 'zh';
   }
 
   Widget _buildAboutCard(BuildContext context, ColorScheme colorScheme) {

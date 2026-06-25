@@ -11,6 +11,7 @@ import '../mirror/providers/mirror_source_provider.dart';
 import '../logs/services/log_center_service.dart';
 import '../update/models/update_models.dart';
 import '../update/providers/update_provider.dart';
+import '../update/screens/update_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -77,6 +78,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeMode = ref.watch(themeModeProvider);
+
+    ref.listen<UpdateState>(updateProvider, (prev, next) {
+      if (next.status == UpdateStatus.available && next.info != null) {
+        UpdateDialog.show(context);
+      } else if (next.status == UpdateStatus.upToDate &&
+          prev?.status == UpdateStatus.checking) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(tr(context, 'update_up_to_date')),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else if (next.status == UpdateStatus.error &&
+          prev?.status == UpdateStatus.checking) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error ?? tr(context, 'update_checking')),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -276,7 +299,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.search_outlined,
                   title: tr(context, 'update_check_now'),
-                  subtitle: ref.read(updateProvider.notifier).lastCheckFormatted ?? tr(context, 'update_never'),
+                  subtitle: ref.watch(updateProvider.notifier).lastCheckFormatted ?? tr(context, 'update_never'),
                   trailing: FilledButton.tonal(
                     onPressed: () {
                       ref.read(updateProvider.notifier).checkForUpdate(forceRefresh: true);

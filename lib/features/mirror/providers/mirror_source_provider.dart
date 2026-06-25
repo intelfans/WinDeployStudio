@@ -36,7 +36,9 @@ class MirrorSourceNotifier extends StateNotifier<MirrorSourceState> {
     final prefs = await SharedPreferences.getInstance();
     final strategyIndex = prefs.getInt('mirror_source_strategy') ?? 0;
     state = MirrorSourceState(
-      strategy: MirrorSourceStrategy.values[strategyIndex],
+      strategy: (strategyIndex >= 0 && strategyIndex < MirrorSourceStrategy.values.length)
+          ? MirrorSourceStrategy.values[strategyIndex]
+          : MirrorSourceStrategy.auto,
     );
   }
 

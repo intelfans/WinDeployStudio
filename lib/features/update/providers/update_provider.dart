@@ -79,17 +79,22 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     state = state.copyWith(
       status: UpdateStatus.downloading,
       downloadProgress: 0.0,
-      downloadSpeed: '',
+      downloadSpeed: '0 KB/s',
+      downloadRemaining: '--',
+      downloadPhase: DownloadPhase.connecting,
+      retryCount: 0,
     );
 
     _cancelToken = CancelToken();
 
     final filePath = await _service.downloadUpdate(
       state.info!,
-      (progress, speed) {
+      (progress, speed, remaining, phase) {
         state = state.copyWith(
           downloadProgress: progress,
           downloadSpeed: speed,
+          downloadRemaining: remaining,
+          downloadPhase: phase,
         );
       },
       _cancelToken!,
@@ -107,7 +112,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       } else {
         state = state.copyWith(
           status: UpdateStatus.error,
-          error: 'Download failed',
+          error: 'Download failed after retries',
         );
       }
     }

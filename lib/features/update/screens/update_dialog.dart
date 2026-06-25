@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/localization/strings.dart';
@@ -10,6 +11,7 @@ class UpdateDialog extends ConsumerWidget {
   static void show(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => const UpdateDialog(),
     );
   }
@@ -17,13 +19,13 @@ class UpdateDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(updateProvider);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     if (state.status == UpdateStatus.downloading) {
       return _DownloadingDialog(
         progress: state.downloadProgress,
         speed: state.downloadSpeed,
+        remaining: state.downloadRemaining,
+        phase: state.downloadPhase,
         onCancel: () => ref.read(updateProvider.notifier).cancelDownload(),
       );
     }
@@ -91,7 +93,7 @@ class _AvailableDialog extends StatelessWidget {
         ),
       ),
       title: Text(
-        tr(context, 'update_available_title'),
+        '${tr(context, 'update_available_title')} v${info.version}',
         textAlign: TextAlign.center,
       ),
       content: SizedBox(
@@ -100,9 +102,16 @@ class _AvailableDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '${tr(context, 'update_available_desc')}\n${info.name}',
+              tr(context, 'update_available_desc'),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${tr(context, 'update_published')}: ${info.publishedAt.year}-${info.publishedAt.month.toString().padLeft(2, '0')}-${info.publishedAt.day.toString().padLeft(2, '0')}',
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
@@ -155,22 +164,137 @@ class _AvailableDialog extends StatelessWidget {
   }
 }
 
-class _DownloadingDialog extends StatelessWidget {
+class _DownloadingDialog extends StatefulWidget {
   final double progress;
   final String speed;
+  final String remaining;
+  final DownloadPhase phase;
   final VoidCallback onCancel;
 
   const _DownloadingDialog({
     required this.progress,
     required this.speed,
+    required this.remaining,
+    required this.phase,
     required this.onCancel,
   });
+
+  @override
+  State<_DownloadingDialog> createState() => _DownloadingDialogState();
+}
+
+class _DownloadingDialogState extends State<_DownloadingDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _progressAnim;
+  int _tipIndex = 0;
+  Timer? _tipTimer;
+
+  static const _connectingTips = [
+    'download_tip_connecting_1',
+    'download_tip_connecting_2',
+    'download_tip_connecting_3',
+  ];
+
+  static const _optimizingTips = [
+    'download_tip_optimizing_1',
+    'download_tip_optimizing_2',
+    'download_tip_optimizing_3',
+  ];
+
+  static const _retryingTips = [
+    'download_tip_retrying_1',
+    'download_tip_retrying_2',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _progressAnim = Tween<double>(begin: 0, end: widget.progress).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    );
+    _animController.forward();
+    _startTipRotation();
+  }
+
+  @override
+  void didUpdateWidget(_DownloadingDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.progress != widget.progress) {
+      _progressAnim = Tween<double>(
+        begin: _progressAnim.value,
+        end: widget.progress,
+      ).animate(
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+      );
+      _animController.forward(from: 0);
+    }
+    if (oldWidget.phase != widget.phase) {
+      _tipIndex = 0;
+    }
+  }
+
+  void _startTipRotation() {
+    _tipTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        setState(() {
+          _tipIndex++;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    _tipTimer?.cancel();
+    super.dispose();
+  }
+
+  String _getCurrentTip(BuildContext context) {
+    List<String> tips;
+    switch (widget.phase) {
+      case DownloadPhase.connecting:
+        tips = _connectingTips;
+        break;
+      case DownloadPhase.optimizing:
+        tips = _optimizingTips;
+        break;
+      case DownloadPhase.retrying:
+        tips = _retryingTips;
+        break;
+      case DownloadPhase.stable:
+        return tr(context, 'download_tip_stable');
+      case DownloadPhase.failed:
+        return tr(context, 'download_tip_failed');
+    }
+    return tr(context, tips[_tipIndex % tips.length]);
+  }
+
+  IconData _getPhaseIcon() {
+    switch (widget.phase) {
+      case DownloadPhase.connecting:
+        return Icons.wifi_find_outlined;
+      case DownloadPhase.optimizing:
+        return Icons.speed_outlined;
+      case DownloadPhase.stable:
+        return Icons.cloud_download_outlined;
+      case DownloadPhase.retrying:
+        return Icons.refresh_outlined;
+      case DownloadPhase.failed:
+        return Icons.error_outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final percent = (progress * 100).toStringAsFixed(0);
+    final percent = (widget.progress * 100).toStringAsFixed(0);
 
     return AlertDialog(
       icon: Container(
@@ -180,7 +304,7 @@ class _DownloadingDialog extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Icon(
-          Icons.download_rounded,
+          _getPhaseIcon(),
           size: 32,
           color: colorScheme.primary,
         ),
@@ -194,14 +318,19 @@ class _DownloadingDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                color: colorScheme.primary,
-              ),
+            AnimatedBuilder(
+              animation: _progressAnim,
+              builder: (context, _) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: _progressAnim.value,
+                    minHeight: 8,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    color: colorScheme.primary,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
             Row(
@@ -212,8 +341,30 @@ class _DownloadingDialog extends StatelessWidget {
                   style: theme.textTheme.bodyMedium,
                 ),
                 Text(
-                  '${tr(context, 'update_speed')}: $speed',
+                  widget.speed.isNotEmpty ? widget.speed : '0 KB/s',
                   style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Text(
+                    _getCurrentTip(context),
+                    key: ValueKey('${widget.phase}_$_tipIndex'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${tr(context, 'update_remaining')}: ${widget.remaining}',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -224,7 +375,7 @@ class _DownloadingDialog extends StatelessWidget {
       ),
       actions: [
         TextButton(
-          onPressed: onCancel,
+          onPressed: widget.onCancel,
           child: Text(tr(context, 'detail_cancel')),
         ),
       ],
