@@ -1,7 +1,7 @@
 最終用戶授權合約 (EULA)
 
 WinDeploy Studio - Windows 部署工具
-版本 1.0.0.0
+版本 1.0.1.0
 
 版權所有 (c) 2026 Bob Steve 保留所有權利
 

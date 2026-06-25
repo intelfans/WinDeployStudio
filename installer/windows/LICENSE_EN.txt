@@ -1,7 +1,7 @@
 END USER LICENSE AGREEMENT (EULA)
 
 WinDeploy Studio - Windows Deployment Tool
-Version 1.0.0.0
+Version 1.0.1.0
 
 Copyright (c) 2026 Bob Steve. All Rights Reserved.
 

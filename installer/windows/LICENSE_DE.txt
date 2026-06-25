@@ -1,7 +1,7 @@
 ENDNUTZER-LIZENZVERTRAG (EULA)
 
 WinDeploy Studio - Windows-Bereitstellungstool
-Version 1.0.0.0
+Version 1.0.1.0
 
 Copyright (c) 2026 Bob Steve. Alle Rechte vorbehalten.
 

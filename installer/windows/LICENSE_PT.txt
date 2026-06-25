@@ -1,7 +1,7 @@
 ACORDO DE LICENÇA DO USUÁRIO FINAL (EULA)
 
 WinDeploy Studio - Ferramenta de implantação Windows
-Versão 1.0.0.0
+Versão 1.0.1.0
 
 Copyright (c) 2026 Bob Steve. Todos os direitos reservados.
 

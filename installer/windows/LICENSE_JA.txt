@@ -1,7 +1,7 @@
 エンドユーザー使用許諾契約書（EULA）
 
 WinDeploy Studio - Windowsデプロイメントツール
-バージョン 1.0.0.0
+バージョン 1.0.1.0
 
 Copyright (c)2026 Bob Steve. All Rights Reserved.
 

@@ -355,60 +355,36 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   }
 
   Future<void> _openDownload(BuildContext context, Locale locale) async {
-    final mirrorSource = ProviderScope.containerOf(context).read(mirrorSourceProvider.notifier);
-    await mirrorSource.detectGeo();
-
-    if (!context.mounted) return;
-
-    final state = ProviderScope.containerOf(context).read(mirrorSourceProvider);
-    final url = mirrorSource.resolveUrl(widget.item);
     final name = widget.item.getName(locale);
 
-    final latency = state.isChina
-        ? _testResult?.china.latency
-        : _testResult?.global.latency;
-    final latencyLabel = latency != null && latency > 0 ? '${latency}ms' : '--';
-
-    final confirmed = await showDialog<bool>(
+    final selectedMirror = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr(ctx, 'mirror_download_confirm_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${tr(ctx, 'mirror_download_mirror')}: $name'),
-            const SizedBox(height: 8),
-            Text('${tr(ctx, 'mirror_download_region')}: '
-                '${state.geo?.regionLabel ?? tr(ctx, 'mirror_download_unknown')} '
-                '(${state.geo?.countryCode ?? "--"})'),
-            const SizedBox(height: 8),
-            Text('${tr(ctx, 'mirror_download_source')}: '
-                '${state.sourceEmoji} ${state.sourceLabel}'),
-            const SizedBox(height: 8),
-            Text('${tr(ctx, 'mirror_download_latency')}: $latencyLabel'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(tr(ctx, 'detail_cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(tr(ctx, 'detail_continue')),
-          ),
-        ],
+      builder: (ctx) => _MirrorSelectionDialog(
+        itemName: name,
+        chinaUrl: widget.item.chinaUrl,
+        globalUrl: widget.item.globalUrl,
       ),
     );
 
-    if (confirmed == true && context.mounted) {
-      final logCenter = LogCenterService();
-      await logCenter.logDownload(
-        '[MirrorSource] Country=${state.geo?.countryCode ?? "N/A"} '
-        'Selected=${state.sourceLabel} '
-        'Mirror=$name URL=$url',
-      );
+    if (selectedMirror == null || !context.mounted) return;
+
+    String url;
+    String mirrorLabel;
+
+    if (selectedMirror == 'china') {
+      url = widget.item.chinaUrl ?? widget.item.downloadUrl;
+      mirrorLabel = 'China Mirror';
+    } else {
+      url = widget.item.globalUrl ?? widget.item.downloadUrl;
+      mirrorLabel = 'Global Mirror';
+    }
+
+    final logCenter = LogCenterService();
+    await logCenter.logDownload(
+      '[MirrorSource] Selected=$mirrorLabel Mirror=$name URL=$url',
+    );
+
+    if (context.mounted) {
       await WebviewHelper.openUrl(context, url, title: name);
     }
   }
@@ -587,6 +563,206 @@ class _MirrorStatusRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MirrorSelectionDialog extends StatelessWidget {
+  final String itemName;
+  final String? chinaUrl;
+  final String? globalUrl;
+
+  const _MirrorSelectionDialog({
+    required this.itemName,
+    this.chinaUrl,
+    this.globalUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final hasChina = chinaUrl != null && chinaUrl!.isNotEmpty;
+    final hasGlobal = globalUrl != null && globalUrl!.isNotEmpty;
+
+    return AlertDialog(
+      icon: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.cloud_download_outlined,
+          size: 32,
+          color: colorScheme.primary,
+        ),
+      ),
+      title: Text(
+        tr(context, 'mirror_select_title'),
+        textAlign: TextAlign.center,
+      ),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              itemName,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              tr(context, 'mirror_select_desc'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            if (hasChina)
+              _MirrorOption(
+                icon: Icons.flag_outlined,
+                title: tr(context, 'mirror_china_title'),
+                subtitle: tr(context, 'mirror_china_desc'),
+                tag: tr(context, 'mirror_china_tag'),
+                tagColor: Colors.blue,
+                onTap: () => Navigator.of(context).pop('china'),
+              ),
+            if (hasChina && hasGlobal) const SizedBox(height: 12),
+            if (hasGlobal)
+              _MirrorOption(
+                icon: Icons.public_outlined,
+                title: tr(context, 'mirror_global_title'),
+                subtitle: tr(context, 'mirror_global_desc'),
+                tag: tr(context, 'mirror_global_tag'),
+                tagColor: Colors.green,
+                onTap: () => Navigator.of(context).pop('global'),
+              ),
+            if (!hasChina && !hasGlobal) ...[
+              _MirrorOption(
+                icon: Icons.download_outlined,
+                title: tr(context, 'mirror_default_title'),
+                subtitle: tr(context, 'mirror_default_desc'),
+                tag: null,
+                onTap: () => Navigator.of(context).pop('default'),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(tr(context, 'detail_cancel')),
+        ),
+      ],
+    );
+  }
+}
+
+class _MirrorOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? tag;
+  final Color? tagColor;
+  final VoidCallback onTap;
+
+  const _MirrorOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.tag,
+    this.tagColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 24, color: colorScheme.primary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (tag != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (tagColor ?? colorScheme.primary)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: (tagColor ?? colorScheme.primary)
+                                  .withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Text(
+                            tag!,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: tagColor ?? colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

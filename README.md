@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Platform-Windows-blue?logo=windows" alt="Platform">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter">
-  <img src="https://img.shields.io/badge/Version-1.0.0-orange" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.0.1-orange" alt="Version">
 </p>
 
 ---
@@ -145,6 +145,12 @@ lib/
 Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo API
 
 ### Changelog
+
+#### v1.0.1
+- Manual mirror selection system (China/Global)
+- Download experience optimization
+- Auto update system improvements
+- UI/UX enhancements
 
 #### v1.0.0
 - Initial release
@@ -280,6 +286,12 @@ Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo A
 
 ### 更新记录
 
+#### v1.0.1
+- 手动镜像选择系统（国内/国际）
+- 下载体验优化
+- 自动更新系统改进
+- UI/UX 增强
+
 #### v1.0.0
 - 首次发布
 - Windows 安装盘制作
@@ -413,6 +425,12 @@ lib/
 Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo API
 
 ### 更新紀錄
+
+#### v1.0.1
+- 手動鏡像選擇系統（國內/國際）
+- 下載體驗最佳化
+- 自動更新系統改進
+- UI/UX 增強
 
 #### v1.0.0
 - 首次發布
@@ -548,6 +566,12 @@ Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo A
 
 ### 変更履歴
 
+#### v1.0.1
+- 手動ミラー選択システム（中国/グローバル）
+- ダウンロード体験の最適化
+- 自動更新システムの改善
+- UI/UX の向上
+
 #### v1.0.0
 - 初回リリース
 - Windows インストールメディア作成
@@ -681,6 +705,12 @@ lib/
 Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo API
 
 ### 변경 내역
+
+#### v1.0.1
+- 수동 미러 선택 시스템 (중국/글로벌)
+- 다운로드 경험 최적화
+- 자동 업데이트 시스템 개선
+- UI/UX 향상
 
 #### v1.0.0
 - 최초 릴리스
@@ -816,6 +846,12 @@ Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo A
 
 ### Änderungsprotokoll
 
+#### v1.0.1
+- Manuelles Mirror-Auswahlsystem (China/Global)
+- Download-Erfahrung Optimierung
+- Auto-Update-System Verbesserungen
+- UI/UX Verbesserungen
+
 #### v1.0.0
 - Erstveröffentlichung
 - Windows-Installationsmedien-Erstellung
@@ -949,6 +985,12 @@ lib/
 Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo API
 
 ### Journal des modifications
+
+#### v1.0.1
+- Système de sélection manuelle des miroirs (Chine/Global)
+- Optimisation de l'expérience de téléchargement
+- Améliorations du système de mise à jour automatique
+- Améliorations UI/UX
 
 #### v1.0.0
 - Première version
@@ -1084,6 +1126,12 @@ Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo A
 
 ### Registro de cambios
 
+#### v1.0.1
+- Sistema de selección manual de espejos (China/Global)
+- Optimización de la experiencia de descarga
+- Mejoras en el sistema de actualización automática
+- Mejoras de UI/UX
+
 #### v1.0.0
 - Versión inicial
 - Creación de medios de instalación Windows
@@ -1217,6 +1265,12 @@ lib/
 Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo API
 
 ### Registro de alterações
+
+#### v1.0.1
+- Sistema de seleção manual de espelhos (China/Global)
+- Otimização da experiência de download
+- Melhorias no sistema de atualização automática
+- Melhorias de UI/UX
 
 #### v1.0.0
 - Versão inicial
@@ -1352,6 +1406,12 @@ Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo A
 
 ### Журнал изменений
 
+#### v1.0.1
+- Система ручного выбора зеркал (Китай/Глобальное)
+- Оптимизация процесса загрузки
+- Улучшения системы автообновления
+- Улучшения UI/UX
+
 #### v1.0.0
 - Первый релиз
 - Создание установочных носителей Windows
@@ -1485,6 +1545,12 @@ lib/
 Flutter · Dart · Riverpod · SQLite · WebView2 · Cloudflare Worker · Mimo API
 
 ### سجل التغييرات
+
+#### v1.0.1
+- نظام الاختيار اليدوي للمرايا (الصين/العالمي)
+- تحسين تجربة التنزيل
+- تحسينات نظام التحديث التلقائي
+- تحسينات واجهة المستخدم/تجربة المستخدم
 
 #### v1.0.0
 - الإصدار الأول

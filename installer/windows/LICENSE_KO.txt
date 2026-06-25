@@ -1,7 +1,7 @@
 최종 사용자 사용권 계약 (EULA)
 
 WinDeploy Studio - Windows 배포 도구
-버전 1.0.0.0
+버전 1.0.1.0
 
 Copyright (c) 2026 Bob Steve. 모든 권리 보유.
 

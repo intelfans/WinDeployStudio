@@ -1,7 +1,7 @@
 ACUERTO DE LICENCIA DE USUARIO FINAL (EULA)
 
 WinDeploy Studio - Herramienta de despliegue Windows
-Versión 1.0.0.0
+Versión 1.0.1.0
 
 Copyright (c) 2026 Bob Steve. Todos los derechos reservados.
 

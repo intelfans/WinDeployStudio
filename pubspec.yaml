@@ -1,7 +1,7 @@
 name: win_deploy_studio
 description: "Modern Windows deployment tool - Bootable USB & Windows To Go creator"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+1
 
 environment:
   sdk: ^3.12.0

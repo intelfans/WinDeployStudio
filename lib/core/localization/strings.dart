@@ -673,6 +673,16 @@ const _en = <String, String>{
   'mirror_speed_test_all_offline': 'Cannot connect to mirror servers. Please check your network.',
   'mirror_speed_test_recommend': 'Recommended',
   'mirror_download_latency': 'Latency',
+  'mirror_select_title': 'Select Download Mirror',
+  'mirror_select_desc': 'Please select a download mirror to continue.',
+  'mirror_china_title': 'China Mirror',
+  'mirror_china_desc': '123 Cloud Drive · Stable · Recommended for China users',
+  'mirror_china_tag': 'China',
+  'mirror_global_title': 'Global Mirror',
+  'mirror_global_desc': 'GoFile · Global access · No regional restriction',
+  'mirror_global_tag': 'Global',
+  'mirror_default_title': 'Download',
+  'mirror_default_desc': 'Direct download link',
 };
 
 const _zh = <String, String>{
@@ -1224,6 +1234,16 @@ const _zh = <String, String>{
   'mirror_speed_test_all_offline': '无法连接镜像服务器，请检查网络',
   'mirror_speed_test_recommend': '推荐',
   'mirror_download_latency': '延迟',
+  'mirror_select_title': '选择下载镜像',
+  'mirror_select_desc': '请选择一个下载镜像以继续。',
+  'mirror_china_title': '中国镜像',
+  'mirror_china_desc': '123云盘 · 稳定 · 国内用户推荐',
+  'mirror_china_tag': '国内',
+  'mirror_global_title': '全球镜像',
+  'mirror_global_desc': 'GoFile · 全球访问 · 无地区限制',
+  'mirror_global_tag': '国际',
+  'mirror_default_title': '下载',
+  'mirror_default_desc': '直接下载链接',
 };
 
 
@@ -1777,6 +1797,16 @@ const _ru = <String, String>{
   'mirror_speed_test_all_offline': 'Не удаётся подключиться к серверам зеркал. Проверьте сеть.',
   'mirror_speed_test_recommend': 'Рекомендуется',
   'mirror_download_latency': 'Задержка',
+  'mirror_select_title': 'Выберите зеркало загрузки',
+  'mirror_select_desc': 'Пожалуйста, выберите зеркало загрузки для продолжения.',
+  'mirror_china_title': 'Китайское зеркало',
+  'mirror_china_desc': '123 Cloud Drive · Стабильно · Рекомендуется для Китая',
+  'mirror_china_tag': 'Китай',
+  'mirror_global_title': 'Глобальное зеркало',
+  'mirror_global_desc': 'GoFile · Глобальный доступ · Без региональных ограничений',
+  'mirror_global_tag': 'Глобальное',
+  'mirror_default_title': 'Скачать',
+  'mirror_default_desc': 'Прямая ссылка для скачивания',
 };
 
 
@@ -2329,6 +2359,16 @@ const _fr = <String, String>{
   'mirror_speed_test_all_offline': 'Impossible de se connecter aux serveurs. Vérifiez votre réseau.',
   'mirror_speed_test_recommend': 'Recommandé',
   'mirror_download_latency': 'Latence',
+  'mirror_select_title': 'Sélectionner le miroir de téléchargement',
+  'mirror_select_desc': 'Veuillez sélectionner un miroir de téléchargement pour continuer.',
+  'mirror_china_title': 'Miroir Chine',
+  'mirror_china_desc': '123 Cloud Drive · Stable · Recommandé pour la Chine',
+  'mirror_china_tag': 'Chine',
+  'mirror_global_title': 'Miroir Global',
+  'mirror_global_desc': 'GoFile · Accès global · Sans restriction régionale',
+  'mirror_global_tag': 'Global',
+  'mirror_default_title': 'Télécharger',
+  'mirror_default_desc': 'Lien de téléchargement direct',
 };
 
 
@@ -2881,6 +2921,16 @@ const _ja = <String, String>{
   'mirror_speed_test_all_offline': 'ミラーサーバーに接続できません。ネットワークを確認してください。',
   'mirror_speed_test_recommend': '推奨',
   'mirror_download_latency': 'レイテンシ',
+  'mirror_select_title': 'ダウンロードミラーを選択',
+  'mirror_select_desc': '続行するにはダウンロードミラーを選択してください。',
+  'mirror_china_title': '中国ミラー',
+  'mirror_china_desc': '123 Cloud Drive · 安定 · 中国ユーザー推奨',
+  'mirror_china_tag': '中国',
+  'mirror_global_title': 'グローバルミラー',
+  'mirror_global_desc': 'GoFile · グローバルアクセス · 地域制限なし',
+  'mirror_global_tag': 'グローバル',
+  'mirror_default_title': 'ダウンロード',
+  'mirror_default_desc': '直接ダウンロードリンク',
 };
 
 const _zhTW = <String, String>{
@@ -3430,6 +3480,16 @@ const _zhTW = <String, String>{
   'mirror_speed_test_all_offline': '無法連線鏡像伺服器，請檢查網路',
   'mirror_speed_test_recommend': '推薦',
   'mirror_download_latency': '延遲',
+  'mirror_select_title': '選擇下載鏡像',
+  'mirror_select_desc': '請選擇一個下載鏡像以繼續。',
+  'mirror_china_title': '中國鏡像',
+  'mirror_china_desc': '123雲端 · 穩定 · 國內用戶推薦',
+  'mirror_china_tag': '國內',
+  'mirror_global_title': '全球鏡像',
+  'mirror_global_desc': 'GoFile · 全球訪問 · 無地區限制',
+  'mirror_global_tag': '國際',
+  'mirror_default_title': '下載',
+  'mirror_default_desc': '直接下載連結',
 };
 
 const _es = <String, String>{
@@ -3979,6 +4039,16 @@ const _es = <String, String>{
   'mirror_speed_test_all_offline': 'No se puede conectar a los servidores. Verifique su red.',
   'mirror_speed_test_recommend': 'Recomendado',
   'mirror_download_latency': 'Latencia',
+  'mirror_select_title': 'Seleccionar espejo de descarga',
+  'mirror_select_desc': 'Seleccione un espejo de descarga para continuar.',
+  'mirror_china_title': 'Espejo China',
+  'mirror_china_desc': '123 Cloud Drive · Estable · Recomendado para China',
+  'mirror_china_tag': 'China',
+  'mirror_global_title': 'Espejo Global',
+  'mirror_global_desc': 'GoFile · Acceso global · Sin restricción regional',
+  'mirror_global_tag': 'Global',
+  'mirror_default_title': 'Descargar',
+  'mirror_default_desc': 'Enlace de descarga directa',
 };
 
 const _ar = <String, String>{
@@ -4528,6 +4598,16 @@ const _ar = <String, String>{
   'mirror_speed_test_all_offline': 'تعذر الاتصال بخوادم المرآة. يرجى التحقق من الشبكة.',
   'mirror_speed_test_recommend': 'موصى به',
   'mirror_download_latency': 'زمن الاستجابة',
+  'mirror_select_title': 'اختيار مرآة التنزيل',
+  'mirror_select_desc': 'يرجى اختيار مرآة تنزيل للمتابعة.',
+  'mirror_china_title': 'مرآة الصين',
+  'mirror_china_desc': '123 Cloud Drive · مستقر · موصى به لمستخدمي الصين',
+  'mirror_china_tag': 'الصين',
+  'mirror_global_title': 'المرآة العالمية',
+  'mirror_global_desc': 'GoFile · وصول عالمي · بدون قيود إقليمية',
+  'mirror_global_tag': 'عالمي',
+  'mirror_default_title': 'تنزيل',
+  'mirror_default_desc': 'رابط تنزيل مباشر',
 };
 
 const _pt = <String, String>{
@@ -5077,6 +5157,16 @@ const _pt = <String, String>{
   'mirror_speed_test_all_offline': 'Não foi possível conectar aos servidores. Verifique sua rede.',
   'mirror_speed_test_recommend': 'Recomendado',
   'mirror_download_latency': 'Latência',
+  'mirror_select_title': 'Selecionar espelho de download',
+  'mirror_select_desc': 'Selecione um espelho de download para continuar.',
+  'mirror_china_title': 'Espelho China',
+  'mirror_china_desc': '123 Cloud Drive · Estável · Recomendado para China',
+  'mirror_china_tag': 'China',
+  'mirror_global_title': 'Espelho Global',
+  'mirror_global_desc': 'GoFile · Acesso global · Sem restrição regional',
+  'mirror_global_tag': 'Global',
+  'mirror_default_title': 'Baixar',
+  'mirror_default_desc': 'Link de download direto',
 };
 
 const _de = <String, String>{
@@ -5626,6 +5716,16 @@ const _de = <String, String>{
   'mirror_speed_test_all_offline': 'Verbindung zu Servern nicht möglich. Netzwerk prüfen.',
   'mirror_speed_test_recommend': 'Empfohlen',
   'mirror_download_latency': 'Latenz',
+  'mirror_select_title': 'Download-Mirror auswählen',
+  'mirror_select_desc': 'Bitte wählen Sie einen Download-Mirror zum Fortfahren.',
+  'mirror_china_title': 'China-Mirror',
+  'mirror_china_desc': '123 Cloud Drive · Stabil · Empfohlen für China-Nutzer',
+  'mirror_china_tag': 'China',
+  'mirror_global_title': 'Globaler Mirror',
+  'mirror_global_desc': 'GoFile · Globaler Zugang · Keine regionale Einschränkung',
+  'mirror_global_tag': 'Global',
+  'mirror_default_title': 'Herunterladen',
+  'mirror_default_desc': 'Direkter Download-Link',
 };
 
 const _ko = <String, String>{
@@ -6175,4 +6275,14 @@ const _ko = <String, String>{
   'mirror_speed_test_all_offline': '미러 서버에 연결할 수 없습니다. 네트워크를 확인하세요.',
   'mirror_speed_test_recommend': '추천',
   'mirror_download_latency': '지연 시간',
+  'mirror_select_title': '다운로드 미러 선택',
+  'mirror_select_desc': '계속하려면 다운로드 미러를 선택하세요.',
+  'mirror_china_title': '중국 미러',
+  'mirror_china_desc': '123 Cloud Drive · 안정적 · 중국 사용자 추천',
+  'mirror_china_tag': '중국',
+  'mirror_global_title': '글로벌 미러',
+  'mirror_global_desc': 'GoFile · 전 세계 접근 · 지역 제한 없음',
+  'mirror_global_tag': '글로벌',
+  'mirror_default_title': '다운로드',
+  'mirror_default_desc': '직접 다운로드 링크',
 };
