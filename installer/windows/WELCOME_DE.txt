@@ -1,36 +1,36 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                          WinDeploy Studio                                    ║
-║                    Windows-Bereitstellungstool                               ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿┌─────────────────────────────────────────────────────────────┐
+│                          WinDeploy Studio                                    │
+│                    Windows-Bereitstellungstool                              │
+└─────────────────────────────────────────────────────────────┘
 
-Vielen Dank für die Wahl von WinDeploy Studio! Wir schätzen Ihre Unterstützung.
+Vielen Dank für die Wahl von WinDeploy Studio!
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-HAUPTFUNKTIONEN:
+Hauptfunktionen:
 
-  ◆ Abbildbibliothek
-    Windows-Abbilder durchsuchen und Download-Links erhalten
-
-  ◆ Bootfähigen USB erstellen
+  🖼️ Image-Bibliothek
+    Kuratierte Windows-Images und Download-Links durchsuchen
+    
+  💿 Bootfähiges USB-Erstellungstool  
     Windows-Installationsmedien aus ISO-Dateien erstellen
+    
+  🚀 Windows To Go
+    Portables Windows-Arbeitsplatz auf USB-Laufwerken erstellen
+    
+  🌍 Mehrsprachige Unterstützung
+    Vollständige chinesische und englische Oberfläche
 
-  ◆ Windows To Go
-    Tragbare Windows To Go-Arbeitsbereiche auf USB-Laufwerken erstellen
+═══════════════════════════════════════════════════════════════
 
-  ◆ Mehrsprachige Unterstützung
-    Vollständige Benutzeroberfläche in mehreren Sprachen
-
-────────────────────────────────────────────────────────────────────────────────
-
-SYSTEMANFORDERUNGEN:
+Systemanforderungen:
 
   • Windows 10/11 (64-Bit)
-  • USB 3.0+-Laufwerk (empfohlen)
+  • USB 3.0+ Laufwerk (empfohlen)
   • Administratorrechte erforderlich
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-Klicken Sie auf Weiter, um mit der Installation fortzufahren.
+Klicken Sie auf "Weiter", um mit der Installation fortzufahren.
 
 © 2026 Bob Steve. Alle Rechte vorbehalten.

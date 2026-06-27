@@ -1,92 +1,97 @@
 ENDNUTZER-LIZENZVERTRAG (EULA)
 
 WinDeploy Studio - Windows-Bereitstellungstool
-Version 1.0.1.0
+Version 1.0.2.0
 
-Copyright (c) 2026 Bob Steve. Alle Rechte vorbehalten.
+Copyright (c) 2026 Bob Steve. All Rights Reserved.
+────────────────────────────────────────────────────────────
 
-────────────────────────────────────────────────────────────────────────────────
+WICHTIG - BITTE SORFÄLTIG LESEN: Dieser Endbenutzer-Lizenzvertrag
+(„Vertrag") ist eine rechtliche Vereinbarung zwischen Ihnen (einzeln oder
+als einzelne juristische Person) und Bob Steve („Lizenzgeber") für die oben
+identifizierte Software (einschließlich Computersoftware und kann zugehörige
+Medien, Druckmaterialien und „Online"- oder elektronische Dokumentation
+umfassen, „Software").
+Durch Installieren, Kopieren oder anderweitiges Verwenden der Software
+erklären Sie sich mit den Bedingungen dieses Vertrags einverstanden. Wenn
+Sie mit den Bedingungen dieses Vertrags nicht einverstanden sind,
+installieren oder verwenden Sie die Software nicht.
 
-WICHTIG – BITTE LESEN SIE DIESES DOKUMENT SORGFÄLTIG DURCH: Dieser
-Endnutzer-Lizenzvertrag („Vertrag") ist eine rechtliche Vereinbarung zwischen
-Ihnen (einzelperson oder juristische Person) und Bob Steve („Lizenzgeber")
-für das oben genannte Softwareprodukt, einschließlich der Computersoftware und
-zugehöriger Medien, Druckerzeugnisse und Online- oder elektronischen
-Dokumentation („Software").
+────────────────────────────────────────────────────────────
 
-Durch Installieren, Kopieren oder andere Nutzung der Software erklären Sie
-sich mit den Bedingungen dieses Vertrags einverstanden. Wenn Sie den
-Bedingungen nicht zustimmen, installieren oder nutzen Sie die Software nicht.
-
-────────────────────────────────────────────────────────────────────────────────
-
-1. LIZENZGEWÄHRUNG
+1. LIZENZERTEILUNG
 
    Bob Steve gewährt Ihnen hiermit eine nicht ausschließliche, nicht
-   übertragbare, widerrufliche Lizenz zur:
-
-   a) Installation und Nutzung der Software auf einem einzelnen Computer;
-
+   übertragbare, widerrufliche Lizenz für:
+   a) Installation und Verwendung der Software auf einem einzigen Computer;
    b) Erstellung einer Kopie der Software ausschließlich zu Archivierungszwecken;
-
-   c) Nutzung der Software für persönliche, Bildungs- oder Geschäftszwecke.
+   c) Verwendung der Software für persönliche, Bildungs- oder Handelszwecke.
 
 2. BESCHREIBUNG DER RECHTE UND EINSCHRÄNKUNGEN
-
-   a) Sie dürfen die Software NICHT verteilen, unterlizenzieren, vermieten,
-      verleihen;
-
-   b) Sie dürfen die Software NICHT ändern, anpassen, übersetzen, dekompilieren
-      oder disassemblieren;
-
-   c) Sie dürfen KEINE abgeleiteten Werke auf Basis der Software erstellen;
-
-   d) Sie dürfen KEINE Eigentumshinweise, Etiketten oder Markierungen auf der
-      Software entfernen oder ändern;
-
-   e) Sie dürfen die Software NICHT für rechtswidrige Zwecke nutzen.
+   a) Sie dürfen die Software nicht verteilen, unterlizenzieren, vermieten,
+      leasen oder verleihen;
+   b) Sie dürfen die Software nicht ändern, anpassen, übersetzen, zurückentwickeln,
+      dekompilieren oder disassemblieren;
+   c) Sie dürfen keine abgeleiteten Werke auf Basis der Software erstellen;
+   d) Sie dürfen keine Eigentumserklärungen, Etiketten oder Markierungen auf
+      der Software entfernen oder ändern;
+   e) Sie dürfen die Software nicht für illegale Zwecke verwenden.
 
 3. GEISTIGES EIGENTUM
 
-   Die Software ist durch Urheberrechtsgesetze und internationale
+   Die Software wird durch Urheberrechtsgesetze und internationale
    Urheberrechtsverträge sowie andere Gesetze und Verträge zum Schutz des
-   geistigen Eigentums geschützt. Die Software wird lizenziert, nicht verkauft.
-   Bob Steve behält alle Rechte, Titel und Interessen an der Software,
-   einschließlich aller Rechte des geistigen Eigentums.
+   geistigen Eigentums geschützt. Die Software wird lizenziert, nicht
+   verkauft. Bob Steve behält alle Rechte, Titel und Interessen an der
+   Software, einschließlich aller geistigen Eigentumsrechte.
 
-4. GARANTIEAUSSCHLUSS
+4. HAFTUNGSAUSSCHLUSS
 
-   DIE SOFTWARE WIRD „WIE BESEHEN" OHNE JEGLICHE GARANTIE BEREITGESTELLT,
-   AUSDRÜCKLICH ODER IMPLIZIT, EINSCHLIESSLICH, ABER NICHT BESCHRÄNKT AUF,
-   GARANTIEN DER MARKTFÄHIGKEIT, EIGNUNG FÜR EINEN BESTIMMTEN ZWECK UND
-   NICHTVERLETZUNG. IN KEINEM FALL SIND DIE AUTOREN ODER INHABER DER
-   URHEBERREchte FÜR ANSPRÜCHE, SCHÄDEN ODER ANDERE HAFTUNGSANSPRÜCHE
-   VERANTWORTLICH.
+   DIE SOFTWARE WIRD „WIE BESEHEN" OHNE JEGLICHE GARANTIE JEDWEDER ART
+   BEREITGESTELLT, AUSDRÜCKLICH ODER IMPLIZIERT, EINSCHLIESSLICH, ABER
+   NICHT BESCHRÄNKT AUF DIE GARANTIEN DER MARKTFÄHIGKEIT, DER EIGNUNG FÜR
+   EINEN BESTIMMTEN ZWECK UND DER NICHTVERLETZUNG. IN KEINEM FALL SIND DIE
+   AUTOREN ODER RECHTEINHABER HAFTBAR FÜR JEGLICHE ANSPRÜCHE, SCHÄDEN ODER
+   ANDERE HAFTUNG, OB IN VERTRAGS-, UNERLAUBTSHANDLUNGS- ODER ANDERER
+   KLAGE, DIE AUS DER SOFTWARE ODER DER VERWENDUNG ODER ANDEREN
+   GESCHÄFTEN IN DER SOFTWARE ENTSTEHEN.
 
 5. HAFTUNGSBESCHRÄNKUNG
 
    SOWEIT NACH GELTENDEM RECHT ZULÄSSIG, HAFTET BOB STEVE IN KEINEM FALL
-   FÜR MITTELBARE, BESONDERE, FOLGE- ODER STRAFSCHÄDEN ODER ENTGANGENEN
-   GEWINN.
+   FÜR MITTELBARE, ZUFÄLLIGE, BESONDERE, FOLGE- ODER STRAFSCHÄDEN ODER
+   JEGLICHEN GEWINN- ODER EINNAHMEVERLUST, OB DIREKT ODER INDIREKT
+   ENTSTANDEN, ODER JEGLICHEN DATEN-, NUTZUNGS-, GOODWILL- ODER ANDEREN
+   IMMATERIELLEN VERLUST, DER SICH ERGIBT AUS:
+   
+   a) IHRER VERWODERUNG ODER UNMÖGLICHKEIT, DIE SOFTWARE ZU VERWENDEN;
+   b) JEGLICHEM UNBEFUGTEN ZUGRIFF AUF UNSERE SERVER UND/ODER JEGLICHE
+      GESPEICHERTE PERSÖNLICHE INFORMATIONEN;
+   c) JEGLICHER UNTERBRECHUNG ODER EINSTELLUNG DER ÜBERTRAGUNG AN ODER
+      VON DER SOFTWARE;
+   d) JEGLICHEN FEHLERN, VIREN, TROJANERN ODER ÄHNLICHEM, DIE VON DRITTEN
+      AN ODER DURCH DIE SOFTWARE ÜBERTRAGEN WERDEN KÖNNEN.
 
 6. KÜNDIGUNG
 
-   Dieser Vertrag bleibt bis zu seiner Kündigung wirksam. Bob Steve kann diesen
-   Vertrag jederzeit ohne vorherige Ankündigung kündigen, wenn Sie eine
-   Bedingung nicht einhalten. Bei Kündigung müssen Sie alle Kopien der Software
-   in Ihrem Besitz vernichten.
+   Dieser Vertrag ist wirksam, bis er gekündigt wird. Bob Steve kann diesen
+   Vertrag jederzeit ohne Vorankündigung kündigen, wenn Sie eine Bedingung
+   dieses Vertrags nicht einhalten. Nach Kündigung müssen Sie alle Kopien
+   der Software in Ihrem Besitz vernichten.
 
 7. ANWENDBARES RECHT
 
    Dieser Vertrag unterliegt den Gesetzen der Volksrepublik China und wird
-   nach diesen ausgelegt.
+   nach diesen ausgelegt, ohne Berücksichtigung seiner Kollisionsnormen.
 
-8. GESAMTE VEREINBARUNG
+8. VOLLSTÄNDIGKEIT
 
-   Dieser Vertrag stellt die gesamte Vereinbarung zwischen Ihnen und Bob Steve
-   bezüglich der Software dar und ersetzt alle früheren Vereinbarungen.
+   Dieser Vertrag stellt die vollständige Vereinbarung zwischen Ihnen und
+   Bob Steve bezüglich der Software dar und ersetzt alle vorherigen oder
+   gleichzeitigen mündlichen oder schriftlichen Vereinbarungen und
+   Absprachen bezüglich der Software.
 
-────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
 
 KONTAKTINFORMATIONEN
 
@@ -94,10 +99,4 @@ KONTAKTINFORMATIONEN
    E-Mail: bob_0910@qq.com
    Website: https://xueyanzhang.top/contact/
 
-────────────────────────────────────────────────────────────────────────────────
-
-Durch Klicken auf „Ich stimme zu" oder durch Installieren oder Nutzen der
-Software bestätigen Sie, dass Sie diesen Vertrag gelesen haben, ihn verstehen
-und sich an seine Bedingungen gebunden fühlen.
-
-© 2026 Bob Steve. Alle Rechte vorbehalten.
+────────────────────────────────────────────────────────────

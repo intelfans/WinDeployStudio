@@ -1411,28 +1411,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                     ),
-                    if (_progressStopwatch != null && _progressStopwatch!.isRunning) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        '${tr(context, "wtg_elapsed")}: ${_formatDuration(_progressStopwatch!.elapsed)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                      if (progress.progress > 0.05 && progress.progress < 0.95) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '${tr(context, "wtg_eta")}: ${_estimateRemaining(progress.progress)}',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                        ),
-                      ],
-                    ],
-                    // Speed and write info (only during applying image)
-                    if (progress.step == WtgStep.applyingImage && progress.currentSpeedBytes > 0) ...[
+                    // Progress details (only during applying image)
+                    if (progress.step == WtgStep.applyingImage) ...[
                       const SizedBox(height: 16),
-                      _buildSpeedInfo(progress),
+                      _buildProgressDetails(progress),
                     ],
                     // Low speed warning
                     if (_showLowSpeedWarning) ...[
@@ -1470,7 +1452,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     );
   }
   
-  Widget _buildSpeedInfo(WtgProgress progress) {
+  Widget _buildProgressDetails(WtgProgress progress) {
     // Update speed smoothing
     final currentSpeedMBps = progress.currentSpeedBytes / (1024 * 1024);
     if (_smoothedSpeed == 0) {
@@ -1478,7 +1460,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     } else {
       _smoothedSpeed = 0.7 * _smoothedSpeed + 0.3 * currentSpeedMBps;
     }
-    
+
     // Check for low speed (below 1 MB/s for 30 seconds = 6 updates at 5s interval)
     if (currentSpeedMBps < 1.0) {
       _lowSpeedCounter++;
@@ -1497,37 +1479,60 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         });
       }
     }
-    
-    final averageSpeedMBps = progress.progress > 0
-        ? (progress.writtenBytes / (1024 * 1024)) / (_progressStopwatch?.elapsed.inSeconds ?? 1)
-        : 0.0;
-    
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _SpeedChip(
-              label: tr(context, 'wtg_current_speed'),
-              value: '${_smoothedSpeed.toStringAsFixed(1)} MB/s',
-            ),
-            const SizedBox(width: 16),
-            _SpeedChip(
-              label: tr(context, 'wtg_average_speed'),
-              value: '${averageSpeedMBps.toStringAsFixed(1)} MB/s',
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (progress.writtenBytes > 0) ...[
-          Text(
-            '${tr(context, 'wtg_written')}: ${_formatBytes(progress.writtenBytes)}${progress.totalBytes > 0 ? ' / ${_formatBytes(progress.totalBytes)}' : ''}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+
+    final formattedSpeed = progress.formattedSpeed;
+    final formattedWritten = progress.formattedWritten;
+    final formattedTotal = progress.formattedTotal;
+    final formattedRemaining = progress.formattedRemaining;
+    final formattedElapsed = progress.formattedElapsed;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _ProgressDetailItem(
+                  icon: Icons.timer_outlined,
+                  label: tr(context, 'wtg_elapsed'),
+                  value: formattedElapsed,
                 ),
+              ),
+              Expanded(
+                child: _ProgressDetailItem(
+                  icon: Icons.speed_outlined,
+                  label: tr(context, 'wtg_write_speed'),
+                  value: formattedSpeed,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _ProgressDetailItem(
+                  icon: Icons.download_outlined,
+                  label: tr(context, 'wtg_written'),
+                  value: '$formattedWritten / $formattedTotal',
+                ),
+              ),
+              Expanded(
+                child: _ProgressDetailItem(
+                  icon: Icons.hourglass_bottom_outlined,
+                  label: tr(context, 'wtg_remaining'),
+                  value: formattedRemaining,
+                ),
+              ),
+            ],
           ),
         ],
-      ],
+      ),
     );
   }
   
@@ -1813,29 +1818,46 @@ class _Chip extends StatelessWidget {
   }
 }
 
-class _SpeedChip extends StatelessWidget {
+class _ProgressDetailItem extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
 
-  const _SpeedChip({required this.label, required this.value});
+  const _ProgressDetailItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+        Icon(
+          icon,
+          size: 18,
+          color: Theme.of(context).colorScheme.primary,
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ],
     );

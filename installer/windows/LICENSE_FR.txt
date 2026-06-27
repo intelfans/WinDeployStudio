@@ -1,91 +1,94 @@
 ACCORD DE LICENCE UTILISATEUR FINAL (EULA)
 
 WinDeploy Studio - Outil de déploiement Windows
-Version 1.0.1.0
+Version 1.0.2.0
 
-Copyright (c)2026 Bob Steve. Tous droits réservés.
+Copyright (c) 2026 Bob Steve. All Rights Reserved.
+────────────────────────────────────────────────────────────
 
-────────────────────────────────────────────────────────────────────────────────
+IMPORTANT - VEUILLEZ LIRE ATTENTIVEMENT : Cet Accord de Licence Utilisateur
+Final (« Accord ») est un accord légal entre vous (individu ou entité unique)
+et Bob Steve (« Licencié ») pour le logiciel identifié ci-dessus (incluant le
+logiciel informatique et pouvant inclure les médias associés, les documents
+imprimés et la documentation « en ligne » ou électronique, « Logiciel »).
+En installant, copiant ou utilisant le Logiciel, vous acceptez d'être lié par
+les termes de cet Accord. Si vous n'acceptez pas les termes de cet Accord,
+n'installez pas et n'utilisez pas le Logiciel.
 
-IMPORTANT - LISEZ ATTENTIVEMENT : Le présent Accord de licence utilisateur final
-("Accord") est un contrat légal entre vous (personne physique ou morale) et
-Bob Steve ("Concédant") pour le produit logiciel identifié ci-dessus, comprenant
-le logiciel informatique et les supports associés, les documents imprimés et la
-documentation électronique ("Logiciel").
-
-En installant, copiant ou utilisant le Logiciel, vous acceptez les termes du
-présent Accord. Si vous n'acceptez pas les termes du présent Accord, n'installez
-pas et n'utilisez pas le Logiciel.
-
-────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
 
 1. CONCESSION DE LICENCE
 
    Bob Steve vous accorde par la présente une licence non exclusive, non
    transférable et révocable pour :
-
    a) Installer et utiliser le Logiciel sur un seul ordinateur ;
-
-   b) Effectuer une copie du Logiciel uniquement à des fins d'archivage ;
-
+   b) Créer une copie du Logiciel à des fins d'archivage uniquement ;
    c) Utiliser le Logiciel à des fins personnelles, éducatives ou commerciales.
 
 2. DESCRIPTION DES DROITS ET LIMITATIONS
-
-   a) Vous NE POUVEZ PAS distribuer, sous-licencier, louer, prêter le Logiciel ;
-
-   b) Vous NE POUVEZ PAS modifier, adapter, traduire, désassembler ou
-      décompiler le Logiciel ;
-
-   c) Vous NE POUVEZ PAS créer d'œuvres dérivées basées sur le Logiciel ;
-
-   d) Vous NE POUVEZ PAS supprimer ou modifier les avis, étiquettes ou marques
-      sur le Logiciel ;
-
-   e) Vous NE POUVEZ PAS utiliser le Logiciel à des fins illégales.
+   a) Vous ne pouvez pas distribuer, sous-licencier, louer, donner en leasing
+      ou prêter le Logiciel ;
+   b) Vous ne pouvez pas modifier, adapter, traduire, désassembler, décompiler
+      ou désosser le Logiciel ;
+   c) Vous ne pouvez pas créer d'œuvres dérivées basées sur le Logiciel ;
+   d) Vous ne pouvez pas supprimer ou modifier les déclarations de propriété,
+      étiquettes ou marques sur le Logiciel ;
+   e) Vous ne pouvez pas utiliser le Logiciel à des fins illégales.
 
 3. PROPRIÉTÉ INTELLECTUELLE
 
    Le Logiciel est protégé par les lois sur le droit d'auteur et les traités
    internationaux sur le droit d'auteur, ainsi que par d'autres lois et traités
    sur la propriété intellectuelle. Le Logiciel est concédé sous licence, non
-   vendu. Bob Steve conserve tous les droits, titres et intérêts relatifs au
+   vendu. Bob Steve conserve tous les droits, titres et intérêts dans le
    Logiciel, y compris tous les droits de propriété intellectuelle.
 
 4. EXCLUSION DE GARANTIE
 
-   LE LOGICIEL EST FOURNI "TEL QUEL" SANS AUCUNE GARANTIE, EXPRESSE OU IMPLICITE,
-   Y COMPRIS, MAIS SANS S'Y LIMITER, LES GARANTIES DE QUALITÉ MARCHANDE,
-   D'ADÉQUATION À UN USAGE PARTICULIER ET DE NON-VIOLATION. EN AUCUN CAS,
-   LES AUTEURS OU LES TITULAIRES DE DROITS D'AUTEUR NE SERONT RESPONSABLES
-   DE TOUTE RÉCLAMATION, DOMMAGE OU AUTRE RESPONSABILITÉ.
+   LE LOGICIEL EST FOURNI « EN L'ÉTAT » SANS AUCUNE GARANTIE DE QUELQUE NATURE
+   QUE CE SOIT, EXPRESSE OU IMPLICITE, Y COMPRIS MAIS SANS S'LIMITER À LA
+   GARANTIE DE QUALITÉ MARCHANDE, D'ADÉQUATION À UN USAGE PARTICULIER ET DE
+   NON-CONTREFAÇON. EN AUCUN CAS, LES AUTEURS OU LES TITULAIRES DU DROIT
+   D'AUTEUR NE SERONT RESPONSABLES DE TOUTE RÉCLAMATION, DOMMAGE OU AUTRE
+   RESPONSABILITÉ, QUE CE SOIT DANS UNE ACTION CONTRACTUELLE, DÉLICTUELLE OU
+   AUTRE, DÉCOULANT DU LOGICIEL OU DE L'UTILISATION OU D'AUTRES TRANSACTIONS
+   DANS LE LOGICIEL.
 
 5. LIMITATION DE RESPONSABILITÉ
 
-   DANS LA MESURE MAXIMALE AUTORISÉE PAR LA LOI APPLICABLE, EN AUCUN CAS
-   BOB STEVE NE SERA RESPONSABLE DES DOMMAGES INDIRECTS, ACCESSOIRES,
-   SPÉCIAUX, CONSÉCUTIFS OU PUNITIFS, NI DE TOUTE PERTE DE BÉNÉFICES OU
-   DE REVENUS.
+   DANS LA MESURE MAXIMALE PERMISE PAR LA LOI APPLICABLE, EN AUCUN CAS BOB
+   STEVE NE SERA RESPONSABLE DE TOUT DOMMAGE INDIRECT, ACCESSOIRE, SPÉCIAL,
+   CONSÉCUTIF OU PUNITIF, OU DE TOUTE PERTE DE PROFIT OU DE REVENU, QU'ELLE
+   SOIT ENCOURUE DIRECTEMENT OU INDIRECTEMENT, OU DE TOUTE PERTE DE DONNÉES,
+   D'UTILISATION, DE CLIENTÈLE OU D'AUTRES PERTES INTANGIBLES, RÉSULTANT DE :
+   
+   a) VOTRE UTILISATION OU IMPOSSIBILITÉ D'UTILISER LE LOGICIEL ;
+   b) TOUT ACCÈS NON AUTORISÉ À NOS SERVEURS ET/OU TOUTE INFORMATION
+      PERSONNELLE STOCKÉE ;
+   c) TOUTE INTERRUPTION OU CESSATION DE TRANSMISSION VERS OU DEPUIS LE
+      LOGICIEL ;
+   d) TOUT BUG, VIRUS, CHEVAL DE TROIE OU SIMILAIRE QUI PEUT ÊTRE TRANSMIS
+      AU LOGICIEL PAR UN TIERS.
 
 6. RÉSILIATION
 
-   Le présent Accord est effectif jusqu'à sa résiliation. Bob Steve peut
-   résilier le présent Accord à tout moment sans préavis si vous ne respectez
-   pas l'une des conditions. En cas de résiliation, vous devez détruire toutes
+   Cet Accord est effectif jusqu'à sa résiliation. Bob Steve peut résilier
+   cet Accord à tout moment sans préavis si vous ne respectez pas l'un des
+   termes de cet Accord. En cas de résiliation, vous devez détruire toutes
    les copies du Logiciel en votre possession.
 
-7. DROIT APPLICABLE
+7. LOI APPLICABLE
 
-   Le présent Accord sera régi et interprété conformément aux lois de la
-   République populaire de Chine.
+   Cet Accord sera régi et interprété conformément aux lois de la République
+   Populaire de Chine, sans égard à ses dispositions de conflit de lois.
 
-8. ACCORD INTÉGRAL
+8. ACCORD COMPLET
 
-   Le présent Accord constitue l'intégralité de l'accord entre vous et Bob Steve
-   concernant le Logiciel et remplace tous les accords et compréhensions
-   antérieurs.
+   Cet Accord constitue l'accord complet entre vous et Bob Steve concernant
+   le Logiciel et remplace tous les accords oraux ou écrits et compréhensions
+   antérieurs ou contemporains concernant le Logiciel.
 
-────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
 
 COORDONNÉES
 
@@ -93,9 +96,4 @@ COORDONNÉES
    Email : bob_0910@qq.com
    Site web : https://xueyanzhang.top/contact/
 
-────────────────────────────────────────────────────────────────────────────────
-
-En cliquant sur "J'accepte" ou en installant le Logiciel, vous reconnaissez avoir
-lu le présent Accord, le comprendre et accepter d'être lié par ses termes.
-
-©2026 Bob Steve. Tous droits réservés.
+────────────────────────────────────────────────────────────

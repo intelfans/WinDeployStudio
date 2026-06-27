@@ -1,36 +1,36 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                          WinDeploy Studio                                    ║
-║                    Outil de déploiement Windows                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿┌─────────────────────────────────────────────────────────────┐
+│                          WinDeploy Studio                                    │
+│                    Outil de déploiement Windows                              │
+└─────────────────────────────────────────────────────────────┘
 
-Merci d'avoir choisi WinDeploy Studio ! Nous apprécions votre soutien.
+Merci d'avoir choisi WinDeploy Studio !
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-FONCTIONNALITÉS PRINCIPALES :
+Fonctionnalités principales :
 
-  ◆ Bibliothèque d'images
-    Parcourir les images Windows avec les liens de téléchargement
+  🖼️ Bibliothèque d'images
+    Parcourir les images Windows et les liens de téléchargement
     
-  ◆ Créateur de USB amorçable
-    Créer des clés USB d'installation Windows à partir de fichiers ISO
+  💿 Outil de création USB amorçable  
+    Créer des supports d'installation Windows à partir de fichiers ISO
     
-  ◆ Windows To Go
-    Créer des espaces de travail portables Windows To Go sur des clés USB
+  🚀 Windows To Go
+    Créer des espaces de travail Windows portables sur clés USB
     
-  ◆ Support multilingue
+  🌍 Support multilingue
     Interface complète en chinois et anglais
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-CONFIGURATION REQUISE :
+Configuration système requise :
 
   • Windows 10/11 (64 bits)
-  • Clé USB 3.0+ (recommandé)
+  • Lecteur USB 3.0+ (recommandé)
   • Privilèges administrateur requis
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-Cliquez sur Suivant pour continuer l'installation.
+Cliquez sur "Suivant" pour continuer l'installation.
 
-©2026 Bob Steve. Tous droits réservés.
+© 2026 Bob Steve. Tous droits réservés.

@@ -1,28 +1,28 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Installation abgeschlossen – Vielen Dank!                 ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿┌─────────────────────────────────────────────────────────────┐
+│                 Installation abgeschlossen - Danke!                 │
+└─────────────────────────────────────────────────────────────┘
 
 WinDeploy Studio wurde erfolgreich installiert!
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-WEITERE SCHRITTE:
+Nächste Schritte:
 
-  ✓ Starten Sie WinDeploy Studio über das Startmenü oder die Desktop-Verknüpfung
+  • Starten Sie WinDeploy Studio über das Startmenü oder die Desktop-Verknüpfung
+  
+  • Durchsuchen Sie die Image-Bibliothek für Windows-Images
+  
+  • Erstellen Sie Ihren ersten bootfähigen USB oder Windows To Go
+  
+  • Teilen Sie Ihr Feedback zur Verbesserung bei!
 
-  ✓ Erkunden Sie die Abbildbibliothek, um Windows-Abbilder anzuzeigen
-
-  ✓ Erstellen Sie Ihren ersten bootfähigen USB oder Windows To Go
-
-  ✓ Teilen Sie Ihr Feedback, um uns bei der Verbesserung zu unterstützen!
-
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
 Vielen Dank für die Wahl von WinDeploy Studio!
 
-Wir schätzen Ihr Feedback und setzen uns für die Verbesserung von WinDeploy Studio ein.
+Wir schätzen Ihr Feedback und sind bestrebt, WinDeploy Studio zu verbessern.
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
 © 2026 Bob Steve. Alle Rechte vorbehalten.
 

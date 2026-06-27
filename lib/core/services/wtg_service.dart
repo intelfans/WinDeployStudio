@@ -24,10 +24,10 @@ class WtgProgress {
   final String message;
   final String? error;
   final String? currentFile;
-  final String? estimatedTime;
   final int writtenBytes;
   final int totalBytes;
   final int currentSpeedBytes;
+  final Duration? elapsedTime;
 
   const WtgProgress({
     required this.step,
@@ -35,11 +35,50 @@ class WtgProgress {
     this.message = '',
     this.error,
     this.currentFile,
-    this.estimatedTime,
     this.writtenBytes = 0,
     this.totalBytes = 0,
     this.currentSpeedBytes = 0,
+    this.elapsedTime,
   });
+
+  int get remainingBytes => totalBytes > writtenBytes ? totalBytes - writtenBytes : 0;
+
+  String get formattedWritten {
+    if (writtenBytes <= 0) return '0 B';
+    if (writtenBytes < 1024 * 1024) return '${(writtenBytes / 1024).toStringAsFixed(1)} KB';
+    if (writtenBytes < 1024 * 1024 * 1024) return '${(writtenBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(writtenBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  String get formattedTotal {
+    if (totalBytes <= 0) return '--';
+    if (totalBytes < 1024 * 1024) return '${(totalBytes / 1024).toStringAsFixed(1)} KB';
+    if (totalBytes < 1024 * 1024 * 1024) return '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  String get formattedRemaining {
+    final rem = remainingBytes;
+    if (rem <= 0) return '0 B';
+    if (rem < 1024 * 1024) return '${(rem / 1024).toStringAsFixed(1)} KB';
+    if (rem < 1024 * 1024 * 1024) return '${(rem / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(rem / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  String get formattedSpeed {
+    if (currentSpeedBytes <= 0) return '--';
+    if (currentSpeedBytes < 1024 * 1024) return '${(currentSpeedBytes / 1024).toStringAsFixed(1)} KB/s';
+    if (currentSpeedBytes < 1024 * 1024 * 1024) return '${(currentSpeedBytes / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    return '${(currentSpeedBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB/s';
+  }
+
+  String get formattedElapsed {
+    if (elapsedTime == null) return '00:00:00';
+    final h = elapsedTime!.inHours.toString().padLeft(2, '0');
+    final m = (elapsedTime!.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (elapsedTime!.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
 }
 
 typedef WtgProgressCallback = void Function(WtgProgress progress);
@@ -60,17 +99,21 @@ class WtgService {
     _log.add(line);
     debugPrint(line);
     
-    // 实时写入文件
-    _writeLogToFile(line);
+    // 实时写入文件 - 同步执行确保日志不丢失
+    _writeLogToFileSync(line);
   }
   
-  Future<void> _writeLogToFile(String line) async {
+  void _writeLogToFileSync(String line) {
     try {
-      final dir = await getApplicationSupportDirectory();
-      final logFile = File(p.join(dir.path, 'logs', 'last_wtg_creation_log.txt'));
-      await logFile.parent.create(recursive: true);
-      await logFile.writeAsString('$line\n', mode: FileMode.append);
-    } catch (_) {}
+      final dir = Directory('C:\\Users\\${Platform.environment['USERNAME']}\\AppData\\Roaming\\WinDeployStudio\\logs');
+      if (!dir.existsSync()) {
+        dir.createSync(recursive: true);
+      }
+      final logFile = File('${dir.path}\\wtg_detail.log');
+      logFile.writeAsStringSync('$line\n', mode: FileMode.append);
+    } catch (e) {
+      debugPrint('Log write error: $e');
+    }
   }
 
   String get logText => _log.join('\n');
@@ -788,24 +831,35 @@ exit
         return null;
       }
       _logLine('ISO file exists: YES');
+      _logLine('ISO file size: ${await isoFile.length()} bytes');
       
       final escapedPath = isoPath.replaceAll("'", "''");
 
       // Clean up any stale mount
       _logLine('Cleaning up stale mounts...');
-      await Process.run('powershell', [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
-      ]).timeout(const Duration(seconds: 10));
+      try {
+        await Process.run('powershell', [
+          '-NoProfile', '-ExecutionPolicy', 'Bypass',
+          '-Command',
+          "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
+        ]).timeout(const Duration(seconds: 15));
+      } catch (e) {
+        _logLine('Cleanup warning (non-fatal): $e');
+      }
 
-      // Mount ISO
+      // Mount ISO with longer timeout
       _logLine('Mounting disk image...');
-      final mountResult = await Process.run('powershell', [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass',
-        '-Command',
-        "Mount-DiskImage -ImagePath '$escapedPath' -PassThru",
-      ]).timeout(const Duration(seconds: 60));
+      ProcessResult mountResult;
+      try {
+        mountResult = await Process.run('powershell', [
+          '-NoProfile', '-ExecutionPolicy', 'Bypass',
+          '-Command',
+          "Mount-DiskImage -ImagePath '$escapedPath' -PassThru",
+        ]).timeout(const Duration(seconds: 120));
+      } on TimeoutException {
+        _logLine('ERROR: Mount timed out after 120 seconds');
+        return null;
+      }
       
       _logLine('Mount exit code: ${mountResult.exitCode}');
       if (mountResult.exitCode != 0) {
@@ -816,27 +870,59 @@ exit
 
       // Get drive letter with retries
       _logLine('Getting drive letter...');
-      for (int i = 0; i < 10; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        final letterResult = await Process.run('powershell', [
-          '-NoProfile', '-ExecutionPolicy', 'Bypass',
-          '-Command',
-          "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
-        ]).timeout(const Duration(seconds: 10));
+      for (int i = 0; i < 15; i++) {
+        if (_cancelled) {
+          _logLine('Cancelled during drive letter detection');
+          return null;
+        }
         
-        _logLine('Drive letter attempt ${i + 1}: exit=${letterResult.exitCode}, stdout="${letterResult.stdout.toString().trim()}"');
+        await Future.delayed(const Duration(milliseconds: 300));
         
-        if (letterResult.exitCode == 0) {
-          final letter = letterResult.stdout.toString().trim();
-          if (letter.isNotEmpty && letter.length == 1) {
-            final mountPoint = '$letter:\\';
-            _logLine('Mounted at: $mountPoint');
-            return mountPoint;
+        try {
+          final letterResult = await Process.run('powershell', [
+            '-NoProfile', '-ExecutionPolicy', 'Bypass',
+            '-Command',
+            "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
+          ]).timeout(const Duration(seconds: 5));
+          
+          _logLine('Drive letter attempt ${i + 1}: exit=${letterResult.exitCode}, stdout="${letterResult.stdout.toString().trim()}"');
+          
+          if (letterResult.exitCode == 0) {
+            final letter = letterResult.stdout.toString().trim();
+            if (letter.isNotEmpty && letter.length == 1 && letter != '0') {
+              final mountPoint = '$letter:\\';
+              _logLine('Mounted at: $mountPoint');
+              return mountPoint;
+            }
           }
+        } catch (e) {
+          _logLine('Drive letter attempt ${i + 1} error: $e');
         }
       }
       
-      _logLine('Failed to get drive letter after 10 attempts');
+      _logLine('Failed to get drive letter after 15 attempts');
+      
+      // Try alternative method to get drive letter
+      _logLine('Trying alternative drive letter detection...');
+      try {
+        final altResult = await Process.run('powershell', [
+          '-NoProfile', '-ExecutionPolicy', 'Bypass',
+          '-Command',
+          "(Get-DiskImage -ImagePath '$escapedPath' | Get-Volume).DriveLetter",
+        ]).timeout(const Duration(seconds: 10));
+        
+        if (altResult.exitCode == 0) {
+          final letter = altResult.stdout.toString().trim();
+          if (letter.isNotEmpty && letter.length == 1 && letter != '0') {
+            final mountPoint = '$letter:\\';
+            _logLine('Mounted at (alt method): $mountPoint');
+            return mountPoint;
+          }
+        }
+      } catch (e) {
+        _logLine('Alternative method failed: $e');
+      }
+      
     } catch (e) {
       _logLine('Mount exception: $e');
     }
@@ -845,15 +931,16 @@ exit
 
   Future<void> _unmountIso(String isoPath) async {
     try {
+      _logLine('Unmounting ISO: $isoPath');
       final escapedPath = isoPath.replaceAll("'", "''");
       await Process.run('powershell', [
         '-NoProfile', '-ExecutionPolicy', 'Bypass',
         '-Command',
         "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue",
-      ]).timeout(const Duration(seconds: 15));
+      ]).timeout(const Duration(seconds: 30));
       _logLine('Unmounted OK');
     } catch (e) {
-      _logLine('Unmount error: $e');
+      _logLine('Unmount error (non-fatal): $e');
     }
   }
 
@@ -872,17 +959,12 @@ exit
       // Check target drive
       final targetDir = Directory(targetDrive);
       _logLine('Target drive exists: ${targetDir.existsSync()}');
-      
-      // Test write speed
-      _logLine('Testing write speed...');
-      final testFile = File('${targetDrive}_speedtest.tmp');
-      final testData = List.filled(1024 * 1024, 0); // 1MB
-      final sw = Stopwatch()..start();
-      await testFile.writeAsBytes(testData);
-      sw.stop();
-      _logLine('Write test: ${sw.elapsedMilliseconds}ms for 1MB');
-      await testFile.delete();
-      
+
+      // Get total image size from source file
+      final sourceFile = File(sourcePath);
+      final totalImageSize = await sourceFile.length();
+      _logLine('Total image size: ${totalImageSize} bytes (${(totalImageSize / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB)');
+
       final stopwatch = Stopwatch()..start();
 
       // Use Process.start for DISM
@@ -899,7 +981,7 @@ exit
       // Monitor DISM output
       int lastPercent = 0;
       bool dismDone = false;
-      
+
       process.stdout.transform(const SystemEncoding().decoder).listen((data) {
         // Parse progress
         final match = RegExp(r'(\d+)%').firstMatch(data);
@@ -907,17 +989,24 @@ exit
           final percent = int.parse(match.group(1)!);
           if (percent > lastPercent) {
             lastPercent = percent;
-            final elapsed = stopwatch.elapsed.inSeconds;
-            _logLine('DISM: $percent% (${elapsed}s)');
-            
+            final elapsed = stopwatch.elapsed;
+            final writtenBytes = (totalImageSize * percent / 100).round();
+            final speedBytes = elapsed.inSeconds > 0 ? (writtenBytes / elapsed.inSeconds).round() : 0;
+
+            _logLine('DISM: $percent% (${elapsed.inSeconds}s)');
+
             _notify(onProgress, WtgProgress(
               step: WtgStep.applyingImage,
               message: 'wtg_svc_applying_percent',
               progress: percent / 100.0,
+              writtenBytes: writtenBytes,
+              totalBytes: totalImageSize,
+              currentSpeedBytes: speedBytes,
+              elapsedTime: elapsed,
             ));
           }
         }
-        
+
         // Log important messages
         if (data.contains('Error') || data.contains('error') || data.contains('failed')) {
           _logLine('DISM: ${data.trim()}');
@@ -933,26 +1022,34 @@ exit
             final percent = int.parse(match.group(1)!);
             if (percent > lastPercent) {
               lastPercent = percent;
+              final elapsed = stopwatch.elapsed;
+              final writtenBytes = (totalImageSize * percent / 100).round();
+              final speedBytes = elapsed.inSeconds > 0 ? (writtenBytes / elapsed.inSeconds).round() : 0;
+
               _notify(onProgress, WtgProgress(
                 step: WtgStep.applyingImage,
                 message: 'wtg_svc_applying_percent',
                 progress: percent / 100.0,
+                writtenBytes: writtenBytes,
+                totalBytes: totalImageSize,
+                currentSpeedBytes: speedBytes,
+                elapsedTime: elapsed,
               ));
             }
           }
         }
       });
 
-      // Monitor target directory size
+      // Monitor target directory size - update every 750ms
       int monitorErrorCount = 0;
       int previousSize = 0;
-      int previousElapsed = 0;
-      final monitorTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      int previousElapsedMs = 0;
+      final monitorTimer = Timer.periodic(const Duration(milliseconds: 750), (timer) {
         if (dismDone || _cancelled) {
           timer.cancel();
           return;
         }
-        
+
         try {
           int totalSize = 0;
           int fileCount = 0;
@@ -963,35 +1060,27 @@ exit
             }
           }
           monitorErrorCount = 0; // Reset on success
-          final sizeMB = (totalSize / (1024 * 1024)).round();
-          final elapsed = stopwatch.elapsed.inSeconds;
-          final speed = elapsed > 0 ? (sizeMB / elapsed).round() : 0;
-          _logLine('Target: ${sizeMB}MB, ${fileCount} files, ${speed}MB/s');
-          
-          // Calculate current speed (bytes per second)
-          final elapsedDelta = elapsed - previousElapsed;
-          if (elapsedDelta > 0) {
+          final elapsed = stopwatch.elapsed;
+          final elapsedMs = elapsed.inMilliseconds;
+          final elapsedDeltaMs = elapsedMs - previousElapsedMs;
+
+          if (elapsedDeltaMs > 0) {
             final sizeDelta = totalSize - previousSize;
-            final currentSpeed = sizeDelta ~/ elapsedDelta;
-            
-            // Estimate total size based on progress (if available)
-            int estimatedTotal = 0;
-            if (lastPercent > 0 && lastPercent <= 100) {
-              estimatedTotal = (totalSize * 100 ~/ lastPercent);
-            }
-            
+            final currentSpeed = (sizeDelta * 1000 / elapsedDeltaMs).round();
+
             _notify(onProgress, WtgProgress(
               step: WtgStep.applyingImage,
               message: 'wtg_svc_applying_percent',
               progress: lastPercent / 100.0,
               writtenBytes: totalSize,
-              totalBytes: estimatedTotal,
+              totalBytes: totalImageSize,
               currentSpeedBytes: currentSpeed,
+              elapsedTime: elapsed,
             ));
           }
-          
+
           previousSize = totalSize;
-          previousElapsed = elapsed;
+          previousElapsedMs = elapsedMs;
         } catch (e) {
           monitorErrorCount++;
           if (monitorErrorCount <= 3) {
@@ -1030,10 +1119,13 @@ exit
         return false;
       }
 
-      _notify(onProgress, const WtgProgress(
+      _notify(onProgress, WtgProgress(
         step: WtgStep.applyingImage,
         message: 'wtg_svc_image_applied',
         progress: 1.0,
+        writtenBytes: totalImageSize,
+        totalBytes: totalImageSize,
+        elapsedTime: stopwatch.elapsed,
       ));
 
       return true;
@@ -1050,24 +1142,48 @@ exit
     try {
       _logLine('Writing boot files: windows=$windowsDrive efi=$efiDrive');
 
+      // Check admin rights first
+      final isAdmin = await _checkAdminRights();
+      if (!isAdmin) {
+        _logLine('ERROR: bcdboot requires administrator privileges');
+        _logLine('Please run the application as administrator');
+        return false;
+      }
+
       // Run bcdboot
+      _logLine('Running bcdboot ${windowsDrive}\\Windows /s $efiDrive /f ALL');
       final result = await Process.run('bcdboot', [
         '${windowsDrive}\\Windows',
         '/s', efiDrive,
         '/f', 'ALL',
-      ]).timeout(const Duration(seconds: 60));
+      ]).timeout(const Duration(seconds: 120));
 
       _logLine('bcdboot exit: ${result.exitCode}');
       _logLine('bcdboot stdout: ${result.stdout}');
 
       if (result.exitCode != 0) {
         _logLine('bcdboot stderr: ${result.stderr}');
+        _logLine('bcdboot FAILED with exit code ${result.exitCode}');
         return false;
       }
 
+      _logLine('bcdboot completed successfully');
       return true;
+    } on TimeoutException {
+      _logLine('bcdboot timed out after 120 seconds');
+      return false;
     } catch (e) {
       _logLine('Boot file error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _checkAdminRights() async {
+    try {
+      final result = await Process.run('net', ['session']);
+      return result.exitCode == 0;
+    } catch (e) {
+      _logLine('Admin check failed: $e');
       return false;
     }
   }

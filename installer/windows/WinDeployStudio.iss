@@ -1,5 +1,5 @@
 #define MyAppName "WinDeploy Studio"
-#define MyAppVersion "1.0.1.0"
+#define MyAppVersion "1.0.2.0"
 #define MyAppPublisher "Bob Steve"
 #define MyAppPublisherZH "Bob Steve"
 #define MyAppExeName "win_deploy_studio.exe"
@@ -19,7 +19,7 @@ AppCopyright=© 2026 {#MyAppPublisher}. All rights reserved.
 DefaultDirName={autopf}\WinDeploy Studio
 DefaultGroupName=WinDeploy Studio
 OutputDir=..\..\dist\windows
-OutputBaseFilename=WinDeployStudio_Setup_1.0.1
+OutputBaseFilename=WinDeployStudio_Setup_1.0.2
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -32,7 +32,7 @@ LicenseFile=LICENSE_EN.txt
 WizardImageFile=wizardimage.bmp
 WizardSmallImageFile=wizardsmallimage.bmp
 SetupIconFile=icon.ico
-VersionInfoVersion=1.0.1.0
+VersionInfoVersion=1.0.2.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppDescription}
 VersionInfoCopyright=© 2026 {#MyAppPublisher}

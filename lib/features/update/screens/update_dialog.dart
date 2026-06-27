@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/localization/strings.dart';
 import '../models/update_models.dart';
 import '../providers/update_provider.dart';
@@ -54,6 +56,7 @@ class UpdateDialog extends ConsumerWidget {
           ref.read(updateProvider.notifier).ignoreVersion(state.info!.tagName);
           Navigator.of(context).pop();
         },
+        releasePageUrl: ref.read(updateProvider.notifier).releasePageUrl,
       );
     }
 
@@ -66,12 +69,14 @@ class _AvailableDialog extends StatelessWidget {
   final VoidCallback onUpdate;
   final VoidCallback onLater;
   final VoidCallback onIgnore;
+  final String releasePageUrl;
 
   const _AvailableDialog({
     required this.info,
     required this.onUpdate,
     required this.onLater,
     required this.onIgnore,
+    required this.releasePageUrl,
   });
 
   @override
@@ -97,7 +102,7 @@ class _AvailableDialog extends StatelessWidget {
         textAlign: TextAlign.center,
       ),
       content: SizedBox(
-        width: 400,
+        width: 450,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -134,10 +139,22 @@ class _AvailableDialog extends StatelessWidget {
                   color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    info.body,
-                    style: theme.textTheme.bodySmall,
+                child: MarkdownBody(
+                  data: info.body,
+                  styleSheet: MarkdownStyleSheet(
+                    p: theme.textTheme.bodySmall,
+                    h1: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    h2: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    h3: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    code: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'Consolas',
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    listBullet: theme.textTheme.bodySmall,
                   ),
                 ),
               ),
@@ -153,6 +170,11 @@ class _AvailableDialog extends StatelessWidget {
         TextButton(
           onPressed: onLater,
           child: Text(tr(context, 'update_later')),
+        ),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.open_in_browser, size: 18),
+          onPressed: () => launchUrl(Uri.parse(releasePageUrl)),
+          label: Text(tr(context, 'update_open_browser')),
         ),
         FilledButton.icon(
           icon: const Icon(Icons.download_rounded, size: 18),

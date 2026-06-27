@@ -1,36 +1,36 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                          WinDeploy Studio                                    ║
-║                    Outil de déploiement Windows                              ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿┌─────────────────────────────────────────────────────────────┐
+│                          WinDeploy Studio                                    │
+│                    Herramienta de despliegue Windows                              │
+└─────────────────────────────────────────────────────────────┘
 
-¡Gracias por elegir WinDeploy Studio! Valoramos su apoyo.
+¡Gracias por elegir WinDeploy Studio!
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-FUNCIONALIDADES PRINCIPALES:
+Características principales:
 
-  ◆ Biblioteca de imágenes
-    Explorar imágenes de Windows con enlaces de descarga
+  🖼️ Biblioteca de imágenes
+    Explorar imágenes de Windows y enlaces de descarga
+    
+  💿 Herramienta de creación USB de arranque  
+    Crear medios de instalación de Windows desde archivos ISO
+    
+  🚀 Windows To Go
+    Crear espacios de trabajo Windows portátiles en unidades USB
+    
+  🌍 Soporte multilingüe
+    Interfaz completa en chino e inglés
 
-  ◆ Creador de USB booteable
-    Crear medios de instalación de Windows a partir de archivos ISO
+═══════════════════════════════════════════════════════════════
 
-  ◆ Windows To Go
-    Crear espacios de trabajo portátiles Windows To Go en memorias USB
-
-  ◆ Soporte multilingüe
-    Interfaz completa en múltiples idiomas
-
-────────────────────────────────────────────────────────────────────────────────
-
-REQUISITOS DEL SISTEMA:
+Requisitos del sistema:
 
   • Windows 10/11 (64 bits)
-  • Memoria USB 3.0+ (recomendado)
+  • Unidad USB 3.0+ (recomendado)
   • Se requieren privilegios de administrador
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-Haga clic en Siguiente para continuar con la instalación.
+Haga clic en "Siguiente" para continuar con la instalación.
 
 © 2026 Bob Steve. Todos los derechos reservados.

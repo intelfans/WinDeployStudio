@@ -1,27 +1,29 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║            Installation terminée - Merci !                                  ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿┌─────────────────────────────────────────────────────────────┐
+│                 Installation terminée - Merci !                 │
+└─────────────────────────────────────────────────────────────┘
 
 WinDeploy Studio a été installé avec succès !
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-PROCHAINES ÉTAPES :
+Prochaines étapes :
 
-  ✓ Lancez WinDeploy Studio depuis le menu Démarrer ou le raccourci bureau
+  • Lancez WinDeploy Studio depuis le menu Démarrer ou le raccourci bureau
   
-  ✓ Explorez la Bibliothèque d'images pour parcourir les images Windows
+  • Parcourez la bibliothèque d'images pour les images Windows
   
-  ✓ Créez votre première clé USB amorçable ou votre espace Windows To Go
+  • Créez votre première clé USB amorçable ou Windows To Go
   
-  ✓ Partagez vos commentaires pour nous aider à nous améliorer !
+  • Partagez vos retours pour nous aider à améliorer !
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
 Merci d'avoir choisi WinDeploy Studio !
 
-Nous apprécions vos commentaires et nous nous engageons à améliorer WinDeploy Studio.
+Nous apprécions vos retours et nous nous engageons à améliorer WinDeploy Studio.
 
-────────────────────────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
 
-©2026 Bob Steve. Tous droits réservés.
+© 2026 Bob Steve. Tous droits réservés.
+
+Site web : https://xueyanzhang.top/contact/

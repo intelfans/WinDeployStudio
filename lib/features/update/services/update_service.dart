@@ -289,7 +289,6 @@ class UpdateService {
       int lastReportedBytes = 0;
       final stopwatch = Stopwatch()..start();
       final speedStopwatch = Stopwatch()..start();
-      double currentSpeed = 0;
       DownloadPhase currentPhase = DownloadPhase.connecting;
 
       await for (final chunk in response.stream) {
@@ -311,7 +310,6 @@ class UpdateService {
             final speed = elapsed > 0
                 ? downloadedBytes * 1000.0 / elapsed
                 : 0.0;
-            currentSpeed = speed;
 
             DownloadPhase newPhase;
             if (elapsed < 5000) {
