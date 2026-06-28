@@ -23,15 +23,21 @@ class AppVersion {
   const AppVersion(this.major, this.minor, this.patch);
 
   factory AppVersion.parse(String version) {
-    final cleaned = version.replaceFirst(RegExp(r'^v'), '');
-    final parts = cleaned.split('.');
-    if (parts.length < 3) {
+    final cleaned = version
+        .trim()
+        .replaceFirst(RegExp(r'^v', caseSensitive: false), '')
+        .split('+')
+        .first;
+    final match = RegExp(
+      r'^(\d+)\.(\d+)\.(\d+)(?:[.-].*)?$',
+    ).firstMatch(cleaned);
+    if (match == null) {
       throw FormatException('Invalid version format: $version');
     }
     return AppVersion(
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-      int.parse(parts[2]),
+      int.parse(match.group(1)!),
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
     );
   }
 
@@ -123,7 +129,9 @@ class UpdateInfo {
       tagName: tagName,
       name: json['name'] as String? ?? '',
       body: json['body'] as String? ?? '',
-      publishedAt: DateTime.tryParse(json['published_at'] as String? ?? '') ?? DateTime.now(),
+      publishedAt:
+          DateTime.tryParse(json['published_at'] as String? ?? '') ??
+          DateTime.now(),
       assets: assetsList,
     );
   }
@@ -131,8 +139,12 @@ class UpdateInfo {
   UpdateAsset? get bestAsset {
     if (assets.isEmpty) return null;
 
-    final exeAssets = assets.where((a) => a.name.toLowerCase().endsWith('.exe')).toList();
-    final zipAssets = assets.where((a) => a.name.toLowerCase().endsWith('.zip')).toList();
+    final exeAssets = assets
+        .where((a) => a.name.toLowerCase().endsWith('.exe'))
+        .toList();
+    final zipAssets = assets
+        .where((a) => a.name.toLowerCase().endsWith('.zip'))
+        .toList();
 
     UpdateAsset? setupExe;
     for (final asset in exeAssets) {
@@ -160,7 +172,8 @@ class UpdateInfo {
   String generateDownloadUrl() {
     final asset = bestAsset;
     if (asset == null) return '';
-    return 'https://github.com/intelfans/WinDeployStudio/releases/download/$tagName/${asset.name}';
+    if (asset.url.isNotEmpty) return asset.url;
+    return 'https://github.com/intelfans/WinDeployStudio/releases/download/$tagName/${Uri.encodeComponent(asset.name)}';
   }
 }
 
@@ -195,7 +208,7 @@ enum UpdateStatus {
   downloaded,
   installing,
   upToDate,
-  error;
+  error,
 }
 
 class UpdateState {

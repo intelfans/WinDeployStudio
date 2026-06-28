@@ -64,7 +64,9 @@ class IsoParseService {
     debugPrint('Size: $fileSize bytes');
 
     final logCenter = LogCenterService();
-    await logCenter.logIso('ISO 解析开始 | 文件: $fileName | 大小: ${_formatSize(fileSize)}');
+    await logCenter.logIso(
+      'ISO 解析开始 | 文件: $fileName | 大小: ${_formatSize(fileSize)}',
+    );
 
     // Step 1: Filename detection (instant)
     _report(onProgress, 'detect', 50);
@@ -85,7 +87,10 @@ class IsoParseService {
     debugPrint('Mounted at: $mountPoint');
 
     // Step 3: Check for install.wim/esd
-    if (_cancelled) { await _unmount(isoPath); return null; }
+    if (_cancelled) {
+      await _unmount(isoPath);
+      return null;
+    }
     _report(onProgress, 'detect', 0);
 
     final wimPath = '${mountPoint}sources\\install.wim';
@@ -102,7 +107,10 @@ class IsoParseService {
     debugPrint('Found: ${hasWim ? "install.wim" : "install.esd"}');
 
     // Step 4: DISM info with timeout
-    if (_cancelled) { await _unmount(isoPath); return null; }
+    if (_cancelled) {
+      await _unmount(isoPath);
+      return null;
+    }
     _report(onProgress, 'info', 0);
 
     final sourcePath = hasWim ? wimPath : esdPath;
@@ -138,7 +146,9 @@ class IsoParseService {
       final version = dismInfo['version'] ?? fastResult.windowsVersion;
       final build = dismInfo['build'] ?? fastResult.buildNumber;
       final arch = dismInfo['architecture'];
-      await logCenter.logIso('ISO 解析成功 | 文件: $fileName | 版本: $version | 构建: $build | 架构: $arch');
+      await logCenter.logIso(
+        'ISO 解析成功 | 文件: $fileName | 版本: $version | 构建: $build | 架构: $arch',
+      );
       return IsoMetadata(
         filePath: isoPath,
         fileName: fileName,
@@ -168,8 +178,12 @@ class IsoParseService {
   }
 
   String _formatSize(int bytes) {
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
@@ -182,25 +196,41 @@ class IsoParseService {
   // --- DISM with reliable timeout ---
 
   Future<Map<String, String>?> _runDismWithTimeout(String wimPath) async {
-    // Use Process.run with a hard timeout
-    final result = await Process.run('dism', [
+    final process = await Process.start('dism', [
       '/Get-WimInfo',
       '/WimFile:$wimPath',
       '/Index:1',
-    ]).timeout(
+    ]);
+
+    final stdoutFuture = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .join();
+    final stderrFuture = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .join();
+
+    final exitCode = await process.exitCode.timeout(
       const Duration(seconds: 30),
       onTimeout: () {
         debugPrint('DISM timed out after 30s');
-        // Kill DISM process
-        Process.run('taskkill', ['/f', '/im', 'dism.exe']).ignore();
-        return ProcessResult(0, -1, '', 'timeout');
+        Process.run('taskkill', [
+          '/F',
+          '/T',
+          '/PID',
+          '${process.pid}',
+        ]).ignore();
+        return -1;
       },
     );
+    final output = await stdoutFuture;
+    final stderr = await stderrFuture;
 
     if (_cancelled) return null;
-    if (result.exitCode != 0) return null;
+    if (exitCode != 0) {
+      debugPrint('DISM failed: $stderr');
+      return null;
+    }
 
-    final output = result.stdout.toString();
     if (output.isEmpty) return null;
 
     final map = <String, String>{};
@@ -232,13 +262,17 @@ class IsoParseService {
 
   // --- Mount ---
 
+  String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
+
   Future<String?> _mountIso(String isoPath) async {
     try {
+      final quotedPath = _psQuote(isoPath);
       final result = await Process.run('powershell', [
         '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
-        "Mount-DiskImage -ImagePath '$isoPath'",
+        "Mount-DiskImage -ImagePath $quotedPath",
       ]).timeout(const Duration(seconds: 15));
 
       if (_cancelled) return null;
@@ -250,8 +284,10 @@ class IsoParseService {
         await Future.delayed(const Duration(milliseconds: 500));
         final r = await Process.run('powershell', [
           '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
           '-Command',
-          "Get-DiskImage -ImagePath '$isoPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
+          "Get-DiskImage -ImagePath $quotedPath | Get-Volume | Select-Object -ExpandProperty DriveLetter",
         ]);
         if (r.exitCode == 0) {
           final letter = r.stdout.toString().trim();
@@ -267,10 +303,13 @@ class IsoParseService {
 
   Future<void> _unmount(String isoPath) async {
     try {
+      final quotedPath = _psQuote(isoPath);
       final process = await Process.start('powershell', [
         '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
-        "Dismount-DiskImage -ImagePath '$isoPath' -ErrorAction SilentlyContinue",
+        "Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue",
       ]);
       final exited = await process.exitCode.timeout(
         const Duration(seconds: 10),
@@ -289,17 +328,24 @@ class IsoParseService {
   // --- Filename detection ---
 
   IsoMetadata _detectFromFileName(
-      String fileName, String filePath, int fileSize) {
+    String fileName,
+    String filePath,
+    int fileSize,
+  ) {
     String? windowsVersion;
     String? buildNumber;
     final lower = fileName.toLowerCase();
 
-    if (lower.contains('win11') || lower.contains('windows11') ||
-        lower.contains('26100') || lower.contains('22621') ||
+    if (lower.contains('win11') ||
+        lower.contains('windows11') ||
+        lower.contains('26100') ||
+        lower.contains('22621') ||
         lower.contains('22000')) {
       windowsVersion = 'Windows 11';
-    } else if (lower.contains('win10') || lower.contains('windows10') ||
-        lower.contains('19045') || lower.contains('19044') ||
+    } else if (lower.contains('win10') ||
+        lower.contains('windows10') ||
+        lower.contains('19045') ||
+        lower.contains('19044') ||
         lower.contains('19043')) {
       windowsVersion = 'Windows 10';
     } else if (lower.contains('server')) {

@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                 Instalação concluída - Obrigado!                 │
-└─────────────────────────────────────────────────────────────┘
+﻿Instalação concluída - Obrigado!
 
-WinDeploy Studio foi instalado com sucesso!
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio foi instalado com sucesso.
 
 Próximos passos:
 
-  • Inicie o WinDeploy Studio pelo Menu Iniciar ou atalho da área de trabalho
-  
-  • Explore a biblioteca de imagens para imagens do Windows
-  
-  • Crie sua primeira USB inicializável ou Windows To Go
-  
-  • Compartilhe seu feedback para nos ajudar a melhorar!
+- Inicie o WinDeploy Studio pelo Menu Iniciar ou atalho da área de trabalho.
+- Explore a biblioteca de imagens para imagens do Windows.
+- Crie seu primeiro USB de instalação do Windows ou Windows To Go.
+- Compartilhe seu feedback para nos ajudar a melhorar.
 
-═══════════════════════════════════════════════════════════════
+Licença: MIT License
+Perfil GitHub: https://github.com/intelfans
+Repositório GitHub: https://github.com/intelfans/WinDeployStudio
 
-Obrigado por escolher o WinDeploy Studio!
+Agradecimentos especiais
 
-Valorizamos seu feedback e nos esforçamos para melhorar o WinDeploy Studio.
+O WinDeploy Studio agradece às seguintes pessoas e comunidades pelo feedback, testes, ideias, inspiração e apoio.
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  Feedback inicial, testes e discussões do projeto
 
-© 2026 Bob Steve. Todos os direitos reservados.
+- Timme
+  Feedback internacional detalhado, recomendações de confiança e usabilidade, sugestões de fontes da Microsoft e revisão da comunidade
 
-Site: https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  Inspiração nas ferramentas de diagnóstico e solução de problemas da Microsoft
+
+- Open Source Community
+  Por documentação, relatórios de bugs, testes, traduções e sugestões

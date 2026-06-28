@@ -25,33 +25,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: HomeScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: HomeScreen()),
           ),
           GoRoute(
             path: '/mirror',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: MirrorScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: MirrorScreen()),
           ),
           GoRoute(
             path: '/creator',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: CreatorScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: CreatorScreen()),
           ),
           GoRoute(
             path: '/wtg',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: WtgScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: WtgScreen()),
           ),
           GoRoute(
             path: '/logs',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: LogsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: LogsScreen()),
           ),
           GoRoute(
             path: '/ai',
@@ -64,15 +59,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/tools',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: ToolsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ToolsScreen()),
           ),
           GoRoute(
             path: '/settings',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: SettingsScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: SettingsScreen()),
           ),
         ],
       ),
@@ -80,41 +73,55 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/mirror/:id',
         builder: (context, state) {
           final item = state.extra as MirrorItem?;
-          if (item != null) {
+          final locale = Localizations.localeOf(context);
+          final blocked =
+              item?.isStarValleyX == true && !item!.isVisibleInLocale(locale);
+          if (item != null && !blocked) {
             return MirrorDetailScreen(item: item);
           }
-          
+
           // Try to find item by ID from provider
           final id = state.pathParameters['id'];
           final mirrorState = ref.watch(mirrorProvider);
-          
+
           // If data not loaded yet, trigger load
-          if (mirrorState.status == MirrorLoadStatus.initial || 
+          if (mirrorState.status == MirrorLoadStatus.initial ||
               mirrorState.status == MirrorLoadStatus.loading) {
             // Trigger load if not already loading
             if (mirrorState.status == MirrorLoadStatus.initial) {
-              Future.microtask(() => ref.read(mirrorProvider.notifier).loadBuiltInMirrors());
+              Future.microtask(
+                () => ref.read(mirrorProvider.notifier).loadBuiltInMirrors(),
+              );
             }
             return Scaffold(
               appBar: AppBar(),
               body: const Center(child: CircularProgressIndicator()),
             );
           }
-          
+
           if (mirrorState.status == MirrorLoadStatus.error) {
             return Scaffold(
               appBar: AppBar(),
-              body: Center(child: Text(mirrorState.error ?? tr(context, 'images_error'))),
+              body: Center(
+                child: Text(
+                  mirrorState.error == null
+                      ? tr(context, 'images_error')
+                      : '${tr(context, 'mirror_error_loading')} ${mirrorState.error}',
+                ),
+              ),
             );
           }
-          
+
           final items = mirrorState.data?.items ?? [];
           final foundItem = items.where((i) => i.id == id).firstOrNull;
-          
-          if (foundItem != null) {
+
+          final foundBlocked =
+              foundItem?.isStarValleyX == true &&
+              !foundItem!.isVisibleInLocale(locale);
+          if (foundItem != null && !foundBlocked) {
             return MirrorDetailScreen(item: foundItem);
           }
-          
+
           return Scaffold(
             appBar: AppBar(),
             body: Center(child: Text(tr(context, 'mirror_not_found'))),
@@ -136,7 +143,16 @@ class ScaffoldWithNavigation extends ConsumerStatefulWidget {
 
 class _ScaffoldWithNavigationState
     extends ConsumerState<ScaffoldWithNavigation> {
-  static const _paths = ['/', '/mirror', '/creator', '/wtg', '/logs', '/ai', '/tools', '/settings'];
+  static const _paths = [
+    '/',
+    '/mirror',
+    '/creator',
+    '/wtg',
+    '/logs',
+    '/ai',
+    '/tools',
+    '/settings',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +219,10 @@ class _ScaffoldWithNavigationState
               selectedIndex: selectedIndex,
               onDestinationSelected: (index) {
                 // Pop all routes back to root before navigating
-                Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+                Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).popUntil((route) => route.isFirst);
                 context.go(_paths[index]);
               },
               labelType: NavigationRailLabelType.all,
@@ -220,9 +239,9 @@ class _ScaffoldWithNavigationState
                     Text(
                       'WDS',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ],
                 ),

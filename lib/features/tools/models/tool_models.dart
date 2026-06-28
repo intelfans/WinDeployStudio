@@ -9,11 +9,16 @@ import '../../../core/localization/strings.dart';
 String _loc(dynamic json, String key) {
   if (json == null) return '';
   if (json is Map) {
-    final locale = L.currentLocale;
-    return json['${key}_$locale'] as String? ??
-        json['${key}_zh'] as String? ??
-        json[key] as String? ??
-        '';
+    final locale = normalizeLocaleCode(L.currentLocale);
+    final language = locale.split('_').first;
+    final isSupported = isSupportedLocaleCode(locale);
+    final localized = isSupported && locale.contains('_')
+        ? json['${key}_$locale'] as String?
+        : json['${key}_$locale'] as String? ??
+              json['${key}_$language'] as String?;
+    if (localized != null) return localized;
+    if (isSupported) return '';
+    return json[key] as String? ?? '';
   }
   if (json is String) return json;
   return '';
@@ -22,14 +27,40 @@ String _loc(dynamic json, String key) {
 List<String> _locList(dynamic json, String key) {
   if (json == null) return [];
   if (json is Map) {
-    final locale = L.currentLocale;
-    final list = json['${key}_$locale'] as List? ??
-        json['${key}_zh'] as List? ??
-        json[key] as List?;
-    return list?.cast<String>() ?? [];
+    final locale = normalizeLocaleCode(L.currentLocale);
+    final language = locale.split('_').first;
+    final isSupported = isSupportedLocaleCode(locale);
+    final list = isSupported && locale.contains('_')
+        ? json['${key}_$locale'] as List?
+        : json['${key}_$locale'] as List? ?? json['${key}_$language'] as List?;
+    if (list != null) return list.cast<String>();
+    if (isSupported) return [];
+    return (json[key] as List?)?.cast<String>() ?? [];
   }
   if (json is List) return json.cast<String>();
   return [];
+}
+
+enum ToolSafetyLevel {
+  beginner,
+  advanced,
+  expert;
+
+  static ToolSafetyLevel fromJson(String? value) {
+    return switch (value?.toLowerCase()) {
+      'advanced' => ToolSafetyLevel.advanced,
+      'expert' => ToolSafetyLevel.expert,
+      _ => ToolSafetyLevel.beginner,
+    };
+  }
+
+  String get labelKey {
+    return switch (this) {
+      ToolSafetyLevel.beginner => 'tool_safety_beginner',
+      ToolSafetyLevel.advanced => 'tool_safety_advanced',
+      ToolSafetyLevel.expert => 'tool_safety_expert',
+    };
+  }
 }
 
 class ToolItem {
@@ -48,6 +79,8 @@ class ToolItem {
   final List<String> screenshots;
   final List<String> features;
   final String? systemRequirements;
+  final ToolSafetyLevel safetyLevel;
+  final String categoryKey;
 
   const ToolItem({
     required this.name,
@@ -65,27 +98,36 @@ class ToolItem {
     this.screenshots = const [],
     this.features = const [],
     this.systemRequirements,
+    this.safetyLevel = ToolSafetyLevel.beginner,
+    this.categoryKey = '',
   });
 
-  factory ToolItem.fromJson(Map<String, dynamic> json) => ToolItem(
-        name: _loc(json, 'name'),
-        desc: _loc(json, 'desc'),
-        icon: json['icon'] as String? ?? 'apps',
-        url: json['url'] as String? ?? '',
-        downloadUrl: json['downloadUrl'] as String?,
-        developer: json['developer'] as String? ?? '',
-        version: json['version'] as String? ?? '',
-        license: _loc(json, 'license'),
-        releaseDate: json['releaseDate'] as String? ?? '',
-        rating: json['rating'] as String? ?? '',
-        featured: json['featured'] as bool? ?? false,
-        tags: _locList(json, 'tags'),
-        screenshots: (json['screenshots'] as List?)?.cast<String>() ?? const [],
-        features: _locList(json, 'features'),
-        systemRequirements: _loc(json, 'systemRequirements'),
-      );
+  factory ToolItem.fromJson(
+    Map<String, dynamic> json, {
+    String categoryKey = '',
+  }) => ToolItem(
+    name: _loc(json, 'name'),
+    desc: _loc(json, 'desc'),
+    icon: json['icon'] as String? ?? 'apps',
+    url: json['url'] as String? ?? '',
+    downloadUrl: json['downloadUrl'] as String?,
+    developer: json['developer'] as String? ?? '',
+    version: json['version'] as String? ?? '',
+    license: _loc(json, 'license'),
+    releaseDate: json['releaseDate'] as String? ?? '',
+    rating: json['rating'] as String? ?? '',
+    featured: json['featured'] as bool? ?? false,
+    tags: _locList(json, 'tags'),
+    screenshots: (json['screenshots'] as List?)?.cast<String>() ?? const [],
+    features: _locList(json, 'features'),
+    systemRequirements: _loc(json, 'systemRequirements'),
+    safetyLevel: ToolSafetyLevel.fromJson(json['safetyLevel'] as String?),
+    categoryKey: categoryKey,
+  );
 
   IconData get iconData => _iconMap[icon] ?? Icons.apps_rounded;
+
+  bool get isActivationRelated => categoryKey == 'tools_cat_activation';
 
   static const _iconMap = <String, IconData>{
     'usb': Icons.usb_rounded,
@@ -124,12 +166,19 @@ class ToolCategory {
   });
 
   factory ToolCategory.fromJson(Map<String, dynamic> json) => ToolCategory(
-        nameKey: json['nameKey'] as String? ?? '',
-        color: json['color'] as String? ?? '#0071C5',
-        tools: (json['tools'] as List?)
-            ?.map((t) => ToolItem.fromJson(t as Map<String, dynamic>))
-            .toList() ?? [],
-      );
+    nameKey: json['nameKey'] as String? ?? '',
+    color: json['color'] as String? ?? '#0071C5',
+    tools:
+        (json['tools'] as List?)
+            ?.map(
+              (t) => ToolItem.fromJson(
+                t as Map<String, dynamic>,
+                categoryKey: json['nameKey'] as String? ?? '',
+              ),
+            )
+            .toList() ??
+        [],
+  );
 
   Color get displayColor {
     final hex = color.replaceFirst('#', '');
@@ -143,13 +192,14 @@ class ToolsData {
   const ToolsData({required this.categories});
 
   factory ToolsData.fromJson(Map<String, dynamic> json) => ToolsData(
-        categories: (json['categories'] as List?)
+    categories:
+        (json['categories'] as List?)
             ?.map((c) => ToolCategory.fromJson(c as Map<String, dynamic>))
-            .toList() ?? [],
-      );
+            .toList() ??
+        [],
+  );
 
-  List<ToolItem> get allTools =>
-      categories.expand((c) => c.tools).toList();
+  List<ToolItem> get allTools => categories.expand((c) => c.tools).toList();
 
   List<ToolItem> get featuredTools =>
       allTools.where((t) => t.featured).toList();
@@ -165,7 +215,9 @@ class ToolsData {
     } catch (_) {}
 
     try {
-      final file = File(p.join(AppConstants.appDataPath, 'WinDeployStudio', 'tools.json'));
+      final file = File(
+        p.join(AppConstants.appDataPath, 'WinDeployStudio', 'tools.json'),
+      );
       if (file.existsSync()) {
         final content = await file.readAsString();
         return ToolsData.fromJson(jsonDecode(content));

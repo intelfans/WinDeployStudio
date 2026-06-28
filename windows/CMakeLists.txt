@@ -10,6 +10,16 @@ set(BINARY_NAME "win_deploy_studio")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+if(POLICY CMP0175)
+  cmake_policy(SET CMP0175 OLD)
+  set(CMAKE_POLICY_DEFAULT_CMP0175 OLD CACHE STRING "Use legacy add_custom_command(TARGET) handling for third-party plugins" FORCE)
+endif()
+
+set(LOCAL_NUGET_EXE "${CMAKE_CURRENT_SOURCE_DIR}/../.tools/nuget/nuget.exe")
+if(EXISTS "${LOCAL_NUGET_EXE}")
+  set(NUGET "${LOCAL_NUGET_EXE}" CACHE FILEPATH "NuGet executable used by Windows plugins" FORCE)
+endif()
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)

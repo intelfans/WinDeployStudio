@@ -1,7 +1,7 @@
 name: win_deploy_studio
-description: "Modern Windows deployment tool - Bootable USB & Windows To Go creator"
+description: "Modern Windows deployment tool - Windows installation media & Windows To Go creator"
 publish_to: 'none'
-version: 1.0.2+1
+version: 1.1.0
 
 environment:
   sdk: ^3.12.0
@@ -13,13 +13,13 @@ dependencies:
     sdk: flutter
 
   # State Management
-  flutter_riverpod: ^2.6.1
+  flutter_riverpod: ^3.3.2
 
   # Database
   sqflite_common_ffi: ^2.3.4+4
 
   # Routing
-  go_router: ^14.8.1
+  go_router: ^17.3.0
 
   # Storage & Paths
   shared_preferences: ^2.3.4
@@ -30,7 +30,7 @@ dependencies:
   logger: ^2.4.0
 
   # File Picker (local ISO import)
-  file_picker: ^8.1.7
+  file_picker: ^11.0.2
 
   # Open browser for mirror downloads
   url_launcher: ^6.3.1
@@ -42,7 +42,7 @@ dependencies:
   http: ^1.2.0
 
   # Markdown rendering
-  flutter_markdown: ^0.7.4+3
+  markdown: ^7.3.1
 
   # WebView (in-app browser)
   webview_windows: ^0.4.0
@@ -55,6 +55,7 @@ dependencies:
   collection: ^1.19.1
   uuid: ^4.5.1
   filesize: ^2.0.1
+  flutter_markdown_plus: ^1.0.7
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +87,3 @@ flutter:
     - assets/intel.ico
     - assets/easter_egg/easter_egg.png
     - assets/intel-1.jpg
-    - assets/adblock/ad_domains.txt
-    - assets/adblock/tracking_domains.txt
-    - assets/adblock/whitelist_domains.txt

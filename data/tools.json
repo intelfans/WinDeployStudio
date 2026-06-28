@@ -14,9 +14,9 @@
           "desc": "快速创建 Windows/Linux 启动盘",
           "desc_zh": "快速创建 Windows/Linux 启动盘",
           "desc_en": "Quickly create Windows/Linux bootable USB drives",
-          "desc_ja": "Windows/Linux起動可能なUSBドライブを素早く作成",
-          "desc_fr": "Créez rapidement des clés USB amorçables Windows/Linux",
-          "desc_ru": "Быстрое создание загрузочных USB-накопителей Windows/Linux",
+          "desc_ja": "Windows/Linux の起動 USB を素早く作成",
+          "desc_fr": "Crée rapidement des clés USB amorçables Windows/Linux",
+          "desc_ru": "Быстро создает загрузочные USB-накопители Windows/Linux",
           "icon": "usb",
           "url": "https://rufus.ie/",
           "downloadUrl": "https://rufus.ie/",
@@ -30,33 +30,202 @@
           "license_ru": "GPL-3.0",
           "rating": "4.8",
           "featured": true,
-          "tags": ["启动盘", "USB", "ISO", "免费", "开源"],
-          "tags_zh": ["启动盘", "USB", "ISO", "免费", "开源"],
-          "tags_en": ["Bootable USB", "USB", "ISO", "Free", "Open Source"],
-          "tags_ja": ["起動USB", "USB", "ISO", "無料", "オープンソース"],
-          "tags_fr": ["USB amorçable", "USB", "ISO", "Gratuit", "Open Source"],
-          "tags_ru": ["Загрузочная USB", "USB", "ISO", "Бесплатно", "Открытый код"],
-          "features": ["UEFI/BIOS 双启动", "GPT/MBR 支持", "Windows To Go", "自动下载 ISO"],
-          "features_zh": ["UEFI/BIOS 双启动", "GPT/MBR 支持", "Windows To Go", "自动下载 ISO"],
-          "features_en": ["UEFI/BIOS dual boot", "GPT/MBR support", "Windows To Go", "Auto-download ISO"],
-          "features_ja": ["UEFI/BIOSデュアルブート", "GPT/MBR対応", "Windows To Go", "ISO自動ダウンロード"],
-          "features_fr": ["Double amorçage UEFI/BIOS", "Support GPT/MBR", "Windows To Go", "Téléchargement automatique ISO"],
-          "features_ru": ["Двойная загрузка UEFI/BIOS", "Поддержка GPT/MBR", "Windows To Go", "Автозагрузка ISO"],
+          "tags": [
+            "启动盘",
+            "USB",
+            "ISO",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "启动盘",
+            "USB",
+            "ISO",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Bootable USB",
+            "USB",
+            "ISO",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "起動 USB",
+            "USB",
+            "ISO",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "USB amorçable",
+            "USB",
+            "ISO",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Загрузочный USB",
+            "USB",
+            "ISO",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "UEFI/BIOS 双启动",
+            "支持 GPT/MBR",
+            "Windows To Go",
+            "自动下载 ISO"
+          ],
+          "features_zh": [
+            "UEFI/BIOS 双启动",
+            "支持 GPT/MBR",
+            "Windows To Go",
+            "自动下载 ISO"
+          ],
+          "features_en": [
+            "UEFI/BIOS dual boot",
+            "GPT/MBR support",
+            "Windows To Go",
+            "Auto-download ISO"
+          ],
+          "features_ja": [
+            "UEFI/BIOS デュアルブート",
+            "GPT/MBR 対応",
+            "Windows To Go",
+            "ISO 自動ダウンロード"
+          ],
+          "features_fr": [
+            "Double amorçage UEFI/BIOS",
+            "Prise en charge GPT/MBR",
+            "Windows To Go",
+            "Téléchargement automatique d’ISO"
+          ],
+          "features_ru": [
+            "Двойная загрузка UEFI/BIOS",
+            "Поддержка GPT/MBR",
+            "Windows To Go",
+            "Автозагрузка ISO"
+          ],
           "systemRequirements": "Windows 8+",
           "systemRequirements_zh": "Windows 8+",
           "systemRequirements_en": "Windows 8+",
           "systemRequirements_ja": "Windows 8+",
           "systemRequirements_fr": "Windows 8+",
-          "systemRequirements_ru": "Windows 8+"
+          "systemRequirements_ru": "Windows 8+",
+          "name_zh_TW": "Rufus",
+          "name_de": "Rufus",
+          "name_es": "Rufus",
+          "name_pt": "Rufus",
+          "name_ar": "Rufus",
+          "name_ko": "Rufus",
+          "desc_zh_TW": "快速建立 Windows/Linux 開機 USB",
+          "desc_de": "Erstellt schnell bootfähige USB-Laufwerke für Windows/Linux",
+          "desc_es": "Crea rápidamente USB de arranque para Windows/Linux",
+          "desc_pt": "Cria rapidamente USBs inicializáveis para Windows/Linux",
+          "desc_ar": "ينشئ بسرعة وحدات USB قابلة للإقلاع لـ Windows/Linux",
+          "desc_ko": "Windows/Linux 부팅 USB를 빠르게 생성",
+          "tags_zh_TW": [
+            "開機 USB",
+            "USB",
+            "ISO",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Bootfähiger USB",
+            "USB",
+            "ISO",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "USB de arranque",
+            "USB",
+            "ISO",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "USB inicializável",
+            "USB",
+            "ISO",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "USB قابل للإقلاع",
+            "USB",
+            "ISO",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "부팅 USB",
+            "USB",
+            "ISO",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "UEFI/BIOS 雙啟動",
+            "支援 GPT/MBR",
+            "Windows To Go",
+            "自動下載 ISO"
+          ],
+          "features_de": [
+            "UEFI/BIOS-Dual-Boot",
+            "GPT/MBR-Unterstützung",
+            "Windows To Go",
+            "ISO automatisch herunterladen"
+          ],
+          "features_es": [
+            "Arranque dual UEFI/BIOS",
+            "Compatibilidad GPT/MBR",
+            "Windows To Go",
+            "Descarga automática de ISO"
+          ],
+          "features_pt": [
+            "Inicialização UEFI/BIOS",
+            "Suporte a GPT/MBR",
+            "Windows To Go",
+            "Download automático de ISO"
+          ],
+          "features_ar": [
+            "إقلاع مزدوج UEFI/BIOS",
+            "دعم GPT/MBR",
+            "Windows To Go",
+            "تنزيل ISO تلقائي"
+          ],
+          "features_ko": [
+            "UEFI/BIOS 듀얼 부팅",
+            "GPT/MBR 지원",
+            "Windows To Go",
+            "ISO 자동 다운로드"
+          ],
+          "license_zh_TW": "GPL-3.0",
+          "license_de": "GPL-3.0",
+          "license_es": "GPL-3.0",
+          "license_pt": "GPL-3.0",
+          "license_ar": "GPL-3.0",
+          "license_ko": "GPL-3.0",
+          "systemRequirements_zh_TW": "Windows 8+",
+          "systemRequirements_de": "Windows 8+",
+          "systemRequirements_es": "Windows 8+",
+          "systemRequirements_pt": "Windows 8+",
+          "systemRequirements_ar": "Windows 8+",
+          "systemRequirements_ko": "Windows 8+",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "Ventoy",
-          "desc": "多 ISO 一键启动 U 盘解决方案",
-          "desc_zh": "多 ISO 一键启动 U 盘解决方案",
+          "desc": "多 ISO 一键启动 U 盘方案",
+          "desc_zh": "多 ISO 一键启动 U 盘方案",
           "desc_en": "Multi-ISO one-click bootable USB solution",
-          "desc_ja": "複数ISO対応ワンクリック起動USBソリューション",
+          "desc_ja": "複数 ISO 対応のワンクリック起動 USB ソリューション",
           "desc_fr": "Solution USB amorçable multi-ISO en un clic",
-          "desc_ru": "Решение для мультизагрузки USB с несколькими ISO",
+          "desc_ru": "Мультизагрузочная USB-система для нескольких ISO в один клик",
           "icon": "usb",
           "url": "https://ventoy.net/",
           "downloadUrl": "https://ventoy.net/",
@@ -70,33 +239,195 @@
           "license_ru": "GPL-3.0",
           "rating": "4.9",
           "featured": true,
-          "tags": ["多启动", "USB", "免费", "开源"],
-          "tags_zh": ["多启动", "USB", "免费", "开源"],
-          "tags_en": ["Multi-boot", "USB", "Free", "Open Source"],
-          "tags_ja": ["マルチブート", "USB", "無料", "オープンソース"],
-          "tags_fr": ["Multi-amorçage", "USB", "Gratuit", "Open Source"],
-          "tags_ru": ["Мультизагрузка", "USB", "Бесплатно", "Открытый код"],
-          "features": ["一个 U 盘放多个 ISO", "无需反复格式化", "UEFI/BIOS 支持", "超过 1000+ ISO 测试"],
-          "features_zh": ["一个 U 盘放多个 ISO", "无需反复格式化", "UEFI/BIOS 支持", "超过 1000+ ISO 测试"],
-          "features_en": ["Multiple ISOs on one USB", "No reformatting needed", "UEFI/BIOS support", "1000+ ISOs tested"],
-          "features_ja": ["1本のUSBに複数ISO保存", "再フォーマット不要", "UEFI/BIOS対応", "1000+ISOテスト済み"],
-          "features_fr": ["Plusieurs ISO sur une clé USB", "Pas de reformatage nécessaire", "Support UEFI/BIOS", "Plus de 1000 ISO testés"],
-          "features_ru": ["Несколько ISO на одной флешке", "Без переформатирования", "Поддержка UEFI/BIOS", "Более 1000 ISO протестировано"],
+          "tags": [
+            "多启动",
+            "USB",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "多启动",
+            "USB",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Multi-boot",
+            "USB",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "マルチブート",
+            "USB",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Multi-boot",
+            "USB",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Мультизагрузка",
+            "USB",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "一个 U 盘放多个 ISO",
+            "无需反复格式化",
+            "支持 UEFI/BIOS",
+            "已测试 1000+ ISO"
+          ],
+          "features_zh": [
+            "一个 U 盘放多个 ISO",
+            "无需反复格式化",
+            "支持 UEFI/BIOS",
+            "已测试 1000+ ISO"
+          ],
+          "features_en": [
+            "Multiple ISOs on one USB",
+            "No reformatting needed",
+            "UEFI/BIOS support",
+            "1000+ ISOs tested"
+          ],
+          "features_ja": [
+            "1本の USB に複数 ISO を保存",
+            "再フォーマット不要",
+            "UEFI/BIOS 対応",
+            "1000 以上の ISO でテスト済み"
+          ],
+          "features_fr": [
+            "Plusieurs ISO sur une seule clé USB",
+            "Aucun reformatage nécessaire",
+            "Prise en charge UEFI/BIOS",
+            "Plus de 1000 ISO testées"
+          ],
+          "features_ru": [
+            "Несколько ISO на одном USB",
+            "Не нужно переформатировать",
+            "Поддержка UEFI/BIOS",
+            "Проверено более 1000 ISO"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "Ventoy",
+          "name_zh_TW": "Ventoy",
+          "name_en": "Ventoy",
+          "name_fr": "Ventoy",
+          "name_de": "Ventoy",
+          "name_es": "Ventoy",
+          "name_pt": "Ventoy",
+          "name_ru": "Ventoy",
+          "name_ar": "Ventoy",
+          "name_ko": "Ventoy",
+          "name_ja": "Ventoy",
+          "desc_zh_TW": "多 ISO 一鍵開機 USB 方案",
+          "desc_de": "Multi-ISO-Lösung für bootfähige USB-Sticks mit einem Klick",
+          "desc_es": "Solución USB de arranque multi-ISO en un clic",
+          "desc_pt": "Solução USB inicializável multi-ISO em um clique",
+          "desc_ar": "حل USB متعدد ISO قابل للإقلاع بنقرة واحدة",
+          "desc_ko": "여러 ISO를 담는 원클릭 부팅 USB 솔루션",
+          "tags_zh_TW": [
+            "多重開機",
+            "USB",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Multi-Boot",
+            "USB",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Multiarranque",
+            "USB",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Multi-boot",
+            "USB",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "تعدد الإقلاع",
+            "USB",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "멀티 부팅",
+            "USB",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "一支 USB 放多個 ISO",
+            "不必反覆格式化",
+            "支援 UEFI/BIOS",
+            "已測試 1000+ ISO"
+          ],
+          "features_de": [
+            "Mehrere ISOs auf einem USB-Stick",
+            "Keine Neuformatierung nötig",
+            "UEFI/BIOS-Unterstützung",
+            "Über 1000 ISOs getestet"
+          ],
+          "features_es": [
+            "Varios ISO en un solo USB",
+            "Sin reformatear",
+            "Compatibilidad UEFI/BIOS",
+            "Más de 1000 ISO probadas"
+          ],
+          "features_pt": [
+            "Várias ISOs em um USB",
+            "Sem reformatar",
+            "Suporte a UEFI/BIOS",
+            "Mais de 1000 ISOs testadas"
+          ],
+          "features_ar": [
+            "عدة ملفات ISO على USB واحد",
+            "لا حاجة لإعادة التهيئة",
+            "دعم UEFI/BIOS",
+            "اختُبر مع أكثر من 1000 ملف ISO"
+          ],
+          "features_ko": [
+            "USB 하나에 여러 ISO 저장",
+            "재포맷 불필요",
+            "UEFI/BIOS 지원",
+            "1000개 이상 ISO 테스트"
+          ],
+          "license_zh_TW": "GPL-3.0",
+          "license_de": "GPL-3.0",
+          "license_es": "GPL-3.0",
+          "license_pt": "GPL-3.0",
+          "license_ar": "GPL-3.0",
+          "license_ko": "GPL-3.0",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "Dism++",
-          "desc": "Windows 系统精简、优化、备份工具",
-          "desc_zh": "Windows 系统精简、优化、备份工具",
+          "desc": "Windows 系统精简、优化与备份工具",
+          "desc_zh": "Windows 系统精简、优化与备份工具",
           "desc_en": "Windows system slimming, optimization and backup tool",
-          "desc_ja": "Windowsシステムの軽量化・最適化・バックアップツール",
-          "desc_fr": "Outil d'allègement, d'optimisation et de sauvegarde Windows",
-          "desc_ru": "Инструмент оптимизации, облегчения и резервного копирования Windows",
+          "desc_ja": "Windows の軽量化、最適化、バックアップツール",
+          "desc_fr": "Outil d’allègement, d’optimisation et de sauvegarde Windows",
+          "desc_ru": "Инструмент для облегчения, оптимизации и резервного копирования Windows",
           "icon": "system",
           "url": "https://www.chuyu.me/",
           "developer": "Chuyu Team",
@@ -105,37 +436,199 @@
           "license_zh": "开源",
           "license_en": "Open Source",
           "license_ja": "オープンソース",
-          "license_fr": "Open Source",
+          "license_fr": "Open source",
           "license_ru": "Открытый код",
           "rating": "4.7",
           "featured": true,
-          "tags": ["精简", "优化", "备份", "免费"],
-          "tags_zh": ["精简", "优化", "备份", "免费"],
-          "tags_en": ["Slimming", "Optimization", "Backup", "Free"],
-          "tags_ja": ["軽量化", "最適化", "バックアップ", "無料"],
-          "tags_fr": ["Allègement", "Optimisation", "Sauvegarde", "Gratuit"],
-          "tags_ru": ["Облегчение", "Оптимизация", "Резервное копирование", "Бесплатно"],
-          "features": ["系统精简", "驱动管理", "更新管理", "系统备份恢复"],
-          "features_zh": ["系统精简", "驱动管理", "更新管理", "系统备份恢复"],
-          "features_en": ["System slimming", "Driver management", "Update management", "System backup & restore"],
-          "features_ja": ["システム軽量化", "ドライバ管理", "更新管理", "システムバックアップ・復元"],
-          "features_fr": ["Allègement du système", "Gestion des pilotes", "Gestion des mises à jour", "Sauvegarde et restauration"],
-          "features_ru": ["Облегчение системы", "Управление драйверами", "Управление обновлениями", "Резервное копирование и восстановление"],
+          "tags": [
+            "精简",
+            "优化",
+            "备份",
+            "免费"
+          ],
+          "tags_zh": [
+            "精简",
+            "优化",
+            "备份",
+            "免费"
+          ],
+          "tags_en": [
+            "Slimming",
+            "Optimization",
+            "Backup",
+            "Free"
+          ],
+          "tags_ja": [
+            "軽量化",
+            "最適化",
+            "バックアップ",
+            "無料"
+          ],
+          "tags_fr": [
+            "Allègement",
+            "Optimisation",
+            "Sauvegarde",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Облегчение",
+            "Оптимизация",
+            "Резервное копирование",
+            "Бесплатно"
+          ],
+          "features": [
+            "系统精简",
+            "驱动管理",
+            "更新管理",
+            "系统备份与还原"
+          ],
+          "features_zh": [
+            "系统精简",
+            "驱动管理",
+            "更新管理",
+            "系统备份与还原"
+          ],
+          "features_en": [
+            "System slimming",
+            "Driver management",
+            "Update management",
+            "System backup & restore"
+          ],
+          "features_ja": [
+            "システム軽量化",
+            "ドライバー管理",
+            "更新管理",
+            "システムのバックアップと復元"
+          ],
+          "features_fr": [
+            "Allègement du système",
+            "Gestion des pilotes",
+            "Gestion des mises à jour",
+            "Sauvegarde et restauration système"
+          ],
+          "features_ru": [
+            "Облегчение системы",
+            "Управление драйверами",
+            "Управление обновлениями",
+            "Резервное копирование и восстановление"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "Dism++",
+          "name_zh_TW": "Dism++",
+          "name_en": "Dism++",
+          "name_fr": "Dism++",
+          "name_de": "Dism++",
+          "name_es": "Dism++",
+          "name_pt": "Dism++",
+          "name_ru": "Dism++",
+          "name_ar": "Dism++",
+          "name_ko": "Dism++",
+          "name_ja": "Dism++",
+          "desc_zh_TW": "Windows 系統精簡、最佳化與備份工具",
+          "desc_de": "Werkzeug zum Verschlanken, Optimieren und Sichern von Windows",
+          "desc_es": "Herramienta para aligerar, optimizar y respaldar Windows",
+          "desc_pt": "Ferramenta para reduzir, otimizar e fazer backup do Windows",
+          "desc_ar": "أداة لتخفيف Windows وتحسينه ونسخه احتياطيًا",
+          "desc_ko": "Windows 시스템 경량화, 최적화, 백업 도구",
+          "tags_zh_TW": [
+            "精簡",
+            "最佳化",
+            "備份",
+            "免費"
+          ],
+          "tags_de": [
+            "Verschlanken",
+            "Optimierung",
+            "Backup",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Aligerar",
+            "Optimización",
+            "Copia de seguridad",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Redução",
+            "Otimização",
+            "Backup",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "تخفيف النظام",
+            "تحسين",
+            "نسخ احتياطي",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "경량화",
+            "최적화",
+            "백업",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "系統精簡",
+            "驅動管理",
+            "更新管理",
+            "系統備份與還原"
+          ],
+          "features_de": [
+            "System verschlanken",
+            "Treiberverwaltung",
+            "Update-Verwaltung",
+            "Systemsicherung und Wiederherstellung"
+          ],
+          "features_es": [
+            "Aligeramiento del sistema",
+            "Gestión de controladores",
+            "Gestión de actualizaciones",
+            "Copia y restauración del sistema"
+          ],
+          "features_pt": [
+            "Redução do sistema",
+            "Gerenciamento de drivers",
+            "Gerenciamento de atualizações",
+            "Backup e restauração do sistema"
+          ],
+          "features_ar": [
+            "تخفيف النظام",
+            "إدارة التعريفات",
+            "إدارة التحديثات",
+            "نسخ النظام واستعادته"
+          ],
+          "features_ko": [
+            "시스템 경량화",
+            "드라이버 관리",
+            "업데이트 관리",
+            "시스템 백업 및 복원"
+          ],
+          "license_zh_TW": "開源",
+          "license_de": "Open Source",
+          "license_es": "Código abierto",
+          "license_pt": "Código aberto",
+          "license_ar": "مفتوح المصدر",
+          "license_ko": "오픈 소스",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "WinNTSetup",
-          "desc": "Windows 安装部署工具",
-          "desc_zh": "Windows 安装部署工具",
+          "desc": "Windows 安装与部署工具",
+          "desc_zh": "Windows 安装与部署工具",
           "desc_en": "Windows installation and deployment tool",
-          "desc_ja": "Windowsインストール・デプロイメントツール",
-          "desc_fr": "Outil d'installation et de déploiement Windows",
-          "desc_ru": "Инструмент установки и развёртывания Windows",
+          "desc_ja": "Windows のインストールと展開ツール",
+          "desc_fr": "Outil d’installation et de déploiement Windows",
+          "desc_ru": "Инструмент установки и развертывания Windows",
           "icon": "system",
           "url": "https://www.msfn.org/board/topic/149612-winntsetup/",
           "developer": "JFX",
@@ -146,24 +639,174 @@
           "license_ja": "無料",
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
-          "tags": ["安装", "部署", "免费"],
-          "tags_zh": ["安装", "部署", "免费"],
-          "tags_en": ["Install", "Deploy", "Free"],
-          "tags_ja": ["インストール", "デプロイ", "無料"],
-          "tags_fr": ["Installation", "Déploiement", "Gratuit"],
-          "tags_ru": ["Установка", "Развёртывание", "Бесплатно"],
-          "features": ["直接安装 WIM/ESD", "无人值守安装", "驱动集成", "BCD 编辑"],
-          "features_zh": ["直接安装 WIM/ESD", "无人值守安装", "驱动集成", "BCD 编辑"],
-          "features_en": ["Direct WIM/ESD install", "Unattended install", "Driver integration", "BCD editing"],
-          "features_ja": ["WIM/ESD直接インストール", "無人インストール", "ドライバ統合", "BCD編集"],
-          "features_fr": ["Installation directe WIM/ESD", "Installation automatisée", "Intégration de pilotes", "Édition BCD"],
-          "features_ru": ["Прямая установка WIM/ESD", "Автоматическая установка", "Интеграция драйверов", "Редактирование BCD"],
+          "tags": [
+            "安装",
+            "部署",
+            "免费"
+          ],
+          "tags_zh": [
+            "安装",
+            "部署",
+            "免费"
+          ],
+          "tags_en": [
+            "Install",
+            "Deploy",
+            "Free"
+          ],
+          "tags_ja": [
+            "インストール",
+            "展開",
+            "無料"
+          ],
+          "tags_fr": [
+            "Installation",
+            "Déploiement",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Установка",
+            "Развертывание",
+            "Бесплатно"
+          ],
+          "features": [
+            "直接安装 WIM/ESD",
+            "无人值守安装",
+            "驱动集成",
+            "BCD 编辑"
+          ],
+          "features_zh": [
+            "直接安装 WIM/ESD",
+            "无人值守安装",
+            "驱动集成",
+            "BCD 编辑"
+          ],
+          "features_en": [
+            "Direct WIM/ESD install",
+            "Unattended install",
+            "Driver integration",
+            "BCD editing"
+          ],
+          "features_ja": [
+            "WIM/ESD の直接インストール",
+            "無人インストール",
+            "ドライバー統合",
+            "BCD 編集"
+          ],
+          "features_fr": [
+            "Installation directe de WIM/ESD",
+            "Installation sans surveillance",
+            "Intégration des pilotes",
+            "Édition BCD"
+          ],
+          "features_ru": [
+            "Прямая установка WIM/ESD",
+            "Автоматическая установка",
+            "Интеграция драйверов",
+            "Редактирование BCD"
+          ],
           "systemRequirements": "Windows XP+",
           "systemRequirements_zh": "Windows XP+",
           "systemRequirements_en": "Windows XP+",
           "systemRequirements_ja": "Windows XP+",
           "systemRequirements_fr": "Windows XP+",
-          "systemRequirements_ru": "Windows XP+"
+          "systemRequirements_ru": "Windows XP+",
+          "name_zh": "WinNTSetup",
+          "name_zh_TW": "WinNTSetup",
+          "name_en": "WinNTSetup",
+          "name_fr": "WinNTSetup",
+          "name_de": "WinNTSetup",
+          "name_es": "WinNTSetup",
+          "name_pt": "WinNTSetup",
+          "name_ru": "WinNTSetup",
+          "name_ar": "WinNTSetup",
+          "name_ko": "WinNTSetup",
+          "name_ja": "WinNTSetup",
+          "desc_zh_TW": "Windows 安裝與部署工具",
+          "desc_de": "Werkzeug für Windows-Installation und -Bereitstellung",
+          "desc_es": "Herramienta de instalación y despliegue de Windows",
+          "desc_pt": "Ferramenta de instalação e implantação do Windows",
+          "desc_ar": "أداة تثبيت ونشر Windows",
+          "desc_ko": "Windows 설치 및 배포 도구",
+          "tags_zh_TW": [
+            "安裝",
+            "部署",
+            "免費"
+          ],
+          "tags_de": [
+            "Installation",
+            "Bereitstellung",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Instalación",
+            "Despliegue",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Instalação",
+            "Implantação",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "تثبيت",
+            "نشر",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "설치",
+            "배포",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "直接安裝 WIM/ESD",
+            "自動安裝",
+            "整合驅動",
+            "BCD 編輯"
+          ],
+          "features_de": [
+            "Direkte WIM/ESD-Installation",
+            "Unbeaufsichtigte Installation",
+            "Treiberintegration",
+            "BCD-Bearbeitung"
+          ],
+          "features_es": [
+            "Instalación directa de WIM/ESD",
+            "Instalación desatendida",
+            "Integración de controladores",
+            "Edición de BCD"
+          ],
+          "features_pt": [
+            "Instalação direta de WIM/ESD",
+            "Instalação autônoma",
+            "Integração de drivers",
+            "Edição do BCD"
+          ],
+          "features_ar": [
+            "تثبيت WIM/ESD مباشرة",
+            "تثبيت غير مراقب",
+            "دمج التعريفات",
+            "تحرير BCD"
+          ],
+          "features_ko": [
+            "WIM/ESD 직접 설치",
+            "무인 설치",
+            "드라이버 통합",
+            "BCD 편집"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows XP+",
+          "systemRequirements_de": "Windows XP+",
+          "systemRequirements_es": "Windows XP+",
+          "systemRequirements_pt": "Windows XP+",
+          "systemRequirements_ar": "Windows XP+",
+          "systemRequirements_ko": "Windows XP+",
+          "safetyLevel": "Expert"
         }
       ]
     },
@@ -173,12 +816,12 @@
       "tools": [
         {
           "name": "CrystalDiskInfo",
-          "desc": "硬盘健康状态检测工具",
-          "desc_zh": "硬盘健康状态检测工具",
+          "desc": "硬盘健康状态监控工具",
+          "desc_zh": "硬盘健康状态监控工具",
           "desc_en": "Hard drive health monitoring tool",
-          "desc_ja": "ハードディスク健康状態モニタリングツール",
-          "desc_fr": "Outil de surveillance de l'état de santé du disque dur",
-          "desc_ru": "Инструмент мониторинга состояния жёсткого диска",
+          "desc_ja": "ディスクの健康状態を監視するツール",
+          "desc_fr": "Outil de surveillance de l’état des disques",
+          "desc_ru": "Инструмент мониторинга состояния дисков",
           "icon": "disk",
           "url": "https://crystalmark.info/en/software/crystaldiskinfo/",
           "downloadUrl": "https://crystalmark.info/en/software/crystaldiskinfo/",
@@ -192,33 +835,195 @@
           "license_ru": "MIT",
           "rating": "4.8",
           "featured": true,
-          "tags": ["S.M.A.R.T", "健康检测", "免费", "开源"],
-          "tags_zh": ["S.M.A.R.T", "健康检测", "免费", "开源"],
-          "tags_en": ["S.M.A.R.T", "Health Check", "Free", "Open Source"],
-          "tags_ja": ["S.M.A.R.T", "健康チェック", "無料", "オープンソース"],
-          "tags_fr": ["S.M.A.R.T", "Contrôle santé", "Gratuit", "Open Source"],
-          "tags_ru": ["S.M.A.R.T", "Проверка здоровья", "Бесплатно", "Открытый код"],
-          "features": ["S.M.A.R.T 监控", "温度监控", "硬盘信息", "USB/NVMe 支持"],
-          "features_zh": ["S.M.A.R.T 监控", "温度监控", "硬盘信息", "USB/NVMe 支持"],
-          "features_en": ["S.M.A.R.T monitoring", "Temperature monitoring", "Drive info", "USB/NVMe support"],
-          "features_ja": ["S.M.A.R.T監視", "温度モニタリング", "ドライブ情報", "USB/NVMe対応"],
-          "features_fr": ["Surveillance S.M.A.R.T", "Surveillance de la température", "Informations disque", "Support USB/NVMe"],
-          "features_ru": ["Мониторинг S.M.A.R.T", "Мониторинг температуры", "Информация о диске", "Поддержка USB/NVMe"],
+          "tags": [
+            "S.M.A.R.T",
+            "健康检测",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "S.M.A.R.T",
+            "健康检测",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "S.M.A.R.T",
+            "Health Check",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "S.M.A.R.T",
+            "健康チェック",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "S.M.A.R.T",
+            "Contrôle santé",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "S.M.A.R.T",
+            "Проверка состояния",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "S.M.A.R.T 监控",
+            "温度监控",
+            "硬盘信息",
+            "支持 USB/NVMe"
+          ],
+          "features_zh": [
+            "S.M.A.R.T 监控",
+            "温度监控",
+            "硬盘信息",
+            "支持 USB/NVMe"
+          ],
+          "features_en": [
+            "S.M.A.R.T monitoring",
+            "Temperature monitoring",
+            "Drive info",
+            "USB/NVMe support"
+          ],
+          "features_ja": [
+            "S.M.A.R.T 監視",
+            "温度監視",
+            "ドライブ情報",
+            "USB/NVMe 対応"
+          ],
+          "features_fr": [
+            "Surveillance S.M.A.R.T",
+            "Suivi de la température",
+            "Informations du disque",
+            "Prise en charge USB/NVMe"
+          ],
+          "features_ru": [
+            "Мониторинг S.M.A.R.T",
+            "Мониторинг температуры",
+            "Информация о диске",
+            "Поддержка USB/NVMe"
+          ],
           "systemRequirements": "Windows 8.1+",
           "systemRequirements_zh": "Windows 8.1+",
           "systemRequirements_en": "Windows 8.1+",
           "systemRequirements_ja": "Windows 8.1+",
           "systemRequirements_fr": "Windows 8.1+",
-          "systemRequirements_ru": "Windows 8.1+"
+          "systemRequirements_ru": "Windows 8.1+",
+          "name_zh": "CrystalDiskInfo",
+          "name_zh_TW": "CrystalDiskInfo",
+          "name_en": "CrystalDiskInfo",
+          "name_fr": "CrystalDiskInfo",
+          "name_de": "CrystalDiskInfo",
+          "name_es": "CrystalDiskInfo",
+          "name_pt": "CrystalDiskInfo",
+          "name_ru": "CrystalDiskInfo",
+          "name_ar": "CrystalDiskInfo",
+          "name_ko": "CrystalDiskInfo",
+          "name_ja": "CrystalDiskInfo",
+          "desc_zh_TW": "硬碟健康狀態監控工具",
+          "desc_de": "Werkzeug zur Überwachung des Laufwerkszustands",
+          "desc_es": "Herramienta para supervisar la salud del disco",
+          "desc_pt": "Ferramenta de monitoramento da saúde do disco",
+          "desc_ar": "أداة لمراقبة صحة الأقراص",
+          "desc_ko": "디스크 상태 모니터링 도구",
+          "tags_zh_TW": [
+            "S.M.A.R.T",
+            "健康檢測",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "S.M.A.R.T",
+            "Zustandsprüfung",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "S.M.A.R.T",
+            "Salud del disco",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "S.M.A.R.T",
+            "Saúde do disco",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "S.M.A.R.T",
+            "فحص الصحة",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "S.M.A.R.T",
+            "상태 검사",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "S.M.A.R.T 監控",
+            "溫度監控",
+            "硬碟資訊",
+            "支援 USB/NVMe"
+          ],
+          "features_de": [
+            "S.M.A.R.T-Überwachung",
+            "Temperaturüberwachung",
+            "Laufwerksinformationen",
+            "USB/NVMe-Unterstützung"
+          ],
+          "features_es": [
+            "Supervisión S.M.A.R.T",
+            "Temperatura",
+            "Información del disco",
+            "Compatibilidad USB/NVMe"
+          ],
+          "features_pt": [
+            "Monitoramento S.M.A.R.T",
+            "Temperatura",
+            "Informações do disco",
+            "Suporte a USB/NVMe"
+          ],
+          "features_ar": [
+            "مراقبة S.M.A.R.T",
+            "مراقبة الحرارة",
+            "معلومات القرص",
+            "دعم USB/NVMe"
+          ],
+          "features_ko": [
+            "S.M.A.R.T 모니터링",
+            "온도 모니터링",
+            "드라이브 정보",
+            "USB/NVMe 지원"
+          ],
+          "license_zh_TW": "MIT",
+          "license_de": "MIT",
+          "license_es": "MIT",
+          "license_pt": "MIT",
+          "license_ar": "MIT",
+          "license_ko": "MIT",
+          "systemRequirements_zh_TW": "Windows 8.1+",
+          "systemRequirements_de": "Windows 8.1+",
+          "systemRequirements_es": "Windows 8.1+",
+          "systemRequirements_pt": "Windows 8.1+",
+          "systemRequirements_ar": "Windows 8.1+",
+          "systemRequirements_ko": "Windows 8.1+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "CrystalDiskMark",
-          "desc": "硬盘读写速度测试工具",
-          "desc_zh": "硬盘读写速度测试工具",
+          "desc": "磁盘读写速度基准测试工具",
+          "desc_zh": "磁盘读写速度基准测试工具",
           "desc_en": "Disk read/write speed benchmark tool",
-          "desc_ja": "ディスク読み書き速度ベンチマークツール",
-          "desc_fr": "Outil de benchmark de vitesse lecture/écriture disque",
-          "desc_ru": "Инструмент тестирования скорости чтения/записи диска",
+          "desc_ja": "ディスク読み書き速度のベンチマークツール",
+          "desc_fr": "Outil de benchmark de vitesse disque",
+          "desc_ru": "Тест скорости чтения и записи диска",
           "icon": "speed",
           "url": "https://crystalmark.info/en/software/crystaldiskmark/",
           "downloadUrl": "https://crystalmark.info/en/software/crystaldiskmark/",
@@ -231,33 +1036,195 @@
           "license_fr": "MIT",
           "license_ru": "MIT",
           "rating": "4.7",
-          "tags": ["测速", "基准测试", "免费", "开源"],
-          "tags_zh": ["测速", "基准测试", "免费", "开源"],
-          "tags_en": ["Speed Test", "Benchmark", "Free", "Open Source"],
-          "tags_ja": ["速度測定", "ベンチマーク", "無料", "オープンソース"],
-          "tags_fr": ["Test de vitesse", "Benchmark", "Gratuit", "Open Source"],
-          "tags_ru": ["Тест скорости", "Бенчмарк", "Бесплатно", "Открытый код"],
-          "features": ["顺序/随机读写", "多队列深度", "自定义测试大小", "NVMe 支持"],
-          "features_zh": ["顺序/随机读写", "多队列深度", "自定义测试大小", "NVMe 支持"],
-          "features_en": ["Sequential/random R/W", "Multiple queue depth", "Custom test sizes", "NVMe support"],
-          "features_ja": ["順次/ランダムR/W", "マルチキュー深度", "テストサイズ指定", "NVMe対応"],
-          "features_fr": ["Lecture/écriture séquentielle/aléatoire", "Profondeur de file multi-queue", "Tailles de test personnalisées", "Support NVMe"],
-          "features_ru": ["Последовательное/случайное чтение-запись", "Множественная глубина очереди", "Настраиваемый размер теста", "Поддержка NVMe"],
+          "tags": [
+            "测速",
+            "基准测试",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "测速",
+            "基准测试",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Speed Test",
+            "Benchmark",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "速度テスト",
+            "ベンチマーク",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Test de vitesse",
+            "Benchmark",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Тест скорости",
+            "Бенчмарк",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "顺序/随机读写",
+            "多队列深度",
+            "自定义测试大小",
+            "支持 NVMe"
+          ],
+          "features_zh": [
+            "顺序/随机读写",
+            "多队列深度",
+            "自定义测试大小",
+            "支持 NVMe"
+          ],
+          "features_en": [
+            "Sequential/random R/W",
+            "Multiple queue depth",
+            "Custom test sizes",
+            "NVMe support"
+          ],
+          "features_ja": [
+            "シーケンシャル/ランダム読み書き",
+            "複数のキュー深度",
+            "テストサイズの指定",
+            "NVMe 対応"
+          ],
+          "features_fr": [
+            "Lecture/écriture séquentielle et aléatoire",
+            "Plusieurs profondeurs de file",
+            "Tailles de test personnalisées",
+            "Prise en charge NVMe"
+          ],
+          "features_ru": [
+            "Последовательное/случайное чтение и запись",
+            "Разные глубины очереди",
+            "Настраиваемые размеры теста",
+            "Поддержка NVMe"
+          ],
           "systemRequirements": "Windows 8.1+",
           "systemRequirements_zh": "Windows 8.1+",
           "systemRequirements_en": "Windows 8.1+",
           "systemRequirements_ja": "Windows 8.1+",
           "systemRequirements_fr": "Windows 8.1+",
-          "systemRequirements_ru": "Windows 8.1+"
+          "systemRequirements_ru": "Windows 8.1+",
+          "name_zh": "CrystalDiskMark",
+          "name_zh_TW": "CrystalDiskMark",
+          "name_en": "CrystalDiskMark",
+          "name_fr": "CrystalDiskMark",
+          "name_de": "CrystalDiskMark",
+          "name_es": "CrystalDiskMark",
+          "name_pt": "CrystalDiskMark",
+          "name_ru": "CrystalDiskMark",
+          "name_ar": "CrystalDiskMark",
+          "name_ko": "CrystalDiskMark",
+          "name_ja": "CrystalDiskMark",
+          "desc_zh_TW": "磁碟讀寫速度基準測試工具",
+          "desc_de": "Benchmark für Lese- und Schreibgeschwindigkeit von Datenträgern",
+          "desc_es": "Prueba de velocidad de lectura/escritura de disco",
+          "desc_pt": "Benchmark de velocidade de leitura/gravação do disco",
+          "desc_ar": "أداة اختبار سرعة قراءة وكتابة القرص",
+          "desc_ko": "디스크 읽기/쓰기 속도 벤치마크 도구",
+          "tags_zh_TW": [
+            "測速",
+            "基準測試",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Geschwindigkeitstest",
+            "Benchmark",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Prueba de velocidad",
+            "Benchmark",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Teste de velocidade",
+            "Benchmark",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "اختبار سرعة",
+            "قياس أداء",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "속도 테스트",
+            "벤치마크",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "循序/隨機讀寫",
+            "多佇列深度",
+            "自訂測試大小",
+            "支援 NVMe"
+          ],
+          "features_de": [
+            "Sequenziell/zufällig lesen und schreiben",
+            "Mehrere Queue-Tiefen",
+            "Eigene Testgrößen",
+            "NVMe-Unterstützung"
+          ],
+          "features_es": [
+            "Lectura/escritura secuencial y aleatoria",
+            "Varias profundidades de cola",
+            "Tamaños de prueba personalizados",
+            "Compatibilidad NVMe"
+          ],
+          "features_pt": [
+            "Leitura/gravação sequencial e aleatória",
+            "Várias profundidades de fila",
+            "Tamanhos de teste personalizados",
+            "Suporte a NVMe"
+          ],
+          "features_ar": [
+            "قراءة/كتابة متسلسلة وعشوائية",
+            "أعماق صف متعددة",
+            "أحجام اختبار مخصصة",
+            "دعم NVMe"
+          ],
+          "features_ko": [
+            "순차/무작위 읽기/쓰기",
+            "다중 큐 깊이",
+            "사용자 지정 테스트 크기",
+            "NVMe 지원"
+          ],
+          "license_zh_TW": "MIT",
+          "license_de": "MIT",
+          "license_es": "MIT",
+          "license_pt": "MIT",
+          "license_ar": "MIT",
+          "license_ko": "MIT",
+          "systemRequirements_zh_TW": "Windows 8.1+",
+          "systemRequirements_de": "Windows 8.1+",
+          "systemRequirements_es": "Windows 8.1+",
+          "systemRequirements_pt": "Windows 8.1+",
+          "systemRequirements_ar": "Windows 8.1+",
+          "systemRequirements_ko": "Windows 8.1+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "Victoria",
           "desc": "硬盘坏道检测与修复工具",
           "desc_zh": "硬盘坏道检测与修复工具",
           "desc_en": "Hard drive bad sector detection and repair tool",
-          "desc_ja": "ハードディスク不良セクタ検出・修復ツール",
-          "desc_fr": "Outil de détection et réparation de secteurs défectueux",
-          "desc_ru": "Инструмент обнаружения и исправления битых секторов",
+          "desc_ja": "不良セクターの検出と修復ツール",
+          "desc_fr": "Outil de détection et réparation des secteurs défectueux",
+          "desc_ru": "Инструмент для поиска и ремонта плохих секторов",
           "icon": "disk",
           "url": "https://hdd.by/victoria/",
           "developer": "Sergei Kazenko",
@@ -268,32 +1235,182 @@
           "license_ja": "無料",
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
-          "tags": ["坏道", "修复", "免费"],
-          "tags_zh": ["坏道", "修复", "免费"],
-          "tags_en": ["Bad Sectors", "Repair", "Free"],
-          "tags_ja": ["不良セクタ", "修復", "無料"],
-          "tags_fr": ["Secteurs défectueux", "Réparation", "Gratuit"],
-          "tags_ru": ["Битые секторы", "Ремонт", "Бесплатно"],
-          "features": ["坏道扫描", "坏道修复", "S.M.A.R.T 读取", "磁盘表面测试"],
-          "features_zh": ["坏道扫描", "坏道修复", "S.M.A.R.T 读取", "磁盘表面测试"],
-          "features_en": ["Bad sector scan", "Bad sector repair", "S.M.A.R.T reading", "Disk surface test"],
-          "features_ja": ["不良セクタスキャン", "不良セクタ修復", "S.M.A.R.T読み取り", "ディスク表面テスト"],
-          "features_fr": ["Analyse des secteurs défectueux", "Réparation des secteurs", "Lecture S.M.A.R.T", "Test de surface du disque"],
-          "features_ru": ["Сканирование битых секторов", "Исправление битых секторов", "Чтение S.M.A.R.T", "Тест поверхности диска"],
+          "tags": [
+            "坏道",
+            "修复",
+            "免费"
+          ],
+          "tags_zh": [
+            "坏道",
+            "修复",
+            "免费"
+          ],
+          "tags_en": [
+            "Bad Sectors",
+            "Repair",
+            "Free"
+          ],
+          "tags_ja": [
+            "不良セクター",
+            "修復",
+            "無料"
+          ],
+          "tags_fr": [
+            "Secteurs défectueux",
+            "Réparation",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Плохие секторы",
+            "Ремонт",
+            "Бесплатно"
+          ],
+          "features": [
+            "坏道扫描",
+            "坏道修复",
+            "读取 S.M.A.R.T",
+            "磁盘表面测试"
+          ],
+          "features_zh": [
+            "坏道扫描",
+            "坏道修复",
+            "读取 S.M.A.R.T",
+            "磁盘表面测试"
+          ],
+          "features_en": [
+            "Bad sector scan",
+            "Bad sector repair",
+            "S.M.A.R.T reading",
+            "Disk surface test"
+          ],
+          "features_ja": [
+            "不良セクタースキャン",
+            "不良セクター修復",
+            "S.M.A.R.T 読み取り",
+            "ディスク表面テスト"
+          ],
+          "features_fr": [
+            "Analyse des secteurs défectueux",
+            "Réparation des secteurs",
+            "Lecture S.M.A.R.T",
+            "Test de surface du disque"
+          ],
+          "features_ru": [
+            "Сканирование плохих секторов",
+            "Ремонт секторов",
+            "Чтение S.M.A.R.T",
+            "Тест поверхности диска"
+          ],
           "systemRequirements": "Windows XP+",
           "systemRequirements_zh": "Windows XP+",
           "systemRequirements_en": "Windows XP+",
           "systemRequirements_ja": "Windows XP+",
           "systemRequirements_fr": "Windows XP+",
-          "systemRequirements_ru": "Windows XP+"
+          "systemRequirements_ru": "Windows XP+",
+          "name_zh": "Victoria",
+          "name_zh_TW": "Victoria",
+          "name_en": "Victoria",
+          "name_fr": "Victoria",
+          "name_de": "Victoria",
+          "name_es": "Victoria",
+          "name_pt": "Victoria",
+          "name_ru": "Victoria",
+          "name_ar": "Victoria",
+          "name_ko": "Victoria",
+          "name_ja": "Victoria",
+          "desc_zh_TW": "硬碟壞軌檢測與修復工具",
+          "desc_de": "Werkzeug zum Erkennen und Reparieren fehlerhafter Sektoren",
+          "desc_es": "Herramienta para detectar y reparar sectores defectuosos",
+          "desc_pt": "Ferramenta para detectar e reparar setores defeituosos",
+          "desc_ar": "أداة لكشف القطاعات التالفة وإصلاحها",
+          "desc_ko": "디스크 불량 섹터 검사 및 복구 도구",
+          "tags_zh_TW": [
+            "壞軌",
+            "修復",
+            "免費"
+          ],
+          "tags_de": [
+            "Fehlerhafte Sektoren",
+            "Reparatur",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Sectores defectuosos",
+            "Reparación",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Setores defeituosos",
+            "Reparo",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "قطاعات تالفة",
+            "إصلاح",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "불량 섹터",
+            "복구",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "壞軌掃描",
+            "壞軌修復",
+            "讀取 S.M.A.R.T",
+            "磁碟表面測試"
+          ],
+          "features_de": [
+            "Scan auf fehlerhafte Sektoren",
+            "Sektorreparatur",
+            "S.M.A.R.T auslesen",
+            "Oberflächentest"
+          ],
+          "features_es": [
+            "Escaneo de sectores defectuosos",
+            "Reparación de sectores",
+            "Lectura S.M.A.R.T",
+            "Prueba de superficie"
+          ],
+          "features_pt": [
+            "Varredura de setores defeituosos",
+            "Reparo de setores",
+            "Leitura S.M.A.R.T",
+            "Teste de superfície"
+          ],
+          "features_ar": [
+            "فحص القطاعات التالفة",
+            "إصلاح القطاعات",
+            "قراءة S.M.A.R.T",
+            "اختبار سطح القرص"
+          ],
+          "features_ko": [
+            "불량 섹터 스캔",
+            "불량 섹터 복구",
+            "S.M.A.R.T 읽기",
+            "디스크 표면 테스트"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows XP+",
+          "systemRequirements_de": "Windows XP+",
+          "systemRequirements_es": "Windows XP+",
+          "systemRequirements_pt": "Windows XP+",
+          "systemRequirements_ar": "Windows XP+",
+          "systemRequirements_ko": "Windows XP+",
+          "safetyLevel": "Expert"
         },
         {
           "name": "WizTree",
-          "desc": "超快磁盘空间分析工具",
-          "desc_zh": "超快磁盘空间分析工具",
+          "desc": "极速磁盘空间分析工具",
+          "desc_zh": "极速磁盘空间分析工具",
           "desc_en": "Ultra-fast disk space analyzer",
           "desc_ja": "超高速ディスク容量分析ツール",
-          "desc_fr": "Analyseur d'espace disque ultra-rapide",
+          "desc_fr": "Analyseur d’espace disque ultra-rapide",
           "desc_ru": "Сверхбыстрый анализатор дискового пространства",
           "icon": "disk",
           "url": "https://diskanalyzer.com/",
@@ -307,24 +1424,162 @@
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
           "rating": "4.9",
-          "tags": ["空间分析", "免费"],
-          "tags_zh": ["空间分析", "免费"],
-          "tags_en": ["Space Analysis", "Free"],
-          "tags_ja": ["容量分析", "無料"],
-          "tags_fr": ["Analyse d'espace", "Gratuit"],
-          "tags_ru": ["Анализ пространства", "Бесплатно"],
-          "features": ["秒级扫描 MFT", "树状图可视化", "文件类型统计", "批量删除"],
-          "features_zh": ["秒级扫描 MFT", "树状图可视化", "文件类型统计", "批量删除"],
-          "features_en": ["Second-scan MFT", "Treemap visualization", "File type statistics", "Batch delete"],
-          "features_ja": ["MFT高速スキャン", "ツリーマップ可視化", "ファイル種別統括", "一括削除"],
-          "features_fr": ["Analyse MFT en quelques secondes", "Visualisation en treemap", "Statistiques par type", "Suppression par lot"],
-          "features_ru": ["Секундное сканирование MFT", "Визуализация treemap", "Статистика по типам", "Пакетное удаление"],
+          "tags": [
+            "空间分析",
+            "免费"
+          ],
+          "tags_zh": [
+            "空间分析",
+            "免费"
+          ],
+          "tags_en": [
+            "Space Analysis",
+            "Free"
+          ],
+          "tags_ja": [
+            "容量分析",
+            "無料"
+          ],
+          "tags_fr": [
+            "Analyse d’espace",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Анализ пространства",
+            "Бесплатно"
+          ],
+          "features": [
+            "秒级扫描 MFT",
+            "树状图可视化",
+            "文件类型统计",
+            "批量删除"
+          ],
+          "features_zh": [
+            "秒级扫描 MFT",
+            "树状图可视化",
+            "文件类型统计",
+            "批量删除"
+          ],
+          "features_en": [
+            "Second-scan MFT",
+            "Treemap visualization",
+            "File type statistics",
+            "Batch delete"
+          ],
+          "features_ja": [
+            "MFT を数秒でスキャン",
+            "ツリーマップ表示",
+            "ファイル種類別統計",
+            "一括削除"
+          ],
+          "features_fr": [
+            "Analyse MFT en quelques secondes",
+            "Visualisation en treemap",
+            "Statistiques par type de fichier",
+            "Suppression par lot"
+          ],
+          "features_ru": [
+            "Сканирование MFT за секунды",
+            "Визуализация treemap",
+            "Статистика по типам файлов",
+            "Пакетное удаление"
+          ],
           "systemRequirements": "Windows Vista+",
           "systemRequirements_zh": "Windows Vista+",
           "systemRequirements_en": "Windows Vista+",
           "systemRequirements_ja": "Windows Vista+",
           "systemRequirements_fr": "Windows Vista+",
-          "systemRequirements_ru": "Windows Vista+"
+          "systemRequirements_ru": "Windows Vista+",
+          "name_zh": "WizTree",
+          "name_zh_TW": "WizTree",
+          "name_en": "WizTree",
+          "name_fr": "WizTree",
+          "name_de": "WizTree",
+          "name_es": "WizTree",
+          "name_pt": "WizTree",
+          "name_ru": "WizTree",
+          "name_ar": "WizTree",
+          "name_ko": "WizTree",
+          "name_ja": "WizTree",
+          "desc_zh_TW": "超高速磁碟空間分析工具",
+          "desc_de": "Sehr schneller Speicherplatz-Analysator",
+          "desc_es": "Analizador de espacio en disco ultrarrápido",
+          "desc_pt": "Analisador de espaço em disco ultrarrápido",
+          "desc_ar": "محلل مساحة قرص فائق السرعة",
+          "desc_ko": "초고속 디스크 공간 분석 도구",
+          "tags_zh_TW": [
+            "空間分析",
+            "免費"
+          ],
+          "tags_de": [
+            "Speicheranalyse",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Análisis de espacio",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Análise de espaço",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "تحليل المساحة",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "공간 분석",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "秒級掃描 MFT",
+            "樹狀圖視覺化",
+            "檔案類型統計",
+            "批次刪除"
+          ],
+          "features_de": [
+            "MFT-Scan in Sekunden",
+            "Treemap-Visualisierung",
+            "Statistik nach Dateityp",
+            "Stapelweises Löschen"
+          ],
+          "features_es": [
+            "Escaneo MFT en segundos",
+            "Visualización tipo treemap",
+            "Estadísticas por tipo de archivo",
+            "Eliminación por lotes"
+          ],
+          "features_pt": [
+            "Varredura MFT em segundos",
+            "Visualização em mapa de árvore",
+            "Estatísticas por tipo de arquivo",
+            "Exclusão em lote"
+          ],
+          "features_ar": [
+            "فحص MFT خلال ثوانٍ",
+            "عرض خريطة شجرية",
+            "إحصاءات حسب نوع الملف",
+            "حذف دفعي"
+          ],
+          "features_ko": [
+            "초 단위 MFT 스캔",
+            "트리맵 시각화",
+            "파일 형식 통계",
+            "일괄 삭제"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows Vista+",
+          "systemRequirements_de": "Windows Vista+",
+          "systemRequirements_es": "Windows Vista+",
+          "systemRequirements_pt": "Windows Vista+",
+          "systemRequirements_ar": "Windows Vista+",
+          "systemRequirements_ko": "Windows Vista+",
+          "safetyLevel": "Beginner"
         }
       ]
     },
@@ -334,12 +1589,12 @@
       "tools": [
         {
           "name": "CPU-Z",
-          "desc": "CPU 与主板内存信息检测",
-          "desc_zh": "CPU 与主板内存信息检测",
+          "desc": "检测 CPU、主板与内存信息",
+          "desc_zh": "检测 CPU、主板与内存信息",
           "desc_en": "CPU, motherboard and memory information detection",
-          "desc_ja": "CPU・マザーボード・メモリ情報検出",
+          "desc_ja": "CPU、マザーボード、メモリ情報を確認",
           "desc_fr": "Détection des informations CPU, carte mère et mémoire",
-          "desc_ru": "Обнаружение информации о процессоре, материнской плате и памяти",
+          "desc_ru": "Определение данных процессора, платы и памяти",
           "icon": "monitor",
           "url": "https://www.cpuid.com/softwares/cpu-z.html",
           "downloadUrl": "https://www.cpuid.com/softwares/cpu-z.html",
@@ -352,33 +1607,195 @@
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
           "rating": "4.7",
-          "tags": ["CPU", "主板", "内存", "免费"],
-          "tags_zh": ["CPU", "主板", "内存", "免费"],
-          "tags_en": ["CPU", "Motherboard", "Memory", "Free"],
-          "tags_ja": ["CPU", "マザーボード", "メモリ", "無料"],
-          "tags_fr": ["CPU", "Carte mère", "Mémoire", "Gratuit"],
-          "tags_ru": ["Процессор", "Материнская плата", "Память", "Бесплатно"],
-          "features": ["CPU 详细参数", "主板信息", "内存时序", "基准测试"],
-          "features_zh": ["CPU 详细参数", "主板信息", "内存时序", "基准测试"],
-          "features_en": ["Detailed CPU specs", "Motherboard info", "Memory timings", "Benchmark"],
-          "features_ja": ["CPU詳細スペック", "マザーボード情報", "メモリタイミング", "ベンチマーク"],
-          "features_fr": ["Spécifications CPU détaillées", "Informations carte mère", "Timings mémoire", "Benchmark"],
-          "features_ru": ["Детальные характеристики процессора", "Информация о материнской плате", "Тайминги памяти", "Бенчмарк"],
+          "tags": [
+            "CPU",
+            "主板",
+            "内存",
+            "免费"
+          ],
+          "tags_zh": [
+            "CPU",
+            "主板",
+            "内存",
+            "免费"
+          ],
+          "tags_en": [
+            "CPU",
+            "Motherboard",
+            "Memory",
+            "Free"
+          ],
+          "tags_ja": [
+            "CPU",
+            "マザーボード",
+            "メモリ",
+            "無料"
+          ],
+          "tags_fr": [
+            "CPU",
+            "Carte mère",
+            "Mémoire",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "CPU",
+            "Материнская плата",
+            "Память",
+            "Бесплатно"
+          ],
+          "features": [
+            "CPU 详细参数",
+            "主板信息",
+            "内存时序",
+            "基准测试"
+          ],
+          "features_zh": [
+            "CPU 详细参数",
+            "主板信息",
+            "内存时序",
+            "基准测试"
+          ],
+          "features_en": [
+            "Detailed CPU specs",
+            "Motherboard info",
+            "Memory timings",
+            "Benchmark"
+          ],
+          "features_ja": [
+            "CPU 詳細スペック",
+            "マザーボード情報",
+            "メモリタイミング",
+            "ベンチマーク"
+          ],
+          "features_fr": [
+            "Caractéristiques CPU détaillées",
+            "Informations carte mère",
+            "Timings mémoire",
+            "Benchmark"
+          ],
+          "features_ru": [
+            "Подробные характеристики CPU",
+            "Данные материнской платы",
+            "Тайминги памяти",
+            "Бенчмарк"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "CPU-Z",
+          "name_zh_TW": "CPU-Z",
+          "name_en": "CPU-Z",
+          "name_fr": "CPU-Z",
+          "name_de": "CPU-Z",
+          "name_es": "CPU-Z",
+          "name_pt": "CPU-Z",
+          "name_ru": "CPU-Z",
+          "name_ar": "CPU-Z",
+          "name_ko": "CPU-Z",
+          "name_ja": "CPU-Z",
+          "desc_zh_TW": "檢測 CPU、主機板與記憶體資訊",
+          "desc_de": "Erkennt Informationen zu CPU, Mainboard und Arbeitsspeicher",
+          "desc_es": "Detecta información de CPU, placa base y memoria",
+          "desc_pt": "Detecta informações de CPU, placa-mãe e memória",
+          "desc_ar": "يعرض معلومات المعالج واللوحة الأم والذاكرة",
+          "desc_ko": "CPU, 메인보드, 메모리 정보 확인",
+          "tags_zh_TW": [
+            "CPU",
+            "主機板",
+            "記憶體",
+            "免費"
+          ],
+          "tags_de": [
+            "CPU",
+            "Mainboard",
+            "Arbeitsspeicher",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "CPU",
+            "Placa base",
+            "Memoria",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "CPU",
+            "Placa-mãe",
+            "Memória",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "CPU",
+            "اللوحة الأم",
+            "الذاكرة",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "CPU",
+            "메인보드",
+            "메모리",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "CPU 詳細規格",
+            "主機板資訊",
+            "記憶體時序",
+            "基準測試"
+          ],
+          "features_de": [
+            "Detaillierte CPU-Daten",
+            "Mainboard-Informationen",
+            "Speichertimings",
+            "Benchmark"
+          ],
+          "features_es": [
+            "Especificaciones detalladas de CPU",
+            "Información de placa base",
+            "Tiempos de memoria",
+            "Benchmark"
+          ],
+          "features_pt": [
+            "Especificações detalhadas da CPU",
+            "Informações da placa-mãe",
+            "Temporizações de memória",
+            "Benchmark"
+          ],
+          "features_ar": [
+            "مواصفات CPU مفصلة",
+            "معلومات اللوحة الأم",
+            "توقيتات الذاكرة",
+            "قياس أداء"
+          ],
+          "features_ko": [
+            "상세 CPU 사양",
+            "메인보드 정보",
+            "메모리 타이밍",
+            "벤치마크"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "GPU-Z",
           "desc": "显卡详细参数检测工具",
           "desc_zh": "显卡详细参数检测工具",
           "desc_en": "Detailed GPU specifications detection tool",
-          "desc_ja": "GPU詳細スペック検出ツール",
-          "desc_fr": "Outil de détection des spécifications GPU détaillées",
-          "desc_ru": "Инструмент обнаружения детальных характеристик GPU",
+          "desc_ja": "GPU 詳細スペック確認ツール",
+          "desc_fr": "Outil de détection détaillée des GPU",
+          "desc_ru": "Инструмент для подробных характеристик GPU",
           "icon": "monitor",
           "url": "https://www.techpowerup.com/gpuz/",
           "downloadUrl": "https://www.techpowerup.com/gpuz/",
@@ -391,24 +1808,174 @@
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
           "rating": "4.8",
-          "tags": ["显卡", "GPU", "免费"],
-          "tags_zh": ["显卡", "GPU", "免费"],
-          "tags_en": ["Graphics Card", "GPU", "Free"],
-          "tags_ja": ["グラフィックス", "GPU", "無料"],
-          "tags_fr": ["Carte graphique", "GPU", "Gratuit"],
-          "tags_ru": ["Видеокарта", "GPU", "Бесплатно"],
-          "features": ["GPU 详细参数", "传感器监控", "BIOS 备份", "假卡检测"],
-          "features_zh": ["GPU 详细参数", "传感器监控", "BIOS 备份", "假卡检测"],
-          "features_en": ["Detailed GPU specs", "Sensor monitoring", "BIOS backup", "Fake card detection"],
-          "features_ja": ["GPU詳細スペック", "センサー監視", "BIOSバックアップ", "偽造カード検出"],
-          "features_fr": ["Spécifications GPU détaillées", "Surveillance des capteurs", "Sauvegarde BIOS", "Détection de fausses cartes"],
-          "features_ru": ["Детальные характеристики GPU", "Мониторинг датчиков", "Резервное копирование BIOS", "Обнаружение подделок"],
+          "tags": [
+            "显卡",
+            "GPU",
+            "免费"
+          ],
+          "tags_zh": [
+            "显卡",
+            "GPU",
+            "免费"
+          ],
+          "tags_en": [
+            "Graphics Card",
+            "GPU",
+            "Free"
+          ],
+          "tags_ja": [
+            "グラフィックカード",
+            "GPU",
+            "無料"
+          ],
+          "tags_fr": [
+            "Carte graphique",
+            "GPU",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Видеокарта",
+            "GPU",
+            "Бесплатно"
+          ],
+          "features": [
+            "GPU 详细参数",
+            "传感器监控",
+            "BIOS 备份",
+            "假卡检测"
+          ],
+          "features_zh": [
+            "GPU 详细参数",
+            "传感器监控",
+            "BIOS 备份",
+            "假卡检测"
+          ],
+          "features_en": [
+            "Detailed GPU specs",
+            "Sensor monitoring",
+            "BIOS backup",
+            "Fake card detection"
+          ],
+          "features_ja": [
+            "GPU 詳細スペック",
+            "センサー監視",
+            "BIOS バックアップ",
+            "偽造カード検出"
+          ],
+          "features_fr": [
+            "Caractéristiques GPU détaillées",
+            "Surveillance des capteurs",
+            "Sauvegarde BIOS",
+            "Détection de fausses cartes"
+          ],
+          "features_ru": [
+            "Подробные характеристики GPU",
+            "Мониторинг датчиков",
+            "Резервная копия BIOS",
+            "Обнаружение поддельных карт"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "GPU-Z",
+          "name_zh_TW": "GPU-Z",
+          "name_en": "GPU-Z",
+          "name_fr": "GPU-Z",
+          "name_de": "GPU-Z",
+          "name_es": "GPU-Z",
+          "name_pt": "GPU-Z",
+          "name_ru": "GPU-Z",
+          "name_ar": "GPU-Z",
+          "name_ko": "GPU-Z",
+          "name_ja": "GPU-Z",
+          "desc_zh_TW": "顯示卡詳細規格檢測工具",
+          "desc_de": "Werkzeug zum Auslesen detaillierter GPU-Daten",
+          "desc_es": "Herramienta para detectar especificaciones detalladas de GPU",
+          "desc_pt": "Ferramenta para detectar especificações detalhadas da GPU",
+          "desc_ar": "أداة لعرض مواصفات GPU التفصيلية",
+          "desc_ko": "GPU 상세 사양 확인 도구",
+          "tags_zh_TW": [
+            "顯示卡",
+            "GPU",
+            "免費"
+          ],
+          "tags_de": [
+            "Grafikkarte",
+            "GPU",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Tarjeta gráfica",
+            "GPU",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Placa de vídeo",
+            "GPU",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "بطاقة رسومات",
+            "GPU",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "그래픽카드",
+            "GPU",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "GPU 詳細規格",
+            "感測器監控",
+            "BIOS 備份",
+            "假卡檢測"
+          ],
+          "features_de": [
+            "Detaillierte GPU-Daten",
+            "Sensorüberwachung",
+            "BIOS-Sicherung",
+            "Erkennung gefälschter Karten"
+          ],
+          "features_es": [
+            "Especificaciones detalladas de GPU",
+            "Supervisión de sensores",
+            "Copia de BIOS",
+            "Detección de tarjetas falsas"
+          ],
+          "features_pt": [
+            "Especificações detalhadas da GPU",
+            "Monitoramento de sensores",
+            "Backup do BIOS",
+            "Detecção de placa falsa"
+          ],
+          "features_ar": [
+            "مواصفات GPU مفصلة",
+            "مراقبة المستشعرات",
+            "نسخ BIOS احتياطي",
+            "كشف البطاقات المزيفة"
+          ],
+          "features_ko": [
+            "상세 GPU 사양",
+            "센서 모니터링",
+            "BIOS 백업",
+            "가짜 카드 감지"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "HWiNFO",
@@ -416,48 +1983,198 @@
           "desc_zh": "全面硬件信息与实时监控",
           "desc_en": "Comprehensive hardware info and real-time monitoring",
           "desc_ja": "包括的なハードウェア情報とリアルタイム監視",
-          "desc_fr": "Informations matériel complètes et surveillance en temps réel",
-          "desc_ru": "Полная информация о железе и мониторинг в реальном времени",
+          "desc_fr": "Informations matérielles complètes et surveillance en temps réel",
+          "desc_ru": "Полная информация об оборудовании и мониторинг в реальном времени",
           "icon": "monitor",
           "url": "https://www.hwinfo.com/",
           "downloadUrl": "https://www.hwinfo.com/",
           "developer": "REALiX s.r.o.",
           "version": "8.28",
-          "license": "免费（个人）",
-          "license_zh": "免费（个人）",
+          "license": "免费（个人使用）",
+          "license_zh": "免费（个人使用）",
           "license_en": "Free (personal)",
           "license_ja": "無料（個人利用）",
-          "license_fr": "Gratuit (personnel)",
-          "license_ru": "Бесплатно (личное использование)",
+          "license_fr": "Gratuit (usage personnel)",
+          "license_ru": "Бесплатно для личного использования",
           "rating": "4.9",
           "featured": true,
-          "tags": ["监控", "传感器", "免费"],
-          "tags_zh": ["监控", "传感器", "免费"],
-          "tags_en": ["Monitoring", "Sensors", "Free"],
-          "tags_ja": ["監視", "センサー", "無料"],
-          "tags_fr": ["Surveillance", "Capteurs", "Gratuit"],
-          "tags_ru": ["Мониторинг", "Датчики", "Бесплатно"],
-          "features": ["全面硬件信息", "实时传感器", "温度/电压/频率", "日志记录"],
-          "features_zh": ["全面硬件信息", "实时传感器", "温度/电压/频率", "日志记录"],
-          "features_en": ["Full hardware info", "Real-time sensors", "Temp/voltage/frequency", "Logging"],
-          "features_ja": ["全ハードウェア情報", "リアルタイムセンサー", "温度/電圧/周波数", "ログ記録"],
-          "features_fr": ["Informations matériel complètes", "Capteurs en temps réel", "Température/voltage/fréquence", "Journalisation"],
-          "features_ru": ["Полная информация о железе", "Датчики реального времени", "Температура/напряжение/частота", "Ведение журнала"],
+          "tags": [
+            "监控",
+            "传感器",
+            "免费"
+          ],
+          "tags_zh": [
+            "监控",
+            "传感器",
+            "免费"
+          ],
+          "tags_en": [
+            "Monitoring",
+            "Sensors",
+            "Free"
+          ],
+          "tags_ja": [
+            "監視",
+            "センサー",
+            "無料"
+          ],
+          "tags_fr": [
+            "Surveillance",
+            "Capteurs",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Мониторинг",
+            "Датчики",
+            "Бесплатно"
+          ],
+          "features": [
+            "全面硬件信息",
+            "实时传感器",
+            "温度/电压/频率",
+            "日志记录"
+          ],
+          "features_zh": [
+            "全面硬件信息",
+            "实时传感器",
+            "温度/电压/频率",
+            "日志记录"
+          ],
+          "features_en": [
+            "Full hardware info",
+            "Real-time sensors",
+            "Temp/voltage/frequency",
+            "Logging"
+          ],
+          "features_ja": [
+            "全ハードウェア情報",
+            "リアルタイムセンサー",
+            "温度/電圧/周波数",
+            "ログ記録"
+          ],
+          "features_fr": [
+            "Informations matérielles complètes",
+            "Capteurs en temps réel",
+            "Température/tension/fréquence",
+            "Journalisation"
+          ],
+          "features_ru": [
+            "Полные сведения об оборудовании",
+            "Датчики в реальном времени",
+            "Температура/напряжение/частота",
+            "Журналирование"
+          ],
           "systemRequirements": "Windows XP+",
           "systemRequirements_zh": "Windows XP+",
           "systemRequirements_en": "Windows XP+",
           "systemRequirements_ja": "Windows XP+",
           "systemRequirements_fr": "Windows XP+",
-          "systemRequirements_ru": "Windows XP+"
+          "systemRequirements_ru": "Windows XP+",
+          "name_zh": "HWiNFO",
+          "name_zh_TW": "HWiNFO",
+          "name_en": "HWiNFO",
+          "name_fr": "HWiNFO",
+          "name_de": "HWiNFO",
+          "name_es": "HWiNFO",
+          "name_pt": "HWiNFO",
+          "name_ru": "HWiNFO",
+          "name_ar": "HWiNFO",
+          "name_ko": "HWiNFO",
+          "name_ja": "HWiNFO",
+          "desc_zh_TW": "完整硬體資訊與即時監控",
+          "desc_de": "Umfassende Hardwareinfos und Echtzeitüberwachung",
+          "desc_es": "Información completa de hardware y monitorización en tiempo real",
+          "desc_pt": "Informações completas de hardware e monitoramento em tempo real",
+          "desc_ar": "معلومات عتاد شاملة ومراقبة فورية",
+          "desc_ko": "종합 하드웨어 정보 및 실시간 모니터링",
+          "tags_zh_TW": [
+            "監控",
+            "感測器",
+            "免費"
+          ],
+          "tags_de": [
+            "Überwachung",
+            "Sensoren",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Monitorización",
+            "Sensores",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Monitoramento",
+            "Sensores",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "مراقبة",
+            "مستشعرات",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "모니터링",
+            "센서",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "完整硬體資訊",
+            "即時感測器",
+            "溫度/電壓/頻率",
+            "記錄功能"
+          ],
+          "features_de": [
+            "Vollständige Hardwareinfos",
+            "Echtzeitsensoren",
+            "Temperatur/Spannung/Frequenz",
+            "Protokollierung"
+          ],
+          "features_es": [
+            "Información completa de hardware",
+            "Sensores en tiempo real",
+            "Temperatura/voltaje/frecuencia",
+            "Registro"
+          ],
+          "features_pt": [
+            "Informações completas de hardware",
+            "Sensores em tempo real",
+            "Temperatura/tensão/frequência",
+            "Registro"
+          ],
+          "features_ar": [
+            "معلومات عتاد كاملة",
+            "مستشعرات فورية",
+            "حرارة/جهد/تردد",
+            "تسجيل"
+          ],
+          "features_ko": [
+            "전체 하드웨어 정보",
+            "실시간 센서",
+            "온도/전압/주파수",
+            "로그 기록"
+          ],
+          "license_zh_TW": "免費（個人使用）",
+          "license_de": "Kostenlos (privat)",
+          "license_es": "Gratis (uso personal)",
+          "license_pt": "Grátis (uso pessoal)",
+          "license_ar": "مجاني للاستخدام الشخصي",
+          "license_ko": "무료(개인용)",
+          "systemRequirements_zh_TW": "Windows XP+",
+          "systemRequirements_de": "Windows XP+",
+          "systemRequirements_es": "Windows XP+",
+          "systemRequirements_pt": "Windows XP+",
+          "systemRequirements_ar": "Windows XP+",
+          "systemRequirements_ko": "Windows XP+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "AIDA64",
           "desc": "专业硬件检测与压力测试",
           "desc_zh": "专业硬件检测与压力测试",
           "desc_en": "Professional hardware detection and stress testing",
-          "desc_ja": "プロフェッショナルハードウェア検出・ストレステスト",
+          "desc_ja": "プロ向けハードウェア検出とストレステスト",
           "desc_fr": "Détection matérielle professionnelle et tests de stress",
-          "desc_ru": "Профессиональное обнаружение железа и стресс-тестирование",
+          "desc_ru": "Профессиональная диагностика оборудования и стресс-тесты",
           "icon": "monitor",
           "url": "https://www.aida64.com/",
           "downloadUrl": "https://www.aida64.com/",
@@ -467,26 +2184,176 @@
           "license_zh": "付费（30 天试用）",
           "license_en": "Paid (30-day trial)",
           "license_ja": "有料（30日間試用）",
-          "license_fr": "Payant (30 jours d'essai)",
-          "license_ru": "Платно (30-дневная пробная версия)",
-          "tags": ["压力测试", "专业", "付费"],
-          "tags_zh": ["压力测试", "专业", "付费"],
-          "tags_en": ["Stress Test", "Professional", "Paid"],
-          "tags_ja": ["ストレステスト", "プロフェッショナル", "有料"],
-          "tags_fr": ["Test de stress", "Professionnel", "Payant"],
-          "tags_ru": ["Стресс-тест", "Профессиональный", "Платный"],
-          "features": ["系统稳定性测试", "硬件检测", "传感器监控", "基准测试"],
-          "features_zh": ["系统稳定性测试", "硬件检测", "传感器监控", "基准测试"],
-          "features_en": ["System stability test", "Hardware detection", "Sensor monitoring", "Benchmark"],
-          "features_ja": ["システム安定性テスト", "ハードウェア検出", "センサー監視", "ベンチマーク"],
-          "features_fr": ["Test de stabilité système", "Détection matérielle", "Surveillance des capteurs", "Benchmark"],
-          "features_ru": ["Тест стабильности системы", "Обнаружение железа", "Мониторинг датчиков", "Бенчмарк"],
+          "license_fr": "Payant (essai de 30 jours)",
+          "license_ru": "Платно, пробная версия 30 дней",
+          "tags": [
+            "压力测试",
+            "专业",
+            "付费"
+          ],
+          "tags_zh": [
+            "压力测试",
+            "专业",
+            "付费"
+          ],
+          "tags_en": [
+            "Stress Test",
+            "Professional",
+            "Paid"
+          ],
+          "tags_ja": [
+            "ストレステスト",
+            "プロ向け",
+            "有料"
+          ],
+          "tags_fr": [
+            "Test de stress",
+            "Professionnel",
+            "Payant"
+          ],
+          "tags_ru": [
+            "Стресс-тест",
+            "Профессионально",
+            "Платно"
+          ],
+          "features": [
+            "系统稳定性测试",
+            "硬件检测",
+            "传感器监控",
+            "基准测试"
+          ],
+          "features_zh": [
+            "系统稳定性测试",
+            "硬件检测",
+            "传感器监控",
+            "基准测试"
+          ],
+          "features_en": [
+            "System stability test",
+            "Hardware detection",
+            "Sensor monitoring",
+            "Benchmark"
+          ],
+          "features_ja": [
+            "システム安定性テスト",
+            "ハードウェア検出",
+            "センサー監視",
+            "ベンチマーク"
+          ],
+          "features_fr": [
+            "Test de stabilité système",
+            "Détection matérielle",
+            "Surveillance des capteurs",
+            "Benchmark"
+          ],
+          "features_ru": [
+            "Тест стабильности системы",
+            "Определение оборудования",
+            "Мониторинг датчиков",
+            "Бенчмарк"
+          ],
           "systemRequirements": "Windows XP+",
           "systemRequirements_zh": "Windows XP+",
           "systemRequirements_en": "Windows XP+",
           "systemRequirements_ja": "Windows XP+",
           "systemRequirements_fr": "Windows XP+",
-          "systemRequirements_ru": "Windows XP+"
+          "systemRequirements_ru": "Windows XP+",
+          "name_zh": "AIDA64",
+          "name_zh_TW": "AIDA64",
+          "name_en": "AIDA64",
+          "name_fr": "AIDA64",
+          "name_de": "AIDA64",
+          "name_es": "AIDA64",
+          "name_pt": "AIDA64",
+          "name_ru": "AIDA64",
+          "name_ar": "AIDA64",
+          "name_ko": "AIDA64",
+          "name_ja": "AIDA64",
+          "desc_zh_TW": "專業硬體檢測與壓力測試",
+          "desc_de": "Professionelle Hardwareerkennung und Stresstests",
+          "desc_es": "Detección profesional de hardware y pruebas de estrés",
+          "desc_pt": "Detecção profissional de hardware e testes de estresse",
+          "desc_ar": "كشف عتاد احترافي واختبارات ضغط",
+          "desc_ko": "전문 하드웨어 진단 및 스트레스 테스트",
+          "tags_zh_TW": [
+            "壓力測試",
+            "專業",
+            "付費"
+          ],
+          "tags_de": [
+            "Stresstest",
+            "Professionell",
+            "Kostenpflichtig"
+          ],
+          "tags_es": [
+            "Prueba de estrés",
+            "Profesional",
+            "De pago"
+          ],
+          "tags_pt": [
+            "Teste de estresse",
+            "Profissional",
+            "Pago"
+          ],
+          "tags_ar": [
+            "اختبار ضغط",
+            "احترافي",
+            "مدفوع"
+          ],
+          "tags_ko": [
+            "스트레스 테스트",
+            "전문",
+            "유료"
+          ],
+          "features_zh_TW": [
+            "系統穩定性測試",
+            "硬體檢測",
+            "感測器監控",
+            "基準測試"
+          ],
+          "features_de": [
+            "Systemstabilitätstest",
+            "Hardwareerkennung",
+            "Sensorüberwachung",
+            "Benchmark"
+          ],
+          "features_es": [
+            "Prueba de estabilidad del sistema",
+            "Detección de hardware",
+            "Supervisión de sensores",
+            "Benchmark"
+          ],
+          "features_pt": [
+            "Teste de estabilidade do sistema",
+            "Detecção de hardware",
+            "Monitoramento de sensores",
+            "Benchmark"
+          ],
+          "features_ar": [
+            "اختبار استقرار النظام",
+            "كشف العتاد",
+            "مراقبة المستشعرات",
+            "قياس أداء"
+          ],
+          "features_ko": [
+            "시스템 안정성 테스트",
+            "하드웨어 감지",
+            "센서 모니터링",
+            "벤치마크"
+          ],
+          "license_zh_TW": "付費（30 天試用）",
+          "license_de": "Kostenpflichtig (30 Tage Testversion)",
+          "license_es": "De pago (prueba de 30 días)",
+          "license_pt": "Pago (teste de 30 dias)",
+          "license_ar": "مدفوع (تجربة 30 يومًا)",
+          "license_ko": "유료(30일 체험판)",
+          "systemRequirements_zh_TW": "Windows XP+",
+          "systemRequirements_de": "Windows XP+",
+          "systemRequirements_es": "Windows XP+",
+          "systemRequirements_pt": "Windows XP+",
+          "systemRequirements_ar": "Windows XP+",
+          "systemRequirements_ko": "Windows XP+",
+          "safetyLevel": "Beginner"
         }
       ]
     },
@@ -499,7 +2366,7 @@
           "desc": "SFTP/FTP 文件传输客户端",
           "desc_zh": "SFTP/FTP 文件传输客户端",
           "desc_en": "SFTP/FTP file transfer client",
-          "desc_ja": "SFTP/FTPファイル転送クライアント",
+          "desc_ja": "SFTP/FTP ファイル転送クライアント",
           "desc_fr": "Client de transfert de fichiers SFTP/FTP",
           "desc_ru": "Клиент передачи файлов SFTP/FTP",
           "icon": "network",
@@ -515,31 +2382,193 @@
           "license_ru": "GPL",
           "rating": "4.8",
           "featured": true,
-          "tags": ["SFTP", "FTP", "免费", "开源"],
-          "tags_zh": ["SFTP", "FTP", "免费", "开源"],
-          "tags_en": ["SFTP", "FTP", "Free", "Open Source"],
-          "tags_ja": ["SFTP", "FTP", "無料", "オープンソース"],
-          "tags_fr": ["SFTP", "FTP", "Gratuit", "Open Source"],
-          "tags_ru": ["SFTP", "FTP", "Бесплатно", "Открытый код"],
-          "features": ["SFTP/SCP/FTP 支持", "图形化界面", "脚本自动化", "集成 PuTTY"],
-          "features_zh": ["SFTP/SCP/FTP 支持", "图形化界面", "脚本自动化", "集成 PuTTY"],
-          "features_en": ["SFTP/SCP/FTP support", "GUI interface", "Script automation", "PuTTY integration"],
-          "features_ja": ["SFTP/SCP/FTP対応", "GUI操作", "スクリプト自動化", "PuTTY統合"],
-          "features_fr": ["Support SFTP/SCP/FTP", "Interface graphique", "Automatisation par scripts", "Intégration PuTTY"],
-          "features_ru": ["Поддержка SFTP/SCP/FTP", "Графический интерфейс", "Автоматизация скриптами", "Интеграция PuTTY"],
+          "tags": [
+            "SFTP",
+            "FTP",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "SFTP",
+            "FTP",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "SFTP",
+            "FTP",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "SFTP",
+            "FTP",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "SFTP",
+            "FTP",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "SFTP",
+            "FTP",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "支持 SFTP/SCP/FTP",
+            "图形界面",
+            "脚本自动化",
+            "集成 PuTTY"
+          ],
+          "features_zh": [
+            "支持 SFTP/SCP/FTP",
+            "图形界面",
+            "脚本自动化",
+            "集成 PuTTY"
+          ],
+          "features_en": [
+            "SFTP/SCP/FTP support",
+            "GUI interface",
+            "Script automation",
+            "PuTTY integration"
+          ],
+          "features_ja": [
+            "SFTP/SCP/FTP 対応",
+            "GUI インターフェイス",
+            "スクリプト自動化",
+            "PuTTY 連携"
+          ],
+          "features_fr": [
+            "Prise en charge SFTP/SCP/FTP",
+            "Interface graphique",
+            "Automatisation par scripts",
+            "Intégration PuTTY"
+          ],
+          "features_ru": [
+            "Поддержка SFTP/SCP/FTP",
+            "Графический интерфейс",
+            "Автоматизация сценариями",
+            "Интеграция PuTTY"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "WinSCP",
+          "name_zh_TW": "WinSCP",
+          "name_en": "WinSCP",
+          "name_fr": "WinSCP",
+          "name_de": "WinSCP",
+          "name_es": "WinSCP",
+          "name_pt": "WinSCP",
+          "name_ru": "WinSCP",
+          "name_ar": "WinSCP",
+          "name_ko": "WinSCP",
+          "name_ja": "WinSCP",
+          "desc_zh_TW": "SFTP/FTP 檔案傳輸用戶端",
+          "desc_de": "Client für SFTP/FTP-Dateiübertragungen",
+          "desc_es": "Cliente de transferencia de archivos SFTP/FTP",
+          "desc_pt": "Cliente de transferência de arquivos SFTP/FTP",
+          "desc_ar": "عميل نقل ملفات SFTP/FTP",
+          "desc_ko": "SFTP/FTP 파일 전송 클라이언트",
+          "tags_zh_TW": [
+            "SFTP",
+            "FTP",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "SFTP",
+            "FTP",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "SFTP",
+            "FTP",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "SFTP",
+            "FTP",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "SFTP",
+            "FTP",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "SFTP",
+            "FTP",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "支援 SFTP/SCP/FTP",
+            "圖形介面",
+            "腳本自動化",
+            "整合 PuTTY"
+          ],
+          "features_de": [
+            "SFTP/SCP/FTP-Unterstützung",
+            "Grafische Oberfläche",
+            "Skript-Automatisierung",
+            "PuTTY-Integration"
+          ],
+          "features_es": [
+            "Compatibilidad SFTP/SCP/FTP",
+            "Interfaz gráfica",
+            "Automatización por scripts",
+            "Integración con PuTTY"
+          ],
+          "features_pt": [
+            "Suporte a SFTP/SCP/FTP",
+            "Interface gráfica",
+            "Automação por scripts",
+            "Integração com PuTTY"
+          ],
+          "features_ar": [
+            "دعم SFTP/SCP/FTP",
+            "واجهة رسومية",
+            "أتمتة بالسكربتات",
+            "تكامل PuTTY"
+          ],
+          "features_ko": [
+            "SFTP/SCP/FTP 지원",
+            "GUI 인터페이스",
+            "스크립트 자동화",
+            "PuTTY 통합"
+          ],
+          "license_zh_TW": "GPL",
+          "license_de": "GPL",
+          "license_es": "GPL",
+          "license_pt": "GPL",
+          "license_ar": "GPL",
+          "license_ko": "GPL",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "PuTTY",
           "desc": "SSH/Telnet 终端客户端",
           "desc_zh": "SSH/Telnet 终端客户端",
           "desc_en": "SSH/Telnet terminal client",
-          "desc_ja": "SSH/Telnetターミナルクライアント",
+          "desc_ja": "SSH/Telnet ターミナルクライアント",
           "desc_fr": "Client terminal SSH/Telnet",
           "desc_ru": "Терминальный клиент SSH/Telnet",
           "icon": "terminal",
@@ -554,33 +2583,195 @@
           "license_fr": "MIT",
           "license_ru": "MIT",
           "rating": "4.6",
-          "tags": ["SSH", "Telnet", "免费", "开源"],
-          "tags_zh": ["SSH", "Telnet", "免费", "开源"],
-          "tags_en": ["SSH", "Telnet", "Free", "Open Source"],
-          "tags_ja": ["SSH", "Telnet", "無料", "オープンソース"],
-          "tags_fr": ["SSH", "Telnet", "Gratuit", "Open Source"],
-          "tags_ru": ["SSH", "Telnet", "Бесплатно", "Открытый код"],
-          "features": ["SSH/Telnet/Serial", "密钥管理", "会话保存", "轻量级"],
-          "features_zh": ["SSH/Telnet/Serial", "密钥管理", "会话保存", "轻量级"],
-          "features_en": ["SSH/Telnet/Serial", "Key management", "Session saving", "Lightweight"],
-          "features_ja": ["SSH/Telnet/Serial", "鍵管理", "セッション保存", "軽量"],
-          "features_fr": ["SSH/Telnet/Serial", "Gestion des clés", "Sauvegarde de sessions", "Léger"],
-          "features_ru": ["SSH/Telnet/Serial", "Управление ключами", "Сохранение сессий", "Лёгкий"],
+          "tags": [
+            "SSH",
+            "Telnet",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "SSH",
+            "Telnet",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "SSH",
+            "Telnet",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "SSH",
+            "Telnet",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "SSH",
+            "Telnet",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "SSH",
+            "Telnet",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "SSH/Telnet/Serial",
+            "密钥管理",
+            "保存会话",
+            "轻量级"
+          ],
+          "features_zh": [
+            "SSH/Telnet/Serial",
+            "密钥管理",
+            "保存会话",
+            "轻量级"
+          ],
+          "features_en": [
+            "SSH/Telnet/Serial",
+            "Key management",
+            "Session saving",
+            "Lightweight"
+          ],
+          "features_ja": [
+            "SSH/Telnet/Serial",
+            "鍵管理",
+            "セッション保存",
+            "軽量"
+          ],
+          "features_fr": [
+            "SSH/Telnet/Serial",
+            "Gestion des clés",
+            "Sessions enregistrées",
+            "Léger"
+          ],
+          "features_ru": [
+            "SSH/Telnet/Serial",
+            "Управление ключами",
+            "Сохранение сессий",
+            "Легкий"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "PuTTY",
+          "name_zh_TW": "PuTTY",
+          "name_en": "PuTTY",
+          "name_fr": "PuTTY",
+          "name_de": "PuTTY",
+          "name_es": "PuTTY",
+          "name_pt": "PuTTY",
+          "name_ru": "PuTTY",
+          "name_ar": "PuTTY",
+          "name_ko": "PuTTY",
+          "name_ja": "PuTTY",
+          "desc_zh_TW": "SSH/Telnet 終端機用戶端",
+          "desc_de": "Terminal-Client für SSH/Telnet",
+          "desc_es": "Cliente de terminal SSH/Telnet",
+          "desc_pt": "Cliente de terminal SSH/Telnet",
+          "desc_ar": "عميل طرفية SSH/Telnet",
+          "desc_ko": "SSH/Telnet 터미널 클라이언트",
+          "tags_zh_TW": [
+            "SSH",
+            "Telnet",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "SSH",
+            "Telnet",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "SSH",
+            "Telnet",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "SSH",
+            "Telnet",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "SSH",
+            "Telnet",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "SSH",
+            "Telnet",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "SSH/Telnet/Serial",
+            "金鑰管理",
+            "儲存工作階段",
+            "輕量"
+          ],
+          "features_de": [
+            "SSH/Telnet/Serial",
+            "Schlüsselverwaltung",
+            "Sitzungen speichern",
+            "Leichtgewichtig"
+          ],
+          "features_es": [
+            "SSH/Telnet/Serial",
+            "Gestión de claves",
+            "Guardado de sesiones",
+            "Ligero"
+          ],
+          "features_pt": [
+            "SSH/Telnet/Serial",
+            "Gerenciamento de chaves",
+            "Salvamento de sessões",
+            "Leve"
+          ],
+          "features_ar": [
+            "SSH/Telnet/Serial",
+            "إدارة المفاتيح",
+            "حفظ الجلسات",
+            "خفيف"
+          ],
+          "features_ko": [
+            "SSH/Telnet/Serial",
+            "키 관리",
+            "세션 저장",
+            "가벼움"
+          ],
+          "license_zh_TW": "MIT",
+          "license_de": "MIT",
+          "license_es": "MIT",
+          "license_pt": "MIT",
+          "license_ar": "MIT",
+          "license_ko": "MIT",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "Wireshark",
           "desc": "网络协议分析与抓包工具",
           "desc_zh": "网络协议分析与抓包工具",
           "desc_en": "Network protocol analyzer and packet capture tool",
-          "desc_ja": "ネットワークプロトコルアナライザ・パケットキャプチャツール",
-          "desc_fr": "Analyseur de protocoles réseau et outil de capture de paquets",
-          "desc_ru": "Анализатор сетевых протоколов и инструмент захвата пакетов",
+          "desc_ja": "ネットワークプロトコル解析とパケットキャプチャツール",
+          "desc_fr": "Analyseur de protocoles réseau et capture de paquets",
+          "desc_ru": "Анализатор сетевых протоколов и перехват пакетов",
           "icon": "network",
           "url": "https://www.wireshark.org/",
           "downloadUrl": "https://www.wireshark.org/download.html",
@@ -593,24 +2784,186 @@
           "license_fr": "GPL-2.0",
           "license_ru": "GPL-2.0",
           "rating": "4.9",
-          "tags": ["抓包", "协议分析", "免费", "开源"],
-          "tags_zh": ["抓包", "协议分析", "免费", "开源"],
-          "tags_en": ["Packet Capture", "Protocol Analysis", "Free", "Open Source"],
-          "tags_ja": ["パケットキャプチャ", "プロトコル分析", "無料", "オープンソース"],
-          "tags_fr": ["Capture de paquets", "Analyse de protocoles", "Gratuit", "Open Source"],
-          "tags_ru": ["Захват пакетов", "Анализ протоколов", "Бесплатно", "Открытый код"],
-          "features": ["深度协议解析", "实时抓包", "显示过滤器", "VoIP 分析"],
-          "features_zh": ["深度协议解析", "实时抓包", "显示过滤器", "VoIP 分析"],
-          "features_en": ["Deep protocol parsing", "Live capture", "Display filters", "VoIP analysis"],
-          "features_ja": ["プロトコル詳細解析", "リアルタイムキャプチャ", "表示フィルター", "VoIP分析"],
-          "features_fr": ["Analyse approfondie des protocoles", "Capture en direct", "Filtres d'affichage", "Analyse VoIP"],
-          "features_ru": ["Глубокий разбор протоколов", "Захват в реальном времени", "Фильтры отображения", "Анализ VoIP"],
+          "tags": [
+            "抓包",
+            "协议分析",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "抓包",
+            "协议分析",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Packet Capture",
+            "Protocol Analysis",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "パケットキャプチャ",
+            "プロトコル解析",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Capture de paquets",
+            "Analyse de protocoles",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Захват пакетов",
+            "Анализ протоколов",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "深度协议解析",
+            "实时抓包",
+            "显示过滤器",
+            "VoIP 分析"
+          ],
+          "features_zh": [
+            "深度协议解析",
+            "实时抓包",
+            "显示过滤器",
+            "VoIP 分析"
+          ],
+          "features_en": [
+            "Deep protocol parsing",
+            "Live capture",
+            "Display filters",
+            "VoIP analysis"
+          ],
+          "features_ja": [
+            "深いプロトコル解析",
+            "ライブキャプチャ",
+            "表示フィルター",
+            "VoIP 解析"
+          ],
+          "features_fr": [
+            "Analyse approfondie des protocoles",
+            "Capture en direct",
+            "Filtres d’affichage",
+            "Analyse VoIP"
+          ],
+          "features_ru": [
+            "Глубокий разбор протоколов",
+            "Захват в реальном времени",
+            "Фильтры отображения",
+            "Анализ VoIP"
+          ],
           "systemRequirements": "Windows 10+",
           "systemRequirements_zh": "Windows 10+",
           "systemRequirements_en": "Windows 10+",
           "systemRequirements_ja": "Windows 10+",
           "systemRequirements_fr": "Windows 10+",
-          "systemRequirements_ru": "Windows 10+"
+          "systemRequirements_ru": "Windows 10+",
+          "name_zh": "Wireshark",
+          "name_zh_TW": "Wireshark",
+          "name_en": "Wireshark",
+          "name_fr": "Wireshark",
+          "name_de": "Wireshark",
+          "name_es": "Wireshark",
+          "name_pt": "Wireshark",
+          "name_ru": "Wireshark",
+          "name_ar": "Wireshark",
+          "name_ko": "Wireshark",
+          "name_ja": "Wireshark",
+          "desc_zh_TW": "網路協定分析與封包擷取工具",
+          "desc_de": "Netzwerkprotokoll-Analyse und Paketmitschnitt",
+          "desc_es": "Analizador de protocolos de red y captura de paquetes",
+          "desc_pt": "Analisador de protocolos de rede e captura de pacotes",
+          "desc_ar": "محلل بروتوكولات الشبكة وأداة التقاط الحزم",
+          "desc_ko": "네트워크 프로토콜 분석 및 패킷 캡처 도구",
+          "tags_zh_TW": [
+            "封包擷取",
+            "協定分析",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Paketmitschnitt",
+            "Protokollanalyse",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Captura de paquetes",
+            "Análisis de protocolos",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Captura de pacotes",
+            "Análise de protocolos",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "التقاط الحزم",
+            "تحليل البروتوكولات",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "패킷 캡처",
+            "프로토콜 분석",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "深度協定解析",
+            "即時封包擷取",
+            "顯示篩選器",
+            "VoIP 分析"
+          ],
+          "features_de": [
+            "Tiefe Protokollanalyse",
+            "Live-Mitschnitt",
+            "Anzeigefilter",
+            "VoIP-Analyse"
+          ],
+          "features_es": [
+            "Análisis profundo de protocolos",
+            "Captura en vivo",
+            "Filtros de visualización",
+            "Análisis VoIP"
+          ],
+          "features_pt": [
+            "Análise profunda de protocolos",
+            "Captura ao vivo",
+            "Filtros de exibição",
+            "Análise VoIP"
+          ],
+          "features_ar": [
+            "تحليل بروتوكولات عميق",
+            "التقاط مباشر",
+            "مرشحات العرض",
+            "تحليل VoIP"
+          ],
+          "features_ko": [
+            "심층 프로토콜 파싱",
+            "실시간 캡처",
+            "표시 필터",
+            "VoIP 분석"
+          ],
+          "license_zh_TW": "GPL-2.0",
+          "license_de": "GPL-2.0",
+          "license_es": "GPL-2.0",
+          "license_pt": "GPL-2.0",
+          "license_ar": "GPL-2.0",
+          "license_ko": "GPL-2.0",
+          "systemRequirements_zh_TW": "Windows 10+",
+          "systemRequirements_de": "Windows 10+",
+          "systemRequirements_es": "Windows 10+",
+          "systemRequirements_pt": "Windows 10+",
+          "systemRequirements_ar": "Windows 10+",
+          "systemRequirements_ko": "Windows 10+",
+          "safetyLevel": "Advanced"
         }
       ]
     },
@@ -620,12 +2973,12 @@
       "tools": [
         {
           "name": "Windhawk",
-          "desc": "Windows 自定义增强平台",
-          "desc_zh": "Windows 自定义增强平台",
+          "desc": "Windows 自定义与增强平台",
+          "desc_zh": "Windows 自定义与增强平台",
           "desc_en": "Windows customization and enhancement platform",
-          "desc_ja": "Windowsカスタマイズ・機能強化プラットフォーム",
-          "desc_fr": "Plateforme de personnalisation et d'amélioration Windows",
-          "desc_ru": "Платформа кастомизации и улучшения Windows",
+          "desc_ja": "Windows カスタマイズと機能拡張プラットフォーム",
+          "desc_fr": "Plateforme de personnalisation et d’amélioration de Windows",
+          "desc_ru": "Платформа настройки и улучшения Windows",
           "icon": "tools",
           "url": "https://windhawk.net/",
           "downloadUrl": "https://windhawk.net/",
@@ -635,36 +2988,198 @@
           "license_zh": "开源",
           "license_en": "Open Source",
           "license_ja": "オープンソース",
-          "license_fr": "Open Source",
+          "license_fr": "Open source",
           "license_ru": "Открытый код",
           "rating": "4.7",
-          "tags": ["自定义", "增强", "免费", "开源"],
-          "tags_zh": ["自定义", "增强", "免费", "开源"],
-          "tags_en": ["Customization", "Enhancement", "Free", "Open Source"],
-          "tags_ja": ["カスタマイズ", "機能強化", "無料", "オープンソース"],
-          "tags_fr": ["Personnalisation", "Amélioration", "Gratuit", "Open Source"],
-          "tags_ru": ["Кастомизация", "Улучшение", "Бесплатно", "Открытый код"],
-          "features": ["任务栏自定义", "资源管理器增强", "Mod 插件系统", "社区分享"],
-          "features_zh": ["任务栏自定义", "资源管理器增强", "Mod 插件系统", "社区分享"],
-          "features_en": ["Taskbar customization", "Explorer enhancement", "Mod plugin system", "Community sharing"],
-          "features_ja": ["タスクバーのカスタマイズ", "エクスプローラー強化", "Modプラグインシステム", "コミュニティ共有"],
-          "features_fr": ["Personnalisation de la barre des tâches", "Amélioration de l'explorateur", "Système de plugins Mod", "Partage communautaire"],
-          "features_ru": ["Кастомизация панели задач", "Улучшение проводника", "Система плагинов Mod", "Обмен в сообществе"],
+          "tags": [
+            "自定义",
+            "增强",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "自定义",
+            "增强",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Customization",
+            "Enhancement",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "カスタマイズ",
+            "機能拡張",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Personnalisation",
+            "Amélioration",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Настройка",
+            "Улучшение",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "任务栏自定义",
+            "资源管理器增强",
+            "Mod 插件系统",
+            "社区分享"
+          ],
+          "features_zh": [
+            "任务栏自定义",
+            "资源管理器增强",
+            "Mod 插件系统",
+            "社区分享"
+          ],
+          "features_en": [
+            "Taskbar customization",
+            "Explorer enhancement",
+            "Mod plugin system",
+            "Community sharing"
+          ],
+          "features_ja": [
+            "タスクバーのカスタマイズ",
+            "エクスプローラー強化",
+            "Mod プラグインシステム",
+            "コミュニティ共有"
+          ],
+          "features_fr": [
+            "Personnalisation de la barre des tâches",
+            "Amélioration de l’Explorateur",
+            "Système de modules",
+            "Partage communautaire"
+          ],
+          "features_ru": [
+            "Настройка панели задач",
+            "Улучшения Проводника",
+            "Система мод-плагинов",
+            "Обмен в сообществе"
+          ],
           "systemRequirements": "Windows 10+",
           "systemRequirements_zh": "Windows 10+",
           "systemRequirements_en": "Windows 10+",
           "systemRequirements_ja": "Windows 10+",
           "systemRequirements_fr": "Windows 10+",
-          "systemRequirements_ru": "Windows 10+"
+          "systemRequirements_ru": "Windows 10+",
+          "name_zh": "Windhawk",
+          "name_zh_TW": "Windhawk",
+          "name_en": "Windhawk",
+          "name_fr": "Windhawk",
+          "name_de": "Windhawk",
+          "name_es": "Windhawk",
+          "name_pt": "Windhawk",
+          "name_ru": "Windhawk",
+          "name_ar": "Windhawk",
+          "name_ko": "Windhawk",
+          "name_ja": "Windhawk",
+          "desc_zh_TW": "Windows 自訂與增強平台",
+          "desc_de": "Plattform zur Anpassung und Erweiterung von Windows",
+          "desc_es": "Plataforma de personalización y mejora de Windows",
+          "desc_pt": "Plataforma de personalização e aprimoramento do Windows",
+          "desc_ar": "منصة تخصيص وتحسين Windows",
+          "desc_ko": "Windows 사용자 지정 및 개선 플랫폼",
+          "tags_zh_TW": [
+            "自訂",
+            "增強",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Anpassung",
+            "Erweiterung",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Personalización",
+            "Mejora",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Personalização",
+            "Aprimoramento",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "تخصيص",
+            "تحسين",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "사용자 지정",
+            "개선",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "工作列自訂",
+            "檔案總管增強",
+            "Mod 外掛系統",
+            "社群分享"
+          ],
+          "features_de": [
+            "Taskleisten-Anpassung",
+            "Explorer-Erweiterungen",
+            "Mod-Plugin-System",
+            "Community-Freigaben"
+          ],
+          "features_es": [
+            "Personalización de la barra de tareas",
+            "Mejoras del Explorador",
+            "Sistema de mods",
+            "Compartición comunitaria"
+          ],
+          "features_pt": [
+            "Personalização da barra de tarefas",
+            "Melhorias no Explorer",
+            "Sistema de mods",
+            "Compartilhamento da comunidade"
+          ],
+          "features_ar": [
+            "تخصيص شريط المهام",
+            "تحسين المستكشف",
+            "نظام إضافات Mod",
+            "مشاركة المجتمع"
+          ],
+          "features_ko": [
+            "작업 표시줄 사용자 지정",
+            "탐색기 개선",
+            "Mod 플러그인 시스템",
+            "커뮤니티 공유"
+          ],
+          "license_zh_TW": "開源",
+          "license_de": "Open Source",
+          "license_es": "Código abierto",
+          "license_pt": "Código aberto",
+          "license_ar": "مفتوح المصدر",
+          "license_ko": "오픈 소스",
+          "systemRequirements_zh_TW": "Windows 10+",
+          "systemRequirements_de": "Windows 10+",
+          "systemRequirements_es": "Windows 10+",
+          "systemRequirements_pt": "Windows 10+",
+          "systemRequirements_ar": "Windows 10+",
+          "systemRequirements_ko": "Windows 10+",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "ExplorerPatcher",
-          "desc": "恢复 Win11 经典任务栏与资源管理器",
-          "desc_zh": "恢复 Win11 经典任务栏与资源管理器",
+          "desc": "恢复 Windows 11 经典任务栏与资源管理器",
+          "desc_zh": "恢复 Windows 11 经典任务栏与资源管理器",
           "desc_en": "Restore classic taskbar and Explorer in Windows 11",
-          "desc_ja": "Windows 11にクラシックなタスクバーとエクスプローラーを復元",
-          "desc_fr": "Restaurer la barre des tâches classique et l'explorateur sous Windows 11",
-          "desc_ru": "Восстановление классической панели задач и проводника в Windows 11",
+          "desc_ja": "Windows 11 にクラシックなタスクバーとエクスプローラーを復元",
+          "desc_fr": "Restaure la barre des tâches et l’Explorateur classiques dans Windows 11",
+          "desc_ru": "Возвращает классическую панель задач и Проводник в Windows 11",
           "icon": "tools",
           "url": "https://github.com/valinet/ExplorerPatcher",
           "downloadUrl": "https://github.com/valinet/ExplorerPatcher/releases",
@@ -677,31 +3192,193 @@
           "license_fr": "GPL-2.0",
           "license_ru": "GPL-2.0",
           "rating": "4.8",
-          "tags": ["任务栏", "Win11", "免费", "开源"],
-          "tags_zh": ["任务栏", "Win11", "免费", "开源"],
-          "tags_en": ["Taskbar", "Win11", "Free", "Open Source"],
-          "tags_ja": ["タスクバー", "Win11", "無料", "オープンソース"],
-          "tags_fr": ["Barre des tâches", "Win11", "Gratuit", "Open Source"],
-          "tags_ru": ["Панель задач", "Win11", "Бесплатно", "Открытый код"],
-          "features": ["Win10 任务栏", "经典右键菜单", "资源管理器标签", "系统托盘自定义"],
-          "features_zh": ["Win10 任务栏", "经典右键菜单", "资源管理器标签", "系统托盘自定义"],
-          "features_en": ["Win10 taskbar", "Classic context menu", "Explorer tabs", "System tray customization"],
-          "features_ja": ["Win10タスクバー", "クラシックコンテキストメニュー", "エクスプローラータブ", "システムトレイのカスタマイズ"],
-          "features_fr": ["Barre des tâches Win10", "Menu contextuel classique", "Onglets de l'explorateur", "Personnalisation de la barre d'état"],
-          "features_ru": ["Панель задач Win10", "Классическое контекстное меню", "Вкладки проводника", "Настройка системного трея"],
+          "tags": [
+            "任务栏",
+            "Win11",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "任务栏",
+            "Win11",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Taskbar",
+            "Win11",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "タスクバー",
+            "Win11",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Barre des tâches",
+            "Win11",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Панель задач",
+            "Win11",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "Win10 任务栏",
+            "经典右键菜单",
+            "资源管理器标签",
+            "系统托盘自定义"
+          ],
+          "features_zh": [
+            "Win10 任务栏",
+            "经典右键菜单",
+            "资源管理器标签",
+            "系统托盘自定义"
+          ],
+          "features_en": [
+            "Win10 taskbar",
+            "Classic context menu",
+            "Explorer tabs",
+            "System tray customization"
+          ],
+          "features_ja": [
+            "Win10 タスクバー",
+            "クラシックな右クリックメニュー",
+            "エクスプローラーのタブ",
+            "システムトレイのカスタマイズ"
+          ],
+          "features_fr": [
+            "Barre des tâches Win10",
+            "Menu contextuel classique",
+            "Onglets de l’Explorateur",
+            "Personnalisation de la zone de notification"
+          ],
+          "features_ru": [
+            "Панель задач Win10",
+            "Классическое контекстное меню",
+            "Вкладки Проводника",
+            "Настройка системного трея"
+          ],
           "systemRequirements": "Windows 11",
           "systemRequirements_zh": "Windows 11",
           "systemRequirements_en": "Windows 11",
           "systemRequirements_ja": "Windows 11",
           "systemRequirements_fr": "Windows 11",
-          "systemRequirements_ru": "Windows 11"
+          "systemRequirements_ru": "Windows 11",
+          "name_zh": "ExplorerPatcher",
+          "name_zh_TW": "ExplorerPatcher",
+          "name_en": "ExplorerPatcher",
+          "name_fr": "ExplorerPatcher",
+          "name_de": "ExplorerPatcher",
+          "name_es": "ExplorerPatcher",
+          "name_pt": "ExplorerPatcher",
+          "name_ru": "ExplorerPatcher",
+          "name_ar": "ExplorerPatcher",
+          "name_ko": "ExplorerPatcher",
+          "name_ja": "ExplorerPatcher",
+          "desc_zh_TW": "還原 Windows 11 經典工作列與檔案總管",
+          "desc_de": "Stellt klassische Taskleiste und Explorer in Windows 11 wieder her",
+          "desc_es": "Restaura la barra de tareas y el Explorador clásicos en Windows 11",
+          "desc_pt": "Restaura a barra de tarefas e o Explorer clássicos no Windows 11",
+          "desc_ar": "يعيد شريط المهام والمستكشف الكلاسيكيين في Windows 11",
+          "desc_ko": "Windows 11에서 클래식 작업 표시줄과 탐색기 복원",
+          "tags_zh_TW": [
+            "工作列",
+            "Win11",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Taskleiste",
+            "Win11",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Barra de tareas",
+            "Win11",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Barra de tarefas",
+            "Win11",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "شريط المهام",
+            "Win11",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "작업 표시줄",
+            "Win11",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "Win10 工作列",
+            "經典右鍵選單",
+            "檔案總管分頁",
+            "系統匣自訂"
+          ],
+          "features_de": [
+            "Win10-Taskleiste",
+            "Klassisches Kontextmenü",
+            "Explorer-Tabs",
+            "Infobereich anpassen"
+          ],
+          "features_es": [
+            "Barra de tareas de Win10",
+            "Menú contextual clásico",
+            "Pestañas del Explorador",
+            "Personalización de la bandeja"
+          ],
+          "features_pt": [
+            "Barra de tarefas do Win10",
+            "Menu de contexto clássico",
+            "Guias no Explorer",
+            "Personalização da bandeja"
+          ],
+          "features_ar": [
+            "شريط مهام Win10",
+            "قائمة سياق كلاسيكية",
+            "تبويبات المستكشف",
+            "تخصيص علبة النظام"
+          ],
+          "features_ko": [
+            "Win10 작업 표시줄",
+            "클래식 컨텍스트 메뉴",
+            "탐색기 탭",
+            "시스템 트레이 사용자 지정"
+          ],
+          "license_zh_TW": "GPL-2.0",
+          "license_de": "GPL-2.0",
+          "license_es": "GPL-2.0",
+          "license_pt": "GPL-2.0",
+          "license_ar": "GPL-2.0",
+          "license_ko": "GPL-2.0",
+          "systemRequirements_zh_TW": "Windows 11",
+          "systemRequirements_de": "Windows 11",
+          "systemRequirements_es": "Windows 11",
+          "systemRequirements_pt": "Windows 11",
+          "systemRequirements_ar": "Windows 11",
+          "systemRequirements_ko": "Windows 11",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "StartAllBack",
-          "desc": "Win11 开始菜单与任务栏增强",
-          "desc_zh": "Win11 开始菜单与任务栏增强",
+          "desc": "Windows 11 开始菜单与任务栏增强",
+          "desc_zh": "Windows 11 开始菜单与任务栏增强",
           "desc_en": "Windows 11 Start menu and taskbar enhancement",
-          "desc_ja": "Windows 11スタートメニュー・タスクバー強化",
+          "desc_ja": "Windows 11 のスタートメニューとタスクバー強化",
           "desc_fr": "Amélioration du menu Démarrer et de la barre des tâches Windows 11",
           "desc_ru": "Улучшение меню «Пуск» и панели задач Windows 11",
           "icon": "tools",
@@ -713,26 +3390,176 @@
           "license_zh": "付费（30 天试用）",
           "license_en": "Paid (30-day trial)",
           "license_ja": "有料（30日間試用）",
-          "license_fr": "Payant (30 jours d'essai)",
-          "license_ru": "Платно (30-дневная пробная версия)",
-          "tags": ["开始菜单", "Win11", "付费"],
-          "tags_zh": ["开始菜单", "Win11", "付费"],
-          "tags_en": ["Start Menu", "Win11", "Paid"],
-          "tags_ja": ["スタートメニュー", "Win11", "有料"],
-          "tags_fr": ["Menu Démarrer", "Win11", "Payant"],
-          "tags_ru": ["Меню «Пуск»", "Win11", "Платный"],
-          "features": ["经典开始菜单", "任务栏增强", "资源管理器恢复", "图标自定义"],
-          "features_zh": ["经典开始菜单", "任务栏增强", "资源管理器恢复", "图标自定义"],
-          "features_en": ["Classic Start menu", "Taskbar enhancement", "Explorer restoration", "Icon customization"],
-          "features_ja": ["クラシックスタートメニュー", "タスクバー強化", "エクスプローラー復元", "アイコンカスタマイズ"],
-          "features_fr": ["Menu Démarrer classique", "Amélioration barre des tâches", "Restauration de l'explorateur", "Personnalisation des icônes"],
-          "features_ru": ["Классическое меню «Пуск»", "Улучшение панели задач", "Восстановление проводника", "Настройка значков"],
+          "license_fr": "Payant (essai de 30 jours)",
+          "license_ru": "Платно, пробная версия 30 дней",
+          "tags": [
+            "开始菜单",
+            "Win11",
+            "付费"
+          ],
+          "tags_zh": [
+            "开始菜单",
+            "Win11",
+            "付费"
+          ],
+          "tags_en": [
+            "Start Menu",
+            "Win11",
+            "Paid"
+          ],
+          "tags_ja": [
+            "スタートメニュー",
+            "Win11",
+            "有料"
+          ],
+          "tags_fr": [
+            "Menu Démarrer",
+            "Win11",
+            "Payant"
+          ],
+          "tags_ru": [
+            "Меню Пуск",
+            "Win11",
+            "Платно"
+          ],
+          "features": [
+            "经典开始菜单",
+            "任务栏增强",
+            "资源管理器恢复",
+            "图标自定义"
+          ],
+          "features_zh": [
+            "经典开始菜单",
+            "任务栏增强",
+            "资源管理器恢复",
+            "图标自定义"
+          ],
+          "features_en": [
+            "Classic Start menu",
+            "Taskbar enhancement",
+            "Explorer restoration",
+            "Icon customization"
+          ],
+          "features_ja": [
+            "クラシックなスタートメニュー",
+            "タスクバー強化",
+            "エクスプローラー復元",
+            "アイコンのカスタマイズ"
+          ],
+          "features_fr": [
+            "Menu Démarrer classique",
+            "Amélioration de la barre des tâches",
+            "Restauration de l’Explorateur",
+            "Personnalisation des icônes"
+          ],
+          "features_ru": [
+            "Классическое меню Пуск",
+            "Улучшение панели задач",
+            "Восстановление Проводника",
+            "Настройка значков"
+          ],
           "systemRequirements": "Windows 11",
           "systemRequirements_zh": "Windows 11",
           "systemRequirements_en": "Windows 11",
           "systemRequirements_ja": "Windows 11",
           "systemRequirements_fr": "Windows 11",
-          "systemRequirements_ru": "Windows 11"
+          "systemRequirements_ru": "Windows 11",
+          "name_zh": "StartAllBack",
+          "name_zh_TW": "StartAllBack",
+          "name_en": "StartAllBack",
+          "name_fr": "StartAllBack",
+          "name_de": "StartAllBack",
+          "name_es": "StartAllBack",
+          "name_pt": "StartAllBack",
+          "name_ru": "StartAllBack",
+          "name_ar": "StartAllBack",
+          "name_ko": "StartAllBack",
+          "name_ja": "StartAllBack",
+          "desc_zh_TW": "Windows 11 開始功能表與工作列增強",
+          "desc_de": "Erweiterung von Startmenü und Taskleiste in Windows 11",
+          "desc_es": "Mejora del menú Inicio y la barra de tareas de Windows 11",
+          "desc_pt": "Aprimoramento do menu Iniciar e da barra de tarefas do Windows 11",
+          "desc_ar": "تحسين قائمة ابدأ وشريط المهام في Windows 11",
+          "desc_ko": "Windows 11 시작 메뉴와 작업 표시줄 개선",
+          "tags_zh_TW": [
+            "開始功能表",
+            "Win11",
+            "付費"
+          ],
+          "tags_de": [
+            "Startmenü",
+            "Win11",
+            "Kostenpflichtig"
+          ],
+          "tags_es": [
+            "Menú Inicio",
+            "Win11",
+            "De pago"
+          ],
+          "tags_pt": [
+            "Menu Iniciar",
+            "Win11",
+            "Pago"
+          ],
+          "tags_ar": [
+            "قائمة ابدأ",
+            "Win11",
+            "مدفوع"
+          ],
+          "tags_ko": [
+            "시작 메뉴",
+            "Win11",
+            "유료"
+          ],
+          "features_zh_TW": [
+            "經典開始功能表",
+            "工作列增強",
+            "檔案總管還原",
+            "圖示自訂"
+          ],
+          "features_de": [
+            "Klassisches Startmenü",
+            "Taskleisten-Erweiterung",
+            "Explorer-Wiederherstellung",
+            "Symbolanpassung"
+          ],
+          "features_es": [
+            "Menú Inicio clásico",
+            "Mejoras de la barra de tareas",
+            "Restauración del Explorador",
+            "Personalización de iconos"
+          ],
+          "features_pt": [
+            "Menu Iniciar clássico",
+            "Melhorias na barra de tarefas",
+            "Restauração do Explorer",
+            "Personalização de ícones"
+          ],
+          "features_ar": [
+            "قائمة ابدأ كلاسيكية",
+            "تحسين شريط المهام",
+            "استعادة المستكشف",
+            "تخصيص الأيقونات"
+          ],
+          "features_ko": [
+            "클래식 시작 메뉴",
+            "작업 표시줄 개선",
+            "탐색기 복원",
+            "아이콘 사용자 지정"
+          ],
+          "license_zh_TW": "付費（30 天試用）",
+          "license_de": "Kostenpflichtig (30 Tage Testversion)",
+          "license_es": "De pago (prueba de 30 días)",
+          "license_pt": "Pago (teste de 30 dias)",
+          "license_ar": "مدفوع (تجربة 30 يومًا)",
+          "license_ko": "유료(30일 체험판)",
+          "systemRequirements_zh_TW": "Windows 11",
+          "systemRequirements_de": "Windows 11",
+          "systemRequirements_es": "Windows 11",
+          "systemRequirements_pt": "Windows 11",
+          "systemRequirements_ar": "Windows 11",
+          "systemRequirements_ko": "Windows 11",
+          "safetyLevel": "Advanced"
         }
       ]
     },
@@ -745,9 +3572,9 @@
           "desc": "综合系统救援启动盘",
           "desc_zh": "综合系统救援启动盘",
           "desc_en": "Comprehensive system rescue boot disk",
-          "desc_ja": "総合システムレスキューブートディスク",
+          "desc_ja": "総合システムレスキュー起動ディスク",
           "desc_fr": "Disque de secours système complet",
-          "desc_ru": "Комплексный загрузочный диск восстановления системы",
+          "desc_ru": "Комплексный загрузочный диск восстановления",
           "icon": "disc",
           "url": "https://www.hirensbootcd.org/",
           "downloadUrl": "https://www.hirensbootcd.org/",
@@ -760,24 +3587,174 @@
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
           "rating": "4.7",
-          "tags": ["救援盘", "PE", "免费"],
-          "tags_zh": ["救援盘", "PE", "免费"],
-          "tags_en": ["Rescue Disk", "PE", "Free"],
-          "tags_ja": ["レスキューディスク", "PE", "無料"],
-          "tags_fr": ["Disque de secours", "PE", "Gratuit"],
-          "tags_ru": ["Диск восстановления", "PE", "Бесплатно"],
-          "features": ["WinPE 环境", "磁盘工具", "数据恢复", "病毒查杀"],
-          "features_zh": ["WinPE 环境", "磁盘工具", "数据恢复", "病毒查杀"],
-          "features_en": ["WinPE environment", "Disk tools", "Data recovery", "Virus scanning"],
-          "features_ja": ["WinPE環境", "ディスクツール", "データ復旧", "ウイルス検出"],
-          "features_fr": ["Environnement WinPE", "Outils disque", "Récupération de données", "Analyse antivirus"],
-          "features_ru": ["Среда WinPE", "Дисковые утилиты", "Восстановление данных", "Антивирусная проверка"],
+          "tags": [
+            "救援盘",
+            "PE",
+            "免费"
+          ],
+          "tags_zh": [
+            "救援盘",
+            "PE",
+            "免费"
+          ],
+          "tags_en": [
+            "Rescue Disk",
+            "PE",
+            "Free"
+          ],
+          "tags_ja": [
+            "レスキューディスク",
+            "PE",
+            "無料"
+          ],
+          "tags_fr": [
+            "Disque de secours",
+            "PE",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Диск восстановления",
+            "PE",
+            "Бесплатно"
+          ],
+          "features": [
+            "WinPE 环境",
+            "磁盘工具",
+            "数据恢复",
+            "病毒查杀"
+          ],
+          "features_zh": [
+            "WinPE 环境",
+            "磁盘工具",
+            "数据恢复",
+            "病毒查杀"
+          ],
+          "features_en": [
+            "WinPE environment",
+            "Disk tools",
+            "Data recovery",
+            "Virus scanning"
+          ],
+          "features_ja": [
+            "WinPE 環境",
+            "ディスクツール",
+            "データ復旧",
+            "ウイルススキャン"
+          ],
+          "features_fr": [
+            "Environnement WinPE",
+            "Outils disque",
+            "Récupération de données",
+            "Analyse antivirus"
+          ],
+          "features_ru": [
+            "Среда WinPE",
+            "Дисковые утилиты",
+            "Восстановление данных",
+            "Проверка на вирусы"
+          ],
           "systemRequirements": "可启动 U 盘",
           "systemRequirements_zh": "可启动 U 盘",
           "systemRequirements_en": "Bootable USB drive",
-          "systemRequirements_ja": "起動可能なUSBドライブ",
+          "systemRequirements_ja": "起動可能な USB ドライブ",
           "systemRequirements_fr": "Clé USB amorçable",
-          "systemRequirements_ru": "Загрузочный USB-накопитель"
+          "systemRequirements_ru": "Загрузочный USB-накопитель",
+          "name_zh": "Hiren's BootCD PE",
+          "name_zh_TW": "Hiren's BootCD PE",
+          "name_en": "Hiren's BootCD PE",
+          "name_fr": "Hiren's BootCD PE",
+          "name_de": "Hiren's BootCD PE",
+          "name_es": "Hiren's BootCD PE",
+          "name_pt": "Hiren's BootCD PE",
+          "name_ru": "Hiren's BootCD PE",
+          "name_ar": "Hiren's BootCD PE",
+          "name_ko": "Hiren's BootCD PE",
+          "name_ja": "Hiren's BootCD PE",
+          "desc_zh_TW": "綜合系統救援開機碟",
+          "desc_de": "Umfassendes bootfähiges Rettungssystem",
+          "desc_es": "Disco de rescate completo para el sistema",
+          "desc_pt": "Disco de resgate completo do sistema",
+          "desc_ar": "قرص إنقاذ نظام شامل قابل للإقلاع",
+          "desc_ko": "종합 시스템 구조 부팅 디스크",
+          "tags_zh_TW": [
+            "救援碟",
+            "PE",
+            "免費"
+          ],
+          "tags_de": [
+            "Rettungsdisk",
+            "PE",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Disco de rescate",
+            "PE",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Disco de resgate",
+            "PE",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "قرص إنقاذ",
+            "PE",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "구조 디스크",
+            "PE",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "WinPE 環境",
+            "磁碟工具",
+            "資料救援",
+            "病毒掃描"
+          ],
+          "features_de": [
+            "WinPE-Umgebung",
+            "Datenträgerwerkzeuge",
+            "Datenrettung",
+            "Virenscan"
+          ],
+          "features_es": [
+            "Entorno WinPE",
+            "Herramientas de disco",
+            "Recuperación de datos",
+            "Análisis antivirus"
+          ],
+          "features_pt": [
+            "Ambiente WinPE",
+            "Ferramentas de disco",
+            "Recuperação de dados",
+            "Verificação de vírus"
+          ],
+          "features_ar": [
+            "بيئة WinPE",
+            "أدوات قرص",
+            "استعادة بيانات",
+            "فحص فيروسات"
+          ],
+          "features_ko": [
+            "WinPE 환경",
+            "디스크 도구",
+            "데이터 복구",
+            "바이러스 검사"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "可開機 USB",
+          "systemRequirements_de": "Bootfähiger USB-Stick",
+          "systemRequirements_es": "Unidad USB de arranque",
+          "systemRequirements_pt": "Unidade USB inicializável",
+          "systemRequirements_ar": "وحدة USB قابلة للإقلاع",
+          "systemRequirements_ko": "부팅 가능한 USB 드라이브",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "MemTest86",
@@ -786,7 +3763,7 @@
           "desc_en": "Memory stability testing tool",
           "desc_ja": "メモリ安定性テストツール",
           "desc_fr": "Outil de test de stabilité de la mémoire",
-          "desc_ru": "Инструмент тестирования стабильности памяти",
+          "desc_ru": "Инструмент проверки стабильности памяти",
           "icon": "monitor",
           "url": "https://www.memtest86.com/",
           "downloadUrl": "https://www.memtest86.com/download.htm",
@@ -795,37 +3772,187 @@
           "license": "免费 / Pro 付费",
           "license_zh": "免费 / Pro 付费",
           "license_en": "Free / Pro paid",
-          "license_ja": "無料 / Pro有料",
+          "license_ja": "無料 / Pro 有料",
           "license_fr": "Gratuit / Pro payant",
           "license_ru": "Бесплатно / Pro платно",
           "rating": "4.9",
-          "tags": ["内存测试", "稳定性", "免费"],
-          "tags_zh": ["内存测试", "稳定性", "免费"],
-          "tags_en": ["Memory Test", "Stability", "Free"],
-          "tags_ja": ["メモリテスト", "安定性", "無料"],
-          "tags_fr": ["Test mémoire", "Stabilité", "Gratuit"],
-          "tags_ru": ["Тест памяти", "Стабильность", "Бесплатно"],
-          "features": ["独立启动运行", "多通道测试", "错误检测", "详细报告"],
-          "features_zh": ["独立启动运行", "多通道测试", "错误检测", "详细报告"],
-          "features_en": ["Standalone boot", "Multi-channel test", "Error detection", "Detailed report"],
-          "features_ja": ["スタンドアロンブート", "マルチチャネルテスト", "エラー検出", "詳細レポート"],
-          "features_fr": ["Amorçage autonome", "Test multi-canal", "Détection d'erreurs", "Rapport détaillé"],
-          "features_ru": ["Автономная загрузка", "Многоканальный тест", "Обнаружение ошибок", "Подробный отчёт"],
+          "tags": [
+            "内存测试",
+            "稳定性",
+            "免费"
+          ],
+          "tags_zh": [
+            "内存测试",
+            "稳定性",
+            "免费"
+          ],
+          "tags_en": [
+            "Memory Test",
+            "Stability",
+            "Free"
+          ],
+          "tags_ja": [
+            "メモリテスト",
+            "安定性",
+            "無料"
+          ],
+          "tags_fr": [
+            "Test mémoire",
+            "Stabilité",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Тест памяти",
+            "Стабильность",
+            "Бесплатно"
+          ],
+          "features": [
+            "独立启动运行",
+            "多通道测试",
+            "错误检测",
+            "详细报告"
+          ],
+          "features_zh": [
+            "独立启动运行",
+            "多通道测试",
+            "错误检测",
+            "详细报告"
+          ],
+          "features_en": [
+            "Standalone boot",
+            "Multi-channel test",
+            "Error detection",
+            "Detailed report"
+          ],
+          "features_ja": [
+            "スタンドアロン起動",
+            "マルチチャネルテスト",
+            "エラー検出",
+            "詳細レポート"
+          ],
+          "features_fr": [
+            "Démarrage autonome",
+            "Test multicanal",
+            "Détection d’erreurs",
+            "Rapport détaillé"
+          ],
+          "features_ru": [
+            "Автономная загрузка",
+            "Многоканальный тест",
+            "Обнаружение ошибок",
+            "Подробный отчет"
+          ],
           "systemRequirements": "可启动 U 盘",
           "systemRequirements_zh": "可启动 U 盘",
           "systemRequirements_en": "Bootable USB drive",
-          "systemRequirements_ja": "起動可能なUSBドライブ",
+          "systemRequirements_ja": "起動可能な USB ドライブ",
           "systemRequirements_fr": "Clé USB amorçable",
-          "systemRequirements_ru": "Загрузочный USB-накопитель"
+          "systemRequirements_ru": "Загрузочный USB-накопитель",
+          "name_zh": "MemTest86",
+          "name_zh_TW": "MemTest86",
+          "name_en": "MemTest86",
+          "name_fr": "MemTest86",
+          "name_de": "MemTest86",
+          "name_es": "MemTest86",
+          "name_pt": "MemTest86",
+          "name_ru": "MemTest86",
+          "name_ar": "MemTest86",
+          "name_ko": "MemTest86",
+          "name_ja": "MemTest86",
+          "desc_zh_TW": "記憶體穩定性測試工具",
+          "desc_de": "Werkzeug zum Testen der Speicherstabilität",
+          "desc_es": "Herramienta para probar la estabilidad de la memoria",
+          "desc_pt": "Ferramenta para testar a estabilidade da memória",
+          "desc_ar": "أداة اختبار استقرار الذاكرة",
+          "desc_ko": "메모리 안정성 테스트 도구",
+          "tags_zh_TW": [
+            "記憶體測試",
+            "穩定性",
+            "免費"
+          ],
+          "tags_de": [
+            "Speichertest",
+            "Stabilität",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Prueba de memoria",
+            "Estabilidad",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Teste de memória",
+            "Estabilidade",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "اختبار ذاكرة",
+            "استقرار",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "메모리 테스트",
+            "안정성",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "獨立開機執行",
+            "多通道測試",
+            "錯誤檢測",
+            "詳細報告"
+          ],
+          "features_de": [
+            "Eigenständiger Start",
+            "Mehrkanaltest",
+            "Fehlererkennung",
+            "Detaillierter Bericht"
+          ],
+          "features_es": [
+            "Arranque independiente",
+            "Prueba multicanal",
+            "Detección de errores",
+            "Informe detallado"
+          ],
+          "features_pt": [
+            "Inicialização independente",
+            "Teste multicanal",
+            "Detecção de erros",
+            "Relatório detalhado"
+          ],
+          "features_ar": [
+            "إقلاع مستقل",
+            "اختبار متعدد القنوات",
+            "كشف الأخطاء",
+            "تقرير مفصل"
+          ],
+          "features_ko": [
+            "독립 부팅",
+            "다중 채널 테스트",
+            "오류 감지",
+            "상세 보고서"
+          ],
+          "license_zh_TW": "免費 / Pro 付費",
+          "license_de": "Kostenlos / Pro kostenpflichtig",
+          "license_es": "Gratis / Pro de pago",
+          "license_pt": "Grátis / Pro pago",
+          "license_ar": "مجاني / Pro مدفوع",
+          "license_ko": "무료 / Pro 유료",
+          "systemRequirements_zh_TW": "可開機 USB",
+          "systemRequirements_de": "Bootfähiger USB-Stick",
+          "systemRequirements_es": "Unidad USB de arranque",
+          "systemRequirements_pt": "Unidade USB inicializável",
+          "systemRequirements_ar": "وحدة USB قابلة للإقلاع",
+          "systemRequirements_ko": "부팅 가능한 USB 드라이브",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "GParted Live",
           "desc": "分区编辑器启动盘",
           "desc_zh": "分区编辑器启动盘",
           "desc_en": "Partition editor boot disk",
-          "desc_ja": "パーティションエディタ起動ディスク",
-          "desc_fr": "Disque de démarrage de l'éditeur de partitions",
-          "desc_ru": "Загрузочный диск редактора разделов",
+          "desc_ja": "パーティションエディター起動ディスク",
+          "desc_fr": "Disque de démarrage pour l’éditeur de partitions",
+          "desc_ru": "Загрузочный редактор разделов",
           "icon": "partition",
           "url": "https://gparted.org/livecd.php",
           "downloadUrl": "https://gparted.org/livecd.php",
@@ -838,24 +3965,186 @@
           "license_fr": "GPL-2.0",
           "license_ru": "GPL-2.0",
           "rating": "4.6",
-          "tags": ["分区", "启动盘", "免费", "开源"],
-          "tags_zh": ["分区", "启动盘", "免费", "开源"],
-          "tags_en": ["Partition", "Boot Disk", "Free", "Open Source"],
-          "tags_ja": ["パーティション", "起動ディスク", "無料", "オープンソース"],
-          "tags_fr": ["Partition", "Disque de démarrage", "Gratuit", "Open Source"],
-          "tags_ru": ["Раздел", "Загрузочный диск", "Бесплатно", "Открытый код"],
-          "features": ["创建/删除分区", "调整大小", "文件系统转换", "数据恢复"],
-          "features_zh": ["创建/删除分区", "调整大小", "文件系统转换", "数据恢复"],
-          "features_en": ["Create/delete partitions", "Resize", "Filesystem conversion", "Data recovery"],
-          "features_ja": ["パーティション作成/削除", "サイズ変更", "ファイルシステム変換", "データ復旧"],
-          "features_fr": ["Créer/supprimer des partitions", "Redimensionner", "Conversion de système de fichiers", "Récupération de données"],
-          "features_ru": ["Создание/удаление разделов", "Изменение размера", "Конвертация файловых систем", "Восстановление данных"],
+          "tags": [
+            "分区",
+            "启动盘",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "分区",
+            "启动盘",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Partition",
+            "Boot Disk",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "パーティション",
+            "起動ディスク",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Partition",
+            "Disque de démarrage",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Раздел",
+            "Загрузочный диск",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "创建/删除分区",
+            "调整大小",
+            "文件系统转换",
+            "数据恢复"
+          ],
+          "features_zh": [
+            "创建/删除分区",
+            "调整大小",
+            "文件系统转换",
+            "数据恢复"
+          ],
+          "features_en": [
+            "Create/delete partitions",
+            "Resize",
+            "Filesystem conversion",
+            "Data recovery"
+          ],
+          "features_ja": [
+            "パーティション作成/削除",
+            "サイズ変更",
+            "ファイルシステム変換",
+            "データ復旧"
+          ],
+          "features_fr": [
+            "Créer/supprimer des partitions",
+            "Redimensionner",
+            "Conversion de système de fichiers",
+            "Récupération de données"
+          ],
+          "features_ru": [
+            "Создание/удаление разделов",
+            "Изменение размера",
+            "Преобразование файловой системы",
+            "Восстановление данных"
+          ],
           "systemRequirements": "可启动 U 盘",
           "systemRequirements_zh": "可启动 U 盘",
           "systemRequirements_en": "Bootable USB drive",
-          "systemRequirements_ja": "起動可能なUSBドライブ",
+          "systemRequirements_ja": "起動可能な USB ドライブ",
           "systemRequirements_fr": "Clé USB amorçable",
-          "systemRequirements_ru": "Загрузочный USB-накопитель"
+          "systemRequirements_ru": "Загрузочный USB-накопитель",
+          "name_zh": "GParted Live",
+          "name_zh_TW": "GParted Live",
+          "name_en": "GParted Live",
+          "name_fr": "GParted Live",
+          "name_de": "GParted Live",
+          "name_es": "GParted Live",
+          "name_pt": "GParted Live",
+          "name_ru": "GParted Live",
+          "name_ar": "GParted Live",
+          "name_ko": "GParted Live",
+          "name_ja": "GParted Live",
+          "desc_zh_TW": "分割區編輯器開機碟",
+          "desc_de": "Bootfähiger Partitionseditor",
+          "desc_es": "Disco de arranque para editar particiones",
+          "desc_pt": "Disco inicializável para edição de partições",
+          "desc_ar": "قرص إقلاع لتحرير الأقسام",
+          "desc_ko": "파티션 편집 부팅 디스크",
+          "tags_zh_TW": [
+            "分割區",
+            "開機碟",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Partition",
+            "Bootdisk",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Partición",
+            "Disco de arranque",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Partição",
+            "Disco inicializável",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "قسم",
+            "قرص إقلاع",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "파티션",
+            "부팅 디스크",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "建立/刪除分割區",
+            "調整大小",
+            "檔案系統轉換",
+            "資料救援"
+          ],
+          "features_de": [
+            "Partitionen erstellen/löschen",
+            "Größe ändern",
+            "Dateisystem konvertieren",
+            "Datenrettung"
+          ],
+          "features_es": [
+            "Crear/eliminar particiones",
+            "Redimensionar",
+            "Conversión de sistema de archivos",
+            "Recuperación de datos"
+          ],
+          "features_pt": [
+            "Criar/excluir partições",
+            "Redimensionar",
+            "Conversão de sistema de arquivos",
+            "Recuperação de dados"
+          ],
+          "features_ar": [
+            "إنشاء/حذف الأقسام",
+            "تغيير الحجم",
+            "تحويل نظام الملفات",
+            "استعادة البيانات"
+          ],
+          "features_ko": [
+            "파티션 생성/삭제",
+            "크기 조정",
+            "파일 시스템 변환",
+            "데이터 복구"
+          ],
+          "license_zh_TW": "GPL-2.0",
+          "license_de": "GPL-2.0",
+          "license_es": "GPL-2.0",
+          "license_pt": "GPL-2.0",
+          "license_ar": "GPL-2.0",
+          "license_ko": "GPL-2.0",
+          "systemRequirements_zh_TW": "可開機 USB",
+          "systemRequirements_de": "Bootfähiger USB-Stick",
+          "systemRequirements_es": "Unidad USB de arranque",
+          "systemRequirements_pt": "Unidade USB inicializável",
+          "systemRequirements_ar": "وحدة USB قابلة للإقلاع",
+          "systemRequirements_ko": "부팅 가능한 USB 드라이브",
+          "safetyLevel": "Expert"
         }
       ]
     },
@@ -868,9 +4157,9 @@
           "desc": "高压缩比文件压缩工具",
           "desc_zh": "高压缩比文件压缩工具",
           "desc_en": "High compression ratio file archiver",
-          "desc_ja": "高圧縮率ファイルアーカイバ",
-          "desc_fr": "Archiveur de fichiers à haute compression",
-          "desc_ru": "Архиватор файлов с высокой степенью сжатия",
+          "desc_ja": "高圧縮率のファイルアーカイバー",
+          "desc_fr": "Archiveur de fichiers à haut taux de compression",
+          "desc_ru": "Архиватор с высокой степенью сжатия",
           "icon": "archive",
           "url": "https://www.7-zip.org/",
           "downloadUrl": "https://www.7-zip.org/download.html",
@@ -884,24 +4173,186 @@
           "license_ru": "LGPL + BSD",
           "rating": "4.9",
           "featured": true,
-          "tags": ["压缩", "解压", "免费", "开源"],
-          "tags_zh": ["压缩", "解压", "免费", "开源"],
-          "tags_en": ["Compress", "Extract", "Free", "Open Source"],
-          "tags_ja": ["圧縮", "展開", "無料", "オープンソース"],
-          "tags_fr": ["Compresser", "Extraire", "Gratuit", "Open Source"],
-          "tags_ru": ["Сжатие", "Распаковка", "Бесплатно", "Открытый код"],
-          "features": ["7z 高压缩比", "支持 80+ 格式", "AES-256 加密", "自解压包"],
-          "features_zh": ["7z 高压缩比", "支持 80+ 格式", "AES-256 加密", "自解压包"],
-          "features_en": ["7z high compression", "80+ format support", "AES-256 encryption", "Self-extracting archives"],
-          "features_ja": ["7z高圧縮", "80+フォーマット対応", "AES-256暗号化", "自己解凍アーカイブ"],
-          "features_fr": ["Haute compression 7z", "Support 80+ formats", "Chiffrement AES-256", "Archives auto-extractibles"],
-          "features_ru": ["Высокое сжатие 7z", "Поддержка 80+ форматов", "Шифрование AES-256", "Самораспаковывающиеся архивы"],
+          "tags": [
+            "压缩",
+            "解压",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "压缩",
+            "解压",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Compress",
+            "Extract",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "圧縮",
+            "展開",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Compresser",
+            "Extraire",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Сжатие",
+            "Распаковка",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "7z 高压缩比",
+            "支持 80+ 格式",
+            "AES-256 加密",
+            "自解压压缩包"
+          ],
+          "features_zh": [
+            "7z 高压缩比",
+            "支持 80+ 格式",
+            "AES-256 加密",
+            "自解压压缩包"
+          ],
+          "features_en": [
+            "7z high compression",
+            "80+ format support",
+            "AES-256 encryption",
+            "Self-extracting archives"
+          ],
+          "features_ja": [
+            "7z 高圧縮",
+            "80 以上の形式に対応",
+            "AES-256 暗号化",
+            "自己解凍アーカイブ"
+          ],
+          "features_fr": [
+            "Haute compression 7z",
+            "Plus de 80 formats pris en charge",
+            "Chiffrement AES-256",
+            "Archives auto-extractibles"
+          ],
+          "features_ru": [
+            "Высокое сжатие 7z",
+            "Поддержка более 80 форматов",
+            "Шифрование AES-256",
+            "Самораспаковывающиеся архивы"
+          ],
           "systemRequirements": "Windows XP+",
           "systemRequirements_zh": "Windows XP+",
           "systemRequirements_en": "Windows XP+",
           "systemRequirements_ja": "Windows XP+",
           "systemRequirements_fr": "Windows XP+",
-          "systemRequirements_ru": "Windows XP+"
+          "systemRequirements_ru": "Windows XP+",
+          "name_zh": "7-Zip",
+          "name_zh_TW": "7-Zip",
+          "name_en": "7-Zip",
+          "name_fr": "7-Zip",
+          "name_de": "7-Zip",
+          "name_es": "7-Zip",
+          "name_pt": "7-Zip",
+          "name_ru": "7-Zip",
+          "name_ar": "7-Zip",
+          "name_ko": "7-Zip",
+          "name_ja": "7-Zip",
+          "desc_zh_TW": "高壓縮率檔案壓縮工具",
+          "desc_de": "Dateiarchivierer mit hoher Kompression",
+          "desc_es": "Archivador de archivos con alta compresión",
+          "desc_pt": "Compactador de arquivos com alta taxa de compressão",
+          "desc_ar": "أداة أرشفة ملفات بنسبة ضغط عالية",
+          "desc_ko": "높은 압축률의 파일 압축 도구",
+          "tags_zh_TW": [
+            "壓縮",
+            "解壓縮",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Komprimieren",
+            "Entpacken",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Comprimir",
+            "Extraer",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Compactar",
+            "Extrair",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "ضغط",
+            "استخراج",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "압축",
+            "해제",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "7z 高壓縮率",
+            "支援 80+ 格式",
+            "AES-256 加密",
+            "自解壓縮檔"
+          ],
+          "features_de": [
+            "Hohe 7z-Kompression",
+            "Über 80 Formate",
+            "AES-256-Verschlüsselung",
+            "Selbstentpackende Archive"
+          ],
+          "features_es": [
+            "Alta compresión 7z",
+            "Más de 80 formatos",
+            "Cifrado AES-256",
+            "Archivos autoextraíbles"
+          ],
+          "features_pt": [
+            "Alta compressão 7z",
+            "Suporte a mais de 80 formatos",
+            "Criptografia AES-256",
+            "Arquivos autoextraíveis"
+          ],
+          "features_ar": [
+            "ضغط 7z عالٍ",
+            "دعم أكثر من 80 صيغة",
+            "تشفير AES-256",
+            "أرشيفات ذاتية الاستخراج"
+          ],
+          "features_ko": [
+            "7z 고압축",
+            "80개 이상 형식 지원",
+            "AES-256 암호화",
+            "자동 압축 해제 아카이브"
+          ],
+          "license_zh_TW": "LGPL + BSD",
+          "license_de": "LGPL + BSD",
+          "license_es": "LGPL + BSD",
+          "license_pt": "LGPL + BSD",
+          "license_ar": "LGPL + BSD",
+          "license_ko": "LGPL + BSD",
+          "systemRequirements_zh_TW": "Windows XP+",
+          "systemRequirements_de": "Windows XP+",
+          "systemRequirements_es": "Windows XP+",
+          "systemRequirements_pt": "Windows XP+",
+          "systemRequirements_ar": "Windows XP+",
+          "systemRequirements_ko": "Windows XP+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "Everything",
@@ -910,7 +4361,7 @@
           "desc_en": "Ultra-fast filename search tool",
           "desc_ja": "超高速ファイル名検索ツール",
           "desc_fr": "Outil de recherche de noms de fichiers ultra-rapide",
-          "desc_ru": "Сверхбыстрый инструмент поиска по именам файлов",
+          "desc_ru": "Сверхбыстрый поиск по именам файлов",
           "icon": "search",
           "url": "https://www.voidtools.com/",
           "downloadUrl": "https://www.voidtools.com/downloads/",
@@ -924,24 +4375,186 @@
           "license_ru": "MIT",
           "rating": "4.9",
           "featured": true,
-          "tags": ["搜索", "文件名", "免费", "开源"],
-          "tags_zh": ["搜索", "文件名", "免费", "开源"],
-          "tags_en": ["Search", "Filename", "Free", "Open Source"],
-          "tags_ja": ["検索", "ファイル名", "無料", "オープンソース"],
-          "tags_fr": ["Recherche", "Nom de fichier", "Gratuit", "Open Source"],
-          "tags_ru": ["Поиск", "Имя файла", "Бесплатно", "Открытый код"],
-          "features": ["毫秒级搜索", "实时索引", "正则表达式", "轻量级"],
-          "features_zh": ["毫秒级搜索", "实时索引", "正则表达式", "轻量级"],
-          "features_en": ["Millisecond search", "Real-time indexing", "Regex support", "Lightweight"],
-          "features_ja": ["ミリ秒検索", "リアルタイムインデックス", "正規表現対応", "軽量"],
-          "features_fr": ["Recherche en millisecondes", "Indexation en temps réel", "Expressions régulières", "Léger"],
-          "features_ru": ["Поиск за миллисекунды", "Индексация в реальном времени", "Поддержка регулярных выражений", "Лёгкий"],
+          "tags": [
+            "搜索",
+            "文件名",
+            "免费",
+            "开源"
+          ],
+          "tags_zh": [
+            "搜索",
+            "文件名",
+            "免费",
+            "开源"
+          ],
+          "tags_en": [
+            "Search",
+            "Filename",
+            "Free",
+            "Open Source"
+          ],
+          "tags_ja": [
+            "検索",
+            "ファイル名",
+            "無料",
+            "オープンソース"
+          ],
+          "tags_fr": [
+            "Recherche",
+            "Nom de fichier",
+            "Gratuit",
+            "Open source"
+          ],
+          "tags_ru": [
+            "Поиск",
+            "Имя файла",
+            "Бесплатно",
+            "Открытый код"
+          ],
+          "features": [
+            "毫秒级搜索",
+            "实时索引",
+            "支持正则表达式",
+            "轻量级"
+          ],
+          "features_zh": [
+            "毫秒级搜索",
+            "实时索引",
+            "支持正则表达式",
+            "轻量级"
+          ],
+          "features_en": [
+            "Millisecond search",
+            "Real-time indexing",
+            "Regex support",
+            "Lightweight"
+          ],
+          "features_ja": [
+            "ミリ秒検索",
+            "リアルタイムインデックス",
+            "正規表現対応",
+            "軽量"
+          ],
+          "features_fr": [
+            "Recherche en millisecondes",
+            "Indexation en temps réel",
+            "Expressions régulières",
+            "Léger"
+          ],
+          "features_ru": [
+            "Поиск за миллисекунды",
+            "Индексация в реальном времени",
+            "Поддержка regex",
+            "Легкий"
+          ],
           "systemRequirements": "Windows XP+",
           "systemRequirements_zh": "Windows XP+",
           "systemRequirements_en": "Windows XP+",
           "systemRequirements_ja": "Windows XP+",
           "systemRequirements_fr": "Windows XP+",
-          "systemRequirements_ru": "Windows XP+"
+          "systemRequirements_ru": "Windows XP+",
+          "name_zh": "Everything",
+          "name_zh_TW": "Everything",
+          "name_en": "Everything",
+          "name_fr": "Everything",
+          "name_de": "Everything",
+          "name_es": "Everything",
+          "name_pt": "Everything",
+          "name_ru": "Everything",
+          "name_ar": "Everything",
+          "name_ko": "Everything",
+          "name_ja": "Everything",
+          "desc_zh_TW": "超高速檔名搜尋工具",
+          "desc_de": "Ultraschnelle Suche nach Dateinamen",
+          "desc_es": "Buscador ultrarrápido de nombres de archivo",
+          "desc_pt": "Pesquisa ultrarrápida por nomes de arquivo",
+          "desc_ar": "أداة بحث فائقة السرعة عن أسماء الملفات",
+          "desc_ko": "초고속 파일명 검색 도구",
+          "tags_zh_TW": [
+            "搜尋",
+            "檔名",
+            "免費",
+            "開源"
+          ],
+          "tags_de": [
+            "Suche",
+            "Dateiname",
+            "Kostenlos",
+            "Open Source"
+          ],
+          "tags_es": [
+            "Búsqueda",
+            "Nombre de archivo",
+            "Gratis",
+            "Código abierto"
+          ],
+          "tags_pt": [
+            "Pesquisa",
+            "Nome de arquivo",
+            "Grátis",
+            "Código aberto"
+          ],
+          "tags_ar": [
+            "بحث",
+            "اسم الملف",
+            "مجاني",
+            "مفتوح المصدر"
+          ],
+          "tags_ko": [
+            "검색",
+            "파일명",
+            "무료",
+            "오픈 소스"
+          ],
+          "features_zh_TW": [
+            "毫秒級搜尋",
+            "即時索引",
+            "支援正規表示式",
+            "輕量"
+          ],
+          "features_de": [
+            "Suche in Millisekunden",
+            "Echtzeitindexierung",
+            "Regex-Unterstützung",
+            "Leichtgewichtig"
+          ],
+          "features_es": [
+            "Búsqueda en milisegundos",
+            "Indexación en tiempo real",
+            "Compatibilidad con regex",
+            "Ligero"
+          ],
+          "features_pt": [
+            "Busca em milissegundos",
+            "Indexação em tempo real",
+            "Suporte a regex",
+            "Leve"
+          ],
+          "features_ar": [
+            "بحث خلال أجزاء من الثانية",
+            "فهرسة فورية",
+            "دعم Regex",
+            "خفيف"
+          ],
+          "features_ko": [
+            "밀리초 단위 검색",
+            "실시간 인덱싱",
+            "정규식 지원",
+            "가벼움"
+          ],
+          "license_zh_TW": "MIT",
+          "license_de": "MIT",
+          "license_es": "MIT",
+          "license_pt": "MIT",
+          "license_ar": "MIT",
+          "license_ko": "MIT",
+          "systemRequirements_zh_TW": "Windows XP+",
+          "systemRequirements_de": "Windows XP+",
+          "systemRequirements_es": "Windows XP+",
+          "systemRequirements_pt": "Windows XP+",
+          "systemRequirements_ar": "Windows XP+",
+          "systemRequirements_ko": "Windows XP+",
+          "safetyLevel": "Beginner"
         },
         {
           "name": "TeraCopy",
@@ -950,7 +4563,7 @@
           "desc_en": "High-speed file copy/move tool",
           "desc_ja": "高速ファイルコピー/移動ツール",
           "desc_fr": "Outil de copie/déplacement de fichiers haute vitesse",
-          "desc_ru": "Высокоскоростной инструмент копирования/перемещения файлов",
+          "desc_ru": "Инструмент быстрого копирования и перемещения файлов",
           "icon": "copy",
           "url": "https://www.codesector.com/teracopy",
           "downloadUrl": "https://www.codesector.com/teracopy",
@@ -959,27 +4572,383 @@
           "license": "免费 / Pro 付费",
           "license_zh": "免费 / Pro 付费",
           "license_en": "Free / Pro paid",
-          "license_ja": "無料 / Pro有料",
+          "license_ja": "無料 / Pro 有料",
           "license_fr": "Gratuit / Pro payant",
           "license_ru": "Бесплатно / Pro платно",
-          "tags": ["复制加速", "文件管理", "免费"],
-          "tags_zh": ["复制加速", "文件管理", "免费"],
-          "tags_en": ["Copy Acceleration", "File Management", "Free"],
-          "tags_ja": ["コピーアクセラレーション", "ファイル管理", "無料"],
-          "tags_fr": ["Accélération copie", "Gestion de fichiers", "Gratuit"],
-          "tags_ru": ["Ускорение копирования", "Управление файлами", "Бесплатно"],
-          "features": ["异步复制", "错误恢复", "进度显示", "校验验证"],
-          "features_zh": ["异步复制", "错误恢复", "进度显示", "校验验证"],
-          "features_en": ["Asynchronous copy", "Error recovery", "Progress display", "Checksum verification"],
-          "features_ja": ["非同期コピー", "エラー回復", "進捗表示", "チェックサム検証"],
-          "features_fr": ["Copie asynchrone", "Récupération d'erreurs", "Affichage de la progression", "Vérification par somme de contrôle"],
-          "features_ru": ["Асинхронное копирование", "Восстановление после ошибок", "Отображение прогресса", "Проверка контрольных сумм"],
+          "tags": [
+            "复制加速",
+            "文件管理",
+            "免费"
+          ],
+          "tags_zh": [
+            "复制加速",
+            "文件管理",
+            "免费"
+          ],
+          "tags_en": [
+            "Copy Acceleration",
+            "File Management",
+            "Free"
+          ],
+          "tags_ja": [
+            "コピー高速化",
+            "ファイル管理",
+            "無料"
+          ],
+          "tags_fr": [
+            "Copie accélérée",
+            "Gestion de fichiers",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Ускорение копирования",
+            "Управление файлами",
+            "Бесплатно"
+          ],
+          "features": [
+            "异步复制",
+            "错误恢复",
+            "进度显示",
+            "校验验证"
+          ],
+          "features_zh": [
+            "异步复制",
+            "错误恢复",
+            "进度显示",
+            "校验验证"
+          ],
+          "features_en": [
+            "Asynchronous copy",
+            "Error recovery",
+            "Progress display",
+            "Checksum verification"
+          ],
+          "features_ja": [
+            "非同期コピー",
+            "エラー復旧",
+            "進捗表示",
+            "チェックサム検証"
+          ],
+          "features_fr": [
+            "Copie asynchrone",
+            "Récupération après erreur",
+            "Affichage de la progression",
+            "Vérification par checksum"
+          ],
+          "features_ru": [
+            "Асинхронное копирование",
+            "Восстановление после ошибок",
+            "Отображение прогресса",
+            "Проверка контрольной суммы"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "TeraCopy",
+          "name_zh_TW": "TeraCopy",
+          "name_en": "TeraCopy",
+          "name_fr": "TeraCopy",
+          "name_de": "TeraCopy",
+          "name_es": "TeraCopy",
+          "name_pt": "TeraCopy",
+          "name_ru": "TeraCopy",
+          "name_ar": "TeraCopy",
+          "name_ko": "TeraCopy",
+          "name_ja": "TeraCopy",
+          "desc_zh_TW": "高速檔案複製/移動工具",
+          "desc_de": "Schnelles Werkzeug zum Kopieren und Verschieben von Dateien",
+          "desc_es": "Herramienta rápida para copiar y mover archivos",
+          "desc_pt": "Ferramenta rápida para copiar e mover arquivos",
+          "desc_ar": "أداة سريعة لنسخ الملفات ونقلها",
+          "desc_ko": "고속 파일 복사/이동 도구",
+          "tags_zh_TW": [
+            "複製加速",
+            "檔案管理",
+            "免費"
+          ],
+          "tags_de": [
+            "Kopierbeschleunigung",
+            "Dateiverwaltung",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Copia acelerada",
+            "Gestión de archivos",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Cópia acelerada",
+            "Gerenciamento de arquivos",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "تسريع النسخ",
+            "إدارة الملفات",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "복사 가속",
+            "파일 관리",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "非同步複製",
+            "錯誤復原",
+            "進度顯示",
+            "校驗驗證"
+          ],
+          "features_de": [
+            "Asynchrones Kopieren",
+            "Fehlerwiederherstellung",
+            "Fortschrittsanzeige",
+            "Prüfsummenprüfung"
+          ],
+          "features_es": [
+            "Copia asíncrona",
+            "Recuperación de errores",
+            "Progreso visible",
+            "Verificación de checksum"
+          ],
+          "features_pt": [
+            "Cópia assíncrona",
+            "Recuperação de erros",
+            "Exibição de progresso",
+            "Verificação de checksum"
+          ],
+          "features_ar": [
+            "نسخ غير متزامن",
+            "استرداد من الأخطاء",
+            "عرض التقدم",
+            "تحقق بالمجموع الاختباري"
+          ],
+          "features_ko": [
+            "비동기 복사",
+            "오류 복구",
+            "진행률 표시",
+            "체크섬 검증"
+          ],
+          "license_zh_TW": "免費 / Pro 付費",
+          "license_de": "Kostenlos / Pro kostenpflichtig",
+          "license_es": "Gratis / Pro de pago",
+          "license_pt": "Grátis / Pro pago",
+          "license_ar": "مجاني / Pro مدفوع",
+          "license_ko": "무료 / Pro 유료",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Beginner"
+        }
+      ]
+    },
+    {
+      "nameKey": "tools_cat_advanced",
+      "color": "#6B7280",
+      "tools": [
+        {
+          "name": "Sysinternals Suite",
+          "name_zh": "Sysinternals Suite",
+          "name_zh_TW": "Sysinternals Suite",
+          "name_en": "Sysinternals Suite",
+          "name_fr": "Sysinternals Suite",
+          "name_de": "Sysinternals Suite",
+          "name_es": "Sysinternals Suite",
+          "name_pt": "Sysinternals Suite",
+          "name_ru": "Sysinternals Suite",
+          "name_ar": "Sysinternals Suite",
+          "name_ko": "Sysinternals Suite",
+          "name_ja": "Sysinternals Suite",
+          "desc": "Official Microsoft toolkit for system diagnostics, troubleshooting, process analysis, startup management, and advanced Windows administration.",
+          "desc_zh": "Microsoft 官方工具集，用于系统诊断、故障排查、进程分析、启动项管理和高级 Windows 管理。",
+          "desc_zh_TW": "Microsoft 官方工具集，用於系統診斷、疑難排解、程序分析、啟動項目管理與進階 Windows 管理。",
+          "desc_en": "Official Microsoft toolkit for system diagnostics, troubleshooting, process analysis, startup management, and advanced Windows administration.",
+          "desc_fr": "Boîte à outils officielle Microsoft pour le diagnostic système, le dépannage, l’analyse des processus, la gestion du démarrage et l’administration avancée de Windows.",
+          "desc_de": "Offizielles Microsoft-Toolkit für Systemdiagnose, Problembehandlung, Prozessanalyse, Startverwaltung und erweiterte Windows-Administration.",
+          "desc_es": "Kit oficial de Microsoft para diagnóstico del sistema, solución de problemas, análisis de procesos, gestión de inicio y administración avanzada de Windows.",
+          "desc_pt": "Conjunto oficial da Microsoft para diagnóstico do sistema, solução de problemas, análise de processos, gerenciamento de inicialização e administração avançada do Windows.",
+          "desc_ru": "Официальный набор инструментов Microsoft для диагностики системы, устранения неполадок, анализа процессов, управления автозапуском и расширенного администрирования Windows.",
+          "desc_ar": "مجموعة أدوات رسمية من Microsoft لتشخيص النظام واستكشاف الأخطاء وتحليل العمليات وإدارة بدء التشغيل وإدارة Windows المتقدمة.",
+          "desc_ko": "시스템 진단, 문제 해결, 프로세스 분석, 시작 항목 관리, 고급 Windows 관리를 위한 Microsoft 공식 도구 모음입니다.",
+          "desc_ja": "システム診断、トラブルシューティング、プロセス分析、スタートアップ管理、高度な Windows 管理のための Microsoft 公式ツールキットです。",
+          "icon": "tools",
+          "url": "https://learn.microsoft.com/sysinternals/",
+          "downloadUrl": "https://learn.microsoft.com/sysinternals/downloads/",
+          "developer": "Microsoft",
+          "license": "Free",
+          "license_zh": "免费",
+          "license_zh_TW": "免費",
+          "license_en": "Free",
+          "license_fr": "Gratuit",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ru": "Бесплатно",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "license_ja": "無料",
+          "featured": true,
+          "tags": [
+            "Diagnostics",
+            "Troubleshooting",
+            "Microsoft",
+            "Administration"
+          ],
+          "tags_zh": [
+            "诊断",
+            "故障排查",
+            "Microsoft",
+            "管理"
+          ],
+          "tags_zh_TW": [
+            "診斷",
+            "疑難排解",
+            "Microsoft",
+            "管理"
+          ],
+          "tags_en": [
+            "Diagnostics",
+            "Troubleshooting",
+            "Microsoft",
+            "Administration"
+          ],
+          "tags_fr": [
+            "Diagnostic",
+            "Dépannage",
+            "Microsoft",
+            "Administration"
+          ],
+          "tags_de": [
+            "Diagnose",
+            "Problembehandlung",
+            "Microsoft",
+            "Administration"
+          ],
+          "tags_es": [
+            "Diagnóstico",
+            "Solución de problemas",
+            "Microsoft",
+            "Administración"
+          ],
+          "tags_pt": [
+            "Diagnóstico",
+            "Solução de problemas",
+            "Microsoft",
+            "Administração"
+          ],
+          "tags_ru": [
+            "Диагностика",
+            "Устранение неполадок",
+            "Microsoft",
+            "Администрирование"
+          ],
+          "tags_ar": [
+            "تشخيص",
+            "استكشاف الأخطاء",
+            "Microsoft",
+            "إدارة"
+          ],
+          "tags_ko": [
+            "진단",
+            "문제 해결",
+            "Microsoft",
+            "관리"
+          ],
+          "tags_ja": [
+            "診断",
+            "トラブルシューティング",
+            "Microsoft",
+            "管理"
+          ],
+          "features": [
+            "Process analysis",
+            "Startup management",
+            "File and registry utilities",
+            "Network and system diagnostics"
+          ],
+          "features_zh": [
+            "进程分析",
+            "启动项管理",
+            "文件和注册表工具",
+            "网络和系统诊断"
+          ],
+          "features_zh_TW": [
+            "程序分析",
+            "啟動項目管理",
+            "檔案與登錄工具",
+            "網路與系統診斷"
+          ],
+          "features_en": [
+            "Process analysis",
+            "Startup management",
+            "File and registry utilities",
+            "Network and system diagnostics"
+          ],
+          "features_fr": [
+            "Analyse des processus",
+            "Gestion du démarrage",
+            "Utilitaires fichiers et registre",
+            "Diagnostics réseau et système"
+          ],
+          "features_de": [
+            "Prozessanalyse",
+            "Startverwaltung",
+            "Datei- und Registrierungswerkzeuge",
+            "Netzwerk- und Systemdiagnose"
+          ],
+          "features_es": [
+            "Análisis de procesos",
+            "Gestión de inicio",
+            "Utilidades de archivos y registro",
+            "Diagnóstico de red y sistema"
+          ],
+          "features_pt": [
+            "Análise de processos",
+            "Gerenciamento de inicialização",
+            "Utilitários de arquivos e registro",
+            "Diagnóstico de rede e sistema"
+          ],
+          "features_ru": [
+            "Анализ процессов",
+            "Управление автозапуском",
+            "Утилиты для файлов и реестра",
+            "Диагностика сети и системы"
+          ],
+          "features_ar": [
+            "تحليل العمليات",
+            "إدارة بدء التشغيل",
+            "أدوات الملفات والسجل",
+            "تشخيص الشبكة والنظام"
+          ],
+          "features_ko": [
+            "프로세스 분석",
+            "시작 항목 관리",
+            "파일 및 레지스트리 유틸리티",
+            "네트워크 및 시스템 진단"
+          ],
+          "features_ja": [
+            "プロセス分析",
+            "スタートアップ管理",
+            "ファイルとレジストリのユーティリティ",
+            "ネットワークとシステム診断"
+          ],
+          "systemRequirements": "Windows 10+",
+          "systemRequirements_zh": "Windows 10+",
+          "systemRequirements_zh_TW": "Windows 10+",
+          "systemRequirements_en": "Windows 10+",
+          "systemRequirements_fr": "Windows 10+",
+          "systemRequirements_de": "Windows 10+",
+          "systemRequirements_es": "Windows 10+",
+          "systemRequirements_pt": "Windows 10+",
+          "systemRequirements_ru": "Windows 10+",
+          "systemRequirements_ar": "Windows 10+",
+          "systemRequirements_ko": "Windows 10+",
+          "systemRequirements_ja": "Windows 10+",
+          "safetyLevel": "Advanced"
         }
       ]
     },
@@ -992,8 +4961,8 @@
           "desc": "Windows/Office 激活工具",
           "desc_zh": "Windows/Office 激活工具",
           "desc_en": "Windows/Office activation tool",
-          "desc_ja": "Windows/Officeアクティベーションツール",
-          "desc_fr": "Outil d'activation Windows/Office",
+          "desc_ja": "Windows/Office アクティベーションツール",
+          "desc_fr": "Outil d’activation Windows/Office",
           "desc_ru": "Инструмент активации Windows/Office",
           "icon": "key",
           "url": "https://github.com/zbezj/HEU_KMS_Activator/releases",
@@ -1005,33 +4974,183 @@
           "license_ja": "無料",
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
-          "tags": ["激活", "KMS", "免费"],
-          "tags_zh": ["激活", "KMS", "免费"],
-          "tags_en": ["Activation", "KMS", "Free"],
-          "tags_ja": ["アクティベーション", "KMS", "無料"],
-          "tags_fr": ["Activation", "KMS", "Gratuit"],
-          "tags_ru": ["Активация", "KMS", "Бесплатно"],
-          "features": ["Windows 激活", "Office 激活", "数字激活", "KMS 激活"],
-          "features_zh": ["Windows 激活", "Office 激活", "数字激活", "KMS 激活"],
-          "features_en": ["Windows activation", "Office activation", "Digital activation", "KMS activation"],
-          "features_ja": ["Windowsアクティベーション", "Officeアクティベーション", "デジタルライセンス", "KMSアクティベーション"],
-          "features_fr": ["Activation Windows", "Activation Office", "Activation numérique", "Activation KMS"],
-          "features_ru": ["Активация Windows", "Активация Office", "Цифровая активация", "Активация KMS"],
+          "tags": [
+            "激活",
+            "KMS",
+            "免费"
+          ],
+          "tags_zh": [
+            "激活",
+            "KMS",
+            "免费"
+          ],
+          "tags_en": [
+            "Activation",
+            "KMS",
+            "Free"
+          ],
+          "tags_ja": [
+            "アクティベーション",
+            "KMS",
+            "無料"
+          ],
+          "tags_fr": [
+            "Activation",
+            "KMS",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Активация",
+            "KMS",
+            "Бесплатно"
+          ],
+          "features": [
+            "Windows 激活",
+            "Office 激活",
+            "数字激活",
+            "KMS 激活"
+          ],
+          "features_zh": [
+            "Windows 激活",
+            "Office 激活",
+            "数字激活",
+            "KMS 激活"
+          ],
+          "features_en": [
+            "Windows activation",
+            "Office activation",
+            "Digital activation",
+            "KMS activation"
+          ],
+          "features_ja": [
+            "Windows アクティベーション",
+            "Office アクティベーション",
+            "デジタル認証",
+            "KMS 認証"
+          ],
+          "features_fr": [
+            "Activation Windows",
+            "Activation Office",
+            "Activation numérique",
+            "Activation KMS"
+          ],
+          "features_ru": [
+            "Активация Windows",
+            "Активация Office",
+            "Цифровая активация",
+            "Активация KMS"
+          ],
           "systemRequirements": "Windows 7+",
           "systemRequirements_zh": "Windows 7+",
           "systemRequirements_en": "Windows 7+",
           "systemRequirements_ja": "Windows 7+",
           "systemRequirements_fr": "Windows 7+",
-          "systemRequirements_ru": "Windows 7+"
+          "systemRequirements_ru": "Windows 7+",
+          "name_zh": "HEU KMS Activator",
+          "name_zh_TW": "HEU KMS Activator",
+          "name_en": "HEU KMS Activator",
+          "name_fr": "HEU KMS Activator",
+          "name_de": "HEU KMS Activator",
+          "name_es": "HEU KMS Activator",
+          "name_pt": "HEU KMS Activator",
+          "name_ru": "HEU KMS Activator",
+          "name_ar": "HEU KMS Activator",
+          "name_ko": "HEU KMS Activator",
+          "name_ja": "HEU KMS Activator",
+          "desc_zh_TW": "Windows/Office 啟用工具",
+          "desc_de": "Aktivierungswerkzeug für Windows/Office",
+          "desc_es": "Herramienta de activación para Windows/Office",
+          "desc_pt": "Ferramenta de ativação para Windows/Office",
+          "desc_ar": "أداة تنشيط Windows/Office",
+          "desc_ko": "Windows/Office 인증 도구",
+          "tags_zh_TW": [
+            "啟用",
+            "KMS",
+            "免費"
+          ],
+          "tags_de": [
+            "Aktivierung",
+            "KMS",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Activación",
+            "KMS",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Ativação",
+            "KMS",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "تنشيط",
+            "KMS",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "인증",
+            "KMS",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "Windows 啟用",
+            "Office 啟用",
+            "數位啟用",
+            "KMS 啟用"
+          ],
+          "features_de": [
+            "Windows-Aktivierung",
+            "Office-Aktivierung",
+            "Digitale Aktivierung",
+            "KMS-Aktivierung"
+          ],
+          "features_es": [
+            "Activación de Windows",
+            "Activación de Office",
+            "Activación digital",
+            "Activación KMS"
+          ],
+          "features_pt": [
+            "Ativação do Windows",
+            "Ativação do Office",
+            "Ativação digital",
+            "Ativação KMS"
+          ],
+          "features_ar": [
+            "تنشيط Windows",
+            "تنشيط Office",
+            "تنشيط رقمي",
+            "تنشيط KMS"
+          ],
+          "features_ko": [
+            "Windows 인증",
+            "Office 인증",
+            "디지털 인증",
+            "KMS 인증"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows 7+",
+          "systemRequirements_de": "Windows 7+",
+          "systemRequirements_es": "Windows 7+",
+          "systemRequirements_pt": "Windows 7+",
+          "systemRequirements_ar": "Windows 7+",
+          "systemRequirements_ko": "Windows 7+",
+          "safetyLevel": "Advanced"
         },
         {
           "name": "Office Tool Plus",
           "desc": "Office 部署、管理与激活工具",
           "desc_zh": "Office 部署、管理与激活工具",
           "desc_en": "Office deployment, management and activation tool",
-          "desc_ja": "Officeデプロイ・管理・アクティベーションツール",
-          "desc_fr": "Outil de déploiement, gestion et activation Office",
-          "desc_ru": "Инструмент развёртывания, управления и активации Office",
+          "desc_ja": "Office の展開、管理、アクティベーションツール",
+          "desc_fr": "Outil de déploiement, gestion et activation d’Office",
+          "desc_ru": "Инструмент развертывания, управления и активации Office",
           "icon": "key",
           "url": "https://www.officetool.plus/zh-cn/",
           "downloadUrl": "https://www.officetool.plus/zh-cn/",
@@ -1043,24 +5162,174 @@
           "license_ja": "無料",
           "license_fr": "Gratuit",
           "license_ru": "Бесплатно",
-          "tags": ["Office", "部署", "免费"],
-          "tags_zh": ["Office", "部署", "免费"],
-          "tags_en": ["Office", "Deploy", "Free"],
-          "tags_ja": ["Office", "デプロイ", "無料"],
-          "tags_fr": ["Office", "Déploiement", "Gratuit"],
-          "tags_ru": ["Office", "Развёртывание", "Бесплатно"],
-          "features": ["Office 安装部署", "版本管理", "激活工具", "自定义安装"],
-          "features_zh": ["Office 安装部署", "版本管理", "激活工具", "自定义安装"],
-          "features_en": ["Office install & deploy", "Version management", "Activation tool", "Custom installation"],
-          "features_ja": ["Officeインストール・デプロイ", "バージョン管理", "アクティベーションツール", "カスタムインストール"],
-          "features_fr": ["Installation et déploiement Office", "Gestion des versions", "Outil d'activation", "Installation personnalisée"],
-          "features_ru": ["Установка и развёртывание Office", "Управление версиями", "Инструмент активации", "Пользовательская установка"],
+          "tags": [
+            "Office",
+            "部署",
+            "免费"
+          ],
+          "tags_zh": [
+            "Office",
+            "部署",
+            "免费"
+          ],
+          "tags_en": [
+            "Office",
+            "Deploy",
+            "Free"
+          ],
+          "tags_ja": [
+            "Office",
+            "展開",
+            "無料"
+          ],
+          "tags_fr": [
+            "Office",
+            "Déploiement",
+            "Gratuit"
+          ],
+          "tags_ru": [
+            "Office",
+            "Развертывание",
+            "Бесплатно"
+          ],
+          "features": [
+            "Office 安装部署",
+            "版本管理",
+            "激活工具",
+            "自定义安装"
+          ],
+          "features_zh": [
+            "Office 安装部署",
+            "版本管理",
+            "激活工具",
+            "自定义安装"
+          ],
+          "features_en": [
+            "Office install & deploy",
+            "Version management",
+            "Activation tool",
+            "Custom installation"
+          ],
+          "features_ja": [
+            "Office のインストールと展開",
+            "バージョン管理",
+            "アクティベーションツール",
+            "カスタムインストール"
+          ],
+          "features_fr": [
+            "Installation et déploiement d’Office",
+            "Gestion des versions",
+            "Outil d’activation",
+            "Installation personnalisée"
+          ],
+          "features_ru": [
+            "Установка и развертывание Office",
+            "Управление версиями",
+            "Инструмент активации",
+            "Настраиваемая установка"
+          ],
           "systemRequirements": "Windows 10+",
           "systemRequirements_zh": "Windows 10+",
           "systemRequirements_en": "Windows 10+",
           "systemRequirements_ja": "Windows 10+",
           "systemRequirements_fr": "Windows 10+",
-          "systemRequirements_ru": "Windows 10+"
+          "systemRequirements_ru": "Windows 10+",
+          "name_zh": "Office Tool Plus",
+          "name_zh_TW": "Office Tool Plus",
+          "name_en": "Office Tool Plus",
+          "name_fr": "Office Tool Plus",
+          "name_de": "Office Tool Plus",
+          "name_es": "Office Tool Plus",
+          "name_pt": "Office Tool Plus",
+          "name_ru": "Office Tool Plus",
+          "name_ar": "Office Tool Plus",
+          "name_ko": "Office Tool Plus",
+          "name_ja": "Office Tool Plus",
+          "desc_zh_TW": "Office 部署、管理與啟用工具",
+          "desc_de": "Werkzeug für Office-Bereitstellung, Verwaltung und Aktivierung",
+          "desc_es": "Herramienta para desplegar, gestionar y activar Office",
+          "desc_pt": "Ferramenta para implantar, gerenciar e ativar o Office",
+          "desc_ar": "أداة نشر Office وإدارته وتنشيطه",
+          "desc_ko": "Office 배포, 관리, 인증 도구",
+          "tags_zh_TW": [
+            "Office",
+            "部署",
+            "免費"
+          ],
+          "tags_de": [
+            "Office",
+            "Bereitstellung",
+            "Kostenlos"
+          ],
+          "tags_es": [
+            "Office",
+            "Despliegue",
+            "Gratis"
+          ],
+          "tags_pt": [
+            "Office",
+            "Implantação",
+            "Grátis"
+          ],
+          "tags_ar": [
+            "Office",
+            "نشر",
+            "مجاني"
+          ],
+          "tags_ko": [
+            "Office",
+            "배포",
+            "무료"
+          ],
+          "features_zh_TW": [
+            "Office 安裝部署",
+            "版本管理",
+            "啟用工具",
+            "自訂安裝"
+          ],
+          "features_de": [
+            "Office installieren und bereitstellen",
+            "Versionsverwaltung",
+            "Aktivierungswerkzeug",
+            "Benutzerdefinierte Installation"
+          ],
+          "features_es": [
+            "Instalación y despliegue de Office",
+            "Gestión de versiones",
+            "Herramienta de activación",
+            "Instalación personalizada"
+          ],
+          "features_pt": [
+            "Instalação e implantação do Office",
+            "Gerenciamento de versões",
+            "Ferramenta de ativação",
+            "Instalação personalizada"
+          ],
+          "features_ar": [
+            "تثبيت Office ونشره",
+            "إدارة الإصدارات",
+            "أداة تنشيط",
+            "تثبيت مخصص"
+          ],
+          "features_ko": [
+            "Office 설치 및 배포",
+            "버전 관리",
+            "인증 도구",
+            "사용자 지정 설치"
+          ],
+          "license_zh_TW": "免費",
+          "license_de": "Kostenlos",
+          "license_es": "Gratis",
+          "license_pt": "Grátis",
+          "license_ar": "مجاني",
+          "license_ko": "무료",
+          "systemRequirements_zh_TW": "Windows 10+",
+          "systemRequirements_de": "Windows 10+",
+          "systemRequirements_es": "Windows 10+",
+          "systemRequirements_pt": "Windows 10+",
+          "systemRequirements_ar": "Windows 10+",
+          "systemRequirements_ko": "Windows 10+",
+          "safetyLevel": "Advanced"
         }
       ]
     }

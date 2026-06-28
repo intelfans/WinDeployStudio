@@ -13,6 +13,7 @@ class DiskInfo {
   final bool isSystem;
   final bool isBoot;
   final bool isOffline;
+  final bool isRemovable;
   final List<String> driveLetters;
   final List<DiskPartition> partitions;
 
@@ -28,6 +29,7 @@ class DiskInfo {
     this.isSystem = false,
     this.isBoot = false,
     this.isOffline = false,
+    this.isRemovable = false,
     this.driveLetters = const [],
     this.partitions = const [],
   });
@@ -58,7 +60,11 @@ class SafetyCheckResult {
   final String reason;
   final Map<String, String>? params;
 
-  const SafetyCheckResult({required this.isSafe, this.reason = '', this.params});
+  const SafetyCheckResult({
+    required this.isSafe,
+    this.reason = '',
+    this.params,
+  });
 }
 
 final diskSafetyServiceProvider = Provider<DiskSafetyService>((ref) {
@@ -70,8 +76,10 @@ class DiskSafetyService {
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-Command', _getAllDisksScript,
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        _getAllDisksScript,
       ]);
 
       if (result.exitCode != 0) return [];
@@ -86,11 +94,15 @@ class DiskSafetyService {
 
   Future<List<DiskInfo>> getRemovableDisks() async {
     final allDisks = await getAllDisks();
-    return allDisks.where((d) =>
-        d.busType == 'USB' ||
-        d.busType == 'SD' ||
-        (!d.isSystem && !d.isBoot)
-    ).toList();
+    return allDisks.where((d) {
+      final busType = d.busType.toUpperCase();
+      final isExternalMedia =
+          busType == 'USB' ||
+          busType == 'SD' ||
+          busType == 'MMC' ||
+          d.isRemovable;
+      return isExternalMedia && !d.isSystem && !d.isBoot && !d.isOffline;
+    }).toList();
   }
 
   Future<SafetyCheckResult> checkDiskSafety(DiskInfo disk) async {
@@ -102,10 +114,7 @@ class DiskSafetyService {
     }
 
     if (disk.isBoot) {
-      return const SafetyCheckResult(
-        isSafe: false,
-        reason: 'safety_boot_disk',
-      );
+      return const SafetyCheckResult(isSafe: false, reason: 'safety_boot_disk');
     }
 
     final hasEfi = await _hasEfiPartition(disk.diskNumber);
@@ -140,7 +149,8 @@ class DiskSafetyService {
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         'Get-Partition -DiskNumber $diskNumber | Where-Object { \$_.Type -eq "EFI" -or \$_.GptType -eq "{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}" } | Measure-Object | Select-Object -ExpandProperty Count',
       ]).timeout(const Duration(seconds: 5));
@@ -156,7 +166,8 @@ class DiskSafetyService {
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         'Get-Partition -DiskNumber $diskNumber | Where-Object { \$_.Type -eq "Recovery" -or \$_.GptType -eq "{de94bba4-06d1-4d40-a16a-bfd50179d6ac}" } | Measure-Object | Select-Object -ExpandProperty Count',
       ]).timeout(const Duration(seconds: 5));
@@ -203,6 +214,7 @@ class DiskSafetyService {
       IsSystem      = $disk.IsSystem
       IsBoot        = $disk.IsBoot
       IsOffline     = $disk.IsOffline
+      IsRemovable   = $disk.IsRemovable
       DriveLetters  = ($letters -join ',')
     }
   } | ConvertTo-Json -Compress
@@ -241,6 +253,7 @@ class DiskSafetyService {
       isSystem: data['IsSystem'] as bool? ?? false,
       isBoot: data['IsBoot'] as bool? ?? false,
       isOffline: data['IsOffline'] as bool? ?? false,
+      isRemovable: data['IsRemovable'] as bool? ?? false,
       driveLetters: letters,
     );
   }
@@ -278,36 +291,52 @@ class DiskSafetyService {
     if (content.isEmpty) return map;
     int i = 0;
     while (i < content.length) {
-      while (i < content.length && content[i] == ' ') { i++; }
+      while (i < content.length && content[i] == ' ') {
+        i++;
+      }
       if (i >= content.length || content[i] != '"') break;
       i++;
       final keyStart = i;
-      while (i < content.length && content[i] != '"') { i++; }
+      while (i < content.length && content[i] != '"') {
+        i++;
+      }
       final key = content.substring(keyStart, i);
       i++;
-      while (i < content.length && (content[i] == ':' || content[i] == ' ')) { i++; }
+      while (i < content.length && (content[i] == ':' || content[i] == ' ')) {
+        i++;
+      }
       if (i >= content.length) break;
       dynamic value;
       if (content[i] == '"') {
         i++;
         final valueStart = i;
-        while (i < content.length && content[i] != '"') { i++; }
+        while (i < content.length && content[i] != '"') {
+          i++;
+        }
         value = content.substring(valueStart, i);
         i++;
       } else if (content[i] == 't') {
-        value = true; i += 4;
+        value = true;
+        i += 4;
       } else if (content[i] == 'f') {
-        value = false; i += 5;
+        value = false;
+        i += 5;
       } else if (content[i] == 'n') {
-        value = null; i += 4;
+        value = null;
+        i += 4;
       } else {
         final numStart = i;
-        while (i < content.length && content[i] != ',' && content[i] != '}') { i++; }
-        value = int.tryParse(content.substring(numStart, i).trim()) ??
+        while (i < content.length && content[i] != ',' && content[i] != '}') {
+          i++;
+        }
+        value =
+            int.tryParse(content.substring(numStart, i).trim()) ??
             double.tryParse(content.substring(numStart, i).trim());
       }
       map[key] = value;
-      while (i < content.length && (content[i] == ',' || content[i] == ' ')) { i++; }
+      while (i < content.length && (content[i] == ',' || content[i] == ' ')) {
+        i++;
+      }
     }
     return map;
   }

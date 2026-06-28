@@ -12,7 +12,7 @@ WinDeploy Studio를 선택해 주셔서 감사합니다!
   🖼️ 이미지 라이브러리
     엄선된 Windows 이미지와 다운로드 링크 탐색
     
-  💿 부팅 USB 생성 도구  
+  💿 Windows 설치 미디어 생성 도구  
     ISO 파일에서 Windows 설치 미디어 생성
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@ WinDeploy Studio를 선택해 주셔서 감사합니다!
 
 "다음"을 클릭하여 설치를 계속하세요.
 
-© 2026 Bob Steve. All rights reserved.
+© 2026 Bob Steve. MIT License에 따라 배포됩니다.

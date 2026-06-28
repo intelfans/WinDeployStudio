@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../models/mirror_models.dart';
 
 enum MirrorLoadStatus { initial, loading, loaded, error }
@@ -53,15 +53,12 @@ class MirrorNotifier extends StateNotifier<MirrorState> {
       final data = MirrorListData.fromJson(json);
 
       debugPrint('Built-in mirrors loaded: ${data.items.length} items');
-      state = state.copyWith(
-        status: MirrorLoadStatus.loaded,
-        data: data,
-      );
+      state = state.copyWith(status: MirrorLoadStatus.loaded, data: data);
     } catch (e) {
       debugPrint('Failed to load built-in mirrors: $e');
       state = state.copyWith(
         status: MirrorLoadStatus.error,
-        error: 'Failed to load mirror list: $e',
+        error: e.toString(),
       );
     }
   }
@@ -76,11 +73,13 @@ class MirrorNotifier extends StateNotifier<MirrorState> {
         if (entity is File && entity.path.toLowerCase().endsWith('.iso')) {
           final fileSize = await entity.length();
           final fileName = entity.path.split(Platform.pathSeparator).last;
-          isos.add(LocalIsoInfo(
-            filePath: entity.path,
-            fileName: fileName,
-            fileSize: fileSize,
-          ));
+          isos.add(
+            LocalIsoInfo(
+              filePath: entity.path,
+              fileName: fileName,
+              fileSize: fileSize,
+            ),
+          );
         }
       }
 

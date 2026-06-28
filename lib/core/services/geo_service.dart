@@ -10,9 +10,6 @@ class GeoResult {
   const GeoResult({required this.countryCode, required this.countryName});
 
   bool get isChina => countryCode == 'CN';
-
-  String get regionLabel => isChina ? 'China' : countryName;
-  String get mirrorLabel => isChina ? 'China Mirror' : 'Global Mirror';
 }
 
 class GeoService {
@@ -54,7 +51,10 @@ class GeoService {
 
         await prefs.setString(_cacheKeyCountryCode, code);
         await prefs.setString(_cacheKeyCountryName, name);
-        await prefs.setInt(_cacheKeyTimestamp, DateTime.now().millisecondsSinceEpoch);
+        await prefs.setInt(
+          _cacheKeyTimestamp,
+          DateTime.now().millisecondsSinceEpoch,
+        );
 
         _cached = GeoResult(countryCode: code, countryName: name);
         debugPrint('[GeoService] Country: $code ($name)');

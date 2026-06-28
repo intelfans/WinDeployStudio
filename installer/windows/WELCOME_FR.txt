@@ -12,7 +12,7 @@ Fonctionnalités principales :
   🖼️ Bibliothèque d'images
     Parcourir les images Windows et les liens de téléchargement
     
-  💿 Outil de création USB amorçable  
+  💿 Créateur de support d'installation Windows  
     Créer des supports d'installation Windows à partir de fichiers ISO
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@ Configuration système requise :
 
 Cliquez sur "Suivant" pour continuer l'installation.
 
-© 2026 Bob Steve. Tous droits réservés.
+© 2026 Bob Steve. Distribué sous licence MIT.

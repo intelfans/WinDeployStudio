@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,15 +47,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   // Confirmation state
   final TextEditingController _confirmController = TextEditingController();
   bool _isConfirmValid = false;
-  
+
   // Progress tracking
   Stopwatch? _progressStopwatch;
   Timer? _progressTimer;
-  
-  // Speed smoothing
-  double _smoothedSpeed = 0;
-  int _lowSpeedCounter = 0;
-  bool _showLowSpeedWarning = false;
+
+  // Lightweight waiting game state. UI-only; it never touches WTG creation.
+  final Random _idleGameRandom = Random();
+  int _idleGameTarget = 4;
+  int _idleGameScore = 0;
 
   @override
   void initState() {
@@ -89,7 +90,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   Future<void> _selectIsoFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['iso'],
         dialogTitle: tr(context, 'wtg_select_iso'),
@@ -158,7 +159,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
       if (metadata != null) {
         final logCenter = LogCenterService();
-        await logCenter.logWTG('WTG ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"}');
+        await logCenter.logWTG(
+          'WTG ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"}',
+        );
         // Load WIM images
         await _loadWimImages(path);
       }
@@ -217,14 +220,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           driveLetter = letter.length == 1 ? '$letter:' : letter;
         }
       }
-      
+
       // If no drive letter from disk info, try to get it via PowerShell
       if (driveLetter.isEmpty) {
         try {
           final result = await Process.run('powershell', [
             '-NoProfile',
             '-Command',
-            r'Get-Partition -DiskNumber ' + '${disk.diskNumber}' + r' | Where-Object { $_.DriveLetter } | Select-Object -First 1 -ExpandProperty DriveLetter',
+            'Get-Partition -DiskNumber ${disk.diskNumber}'
+                r' | Where-Object { $_.DriveLetter } | Select-Object -First 1 -ExpandProperty DriveLetter',
           ]).timeout(const Duration(seconds: 5));
           if (result.exitCode == 0) {
             final letter = result.stdout.toString().trim();
@@ -239,6 +243,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       final result = await compatibilityService.checkCompatibility(
         diskNumber: disk.diskNumber,
         driveLetter: driveLetter,
+        fallbackDisk: disk,
       );
 
       if (!mounted) return;
@@ -256,14 +261,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   Future<void> _startWtgCreation() async {
-    if (_selectedIso == null || _selectedDisk == null || _selectedImageIndex == null) return;
+    if (_selectedIso == null ||
+        _selectedDisk == null ||
+        _selectedImageIndex == null) {
+      return;
+    }
 
     // Start progress timer
     _progressStopwatch = Stopwatch()..start();
-    
+
     // Update UI periodically to show elapsed time
     _progressTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted && _progressStopwatch != null && _progressStopwatch!.isRunning) {
+      if (mounted &&
+          _progressStopwatch != null &&
+          _progressStopwatch!.isRunning) {
         setState(() {}); // Refresh to update elapsed time display
       }
     });
@@ -295,6 +306,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     );
 
     if (mounted) {
+      _progressTimer?.cancel();
+      _progressStopwatch?.stop();
       setState(() {
         _currentStep = result ? 9 : 10; // Complete or Failed
       });
@@ -302,14 +315,19 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   String _resolveLocalizedMessage(BuildContext context, String key) {
-    // If the key contains newlines, it's a composite message with log path
+    // Composite progress messages keep the first line as a localization key.
     final parts = key.split('\n\nLog: ');
-    final actualKey = parts[0];
+    final messageLines = parts[0].split('\n');
+    final actualKey = messageLines.first;
+    final details = messageLines.skip(1).where((line) => line.isNotEmpty);
     final logPath = parts.length > 1 ? parts[1] : null;
-    
+
     var resolved = tr(context, actualKey);
+    if (details.isNotEmpty) {
+      resolved = '$resolved\n${details.join('\n')}';
+    }
     if (logPath != null) {
-      resolved = '$resolved\n\nLog: $logPath';
+      resolved = '$resolved\n\n${tr(context, 'logs_title')}: $logPath';
     }
     return resolved;
   }
@@ -324,16 +342,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           children: [
             Text(
               tr(context, 'wtg_title'),
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
               tr(context, 'wtg_subtitle'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 24),
             Expanded(child: _buildCurrentStep()),
@@ -372,16 +390,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step1_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step1_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         if (_isParsing) ...[
@@ -394,9 +412,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 const SizedBox(height: 8),
                 SizedBox(
                   width: 200,
-                  child: LinearProgressIndicator(
-                    value: _parsePercent / 100.0,
-                  ),
+                  child: LinearProgressIndicator(value: _parsePercent / 100.0),
                 ),
                 const SizedBox(height: 8),
                 Text('$_parsePercent%'),
@@ -417,19 +433,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       Text(
                         tr(context, 'wtg_iso_selected'),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _InfoRow(
-                    tr(context, 'creator_file'),
-                    _selectedIso!.fileName,
-                  ),
+                  _InfoRow(tr(context, 'creator_file'), _selectedIso!.fileName),
                   _InfoRow(
                     tr(context, 'creator_version'),
-                    _selectedIso!.windowsVersion ?? tr(context, 'creator_unknown'),
+                    _selectedIso!.windowsVersion ??
+                        tr(context, 'creator_unknown'),
                   ),
                   _InfoRow(
                     tr(context, 'creator_size'),
@@ -479,15 +493,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     Text(
                       tr(context, 'creator_select_btn'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       tr(context, 'creator_select_iso_desc'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -506,16 +520,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step2_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step2_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         if (_isLoadingWim) ...[
@@ -542,8 +556,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       Text(
                         tr(context, 'wtg_wim_loaded'),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -579,8 +593,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       Text(
                         tr(context, 'wtg_no_wim_found'),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                   ),
@@ -589,8 +603,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     Text(
                       tr(context, 'wtg_debug_info'),
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -598,16 +612,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       height: 200,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Scrollbar(
                         child: SingleChildScrollView(
                           child: SelectableText(
                             _debugLogs.join('\n'),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontFamily: 'monospace',
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(fontFamily: 'monospace'),
                           ),
                         ),
                       ),
@@ -657,72 +672,80 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step3_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step3_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
-          child: ListView.builder(
-            itemCount: _wimImages.length,
-            itemBuilder: (context, index) {
-              final image = _wimImages[index];
-              final isSelected = _selectedImageIndex == image['index'];
+          child: RadioGroup<int>(
+            groupValue: _selectedImageIndex,
+            onChanged: (value) {
+              setState(() => _selectedImageIndex = value);
+            },
+            child: ListView.builder(
+              itemCount: _wimImages.length,
+              itemBuilder: (context, index) {
+                final image = _wimImages[index];
+                final imageIndex = image['index'] as int;
+                final isSelected = _selectedImageIndex == imageIndex;
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: Radio<int>(
-                    value: image['index'] as int,
-                    groupValue: _selectedImageIndex,
-                    onChanged: (value) {
-                      setState(() => _selectedImageIndex = value);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: Radio<int>(value: imageIndex),
+                    title: Text(
+                      image['name'] ??
+                          tr(
+                            context,
+                            'wtg_image_fallback',
+                          ).replaceAll('{index}', '$imageIndex'),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (image['description'] != null)
+                          Text(
+                            image['description'],
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            if (image['edition'] != null)
+                              _Chip(label: image['edition']),
+                            if (image['architecture'] != null)
+                              _Chip(label: image['architecture']),
+                            if (image['size'] != null)
+                              _Chip(label: image['size']),
+                          ],
+                        ),
+                      ],
+                    ),
+                    trailing: isSelected
+                        ? Icon(
+                            Icons.check_circle,
+                            color: Theme.of(context).colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedImageIndex = imageIndex);
                     },
                   ),
-                  title: Text(
-                    image['name'] ?? '${tr(context, 'wtg_image_fallback')} ${image['index']}',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (image['description'] != null)
-                        Text(
-                          image['description'],
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          if (image['edition'] != null)
-                            _Chip(label: image['edition']),
-                          if (image['architecture'] != null)
-                            _Chip(label: image['architecture']),
-                          if (image['size'] != null)
-                            _Chip(label: image['size']),
-                        ],
-                      ),
-                    ],
-                  ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedImageIndex = image['index'] as int?);
-                  },
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -753,16 +776,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step4_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step4_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         if (_isDetecting) ...[
@@ -803,7 +826,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 children: [
                   // Disk list
                   ..._disks.map((disk) {
-                    final isSelected = _selectedDisk?.diskNumber == disk.diskNumber;
+                    final isSelected =
+                        _selectedDisk?.diskNumber == disk.diskNumber;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
@@ -815,9 +839,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                         ),
                         title: Text(
                           disk.friendlyName,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,14 +852,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                             if (disk.serialNumber.isNotEmpty)
                               Text(
                                 '${tr(context, 'creator_serial')}: ${disk.serialNumber}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                               ),
                           ],
                         ),
                         trailing: isSelected
-                            ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
+                            ? Icon(
+                                Icons.check_circle,
+                                color: Theme.of(context).colorScheme.primary,
+                              )
                             : null,
                         onTap: () {
                           setState(() {
@@ -848,7 +877,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       ),
                     );
                   }),
-                  
+
                   // Compatibility checking indicator
                   if (_isCheckingCompatibility) ...[
                     const SizedBox(height: 16),
@@ -862,13 +891,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       ),
                     ),
                   ],
-                  
+
                   // Compatibility result card
                   if (_compatibilityResult != null) ...[
                     const SizedBox(height: 16),
                     _buildCompatibilityCard(),
                   ],
-                  
+
                   // Action buttons
                   const SizedBox(height: 16),
                   Row(
@@ -920,9 +949,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     child: Text(
                       result.gradeText,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: gradeColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        color: gradeColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -934,14 +963,14 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       Text(
                         tr(context, 'wtg_compatibility_grade'),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       Text(
                         tr(context, result.gradeDescription),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -952,23 +981,33 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             _InfoRow(tr(context, 'wtg_bus_type'), result.busType),
             _InfoRow(tr(context, 'wtg_usb_version'), result.usbVersion),
             _InfoRow(tr(context, 'creator_size'), result.sizeFormatted),
-            
+
             // Speed test results
             if (result.speedTestSuccess) ...[
-              _InfoRow(tr(context, 'wtg_read_speed'), '${result.readSpeedMBps} MB/s'),
-              _InfoRow(tr(context, 'wtg_write_speed'), '${result.writeSpeedMBps} MB/s'),
+              _InfoRow(
+                tr(context, 'wtg_read_speed'),
+                '${result.readSpeedMBps} MB/s',
+              ),
+              _InfoRow(
+                tr(context, 'wtg_write_speed'),
+                '${result.writeSpeedMBps} MB/s',
+              ),
             ] else ...[
               const Divider(),
               Row(
                 children: [
-                  Icon(Icons.speed, size: 16, color: Theme.of(context).colorScheme.error),
+                  Icon(
+                    Icons.speed,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     tr(context, 'wtg_speed_test_failed'),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -979,90 +1018,97 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                   child: Text(
                     tr(context, result.speedTestError!),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ),
               ],
             ],
-            
+
             // Warnings
             if (result.warnings.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
                 tr(context, 'wtg_warnings'),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              ...result.warnings.map((w) => Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.error,
+              ...result.warnings.map(
+                (w) => Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          tr(context, w),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            tr(context, w),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
-            
+
             // Recommendations
             if (result.recommendations.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
                 tr(context, 'wtg_recommendations'),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
               ),
-              ...result.recommendations.map((r) => Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.primary,
+              ...result.recommendations.map(
+                (r) => Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          tr(context, r),
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            tr(context, r),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
-            
+
             // Debug info section (collapsible)
             if (result.debugLogs.isNotEmpty) ...[
               const SizedBox(height: 12),
               Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   title: Text(
                     tr(context, 'wtg_debug_info'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   children: [
                     Container(
@@ -1070,14 +1116,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       height: 200,
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Scrollbar(
                         child: SingleChildScrollView(
                           child: SelectableText(
                             result.debugLogs.join('\n'),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
                                   fontFamily: 'monospace',
                                   fontSize: 10,
                                 ),
@@ -1118,16 +1167,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step5_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step5_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
@@ -1143,9 +1192,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       children: [
                         Text(
                           tr(context, 'creator_iso_section'),
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
                         _InfoRow(
@@ -1154,7 +1202,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                         ),
                         _InfoRow(
                           tr(context, 'creator_version'),
-                          _selectedIso?.windowsVersion ?? tr(context, 'creator_unknown'),
+                          _selectedIso?.windowsVersion ??
+                              tr(context, 'creator_unknown'),
                         ),
                         _InfoRow(
                           tr(context, 'creator_size'),
@@ -1164,29 +1213,44 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                           const Divider(),
                           Text(
                             tr(context, 'wtg_selected_image'),
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 8),
                           ..._wimImages
-                              .where((img) => img['index'] == _selectedImageIndex)
-                              .map((img) => Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
+                              .where(
+                                (img) => img['index'] == _selectedImageIndex,
+                              )
+                              .map(
+                                (img) => Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      img['name'] ??
+                                          tr(
+                                            context,
+                                            'wtg_image_fallback',
+                                          ).replaceAll(
+                                            '{index}',
+                                            '${img['index']}',
+                                          ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    if (img['edition'] != null)
                                       Text(
-                                        img['name'] ?? '${tr(context, 'wtg_image_fallback')} ${img['index']}',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                        img['edition'],
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
-                                      if (img['edition'] != null)
-                                        Text(
-                                          img['edition'],
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                    ],
-                                  )),
+                                  ],
+                                ),
+                              ),
                         ],
                       ],
                     ),
@@ -1202,9 +1266,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       children: [
                         Text(
                           tr(context, 'creator_usb_section'),
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
                         _InfoRow(
@@ -1243,7 +1306,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                         const SizedBox(height: 8),
                         Text(
                           tr(context, 'creator_warning'),
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
                                 color: Theme.of(context).colorScheme.error,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -1263,9 +1327,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       children: [
                         Text(
                           tr(context, 'erase_title'),
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -1282,7 +1345,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                           onChanged: (value) {
                             setState(() {
                               _isConfirmValid =
-                                  value.trim() == tr(context, 'wtg_erase_confirm_word');
+                                  value.trim() ==
+                                  tr(context, 'wtg_erase_confirm_word');
                             });
                           },
                         ),
@@ -1351,16 +1415,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step6_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step6_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
@@ -1376,11 +1440,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       const CircularProgressIndicator(),
                       const SizedBox(height: 24),
                     ] else if (progress.step == WtgStep.complete) ...[
-                      Icon(
-                        Icons.check_circle,
-                        size: 64,
-                        color: Colors.green,
-                      ),
+                      Icon(Icons.check_circle, size: 64, color: Colors.green),
                       const SizedBox(height: 24),
                     ] else ...[
                       Icon(
@@ -1393,41 +1453,37 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     Text(
                       stepText,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: 400,
                       child: LinearProgressIndicator(
                         value: progress.progress,
-                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '${(progress.progress * 100).toStringAsFixed(0)}%',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     // Progress details (only during applying image)
                     if (progress.step == WtgStep.applyingImage) ...[
                       const SizedBox(height: 16),
                       _buildProgressDetails(progress),
                     ],
-                    // Low speed warning
-                    if (_showLowSpeedWarning) ...[
-                      const SizedBox(height: 12),
-                      _buildLowSpeedWarning(),
-                    ],
                     if (progress.currentFile != null) ...[
                       const SizedBox(height: 8),
                       Text(
                         progress.currentFile!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                     if (progress.message.isNotEmpty) ...[
@@ -1435,10 +1491,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       Text(
                         _resolveLocalizedMessage(context, progress.message),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: progress.step == WtgStep.failed
-                                  ? Theme.of(context).colorScheme.error
-                                  : Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                          color: progress.step == WtgStep.failed
+                              ? Theme.of(context).colorScheme.error
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1451,151 +1507,60 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       ],
     );
   }
-  
+
   Widget _buildProgressDetails(WtgProgress progress) {
-    // Update speed smoothing
-    final currentSpeedMBps = progress.currentSpeedBytes / (1024 * 1024);
-    if (_smoothedSpeed == 0) {
-      _smoothedSpeed = currentSpeedMBps;
-    } else {
-      _smoothedSpeed = 0.7 * _smoothedSpeed + 0.3 * currentSpeedMBps;
-    }
+    final elapsed = _progressStopwatch?.elapsed ?? progress.elapsedTime;
+    final formattedElapsed = _formatElapsed(elapsed ?? Duration.zero);
 
-    // Check for low speed (below 1 MB/s for 30 seconds = 6 updates at 5s interval)
-    if (currentSpeedMBps < 1.0) {
-      _lowSpeedCounter++;
-      if (_lowSpeedCounter >= 6 && !_showLowSpeedWarning) {
-        _showLowSpeedWarning = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() {});
-        });
-      }
-    } else {
-      _lowSpeedCounter = 0;
-      if (_showLowSpeedWarning) {
-        _showLowSpeedWarning = false;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() {});
-        });
-      }
-    }
-
-    final formattedSpeed = progress.formattedSpeed;
-    final formattedWritten = progress.formattedWritten;
-    final formattedTotal = progress.formattedTotal;
-    final formattedRemaining = progress.formattedRemaining;
-    final formattedElapsed = progress.formattedElapsed;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _ProgressDetailItem(
-                  icon: Icons.timer_outlined,
-                  label: tr(context, 'wtg_elapsed'),
-                  value: formattedElapsed,
-                ),
+    return SizedBox(
+      width: 560,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: _ProgressDetailItem(
+                icon: Icons.timer_outlined,
+                label: tr(context, 'wtg_elapsed'),
+                value: formattedElapsed,
               ),
-              Expanded(
-                child: _ProgressDetailItem(
-                  icon: Icons.speed_outlined,
-                  label: tr(context, 'wtg_write_speed'),
-                  value: formattedSpeed,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _ProgressDetailItem(
-                  icon: Icons.download_outlined,
-                  label: tr(context, 'wtg_written'),
-                  value: '$formattedWritten / $formattedTotal',
-                ),
-              ),
-              Expanded(
-                child: _ProgressDetailItem(
-                  icon: Icons.hourglass_bottom_outlined,
-                  label: tr(context, 'wtg_remaining'),
-                  value: formattedRemaining,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildLowSpeedWarning() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.speed,
-            size: 20,
-            color: Theme.of(context).colorScheme.onTertiaryContainer,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              tr(context, 'wtg_low_speed_warning'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onTertiaryContainer,
-                  ),
             ),
-          ),
-        ],
+            const SizedBox(width: 20),
+            _IdleGamePanel(
+              activeIndex: _idleGameTarget,
+              score: _idleGameScore,
+              onTileTap: _handleIdleGameTap,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  String _formatElapsed(Duration elapsed) {
+    final hours = elapsed.inHours.toString().padLeft(2, '0');
+    final minutes = (elapsed.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
   }
 
-  String _estimateRemaining(double progress) {
-    if (_progressStopwatch == null) return '--:--';
-    
-    final elapsedSeconds = _progressStopwatch!.elapsed.inSeconds;
-    
-    // Need at least 15 seconds and 5% progress for stable estimate
-    if (elapsedSeconds < 15 || progress < 0.05) return '--:--';
-    
-    if (progress >= 0.99) return '0:00';
-    
-    // Use average speed for estimation (total elapsed / progress)
-    final totalEstimatedSeconds = (elapsedSeconds / progress).round();
-    final remainingSeconds = totalEstimatedSeconds - elapsedSeconds;
-    
-    if (remainingSeconds <= 0) return '0:00';
-    
-    final minutes = remainingSeconds ~/ 60;
-    final seconds = remainingSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
-  
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  void _handleIdleGameTap(int index) {
+    if (index != _idleGameTarget) return;
+    setState(() {
+      _idleGameScore++;
+      var nextTarget = _idleGameRandom.nextInt(9);
+      if (nextTarget == _idleGameTarget) {
+        nextTarget = (nextTarget + 1) % 9;
+      }
+      _idleGameTarget = nextTarget;
+    });
   }
 
   Widget _buildStepComplete() {
@@ -1604,16 +1569,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step_complete_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step_complete_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
@@ -1624,24 +1589,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 64,
-                      color: Colors.green,
-                    ),
+                    Icon(Icons.check_circle, size: 64, color: Colors.green),
                     const SizedBox(height: 24),
                     Text(
                       tr(context, 'wtg_creation_complete'),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       tr(context, 'wtg_creation_complete_desc'),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -1682,16 +1643,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       children: [
         Text(
           tr(context, 'wtg_step_failed_title'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
           tr(context, 'wtg_step_failed_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 24),
         Expanded(
@@ -1711,17 +1672,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     Text(
                       tr(context, 'wtg_creation_failed'),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     if (_wtgProgress?.message != null) ...[
                       Text(
-                        _resolveLocalizedMessage(context, _wtgProgress!.message),
+                        _resolveLocalizedMessage(
+                          context,
+                          _wtgProgress!.message,
+                        ),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1780,14 +1744,14 @@ class _InfoRow extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1811,8 +1775,8 @@ class _Chip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -1833,11 +1797,7 @@ class _ProgressDetailItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 18,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -1846,20 +1806,106 @@ class _ProgressDetailItem extends StatelessWidget {
               Text(
                 label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               Text(
                 value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _IdleGamePanel extends StatelessWidget {
+  final int activeIndex;
+  final int score;
+  final ValueChanged<int> onTileTap;
+
+  const _IdleGamePanel({
+    required this.activeIndex,
+    required this.score,
+    required this.onTileTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      width: 132,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 78,
+            height: 78,
+            child: GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: 9,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+              ),
+              itemBuilder: (context, index) {
+                final isActive = index == activeIndex;
+                return Material(
+                  color: isActive
+                      ? colorScheme.primary
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => onTileTap(index),
+                    child: Center(
+                      child: AnimatedScale(
+                        scale: isActive ? 1 : 0.75,
+                        duration: const Duration(milliseconds: 140),
+                        child: Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: isActive
+                              ? colorScheme.onPrimary
+                              : colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.sports_esports_outlined,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  score.toString(),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

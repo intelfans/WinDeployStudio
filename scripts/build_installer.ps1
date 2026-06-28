@@ -8,6 +8,15 @@ Write-Host "  Building WinDeploy Studio Installer" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Step 0: Ensure NuGet for Flutter Windows native assets
+Write-Host "[0/5] Ensuring NuGet is available..." -ForegroundColor Yellow
+& "$PSScriptRoot\ensure_nuget.ps1"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  NuGet setup failed!" -ForegroundColor Red
+    exit 1
+}
+Write-Host "  Done!" -ForegroundColor Green
+
 # Step 1: Clean previous build
 Write-Host "[1/5] Cleaning previous build..." -ForegroundColor Yellow
 if (Test-Path "build\windows\x64\runner\Release") {
@@ -92,7 +101,7 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "  Build Complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Installer location: dist\windows\WinDeployStudio_Setup_1.0.3.exe" -ForegroundColor Cyan
+Write-Host "Installer location: dist\windows\WinDeployStudio_Setup_1.1.0.exe" -ForegroundColor Cyan
 Write-Host ""
 
 # Open output directory

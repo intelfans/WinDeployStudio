@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                       安装完成 - 谢谢！                       │
-└─────────────────────────────────────────────────────────────┘
+﻿安装完成 - 谢谢！
 
-WinDeploy Studio 已成功安装！
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio 已成功安装。
 
 接下来您可以：
 
-  • 从开始菜单或桌面快捷方式启动 WinDeploy Studio
-  
-  • 浏览镜像中心查看 Windows 镜像
-  
-  • 创建您的第一个启动盘或 Windows To Go
-  
-  • 分享您的反馈帮助我们改进！
+- 从开始菜单或桌面快捷方式启动 WinDeploy Studio。
+- 浏览镜像中心查看 Windows 镜像。
+- 创建您的第一个 Windows 安装盘或 Windows To Go。
+- 分享您的反馈，帮助我们继续改进。
 
-═══════════════════════════════════════════════════════════════
+许可证：MIT License
+GitHub 主页：https://github.com/intelfans
+GitHub 仓库：https://github.com/intelfans/WinDeployStudio
 
-感谢您选择 WinDeploy Studio！
+特别感谢
 
-我们重视您的反馈，致力于让 WinDeploy Studio 变得更好。
+WinDeploy Studio 感谢以下个人和社区在反馈、测试、想法、灵感和支持方面提供的宝贵帮助。
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  早期反馈、测试和项目讨论
 
-© 2026 Bob Steve. 保留所有权利。
+- Timme
+  细致的国际用户反馈、信任与易用性建议、Microsoft 官方来源建议和社区审阅
 
-网站: https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  来自 Microsoft 诊断与故障排查工具的启发
+
+- Open Source Community
+  感谢文档、错误报告、测试、翻译和建议

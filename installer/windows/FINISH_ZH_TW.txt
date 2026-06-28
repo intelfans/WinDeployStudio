@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                      安裝完成 - 謝謝！                       │
-└─────────────────────────────────────────────────────────────┘
+﻿安裝完成 - 謝謝！
 
-WinDeploy Studio 已成功安裝！
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio 已成功安裝。
 
 接下來您可以：
 
-  • 從開始選單或桌面捷徑啟動 WinDeploy Studio
-  
-  • 瀏覽鏡像中心查看 Windows 鏡像
-  
-  • 建立您的第一個開機碟或 Windows To Go
-  
-  • 分享您的回饋幫助我們改進！
+- 從開始選單或桌面捷徑啟動 WinDeploy Studio。
+- 瀏覽鏡像中心查看 Windows 鏡像。
+- 建立您的第一個 Windows 安裝盤或 Windows To Go。
+- 分享您的回饋，幫助我們繼續改進。
 
-═══════════════════════════════════════════════════════════════
+授權：MIT License
+GitHub 主頁：https://github.com/intelfans
+GitHub 儲存庫：https://github.com/intelfans/WinDeployStudio
 
-感謝您選擇 WinDeploy Studio！
+特別感謝
 
-我們重視您的回饋，致力於讓 WinDeploy Studio 變得更好。
+WinDeploy Studio 感謝以下個人和社群在回饋、測試、想法、靈感和支持方面提供的寶貴幫助。
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  早期回饋、測試和專案討論
 
-© 2026 Bob Steve. 保留所有權利。
+- Timme
+  細緻的國際使用者回饋、信任與易用性建議、Microsoft 官方來源建議和社群審閱
 
-網站: https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  來自 Microsoft 診斷與疑難排解工具的啟發
+
+- Open Source Community
+  感謝文件、錯誤回報、測試、翻譯和建議

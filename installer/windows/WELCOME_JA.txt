@@ -12,7 +12,7 @@ WinDeploy Studio をお選びいただきありがとうございます！
   🖼️ イメージライブラリ
     厳選された Windows イメージとダウンロードリンクを閲覧
     
-  💿 起動可能 USB 作成ツール  
+  💿 Windows インストールメディア作成ツール  
     ISO ファイルから Windows インストールメディアを作成
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@ WinDeploy Studio をお選びいただきありがとうございます！
 
 「次へ」をクリックしてインストールを続行してください。
 
-© 2026 Bob Steve. All rights reserved.
+© 2026 Bob Steve. MIT License の下で配布されています。

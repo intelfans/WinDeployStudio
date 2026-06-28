@@ -12,7 +12,7 @@ Hauptfunktionen:
   🖼️ Image-Bibliothek
     Kuratierte Windows-Images und Download-Links durchsuchen
     
-  💿 Bootfähiges USB-Erstellungstool  
+  💿 Windows-Installationsmedium erstellen  
     Windows-Installationsmedien aus ISO-Dateien erstellen
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@ Systemanforderungen:
 
 Klicken Sie auf "Weiter", um mit der Installation fortzufahren.
 
-© 2026 Bob Steve. Alle Rechte vorbehalten.
+© 2026 Bob Steve. Veröffentlicht unter der MIT-Lizenz.

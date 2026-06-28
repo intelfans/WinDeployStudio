@@ -12,7 +12,7 @@ Características principales:
   🖼️ Biblioteca de imágenes
     Explorar imágenes de Windows y enlaces de descarga
     
-  💿 Herramienta de creación USB de arranque  
+  💿 Creador de medio de instalación de Windows  
     Crear medios de instalación de Windows desde archivos ISO
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@ Requisitos del sistema:
 
 Haga clic en "Siguiente" para continuar con la instalación.
 
-© 2026 Bob Steve. Todos los derechos reservados.
+© 2026 Bob Steve. Publicado bajo la licencia MIT.

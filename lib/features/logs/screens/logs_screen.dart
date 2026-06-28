@@ -83,19 +83,26 @@ class _LogsScreenState extends State<LogsScreen> {
             color: colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(Icons.receipt_long_rounded,
-              size: 32, color: colorScheme.onPrimaryContainer),
+          child: Icon(
+            Icons.receipt_long_rounded,
+            size: 32,
+            color: colorScheme.onPrimaryContainer,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(tr(context, 'logs_title'),
-                  style: AppTypography.pageTitleWith(colorScheme.onSurface)),
+              Text(
+                tr(context, 'logs_title'),
+                style: AppTypography.pageTitleWith(colorScheme.onSurface),
+              ),
               const SizedBox(height: 4),
-              Text(tr(context, 'logs_subtitle'),
-                  style: AppTypography.bodyWith(colorScheme.onSurfaceVariant)),
+              Text(
+                tr(context, 'logs_subtitle'),
+                style: AppTypography.bodyWith(colorScheme.onSurfaceVariant),
+              ),
             ],
           ),
         ),
@@ -152,17 +159,23 @@ class _LogsScreenState extends State<LogsScreen> {
         try {
           final path = await _service.exportLogs();
           if (mounted) {
-            final msg = tr(context, 'logs_exported').replaceAll('{path}', path);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(msg)),
-            );
+            final msg = tr(
+              this.context,
+              'logs_exported',
+            ).replaceAll('{path}', path);
+            ScaffoldMessenger.of(
+              this.context,
+            ).showSnackBar(SnackBar(content: Text(msg)));
           }
         } catch (e) {
           if (mounted) {
-            final msg = tr(context, 'logs_export_failed').replaceAll('{error}', '$e');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(msg)),
-            );
+            final msg = tr(
+              this.context,
+              'logs_export_failed',
+            ).replaceAll('{error}', '$e');
+            ScaffoldMessenger.of(
+              this.context,
+            ).showSnackBar(SnackBar(content: Text(msg)));
           }
         }
         break;
@@ -175,19 +188,23 @@ class _LogsScreenState extends State<LogsScreen> {
   void _showClearDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => _ClearLogsDialog(
-        service: _service,
-        onCleared: () => _loadData(),
-      ),
+      builder: (ctx) =>
+          _ClearLogsDialog(service: _service, onCleared: () => _loadData()),
     );
   }
 
-  Widget _buildStatsRow(BuildContext context, ColorScheme colorScheme, bool isCompact) {
+  Widget _buildStatsRow(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isCompact,
+  ) {
     final stats = _stats;
     if (stats == null) return const SizedBox.shrink();
 
     final totalFilesText = stats.formattedSize;
-    final lastActivityText = stats.lastActivityFormatted((key) => tr(context, key));
+    final lastActivityText = stats.lastActivityFormatted(
+      (key) => tr(context, key),
+    );
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -265,7 +282,7 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Widget _buildCategoryGrid(BuildContext context, bool isCompact) {
     final stats = _stats;
-    
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -279,7 +296,7 @@ class _LogsScreenState extends State<LogsScreen> {
       itemBuilder: (context, index) {
         final category = LogCategory.values[index];
         final count = stats?.categoryCounts[category] ?? 0;
-        
+
         return LogCategoryCard(
           category: category,
           categoryDisplayName: tr(context, category.nameKey),
@@ -350,30 +367,58 @@ class _ClearLogsDialogState extends State<_ClearLogsDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(tr(context, 'logs_clear_time'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                tr(context, 'logs_clear_time'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _TimeChip(label: tr(context, 'logs_clear_all'), value: -1, groupValue: _daysOld, onSelected: (v) => setState(() => _daysOld = v)),
-                  _TimeChip(label: tr(context, 'logs_clear_1d'), value: 1, groupValue: _daysOld, onSelected: (v) => setState(() => _daysOld = v)),
-                  _TimeChip(label: tr(context, 'logs_clear_7d'), value: 7, groupValue: _daysOld, onSelected: (v) => setState(() => _daysOld = v)),
-                  _TimeChip(label: tr(context, 'logs_clear_30d'), value: 30, groupValue: _daysOld, onSelected: (v) => setState(() => _daysOld = v)),
+                  _TimeChip(
+                    label: tr(context, 'logs_clear_all'),
+                    value: -1,
+                    groupValue: _daysOld,
+                    onSelected: (v) => setState(() => _daysOld = v),
+                  ),
+                  _TimeChip(
+                    label: tr(context, 'logs_clear_1d'),
+                    value: 1,
+                    groupValue: _daysOld,
+                    onSelected: (v) => setState(() => _daysOld = v),
+                  ),
+                  _TimeChip(
+                    label: tr(context, 'logs_clear_7d'),
+                    value: 7,
+                    groupValue: _daysOld,
+                    onSelected: (v) => setState(() => _daysOld = v),
+                  ),
+                  _TimeChip(
+                    label: tr(context, 'logs_clear_30d'),
+                    value: 30,
+                    groupValue: _daysOld,
+                    onSelected: (v) => setState(() => _daysOld = v),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
-              Text(tr(context, 'logs_clear_categories'), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                tr(context, 'logs_clear_categories'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 8),
-              ...LogCategory.values.map((c) => CheckboxListTile(
-                    value: _selected[c],
-                    onChanged: (v) => setState(() => _selected[c] = v ?? false),
-                    title: Text(tr(context, c.nameKey)),
-                    secondary: Icon(c.icon, color: c.color, size: 20),
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                  )),
+              ...LogCategory.values.map(
+                (c) => CheckboxListTile(
+                  value: _selected[c],
+                  onChanged: (v) => setState(() => _selected[c] = v ?? false),
+                  title: Text(tr(context, c.nameKey)),
+                  secondary: Icon(c.icon, color: c.color, size: 20),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
             ],
           ),
         ),
@@ -392,12 +437,18 @@ class _ClearLogsDialogState extends State<_ClearLogsDialog> {
   }
 
   Future<void> _doClear() async {
-    final categories = _selected.entries.where((e) => e.value).map((e) => e.key).toList();
+    final categories = _selected.entries
+        .where((e) => e.value)
+        .map((e) => e.key)
+        .toList();
     if (categories.isEmpty) return;
 
     Navigator.pop(context);
     final daysOld = _daysOld == -1 ? null : _daysOld;
-    final count = await widget.service.clearOldLogs(daysOld: daysOld, categories: categories);
+    final count = await widget.service.clearOldLogs(
+      daysOld: daysOld,
+      categories: categories,
+    );
     widget.onCleared();
     if (mounted) {
       final msg = tr(context, 'logs_deleted').replaceAll('{count}', '$count');

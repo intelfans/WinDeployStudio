@@ -41,21 +41,28 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr(context, 'images_title'),
-                          style: theme.textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      Text(
+                        tr(context, 'images_title'),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(tr(context, 'images_subtitle'),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          )),
+                      Text(
+                        tr(context, 'images_subtitle'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   tooltip: tr(context, 'images_retry'),
-                  onPressed: () => ref.read(mirrorProvider.notifier).loadBuiltInMirrors(force: true),
+                  onPressed: () => ref
+                      .read(mirrorProvider.notifier)
+                      .loadBuiltInMirrors(force: true),
                 ),
               ],
             ),
@@ -87,14 +94,22 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline,
-                  size: 48, color: Theme.of(context).colorScheme.error),
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(height: 16),
-              Text(state.error ?? tr(context, 'images_error')),
+              Text(
+                state.error == null
+                    ? tr(context, 'images_error')
+                    : '${tr(context, 'mirror_error_loading')} ${state.error}',
+              ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: () =>
-                    ref.read(mirrorProvider.notifier).loadBuiltInMirrors(force: true),
+                onPressed: () => ref
+                    .read(mirrorProvider.notifier)
+                    .loadBuiltInMirrors(force: true),
                 icon: const Icon(Icons.refresh),
                 label: Text(tr(context, 'images_retry')),
               ),
@@ -112,8 +127,10 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
   }
 
   Widget _buildMirrorList(
-      List<MirrorCategory> categories, List<LocalIsoInfo> localIsos, Locale locale) {
-    final isChinese = locale.languageCode == 'zh';
+    List<MirrorCategory> categories,
+    List<LocalIsoInfo> localIsos,
+    Locale locale,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -126,19 +143,21 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
                 _CategoryTile(
                   label: tr(context, 'images_category_all'),
                   icon: Icons.apps,
-                  count: categories.fold(0, (sum, c) => sum + c.items.length) +
-                      localIsos.length - (isChinese ? 0 : 1),
+                  count:
+                      categories.fold(0, (sum, c) => sum + c.items.length) +
+                      localIsos.length,
                   isSelected: _selectedCategory == null,
                   onTap: () => setState(() => _selectedCategory = null),
                 ),
-                ...categories.map((cat) => _CategoryTile(
-                      label: cat.name,
-                      icon: _getCategoryIcon(cat.icon),
-                      count: cat.items.length - (!isChinese && cat.icon == 'other' ? 1 : 0),
-                      isSelected: _selectedCategory == cat.name,
-                      onTap: () =>
-                          setState(() => _selectedCategory = cat.name),
-                    )),
+                ...categories.map(
+                  (cat) => _CategoryTile(
+                    label: cat.name,
+                    icon: _getCategoryIcon(cat.icon),
+                    count: cat.items.length,
+                    isSelected: _selectedCategory == cat.id,
+                    onTap: () => setState(() => _selectedCategory = cat.id),
+                  ),
+                ),
                 if (localIsos.isNotEmpty)
                   _CategoryTile(
                     label: tr(context, 'images_local_library'),
@@ -159,24 +178,22 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
   }
 
   Widget _buildItemsList(
-      List<MirrorCategory> categories, List<LocalIsoInfo> localIsos, Locale locale) {
+    List<MirrorCategory> categories,
+    List<LocalIsoInfo> localIsos,
+    Locale locale,
+  ) {
     if (_selectedCategory == '__local__') {
       return _buildLocalIsoList(localIsos);
     }
-
-    final isChinese = locale.languageCode == 'zh';
 
     List<MirrorItem> items;
     if (_selectedCategory == null) {
       items = categories.expand((c) => c.items).toList();
     } else {
-      final cat =
-          categories.where((c) => c.name == _selectedCategory).firstOrNull;
+      final cat = categories
+          .where((c) => c.id == _selectedCategory)
+          .firstOrNull;
       items = cat?.items ?? [];
-    }
-
-    if (!isChinese) {
-      items = items.where((item) => item.id != 'font-pack').toList();
     }
 
     return ListView(
@@ -185,10 +202,12 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
         if (_selectedCategory == null && localIsos.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.only(top: 16, bottom: 8),
-            child: Text(tr(context, 'images_local_library'),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    )),
+            child: Text(
+              tr(context, 'images_local_library'),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
           ),
           ...localIsos.map((iso) => _LocalIsoCard(iso: iso)),
         ],
@@ -210,12 +229,8 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
     switch (icon) {
       case 'official':
         return Icons.verified;
-      case 'tiny':
-        return Icons.compress;
-      case 'xlite':
-        return Icons.speed;
-      case 'custom':
-        return Icons.palette;
+      case 'community':
+        return Icons.groups_outlined;
       default:
         return Icons.folder;
     }
@@ -242,12 +257,16 @@ class _CategoryTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, size: 20),
       title: Text(label, style: theme.textTheme.bodyMedium),
-      trailing: Text('$count',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+      trailing: Text(
+        '$count',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
       selected: isSelected,
-      selectedTileColor:
-          theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+      selectedTileColor: theme.colorScheme.primaryContainer.withValues(
+        alpha: 0.3,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       onTap: onTap,
     );
@@ -264,6 +283,16 @@ class _MirrorItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final name = item.getName(locale);
     final type = item.getType(locale);
+    final badgeLabel = item.isOfficialMicrosoft
+        ? tr(context, 'mirror_badge_official')
+        : item.isCommunityImage
+        ? tr(context, 'mirror_badge_community')
+        : '';
+    final trustText = item.isOfficialMicrosoft
+        ? tr(context, 'mirror_desc_official')
+        : item.isCommunityImage
+        ? tr(context, 'mirror_desc_community')
+        : '';
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
@@ -280,44 +309,82 @@ class _MirrorItemCard extends StatelessWidget {
                   color: _catColor(item.category).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(_catIcon(item.category),
-                    color: _catColor(item.category)),
+                child: Icon(
+                  _catIcon(item.category),
+                  color: _catColor(item.category),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(
+                      name,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        _buildTag(context, _catLabel(context, item.category), _catColor(item.category)),
+                        if (badgeLabel.isNotEmpty)
+                          _buildTag(
+                            context,
+                            badgeLabel,
+                            _catColor(item.category),
+                          ),
                         if (item.version != null)
-                          _buildTag(context, item.version!, const Color(0xFF0071C5)),
+                          _buildTag(
+                            context,
+                            item.version!,
+                            const Color(0xFF0071C5),
+                          ),
                         if (item.build != null)
-                          _buildTag(context, item.build!, const Color(0xFF107C10)),
+                          _buildTag(
+                            context,
+                            item.build!,
+                            const Color(0xFF107C10),
+                          ),
                         if (item.architecture != null)
-                          _buildTag(context, item.architecture!, const Color(0xFF5C2D91)),
+                          _buildTag(
+                            context,
+                            item.architecture!,
+                            const Color(0xFF5C2D91),
+                          ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    if (type.isNotEmpty || item.size != null)
+                    if (trustText.isNotEmpty) ...[
+                      const SizedBox(height: 4),
                       Text(
-                        [if (type.isNotEmpty) type, if (item.size != null) item.size].join(' · '),
+                        trustText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    if (type.isNotEmpty || item.size != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (type.isNotEmpty) type,
+                          if (item.size != null) item.size,
+                        ].join(' / '),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -344,38 +411,12 @@ class _MirrorItemCard extends StatelessWidget {
     );
   }
 
-  String _catLabel(BuildContext context, String category) {
-    switch (category) {
-      case 'Official Original':
-        return tr(context, 'mirror_category_official');
-      case 'Official LTSC':
-        return tr(context, 'mirror_category_ltsc');
-      case 'TinyOS':
-        return tr(context, 'mirror_category_tinyos');
-      case 'X-Lite':
-        return tr(context, 'mirror_category_xlite');
-      case 'Custom':
-        return tr(context, 'mirror_category_custom');
-      case 'Tools':
-        return tr(context, 'mirror_category_tools');
-      default:
-        return category;
-    }
-  }
-
   IconData _catIcon(String category) {
     switch (category) {
-      case 'Official Original':
-      case 'Official LTSC':
+      case 'Official Microsoft':
         return Icons.verified;
-      case 'TinyOS':
-        return Icons.compress;
-      case 'X-Lite':
-        return Icons.speed;
-      case 'Custom':
-        return Icons.palette;
-      case 'Tools':
-        return Icons.build;
+      case 'Community Images':
+        return Icons.groups_outlined;
       default:
         return Icons.folder;
     }
@@ -383,16 +424,9 @@ class _MirrorItemCard extends StatelessWidget {
 
   Color _catColor(String category) {
     switch (category) {
-      case 'Official Original':
-      case 'Official LTSC':
+      case 'Official Microsoft':
         return const Color(0xFF0071C5);
-      case 'TinyOS':
-        return const Color(0xFF107C10);
-      case 'X-Lite':
-        return const Color(0xFFD83B01);
-      case 'Custom':
-        return const Color(0xFF5C2D91);
-      case 'Tools':
+      case 'Community Images':
         return const Color(0xFF008272);
       default:
         return Colors.grey;

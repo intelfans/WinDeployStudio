@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/strings.dart';
 import '../models/chat_models.dart';
 import '../services/ai_service.dart';
 
@@ -62,7 +64,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         return;
       }
 
-      final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.json'));
+      final files = dir.listSync().whereType<File>().where(
+        (f) => f.path.endsWith('.json'),
+      );
       final sessions = <ChatSession>[];
       for (final file in files) {
         try {
@@ -94,7 +98,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void createNewSession() {
-    final session = ChatSession(title: 'New Chat');
+    final session = ChatSession(title: trCurrent('ai_new_chat'));
     final sessions = [session, ...state.sessions];
     state = state.copyWith(
       sessions: sessions.take(50).toList(),
@@ -139,13 +143,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     if (session.messages.isEmpty) {
-      final title = content.length > 30 ? '${content.substring(0, 30)}...' : content;
+      final title = content.length > 30
+          ? '${content.substring(0, 30)}...'
+          : content;
       updatedSession = updatedSession.copyWith(title: title);
     }
 
     _updateSession(updatedSession);
 
-    final assistantMessage = ChatMessage(role: 'assistant', content: '', isStreaming: true);
+    final assistantMessage = ChatMessage(
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    );
     final withAssistant = [...updatedSession.messages, assistantMessage];
     _updateSession(updatedSession.copyWith(messages: withAssistant));
 
@@ -154,7 +164,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _cancelToken = CancelToken();
 
     final apiMessages = [
-      {'role': 'system', 'content': systemPrompt ?? 'You are WinDeploy AI assistant.'},
+      {
+        'role': 'system',
+        'content': systemPrompt ?? 'You are WinDeploy AI assistant.',
+      },
       ...updatedMessages.map((m) => {'role': m.apiRole, 'content': m.content}),
     ];
 
@@ -167,7 +180,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         _updateLastMessage(_streamBuffer, isStreaming: true);
       },
       onSources: (sources) {
-        final sourceMaps = sources.map((s) => {'title': s.title, 'url': s.url}).toList();
+        final sourceMaps = sources
+            .map((s) => {'title': s.title, 'url': s.url})
+            .toList();
         _updateLastMessageSources(sourceMaps);
       },
       onComplete: () {
@@ -176,7 +191,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         _saveCurrentSession();
       },
       onError: (error) {
-        _updateLastMessage('Error: $error', isStreaming: false);
+        _updateLastMessage(
+          '${trCurrent('creator_error')}: $error',
+          isStreaming: false,
+        );
         state = state.copyWith(isGenerating: false);
         _saveCurrentSession();
       },
@@ -190,7 +208,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void _updateSession(ChatSession session) {
-    final sessions = state.sessions.map((s) => s.id == session.id ? session : s).toList();
+    final sessions = state.sessions
+        .map((s) => s.id == session.id ? session : s)
+        .toList();
     state = state.copyWith(sessions: sessions);
   }
 
@@ -199,9 +219,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
     if (session == null || session.messages.isEmpty) return;
 
     final lastMsg = session.messages.last;
-    final updated = lastMsg.copyWith(content: content, isStreaming: isStreaming);
-    final messages = [...session.messages.sublist(0, session.messages.length - 1), updated];
-    _updateSession(session.copyWith(messages: messages, updatedAt: DateTime.now()));
+    final updated = lastMsg.copyWith(
+      content: content,
+      isStreaming: isStreaming,
+    );
+    final messages = [
+      ...session.messages.sublist(0, session.messages.length - 1),
+      updated,
+    ];
+    _updateSession(
+      session.copyWith(messages: messages, updatedAt: DateTime.now()),
+    );
   }
 
   void _updateLastMessageSources(List<Map<String, String>> sources) {
@@ -210,8 +238,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final lastMsg = session.messages.last;
     final updated = lastMsg.copyWith(sources: sources);
-    final messages = [...session.messages.sublist(0, session.messages.length - 1), updated];
-    _updateSession(session.copyWith(messages: messages, updatedAt: DateTime.now()));
+    final messages = [
+      ...session.messages.sublist(0, session.messages.length - 1),
+      updated,
+    ];
+    _updateSession(
+      session.copyWith(messages: messages, updatedAt: DateTime.now()),
+    );
   }
 
   void _saveCurrentSession() {

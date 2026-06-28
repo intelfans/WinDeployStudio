@@ -4,8 +4,10 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'WinDeploy Studio';
-  static const String appVersion = '1.0.2';
-  static const String appBuild = '1';
+  static const String appVersion = '1.1.0';
+  static const String licenseName = 'MIT License';
+  static const String githubRepository =
+      'https://github.com/intelfans/WinDeployStudio';
 
   // Download
   static const int maxConcurrentDownloads = 3;

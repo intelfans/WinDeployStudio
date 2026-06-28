@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _prefKey = 'language_code';
@@ -17,19 +17,18 @@ class LocaleNotifier extends StateNotifier<Locale> {
     final prefs = await SharedPreferences.getInstance();
     final code = prefs.getString(_prefKey);
     if (code != null && code.isNotEmpty) {
-      final parts = code.split('_');
-      state = parts.length > 1
-          ? Locale(parts[0], parts.sublist(1).join('_'))
-          : Locale(code);
-      L.currentLocale = code;
+      final normalized = normalizeLocaleCode(code);
+      state = localeFromCode(normalized);
+      L.currentLocale = normalized;
+      if (normalized != code) {
+        await prefs.setString(_prefKey, normalized);
+      }
     }
   }
 
   Future<void> setLocale(Locale locale) async {
-    state = locale;
-    final code = locale.countryCode != null && locale.countryCode!.isNotEmpty
-        ? '${locale.languageCode}_${locale.countryCode}'
-        : locale.languageCode;
+    final code = normalizeLocaleCode(localeCodeFromLocale(locale));
+    state = localeFromCode(code);
     L.currentLocale = code;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKey, code);
@@ -52,12 +51,63 @@ class L {
   static String currentLocale = 'en';
 }
 
-String tr(BuildContext context, String key) {
-  final locale = Localizations.localeOf(context);
-  final code = locale.countryCode != null && locale.countryCode!.isNotEmpty
-      ? '${locale.languageCode}_${locale.countryCode}'
-      : locale.languageCode;
-  final map = switch (code) {
+const supportedLocaleCodes = <String>{
+  'zh',
+  'zh_TW',
+  'en',
+  'fr',
+  'de',
+  'es',
+  'pt',
+  'ru',
+  'ar',
+  'ko',
+  'ja',
+};
+
+String localeCodeFromLocale(Locale locale) =>
+    locale.countryCode != null && locale.countryCode!.isNotEmpty
+    ? '${locale.languageCode}_${locale.countryCode}'
+    : locale.languageCode;
+
+Locale localeFromCode(String code) {
+  final normalized = normalizeLocaleCode(code);
+  final parts = normalized.split('_');
+  return parts.length > 1
+      ? Locale(parts[0], parts.sublist(1).join('_'))
+      : Locale(normalized);
+}
+
+String normalizeLocaleCode(String code) {
+  final normalized = code.replaceAll('-', '_');
+  if (supportedLocaleCodes.contains(normalized)) return normalized;
+
+  final parts = normalized.split('_');
+  if (parts.isEmpty) return normalized;
+
+  final language = parts.first.toLowerCase();
+  final tags = parts.skip(1).map((part) => part.toUpperCase()).toSet();
+
+  if (language == 'zh') {
+    if (tags.contains('TW') ||
+        tags.contains('HK') ||
+        tags.contains('MO') ||
+        tags.contains('HANT')) {
+      return 'zh_TW';
+    }
+    return 'zh';
+  }
+
+  if (supportedLocaleCodes.contains(language)) return language;
+  return normalized;
+}
+
+bool isSupportedLocaleCode(String code) =>
+    supportedLocaleCodes.contains(normalizeLocaleCode(code));
+
+Map<String, String> _mapForCode(String code) {
+  return switch (normalizeLocaleCode(code)) {
+    'en' => _en,
     'zh' => _zh,
     'ru' => _ru,
     'fr' => _fr,
@@ -68,32 +118,43 @@ String tr(BuildContext context, String key) {
     'ko' => _ko,
     'ja' => _ja,
     'zh_TW' => _zhTW,
-    _ => _en,
+    _ => const {},
   };
-  return map[key] ?? _en[key] ?? key;
+}
+
+String trByCode(String code, String key) {
+  final map = _mapForCode(code);
+  return map[key] ?? key;
+}
+
+String trCurrent(String key) => trByCode(L.currentLocale, key);
+
+String tr(BuildContext context, String key) {
+  final locale = Localizations.localeOf(context);
+  return trByCode(localeCodeFromLocale(locale), key);
 }
 
 const _en = <String, String>{
   // App
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Bootable USB & Windows To Go Creator',
+  'app_subtitle': 'Windows Install Media & Windows To Go Creator',
 
   // Navigation
   'nav_home': 'Home',
   'nav_images': 'Images',
-  'nav_creator': 'Creator',
+  'nav_creator': 'Install Media',
   'nav_wtg': 'WTG',
   'nav_logs': 'Logs',
   'nav_settings': 'Settings',
 
   // Home
   'home_title': 'Windows Deployment Toolkit',
-  'home_subtitle': 'Bootable USB & Windows To Go Creator',
+  'home_subtitle': 'Windows Install Media & Windows To Go Creator',
   'home_quick_start': 'Quick Start',
   'home_image_library': 'Image Library',
   'home_image_library_desc': 'Browse Windows images and get download links',
-  'home_bootable_usb': 'Bootable USB Creator',
-  'home_bootable_usb_desc': 'Create a Windows bootable USB drive',
+  'home_bootable_usb': 'Windows Installation Media Creator',
+  'home_bootable_usb_desc': 'Create a Windows installation USB from an ISO',
   'home_font_pack': 'Download Font Pack',
   'home_font_pack_desc': 'CJK fonts for lite Windows ISOs',
   'home_wtg': 'Windows To Go',
@@ -105,7 +166,7 @@ const _en = <String, String>{
   'home_platform': 'Platform',
   'home_engine': 'Engine',
   'home_focus': 'Focus',
-  'home_focus_value': 'Bootable USB & WTG',
+  'home_focus_value': 'Install Media & WTG',
   'home_license': 'License',
   'home_license_value': 'Open Source',
 
@@ -139,15 +200,19 @@ const _en = <String, String>{
   'images_error': 'Unknown error',
   'mirror_not_found': 'Mirror item not found',
   'cancel_title': 'Cancel',
-  'cancel_parse_desc': 'Cancel ISO parsing? The mounted image will be unmounted.',
+  'cancel_parse_desc':
+      'Cancel ISO parsing? The mounted image will be unmounted.',
   'cancel_confirm': 'Confirm Cancel',
-  'cancel_create_desc': 'Cancel bootable USB creation? The process cannot be resumed.',
+  'cancel_create_desc':
+      'Cancel Windows installation media creation? The process cannot be resumed.',
 
   // Font pack warning
   'fontpack_warning': 'This system may be missing Chinese fonts',
-  'fontpack_recommend': 'Recommend downloading and installing the Chinese Font Pack',
+  'fontpack_recommend':
+      'Recommend downloading and installing the Chinese Font Pack',
   'fontpack_download': 'Download Font Pack',
-  'fontpack_desc': 'Chinese font supplement pack for lite Windows ISOs. Includes common CJK fonts to ensure Chinese content displays correctly.',
+  'fontpack_desc':
+      'Chinese font supplement pack for lite Windows ISOs. Includes common CJK fonts to ensure Chinese content displays correctly.',
   'fontpack_feature_1': 'Includes HarmonyOS Sans SC and other Chinese fonts',
   'fontpack_feature_2': 'Supports Windows 10/11',
   'fontpack_feature_3': 'One-click install for all users',
@@ -159,8 +224,8 @@ const _en = <String, String>{
   'iso_step_cleanup': 'Cleaning up...',
 
   // Creator
-  'creator_title': 'Bootable USB Creator',
-  'creator_subtitle': 'Create a Windows bootable USB drive',
+  'creator_title': 'Windows Installation Media Creator',
+  'creator_subtitle': 'Create a Windows installation USB from an ISO',
   'creator_step_iso': 'Select ISO',
   'creator_step_usb': 'Select USB',
   'creator_step_confirm': 'Confirm',
@@ -187,8 +252,8 @@ const _en = <String, String>{
   'creator_start': 'Start Creating',
   'creator_creating': 'Creating...',
   'creator_parsing': 'Parsing ISO file...',
-  'creator_complete_title': 'Bootable USB Created!',
-  'creator_complete_desc': 'Your bootable USB drive is ready to use',
+  'creator_complete_title': 'Windows Installation Media Created!',
+  'creator_complete_desc': 'Your Windows installation USB is ready to use',
   'creator_another': 'Create Another',
   'creator_parse_error': 'Failed to parse ISO file',
   'creator_error': 'Error',
@@ -238,7 +303,18 @@ const _en = <String, String>{
   'settings_license': 'License',
   'settings_license_value': 'Open Source',
   'settings_built_with': 'Built with:',
-  'settings_copyright': '©2026 Bob Steve. All rights reserved.',
+  'settings_copyright': '©2026 Bob Steve. Released under the MIT License.',
+  'about_github_repository': 'GitHub Repository',
+  'special_thanks_title': '特別感謝',
+  'special_thanks_intro':
+      'WinDeploy Studio would like to thank the following people and communities for their valuable feedback, testing, ideas, inspiration, and support.',
+  'thanks_astra_desc': 'Early feedback, testing, and project discussions',
+  'thanks_timme_desc':
+      'Detailed international user feedback, trust and usability recommendations, Microsoft source suggestions, and community review',
+  'thanks_sysinternals_desc':
+      'Inspiration from Microsoft\'s diagnostic and troubleshooting tools',
+  'thanks_open_source_desc':
+      'For documentation, bug reports, testing, translations, and suggestions',
   'close': 'Close',
   'copied': 'Copied',
   'ai_thinking': 'Thinking...',
@@ -318,9 +394,11 @@ const _en = <String, String>{
   'wtg_grade_f': 'Failed - Not suitable for Windows To Go',
   'wtg_grade_unknown': 'Unknown - Speed test required',
   'wtg_warn_disk_info_failed': 'Unable to retrieve disk information',
-  'wtg_warn_size_small': 'Disk size is less than 32GB - not recommended for Windows To Go',
+  'wtg_warn_size_small':
+      'Disk size is less than 32GB - not recommended for Windows To Go',
   'wtg_warn_not_usb': 'This does not appear to be a USB drive',
-  'wtg_warn_performance_low': 'Performance may not be sufficient for Windows To Go (requires ~80 MB/s)',
+  'wtg_warn_performance_low':
+      'Performance may not be sufficient for Windows To Go (requires ~80 MB/s)',
   'wtg_warn_speed_test_failed': 'Speed test failed',
   'wtg_err_drive_not_found': 'Drive root not found',
   'wtg_err_empty_drive_letter': 'Empty drive letter',
@@ -331,7 +409,8 @@ const _en = <String, String>{
   'wtg_average_speed': 'Average Speed',
   'wtg_written': 'Written',
   'wtg_remaining': 'Remaining',
-  'wtg_low_speed_warning': 'Low random write performance detected. Windows To Go creation may take longer than expected. Please be patient.',
+  'wtg_low_speed_warning':
+      'Low random write performance detected. Windows To Go creation may take longer than expected. Please be patient.',
   'wtg_images_found': '{count} Windows images found',
   'wtg_image_fallback': 'Image {index}',
   'wtg_disk_number': 'Disk {number}',
@@ -370,7 +449,7 @@ const _en = <String, String>{
   'logs_min_ago': '{n} min ago',
   'logs_hours_ago': '{n} hours ago',
   'logs_days_ago': '{n} days ago',
-  'logs_cat_usb': 'USB Logs',
+  'logs_cat_usb': 'Install Media Logs',
   'logs_cat_wtg': 'WTG Logs',
   'logs_cat_downloads': 'Downloads',
   'logs_cat_iso': 'ISO Parse',
@@ -401,6 +480,7 @@ const _en = <String, String>{
   'update_install_desc': 'The update has been downloaded. Install now?',
   'update_up_to_date': 'You are up to date',
   'update_checking': 'Checking for updates...',
+  'update_check_failed': 'Failed to check for updates',
   'update_channel': 'Update Channel',
   'update_channel_stable': 'Stable',
   'update_channel_beta': 'Beta',
@@ -432,10 +512,11 @@ const _en = <String, String>{
   'ai_clear_chat': 'Clear chat',
   'ai_input_hint': 'Ask anything about Windows deployment...',
   'ai_welcome_title': 'Hello, I\'m WinDeploy AI',
-  'ai_welcome_desc': 'I can help you with Windows deployment, Windows To Go, bootable USB creation, and more.',
+  'ai_welcome_desc':
+      'I can help you with Windows deployment, Windows To Go, installation media creation, and more.',
   'ai_ability_windows': 'Windows Install',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'Bootable USB',
+  'ai_ability_usb': 'Install Media',
   'ai_ability_iso': 'ISO Analysis',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -443,7 +524,8 @@ const _en = <String, String>{
   'ai_ability_logs': 'Log Analysis',
   'ai_example_questions': 'Example questions',
   'ai_example_q1': 'Why can\'t my WTG boot?',
-  'ai_example_q2': 'What\'s the difference between Tiny11 and original Windows?',
+  'ai_example_q2':
+      'What\'s the difference between Tiny11 and original Windows?',
   'ai_example_q3': 'Is this USB suitable for Windows To Go?',
   'ai_action_analyze_logs': 'Analyze Logs',
   'ai_action_analyze_iso': 'Analyze ISO',
@@ -452,6 +534,26 @@ const _en = <String, String>{
   'ai_no_logs': 'No log files found to analyze.',
   'ai_please_wait': 'Please wait for the current response to finish...',
 
+  'ai_settings_section': 'AI Assistant',
+  'ai_proxy_url': 'AI Proxy URL',
+  'ai_proxy_url_desc':
+      'Use an OpenAI-compatible proxy endpoint. Leave empty or reset to use the built-in endpoint.',
+  'ai_proxy_url_loading': 'Loading...',
+  'ai_proxy_url_invalid': 'Enter a valid HTTP or HTTPS URL',
+  'ai_error_unauthorized': 'AI service is not authorized.',
+  'ai_error_rate_limited': 'Too many requests. Please try again later.',
+  'ai_error_unavailable': 'AI service is temporarily unavailable.',
+  'ai_error_http': 'AI service error ({status}).',
+  'ai_error_timeout':
+      'AI service connection timed out. Check your network or change the AI proxy URL in Settings.',
+  'ai_error_unreachable':
+      'Cannot connect to the AI service. Your network may be unable to reach the built-in workers.dev proxy. Change the AI proxy URL in Settings and try again.',
+  'ai_error_tls':
+      'AI service TLS connection failed. Check system time, network proxy, or change the AI proxy URL.',
+  'ai_error_connection': 'AI service connection failed: {error}',
+  'settings_edit': 'Edit',
+  'settings_save': 'Save',
+  'settings_reset_default': 'Reset to Default',
   // Tools
   'nav_tools': 'Tools',
   'tools_title': 'Tools',
@@ -472,17 +574,6 @@ const _en = <String, String>{
   'tools_website': 'Website',
   'tools_download': 'Download',
 
-  // AdBlock
-  'adblock_on': 'AdBlock ON',
-  'adblock_off': 'AdBlock OFF',
-  'adblock_stats': 'AdBlock Statistics',
-  'adblock_ads': 'Ads blocked',
-  'adblock_trackers': 'Trackers blocked',
-  'adblock_total': 'Total blocked',
-  'adblock_enabled': 'Ad Blocking Enabled',
-  'adblock_privacy': 'Privacy Protection Enabled',
-  'adblock_whitelist': 'Add to Whitelist',
-  'adblock_disable_site': 'Disable for this site',
   'tools_cat_system': 'System Tools',
   'tools_cat_disk': 'Disk Tools',
   'tools_cat_driver': 'Driver Tools',
@@ -493,11 +584,39 @@ const _en = <String, String>{
   'tools_cat_optimize': 'System Optimization',
   'tools_cat_rescue': 'System Rescue',
   'tools_cat_file': 'File Tools',
-  'tools_cat_activation': 'Activation',
-
-  // WebView
+  'tools_cat_activation': 'License & Activation Utilities',
+  'tools_cat_advanced': 'Advanced Tools',
+  'tool_safety_beginner': 'Beginner',
+  'tool_safety_advanced': 'Advanced',
+  'tool_safety_expert': 'Expert',
+  'tool_warning_continue': 'Continue',
+  'tool_warning_cancel': 'Cancel',
+  'tool_warning_dism_title': 'DISM++ Notice',
+  'tool_warning_dism_message':
+      'DISM++ is a powerful Windows maintenance utility.\n\nIncorrect use may affect Windows components, services, updates, drivers, or system stability.\n\nRecommended for users who understand the purpose of the selected operation.',
+  'tool_warning_windhawk_title': 'Windhawk Notice',
+  'tool_warning_windhawk_message':
+      'Windhawk modifies Windows user interface behavior through plugins.\n\nSome plugins may affect stability, compatibility, or future Windows updates.\n\nReview plugin descriptions carefully before installation.',
+  'tool_warning_expert_title': 'Expert Tool',
+  'tool_warning_expert_message':
+      'This tool is intended for experienced users.\n\nChanges made by this tool may affect system functionality, data integrity, or operating system stability.\n\nProceed only if you understand the purpose and impact of the operation.',
+  'tool_warning_do_not_show_again': 'Do not show again',
+  'activation_tool_notice_title': 'Activation Tool Notice',
+  'activation_tool_notice_message':
+      'This tool is provided for educational, testing, troubleshooting, research, and system administration purposes.\n\nWinDeploy Studio does not provide software licenses, product keys, activation services, or authorization bypass mechanisms.\n\nUsers are responsible for ensuring compliance with all applicable software license agreements.\n\nFor production environments, commercial use, or long-term deployment, obtaining a valid license from the software vendor is strongly recommended.\n\nProceed only if you understand the purpose and legal implications of the selected tool.',
+  'activation_tool_badge_tooltip':
+      'May affect software licensing or activation status.',
+  'activation_tool_disclaimer_title': 'License and activation notice',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio does not endorse software piracy, unauthorized activation, or license circumvention.\n\nAll activation-related utilities are provided as third-party resources.\n\nUsers must comply with Microsoft and other software vendors\' license terms.',
+  'ai_notice_title': 'AI Assistant Notice',
+  'ai_notice_message':
+      'AI-generated content may be inaccurate or incomplete.\n\nAlways review and verify important operations before applying changes to your system.\n\nThe AI assistant provides suggestions only and cannot guarantee compatibility, stability, or safety.',
+  'ai_notice_got_it': 'Got it',
+  'ai_notice_do_not_show': 'Do not show again',
   'webview_not_available': 'WebView2 Not Installed',
-  'webview_download_desc': 'Your system needs WebView2 Runtime to open pages in-app. Download it now?',
+  'webview_download_desc':
+      'Your system needs WebView2 Runtime to open pages in-app. Download it now?',
   'webview_download': 'Download WebView2',
   'webview_open_in_browser': 'Open in Browser',
   'webview_open_external': 'Open in Browser',
@@ -516,7 +635,8 @@ const _en = <String, String>{
   'webview_download_complete': 'Download complete',
   'webview_download_failed': 'Download failed',
   'webview_downgrade_title': 'Site may not be compatible',
-  'webview_downgrade_desc': 'This site may not work well in the built-in browser. It is recommended to open it in your system browser.',
+  'webview_downgrade_desc':
+      'This site may not work well in the built-in browser. It is recommended to open it in your system browser.',
   'webview_diag': 'Network Diagnostics',
   'webview_diag_title': 'Network Diagnostics',
 
@@ -544,10 +664,14 @@ const _en = <String, String>{
   'ai_search_canary': 'Search AMD',
   'ai_search_wtg_tutorial': 'Search Linus Tech Tips',
   'ai_search_rufus': 'Search WTG Tutorial',
-  'ai_search_ms_update_prompt': 'Search for Intel CPU, GPU, driver downloads, and product information.',
-  'ai_search_canary_prompt': 'Search for AMD CPU, GPU, driver downloads, and product information.',
-  'ai_search_wtg_tutorial_prompt': 'Search for Linus Tech Tips videos and reviews.',
-  'ai_search_rufus_prompt': 'Search for Windows To Go creation tutorials and best practices.',
+  'ai_search_ms_update_prompt':
+      'Search for Intel CPU, GPU, driver downloads, and product information.',
+  'ai_search_canary_prompt':
+      'Search for AMD CPU, GPU, driver downloads, and product information.',
+  'ai_search_wtg_tutorial_prompt':
+      'Search for Linus Tech Tips videos and reviews.',
+  'ai_search_rufus_prompt':
+      'Search for Windows To Go creation tutorials and best practices.',
 
   // Intel dialog
   'intel_cpu': 'CPU',
@@ -573,14 +697,27 @@ const _en = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Custom',
   'mirror_category_tools': 'Tools',
+  'mirror_category_official_microsoft': 'Official Microsoft',
+  'mirror_category_community': 'Community Images',
+  'mirror_badge_official': 'Official Microsoft Source',
+  'mirror_badge_community': 'Community Image',
+  'mirror_desc_official': 'Download directly from Microsoft',
+  'mirror_desc_community': 'Third-party community maintained image',
+  'official_download_title': 'Official Microsoft Download',
+  'official_download_message':
+      'You are about to visit Microsoft\'s official download website.\n\nMicrosoft may require you to:\n\n* Select language\n* Select edition\n* Select architecture\n* Use Media Creation Tool (depending on device and region)\n\nThe download process will continue in your system browser.',
+  'official_download_open': 'Open Microsoft Website',
+  'official_download_open_failed': 'Could not open the system browser.',
   'mirror_error_loading': 'Failed to load mirror list:',
 
   // Disk safety
   'safety_system_disk': 'This disk contains the running Windows system',
   'safety_boot_disk': 'This disk is the boot disk',
   'safety_efi_partition': 'This disk contains an EFI system partition',
-  'safety_recovery_partition': 'This disk contains a Windows Recovery partition',
-  'safety_windows_install': 'This disk contains the Windows installation ({drive})',
+  'safety_recovery_partition':
+      'This disk contains a Windows Recovery partition',
+  'safety_windows_install':
+      'This disk contains the Windows installation ({drive})',
 
   // Boot service messages
   'boot_preparing': 'Preparing...',
@@ -599,7 +736,7 @@ const _en = <String, String>{
   'boot_writing_boot': 'Writing boot files...',
   'boot_write_failed': 'Boot file write failed',
   'boot_setting_icon': 'Setting volume icon...',
-  'boot_verifying': 'Verifying bootable USB...',
+  'boot_verifying': 'Verifying installation media...',
   'boot_complete': 'Complete!',
   'boot_verify_failed': 'Verification failed',
   'boot_no_drive_letter': 'Could not find assigned drive letter',
@@ -619,20 +756,25 @@ const _en = <String, String>{
   'wtg_svc_verifying': 'Verifying WTG...',
   'wtg_svc_complete': 'WTG creation complete!',
   'wtg_svc_verify_failed': 'Verification failed',
-  'wtg_svc_timeout': 'Operation timed out: disk may be in use or locked. Please close other programs and retry.',
+  'wtg_svc_timeout':
+      'Operation timed out: disk may be in use or locked. Please close other programs and retry.',
   'wtg_svc_applying_percent': 'Applying image... {percent}%',
   'wtg_svc_image_applied': 'Image applied',
 
   // AI Prompt strings
-  'ai_prompt_system': 'You are the built-in AI assistant of WinDeploy Studio, specializing in Windows deployment.\n\n[RULES]\n- Be concise and direct, no filler or repetition\n- Use tables or lists, avoid long paragraphs\n- If data is insufficient, say "More information needed", never fabricate\n- Total response under 500 words\n- Never self-deprecate (e.g. "I cannot access", "As an AI"), just give the analysis\n\n[EXPERTISE]\nWindows installation/deployment, Windows To Go, Bootable USB creation, DISM, BCDBoot, ISO image analysis, USB boot issues, WinDeploy Studio usage',
-  'ai_prompt_analyze_prefix': 'Based on the following real data, analyze concisely. Use tables or lists.\n\n[ANALYSIS RULES]\n- Only analyze based on provided data, do not fabricate\n- Mark risks with 🔴High 🟡Medium 🟢Low\n- Put conclusions first, no more than 3 lines\n- Detailed analysis below, use tables\n- Total response under 300 words\n\n',
+  'ai_prompt_system':
+      'You are the built-in AI assistant of WinDeploy Studio, specializing in Windows deployment.\n\n[RULES]\n- Be concise and direct, no filler or repetition\n- Use tables or lists, avoid long paragraphs\n- If data is insufficient, say "More information needed", never fabricate\n- Total response under 500 words\n- Never self-deprecate (e.g. "I cannot access", "As an AI"), just give the analysis\n\n[EXPERTISE]\nWindows installation/deployment, Windows To Go, installation media creation, DISM, BCDBoot, ISO image analysis, USB boot issues, WinDeploy Studio usage',
+  'ai_prompt_analyze_prefix':
+      'Based on the following real data, analyze concisely. Use tables or lists.\n\n[ANALYSIS RULES]\n- Only analyze based on provided data, do not fabricate\n- Mark risks with 🔴High 🟡Medium 🟢Low\n- Put conclusions first, no more than 3 lines\n- Detailed analysis below, use tables\n- Total response under 300 words\n\n',
   'ai_prompt_log_content': '[LOG CONTENT]',
   'ai_prompt_iso_info': '[ISO INFO]',
   'ai_prompt_usb_info': '[USB DEVICE INFO]',
-  'ai_prompt_diagnose_prefix': 'Please diagnose the following system status:\n\n',
+  'ai_prompt_diagnose_prefix':
+      'Please diagnose the following system status:\n\n',
   'ai_prompt_log_summary': '[LOG SUMMARY]',
   'ai_prompt_task_status': '[TASK STATUS]',
-  'ai_prompt_diagnose_suffix': 'Please provide a comprehensive diagnostic report.',
+  'ai_prompt_diagnose_suffix':
+      'Please provide a comprehensive diagnostic report.',
   'ai_prompt_iso_logs': '[ISO OPERATION LOGS]',
   'ai_prompt_local_isos': '[LOCAL ISO FILES]',
   'ai_prompt_no_iso_found': '  No ISO files found',
@@ -662,17 +804,13 @@ const _en = <String, String>{
   'mirror_download_source': 'Download source',
   'mirror_download_unknown': 'Unknown',
   'mirror_source_label': 'Recommended source',
-  'mirror_strategy_auto': 'Auto select (Recommended)',
-  'mirror_strategy_china': 'Force China Mirror',
-  'mirror_strategy_global': 'Force Global Mirror',
-  'settings_mirror_source': 'Download Source',
-  'settings_mirror_source_desc': 'Mirror source strategy',
   'mirror_geo_failed': 'Unable to determine region, using Global Mirror',
   'mirror_speed_test_title': 'Mirror Status',
   'mirror_speed_test_testing': 'Testing mirror sources...',
   'mirror_speed_test_refresh': 'Retest',
   'mirror_speed_test_failed': 'Speed test failed',
-  'mirror_speed_test_all_offline': 'Cannot connect to mirror servers. Please check your network.',
+  'mirror_speed_test_all_offline':
+      'Cannot connect to mirror servers. Please check your network.',
   'mirror_speed_test_recommend': 'Recommended',
   'mirror_download_latency': 'Latency',
   'mirror_select_title': 'Select Download Mirror',
@@ -689,20 +827,20 @@ const _en = <String, String>{
 
 const _zh = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': '可启动 USB 和 Windows To Go 创建工具',
+  'app_subtitle': 'Windows 安装盘和 Windows To Go 创建工具',
   'nav_home': '首页',
   'nav_images': '镜像',
-  'nav_creator': '创建',
+  'nav_creator': '安装盘',
   'nav_wtg': 'WTG',
   'nav_logs': '日志',
   'nav_settings': '设置',
   'home_title': 'Windows 部署工具箱',
-  'home_subtitle': '可启动 USB 和 Windows To Go 创建工具',
+  'home_subtitle': 'Windows 安装盘和 Windows To Go 创建工具',
   'home_quick_start': '快速开始',
   'home_image_library': '镜像库',
   'home_image_library_desc': '浏览 Windows 镜像并获取下载链接',
-  'home_bootable_usb': '可启动 USB 创建工具',
-  'home_bootable_usb_desc': '创建 Windows 可启动 U 盘',
+  'home_bootable_usb': 'Windows 安装盘创建工具',
+  'home_bootable_usb_desc': '从 ISO 创建 Windows 安装 U 盘',
   'home_font_pack': '下载字体包',
   'home_font_pack_desc': '适用于精简版 Windows ISO 的 CJK 字体',
   'home_wtg': 'Windows To Go',
@@ -714,7 +852,7 @@ const _zh = <String, String>{
   'home_platform': '平台',
   'home_engine': '引擎',
   'home_focus': '专注',
-  'home_focus_value': '可启动 USB 和 WTG',
+  'home_focus_value': '安装盘和 WTG',
   'home_license': '许可证',
   'home_license_value': '开源',
   'images_title': '镜像库',
@@ -746,7 +884,7 @@ const _zh = <String, String>{
   'cancel_title': '取消',
   'cancel_parse_desc': '取消 ISO 解析？已挂载的镜像将被卸载。',
   'cancel_confirm': '确认取消',
-  'cancel_create_desc': '取消可启动 USB 创建？此操作不可撤销。',
+  'cancel_create_desc': '取消 Windows 安装盘创建？此操作不可恢复。',
   'fontpack_warning': '此系统可能缺少中文字体',
   'fontpack_recommend': '建议下载并安装中文字体包',
   'fontpack_download': '下载字体包',
@@ -758,8 +896,8 @@ const _zh = <String, String>{
   'iso_step_detect': '正在检测安装程序...',
   'iso_step_info': '正在读取镜像信息...',
   'iso_step_cleanup': '正在清理...',
-  'creator_title': '可启动 USB 创建工具',
-  'creator_subtitle': '创建 Windows 可启动 U 盘',
+  'creator_title': 'Windows 安装盘创建工具',
+  'creator_subtitle': '从 ISO 创建 Windows 安装 U 盘',
   'creator_step_iso': '选择 ISO',
   'creator_step_usb': '选择 USB',
   'creator_step_confirm': '确认',
@@ -786,8 +924,8 @@ const _zh = <String, String>{
   'creator_start': '开始创建',
   'creator_creating': '正在创建...',
   'creator_parsing': '正在解析 ISO 文件...',
-  'creator_complete_title': '可启动 USB 创建完成！',
-  'creator_complete_desc': '您的可启动 U 盘已准备就绪',
+  'creator_complete_title': 'Windows 安装盘创建完成！',
+  'creator_complete_desc': '您的 Windows 安装 U 盘已准备就绪',
   'creator_another': '再创建一个',
   'creator_parse_error': 'ISO 文件解析失败',
   'creator_error': '错误',
@@ -831,7 +969,14 @@ const _zh = <String, String>{
   'settings_license': '许可证',
   'settings_license_value': '开源',
   'settings_built_with': '构建工具：',
-  'settings_copyright': '©2026 Bob Steve. All rights reserved.',
+  'settings_copyright': '©2026 Bob Steve. 基于 MIT License 发布。',
+  'about_github_repository': 'GitHub 仓库',
+  'special_thanks_title': '特别感谢',
+  'special_thanks_intro': 'WinDeploy Studio 感谢以下个人和社区在反馈、测试、想法、灵感和支持方面提供的宝贵帮助。',
+  'thanks_astra_desc': '早期反馈、测试和项目讨论',
+  'thanks_timme_desc': '细致的国际用户反馈、信任与易用性建议、Microsoft 官方来源建议和社区审阅',
+  'thanks_sysinternals_desc': '来自 Microsoft 诊断与故障排查工具的启发',
+  'thanks_open_source_desc': '感谢文档、错误报告、测试、翻译和建议',
   'close': '关闭',
   'copied': '已复制',
   'ai_thinking': '正在思考...',
@@ -957,7 +1102,7 @@ const _zh = <String, String>{
   'logs_min_ago': '{n} 分钟前',
   'logs_hours_ago': '{n} 小时前',
   'logs_days_ago': '{n} 天前',
-  'logs_cat_usb': 'USB 日志',
+  'logs_cat_usb': '安装盘日志',
   'logs_cat_wtg': 'WTG 日志',
   'logs_cat_downloads': '下载',
   'logs_cat_iso': 'ISO 解析',
@@ -988,6 +1133,7 @@ const _zh = <String, String>{
   'update_install_desc': '更新已下载完成。是否立即安装？',
   'update_up_to_date': '已是最新版本',
   'update_checking': '正在检查更新...',
+  'update_check_failed': '检查更新失败',
   'update_channel': '更新通道',
   'update_channel_stable': '稳定版',
   'update_channel_beta': '测试版',
@@ -1018,10 +1164,10 @@ const _zh = <String, String>{
   'ai_clear_chat': '清除对话',
   'ai_input_hint': '询问关于 Windows 部署的任何问题...',
   'ai_welcome_title': '你好，我是 WinDeploy AI',
-  'ai_welcome_desc': '我可以帮助您进行 Windows 部署、Windows To Go、可启动 USB 创建等。',
+  'ai_welcome_desc': '我可以帮助您进行 Windows 部署、Windows To Go、安装盘创建等。',
   'ai_ability_windows': 'Windows 安装',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': '可启动 USB',
+  'ai_ability_usb': '安装盘',
   'ai_ability_iso': 'ISO 分析',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -1037,6 +1183,29 @@ const _zh = <String, String>{
   'ai_action_diagnose': '诊断',
   'ai_no_logs': '未找到可供分析的日志文件。',
   'ai_please_wait': '请等待当前回复完成...',
+
+  'ai_settings_section': 'AI \u52A9\u624B',
+  'ai_proxy_url': 'AI \u4EE3\u7406\u5730\u5740',
+  'ai_proxy_url_desc':
+      '\u4F7F\u7528\u517C\u5BB9 OpenAI \u7684\u4EE3\u7406\u7AEF\u70B9\u3002\u7559\u7A7A\u6216\u6062\u590D\u9ED8\u8BA4\u5C06\u4F7F\u7528\u5185\u7F6E\u7AEF\u70B9\u3002',
+  'ai_proxy_url_loading': '\u6B63\u5728\u52A0\u8F7D...',
+  'ai_proxy_url_invalid':
+      '\u8BF7\u8F93\u5165\u6709\u6548\u7684 HTTP \u6216 HTTPS \u5730\u5740',
+  'ai_error_unauthorized': 'AI \u670D\u52A1\u672A\u6388\u6743\u3002',
+  'ai_error_rate_limited':
+      '\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002',
+  'ai_error_unavailable': 'AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\u3002',
+  'ai_error_http': 'AI \u670D\u52A1\u9519\u8BEF\uFF08{status}\uFF09\u3002',
+  'ai_error_timeout':
+      'AI \u670D\u52A1\u8FDE\u63A5\u8D85\u65F6\u3002\u8BF7\u68C0\u67E5\u7F51\u7EDC\uFF0C\u6216\u5728\u8BBE\u7F6E\u4E2D\u66F4\u6362 AI \u4EE3\u7406\u5730\u5740\u3002',
+  'ai_error_unreachable':
+      '\u65E0\u6CD5\u8FDE\u63A5 AI \u670D\u52A1\u3002\u5F53\u524D\u7F51\u7EDC\u53EF\u80FD\u65E0\u6CD5\u8BBF\u95EE\u5185\u7F6E workers.dev \u4EE3\u7406\uFF0C\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u66F4\u6362 AI \u4EE3\u7406\u5730\u5740\u540E\u91CD\u8BD5\u3002',
+  'ai_error_tls':
+      'AI \u670D\u52A1 TLS \u8FDE\u63A5\u5931\u8D25\u3002\u8BF7\u68C0\u67E5\u7CFB\u7EDF\u65F6\u95F4\u3001\u7F51\u7EDC\u4EE3\u7406\uFF0C\u6216\u66F4\u6362 AI \u4EE3\u7406\u5730\u5740\u3002',
+  'ai_error_connection': 'AI \u670D\u52A1\u8FDE\u63A5\u5931\u8D25\uFF1A{error}',
+  'settings_edit': '\u7F16\u8F91',
+  'settings_save': '\u4FDD\u5B58',
+  'settings_reset_default': '\u6062\u590D\u9ED8\u8BA4',
   'nav_tools': '工具',
   'tools_title': '工具',
   'tools_subtitle': 'Windows 部署推荐工具',
@@ -1055,16 +1224,6 @@ const _zh = <String, String>{
   'tools_features': '功能特性',
   'tools_website': '网站',
   'tools_download': '下载',
-  'adblock_on': '广告拦截已开启',
-  'adblock_off': '广告拦截已关闭',
-  'adblock_stats': '广告拦截统计',
-  'adblock_ads': '已拦截广告',
-  'adblock_trackers': '已拦截跟踪器',
-  'adblock_total': '拦截总数',
-  'adblock_enabled': '广告拦截已启用',
-  'adblock_privacy': '隐私保护已启用',
-  'adblock_whitelist': '添加到白名单',
-  'adblock_disable_site': '为此站点禁用',
   'tools_cat_system': '系统工具',
   'tools_cat_disk': '磁盘工具',
   'tools_cat_driver': '驱动工具',
@@ -1075,7 +1234,35 @@ const _zh = <String, String>{
   'tools_cat_optimize': '系统优化',
   'tools_cat_rescue': '系统救援',
   'tools_cat_file': '文件工具',
-  'tools_cat_activation': '激活',
+  'tools_cat_activation': '授权与激活工具',
+  'tools_cat_advanced': '\u9ad8\u7ea7\u5de5\u5177',
+  'tool_safety_beginner': '\u5165\u95e8',
+  'tool_safety_advanced': '\u9ad8\u7ea7',
+  'tool_safety_expert': '\u4e13\u5bb6',
+  'tool_warning_continue': '\u7ee7\u7eed',
+  'tool_warning_cancel': '\u53d6\u6d88',
+  'tool_warning_dism_title': 'DISM++ \u63d0\u793a',
+  'tool_warning_dism_message':
+      'DISM++ \u662f\u529f\u80fd\u5f3a\u5927\u7684 Windows \u7ef4\u62a4\u5de5\u5177\u3002\n\n\u9519\u8bef\u4f7f\u7528\u53ef\u80fd\u5f71\u54cd Windows \u7ec4\u4ef6\u3001\u670d\u52a1\u3001\u66f4\u65b0\u3001\u9a71\u52a8\u7a0b\u5e8f\u6216\u7cfb\u7edf\u7a33\u5b9a\u6027\u3002\n\n\u5efa\u8bae\u4e86\u89e3\u6240\u9009\u64cd\u4f5c\u76ee\u7684\u7684\u7528\u6237\u4f7f\u7528\u3002',
+  'tool_warning_windhawk_title': 'Windhawk \u63d0\u793a',
+  'tool_warning_windhawk_message':
+      'Windhawk \u4f1a\u901a\u8fc7\u63d2\u4ef6\u4fee\u6539 Windows \u7528\u6237\u754c\u9762\u7684\u884c\u4e3a\u3002\n\n\u90e8\u5206\u63d2\u4ef6\u53ef\u80fd\u5f71\u54cd\u7a33\u5b9a\u6027\u3001\u517c\u5bb9\u6027\u6216\u672a\u6765\u7684 Windows \u66f4\u65b0\u3002\n\n\u5b89\u88c5\u524d\u8bf7\u4ed4\u7ec6\u9605\u8bfb\u63d2\u4ef6\u8bf4\u660e\u3002',
+  'tool_warning_expert_title': '\u4e13\u5bb6\u5de5\u5177',
+  'tool_warning_expert_message':
+      '\u6b64\u5de5\u5177\u9762\u5411\u6709\u7ecf\u9a8c\u7684\u7528\u6237\u3002\n\n\u6b64\u5de5\u5177\u6240\u505a\u7684\u66f4\u6539\u53ef\u80fd\u5f71\u54cd\u7cfb\u7edf\u529f\u80fd\u3001\u6570\u636e\u5b8c\u6574\u6027\u6216\u64cd\u4f5c\u7cfb\u7edf\u7a33\u5b9a\u6027\u3002\n\n\u8bf7\u4ec5\u5728\u7406\u89e3\u8be5\u64cd\u4f5c\u76ee\u7684\u548c\u5f71\u54cd\u540e\u7ee7\u7eed\u3002',
+  'tool_warning_do_not_show_again': '不再显示',
+  'activation_tool_notice_title': '激活工具提示',
+  'activation_tool_notice_message':
+      '此工具仅作为第三方资源提供，用于学习、测试、故障排查、研究和系统管理场景。\n\nWinDeploy Studio 不提供软件许可证、产品密钥、激活服务或绕过授权的机制。\n\n用户需自行确保符合所有适用的软件许可协议。\n\n在生产环境、商业用途或长期部署中，强烈建议从软件厂商获取有效许可证。\n\n请仅在理解所选工具用途及相关法律含义后继续。',
+  'activation_tool_badge_tooltip': '可能影响软件授权或激活状态。',
+  'activation_tool_disclaimer_title': '授权与激活说明',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio 不支持软件盗版、未经授权的激活或规避许可限制。\n\n所有激活相关工具均作为第三方资源提供。\n\n用户必须遵守 Microsoft 及其他软件厂商的许可条款。',
+  'ai_notice_title': 'AI \u52a9\u624b\u63d0\u793a',
+  'ai_notice_message':
+      'AI \u751f\u6210\u5185\u5bb9\u53ef\u80fd\u4e0d\u51c6\u786e\u6216\u4e0d\u5b8c\u6574\u3002\n\n\u5728\u5bf9\u7cfb\u7edf\u5e94\u7528\u66f4\u6539\u524d\uff0c\u8bf7\u52a1\u5fc5\u68c0\u67e5\u5e76\u6838\u5b9e\u91cd\u8981\u64cd\u4f5c\u3002\n\nAI \u52a9\u624b\u4ec5\u63d0\u4f9b\u5efa\u8bae\uff0c\u65e0\u6cd5\u4fdd\u8bc1\u517c\u5bb9\u6027\u3001\u7a33\u5b9a\u6027\u6216\u5b89\u5168\u6027\u3002',
+  'ai_notice_got_it': '\u77e5\u9053\u4e86',
+  'ai_notice_do_not_show': '\u4e0d\u518d\u663e\u793a',
   'webview_not_available': '未安装 WebView2',
   'webview_download_desc': '您的系统需要 WebView2 Runtime 才能在应用内打开页面。立即下载？',
   'webview_download': '下载 WebView2',
@@ -1144,6 +1331,17 @@ const _zh = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': '自定义',
   'mirror_category_tools': '工具',
+  'mirror_category_official_microsoft': 'Microsoft 官方',
+  'mirror_category_community': '社区镜像',
+  'mirror_badge_official': 'Microsoft 官方来源',
+  'mirror_badge_community': '社区镜像',
+  'mirror_desc_official': '直接从 Microsoft 下载',
+  'mirror_desc_community': '由第三方社区维护的镜像',
+  'official_download_title': 'Microsoft 官方下载',
+  'official_download_message':
+      '你将打开 Microsoft 官方下载网站。\n\nMicrosoft 可能会要求你：\n\n* 选择语言\n* 选择版本\n* 选择架构\n* 使用 Media Creation Tool（取决于设备和地区）\n\n下载流程将在系统默认浏览器中继续。',
+  'official_download_open': '打开 Microsoft 网站',
+  'official_download_open_failed': '无法打开系统默认浏览器。',
   'mirror_error_loading': '加载镜像列表失败：',
   'safety_system_disk': '此磁盘包含正在运行的 Windows 系统',
   'safety_boot_disk': '此磁盘是启动磁盘',
@@ -1166,7 +1364,7 @@ const _zh = <String, String>{
   'boot_writing_boot': '正在写入引导文件...',
   'boot_write_failed': '引导文件写入失败',
   'boot_setting_icon': '正在设置卷标图标...',
-  'boot_verifying': '正在验证可启动 USB...',
+  'boot_verifying': '正在验证安装盘...',
   'boot_complete': '完成！',
   'boot_verify_failed': '验证失败',
   'boot_no_drive_letter': '无法找到分配的驱动器盘符',
@@ -1189,8 +1387,10 @@ const _zh = <String, String>{
   'wtg_svc_image_applied': '镜像已应用',
 
   // AI 提示词
-  'ai_prompt_system': '你是 WinDeploy Studio 内置 AI 助手，专注于 Windows 部署领域。\n\n【回答规则】\n- 简洁直接，禁止废话和重复\n- 使用表格或列表，禁止大段叙述\n- 数据不足时直接说"需要更多信息"，禁止编造\n- 总回答不超过 500 字\n- 禁止自我否定（如"我无法访问"、"我作为AI"），直接给出分析结果\n\n【专业领域】\nWindows 安装/部署、Windows To Go、启动盘制作、DISM、BCDBoot、ISO 镜像分析、USB 启动问题、WinDeploy Studio 使用',
-  'ai_prompt_analyze_prefix': '基于以下真实数据分析，简洁回答，用表格或列表格式。\n\n【分析规则】\n- 只基于提供的数据分析，不要编造\n- 风险用 🔴高 🟡中 🟢低 标记\n- 结论放在最前面，不超过3行\n- 详细分析放后面，用表格\n- 总回答不超过300字\n\n',
+  'ai_prompt_system':
+      '你是 WinDeploy Studio 内置 AI 助手，专注于 Windows 部署领域。\n\n【回答规则】\n- 简洁直接，禁止废话和重复\n- 使用表格或列表，禁止大段叙述\n- 数据不足时直接说"需要更多信息"，禁止编造\n- 总回答不超过 500 字\n- 禁止自我否定（如"我无法访问"、"我作为AI"），直接给出分析结果\n\n【专业领域】\nWindows 安装/部署、Windows To Go、安装盘创建、DISM、BCDBoot、ISO 镜像分析、USB 启动问题、WinDeploy Studio 使用',
+  'ai_prompt_analyze_prefix':
+      '基于以下真实数据分析，简洁回答，用表格或列表格式。\n\n【分析规则】\n- 只基于提供的数据分析，不要编造\n- 风险用 🔴高 🟡中 🟢低 标记\n- 结论放在最前面，不超过3行\n- 详细分析放后面，用表格\n- 总回答不超过300字\n\n',
   'ai_prompt_log_content': '【日志内容】',
   'ai_prompt_iso_info': '【ISO 信息】',
   'ai_prompt_usb_info': '【USB 设备信息】',
@@ -1225,11 +1425,6 @@ const _zh = <String, String>{
   'mirror_download_source': '下载源',
   'mirror_download_unknown': '未知',
   'mirror_source_label': '推荐源',
-  'mirror_strategy_auto': '自动选择（推荐）',
-  'mirror_strategy_china': '强制中国镜像',
-  'mirror_strategy_global': '强制全球镜像',
-  'settings_mirror_source': '下载源',
-  'settings_mirror_source_desc': '镜像源策略',
   'mirror_geo_failed': '无法确定地区，已切换到全球镜像源',
   'mirror_speed_test_title': '镜像源状态',
   'mirror_speed_test_testing': '正在检测镜像源...',
@@ -1250,24 +1445,22 @@ const _zh = <String, String>{
   'mirror_default_desc': '直接下载链接',
 };
 
-
 const _ru = <String, String>{
-
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Создание загрузочных USB и Windows To Go',
+  'app_subtitle': 'Создание установочных носителей Windows и Windows To Go',
   'nav_home': 'Главная',
   'nav_images': 'Образы',
-  'nav_creator': 'Создание',
+  'nav_creator': 'Носитель',
   'nav_wtg': 'WTG',
   'nav_logs': 'Журнал',
   'nav_settings': 'Настройки',
   'home_title': 'Набор инструментов для развёртывания Windows',
-  'home_subtitle': 'Создание загрузочных USB и Windows To Go',
+  'home_subtitle': 'Создание установочных носителей Windows и Windows To Go',
   'home_quick_start': 'Быстрый старт',
   'home_image_library': 'Библиотека образов',
   'home_image_library_desc': 'Просмотр образов Windows и ссылок для загрузки',
-  'home_bootable_usb': 'Создание загрузочной USB',
-  'home_bootable_usb_desc': 'Создание загрузочной USB-флешки Windows',
+  'home_bootable_usb': 'Создать установочный носитель Windows',
+  'home_bootable_usb_desc': 'Создать USB-носитель для установки Windows из ISO',
   'home_font_pack': 'Скачать пакет шрифтов',
   'home_font_pack_desc': 'Шрифты CJK для облегчённых образов Windows',
   'home_wtg': 'Windows To Go',
@@ -1279,7 +1472,7 @@ const _ru = <String, String>{
   'home_platform': 'Платформа',
   'home_engine': 'Движок',
   'home_focus': 'Специализация',
-  'home_focus_value': 'Загрузочные USB и WTG',
+  'home_focus_value': 'Установочный носитель & WTG',
   'home_license': 'Лицензия',
   'home_license_value': 'Открытый исходный код',
   'images_title': 'Библиотека образов',
@@ -1309,13 +1502,17 @@ const _ru = <String, String>{
   'images_error': 'Неизвестная ошибка',
   'mirror_not_found': 'Зеркало не найдено',
   'cancel_title': 'Отмена',
-  'cancel_parse_desc': 'Отменить разбор ISO? Смонтированный образ будет отключён.',
+  'cancel_parse_desc':
+      'Отменить разбор ISO? Смонтированный образ будет отключён.',
   'cancel_confirm': 'Подтвердить отмену',
-  'cancel_create_desc': 'Отменить создание загрузочной USB? Процесс нельзя будет возобновить.',
+  'cancel_create_desc':
+      'Отменить создание установочного носителя Windows? Процесс нельзя будет возобновить.',
   'fontpack_warning': 'В системе могут отсутствовать китайские шрифты',
-  'fontpack_recommend': 'Рекомендуется скачать и установить пакет китайских шрифтов',
+  'fontpack_recommend':
+      'Рекомендуется скачать и установить пакет китайских шрифтов',
   'fontpack_download': 'Скачать пакет шрифтов',
-  'fontpack_desc': 'Пакет китайских шрифтов для облегчённых образов Windows. Включает основные шрифты CJK для корректного отображения китайского контента.',
+  'fontpack_desc':
+      'Пакет китайских шрифтов для облегчённых образов Windows. Включает основные шрифты CJK для корректного отображения китайского контента.',
   'fontpack_feature_1': 'Включает HarmonyOS Sans SC и другие китайские шрифты',
   'fontpack_feature_2': 'Поддержка Windows 10/11',
   'fontpack_feature_3': 'Установка в один клик для всех пользователей',
@@ -1323,8 +1520,8 @@ const _ru = <String, String>{
   'iso_step_detect': 'Обнаружение установщика...',
   'iso_step_info': 'Чтение информации об образе...',
   'iso_step_cleanup': 'Очистка...',
-  'creator_title': 'Создание загрузочной USB',
-  'creator_subtitle': 'Создание загрузочной USB-флешки Windows',
+  'creator_title': 'Создание установочного носителя Windows',
+  'creator_subtitle': 'Создать USB-носитель для установки Windows из ISO',
   'creator_step_iso': 'Выбор ISO',
   'creator_step_usb': 'Выбор USB',
   'creator_step_confirm': 'Подтверждение',
@@ -1351,8 +1548,8 @@ const _ru = <String, String>{
   'creator_start': 'Начать создание',
   'creator_creating': 'Создание...',
   'creator_parsing': 'Разбор файла ISO...',
-  'creator_complete_title': 'Загрузочная USB создана!',
-  'creator_complete_desc': 'Ваша загрузочная USB-флешка готова к использованию',
+  'creator_complete_title': 'Установочный носитель Windows создан!',
+  'creator_complete_desc': 'Ваш USB-носитель для установки Windows готов к использованию',
   'creator_another': 'Создать ещё',
   'creator_parse_error': 'Ошибка разбора файла ISO',
   'creator_error': 'Ошибка',
@@ -1396,7 +1593,18 @@ const _ru = <String, String>{
   'settings_license': 'Лицензия',
   'settings_license_value': 'Открытый исходный код',
   'settings_built_with': 'Создано с помощью:',
-  'settings_copyright': '©2026 Bob Steve. Все права защищены.',
+  'settings_copyright': '©2026 Bob Steve. Распространяется по лицензии MIT.',
+  'about_github_repository': 'Репозиторий GitHub',
+  'special_thanks_title': 'Особая благодарность',
+  'special_thanks_intro':
+      'WinDeploy Studio благодарит людей и сообщества за ценные отзывы, тестирование, идеи, вдохновение и поддержку.',
+  'thanks_astra_desc': 'Ранние отзывы, тестирование и обсуждения проекта',
+  'thanks_timme_desc':
+      'Подробные отзывы международных пользователей, рекомендации по доверию и удобству, предложения по источникам Microsoft и обзор сообщества',
+  'thanks_sysinternals_desc':
+      'Вдохновение от диагностических инструментов Microsoft',
+  'thanks_open_source_desc':
+      'За документацию, отчеты об ошибках, тестирование, переводы и предложения',
   'close': 'Закрыть',
   'copied': 'Скопировано',
   'ai_thinking': 'Обработка...',
@@ -1457,7 +1665,8 @@ const _ru = <String, String>{
   'wtg_step_complete_title': 'Шаг 7: Завершено',
   'wtg_step_complete_desc': 'Windows To Go успешно создан',
   'wtg_creation_complete': 'Windows To Go создан!',
-  'wtg_creation_complete_desc': 'Ваша рабочая среда Windows To Go готова к использованию',
+  'wtg_creation_complete_desc':
+      'Ваша рабочая среда Windows To Go готова к использованию',
   'wtg_step_failed_title': 'Ошибка создания',
   'wtg_step_failed_desc': 'Произошла ошибка при создании Windows To Go',
   'wtg_creation_failed': 'Ошибка создания',
@@ -1472,9 +1681,11 @@ const _ru = <String, String>{
   'wtg_grade_f': 'Не подходит - Не пригоден для Windows To Go',
   'wtg_grade_unknown': 'Неизвестно - Требуется тест скорости',
   'wtg_warn_disk_info_failed': 'Не удалось получить информацию о диске',
-  'wtg_warn_size_small': 'Размер диска менее 32 ГБ - не рекомендуется для Windows To Go',
+  'wtg_warn_size_small':
+      'Размер диска менее 32 ГБ - не рекомендуется для Windows To Go',
   'wtg_warn_not_usb': 'Это устройство не является USB-накопителем',
-  'wtg_warn_performance_low': 'Производительность может быть недостаточной для Windows To Go (требуется ~80 МБ/с)',
+  'wtg_warn_performance_low':
+      'Производительность может быть недостаточной для Windows To Go (требуется ~80 МБ/с)',
   'wtg_warn_speed_test_failed': 'Тест скорости не удался',
   'wtg_err_drive_not_found': 'Корень диска не найден',
   'wtg_err_empty_drive_letter': 'Пустая буква диска',
@@ -1485,7 +1696,8 @@ const _ru = <String, String>{
   'wtg_average_speed': 'Средняя скорость',
   'wtg_written': 'Записано',
   'wtg_remaining': 'Осталось',
-  'wtg_low_speed_warning': 'Обнаружена низкая производительность случайной записи. Создание Windows To Go может занять больше времени. Пожалуйста, подождите.',
+  'wtg_low_speed_warning':
+      'Обнаружена низкая производительность случайной записи. Создание Windows To Go может занять больше времени. Пожалуйста, подождите.',
   'wtg_images_found': 'Найдено {count} образов Windows',
   'wtg_image_fallback': 'Образ {index}',
   'wtg_disk_number': 'Диск {number}',
@@ -1522,7 +1734,7 @@ const _ru = <String, String>{
   'logs_min_ago': '{n} мин. назад',
   'logs_hours_ago': '{n} ч. назад',
   'logs_days_ago': '{n} дн. назад',
-  'logs_cat_usb': 'Журналы USB',
+  'logs_cat_usb': 'Журналы носителя',
   'logs_cat_wtg': 'Журналы WTG',
   'logs_cat_downloads': 'Загрузки',
   'logs_cat_iso': 'Разбор ISO',
@@ -1553,6 +1765,7 @@ const _ru = <String, String>{
   'update_install_desc': 'Обновление загружено. Установить сейчас?',
   'update_up_to_date': 'У вас последняя версия',
   'update_checking': 'Проверка обновлений...',
+  'update_check_failed': 'Не удалось проверить обновления',
   'update_channel': 'Канал обновлений',
   'update_channel_stable': 'Стабильный',
   'update_channel_beta': 'Бета',
@@ -1583,10 +1796,11 @@ const _ru = <String, String>{
   'ai_clear_chat': 'Очистить чат',
   'ai_input_hint': 'Спросите что-нибудь о развёртывании Windows...',
   'ai_welcome_title': 'Привет, я WinDeploy AI',
-  'ai_welcome_desc': 'Я могу помочь с развёртыванием Windows, Windows To Go, созданием загрузочных USB и многим другим.',
+  'ai_welcome_desc':
+      'Я могу помочь с развёртыванием Windows, Windows To Go, созданием установочных носителей Windows и многим другим.',
   'ai_ability_windows': 'Установка Windows',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'Загрузочная USB',
+  'ai_ability_usb': 'Носитель Windows',
   'ai_ability_iso': 'Анализ ISO',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -1602,6 +1816,33 @@ const _ru = <String, String>{
   'ai_action_diagnose': 'Диагностика',
   'ai_no_logs': 'Файлы журналов для анализа не найдены.',
   'ai_please_wait': 'Пожалуйста, дождитесь завершения текущего ответа...',
+
+  'ai_settings_section': 'AI-\u043F\u043E\u043C\u043E\u0449\u043D\u0438\u043A',
+  'ai_proxy_url': 'URL AI-\u043F\u0440\u043E\u043A\u0441\u0438',
+  'ai_proxy_url_desc':
+      '\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 OpenAI-\u0441\u043E\u0432\u043C\u0435\u0441\u0442\u0438\u043C\u044B\u0439 \u043F\u0440\u043E\u043A\u0441\u0438-endpoint. \u041E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043F\u0443\u0441\u0442\u044B\u043C \u0438\u043B\u0438 \u0441\u0431\u0440\u043E\u0441\u044C\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 endpoint.',
+  'ai_proxy_url_loading': '\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...',
+  'ai_proxy_url_invalid':
+      '\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 HTTP- \u0438\u043B\u0438 HTTPS-\u0430\u0434\u0440\u0435\u0441',
+  'ai_error_unauthorized':
+      'AI-\u0441\u0435\u0440\u0432\u0438\u0441 \u043D\u0435 \u0430\u0432\u0442\u043E\u0440\u0438\u0437\u043E\u0432\u0430\u043D.',
+  'ai_error_rate_limited':
+      '\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.',
+  'ai_error_unavailable':
+      'AI-\u0441\u0435\u0440\u0432\u0438\u0441 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D.',
+  'ai_error_http':
+      '\u041E\u0448\u0438\u0431\u043A\u0430 AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0430 ({status}).',
+  'ai_error_timeout':
+      '\u0412\u0440\u0435\u043C\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443 \u0438\u0441\u0442\u0435\u043A\u043B\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0435\u0442\u044C \u0438\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u0435 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445.',
+  'ai_error_unreachable':
+      '\u041D\u0435 \u0443\u0434\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443. \u0421\u0435\u0442\u044C \u043C\u043E\u0436\u0435\u0442 \u043D\u0435 \u0434\u043E\u0441\u0442\u0438\u0433\u0430\u0442\u044C \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u043A\u0441\u0438 workers.dev. \u0418\u0437\u043C\u0435\u043D\u0438\u0442\u0435 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435.',
+  'ai_error_tls':
+      'TLS-\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443 \u0441\u0431\u043E\u0439\u043D\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F, \u0441\u0435\u0442\u0435\u0432\u043E\u0439 \u043F\u0440\u043E\u043A\u0441\u0438 \u0438\u043B\u0438 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438.',
+  'ai_error_connection':
+      '\u0421\u0431\u043E\u0439 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443: {error}',
+  'settings_edit': '\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C',
+  'settings_save': '\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C',
+  'settings_reset_default': '\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C',
   'nav_tools': 'Инструменты',
   'tools_title': 'Инструменты',
   'tools_subtitle': 'Рекомендуемые инструменты для развёртывания Windows',
@@ -1620,16 +1861,6 @@ const _ru = <String, String>{
   'tools_features': 'Функции',
   'tools_website': 'Веб-сайт',
   'tools_download': 'Скачать',
-  'adblock_on': 'Блокировка включена',
-  'adblock_off': 'Блокировка выключена',
-  'adblock_stats': 'Статистика блокировки',
-  'adblock_ads': 'Заблокировано рекламы',
-  'adblock_trackers': 'Заблокировано трекеров',
-  'adblock_total': 'Всего заблокировано',
-  'adblock_enabled': 'Блокировка рекламы включена',
-  'adblock_privacy': 'Защита конфиденциальности включена',
-  'adblock_whitelist': 'Добавить в белый список',
-  'adblock_disable_site': 'Отключить для этого сайта',
   'tools_cat_system': 'Системные инструменты',
   'tools_cat_disk': 'Инструменты для дисков',
   'tools_cat_driver': 'Драйверы',
@@ -1640,9 +1871,49 @@ const _ru = <String, String>{
   'tools_cat_optimize': 'Оптимизация системы',
   'tools_cat_rescue': 'Восстановление системы',
   'tools_cat_file': 'Файловые инструменты',
-  'tools_cat_activation': 'Активация',
+  'tools_cat_activation': 'Лицензирование и активация',
+  'tools_cat_advanced':
+      '\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u044b\u0435 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b',
+  'tool_safety_beginner':
+      '\u041d\u0430\u0447\u0430\u043b\u044c\u043d\u044b\u0439',
+  'tool_safety_advanced':
+      '\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u044b\u0439',
+  'tool_safety_expert':
+      '\u042d\u043a\u0441\u043f\u0435\u0440\u0442\u043d\u044b\u0439',
+  'tool_warning_continue':
+      '\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c',
+  'tool_warning_cancel': '\u041e\u0442\u043c\u0435\u043d\u0430',
+  'tool_warning_dism_title':
+      '\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435 DISM++',
+  'tool_warning_dism_message':
+      'DISM++ \u2014 \u043c\u043e\u0449\u043d\u0430\u044f \u0443\u0442\u0438\u043b\u0438\u0442\u0430 \u043e\u0431\u0441\u043b\u0443\u0436\u0438\u0432\u0430\u043d\u0438\u044f Windows.\n\n\u041d\u0435\u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e\u0435 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u0435 \u043c\u043e\u0436\u0435\u0442 \u043f\u043e\u0432\u043b\u0438\u044f\u0442\u044c \u043d\u0430 \u043a\u043e\u043c\u043f\u043e\u043d\u0435\u043d\u0442\u044b Windows, \u0441\u043b\u0443\u0436\u0431\u044b, \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f, \u0434\u0440\u0430\u0439\u0432\u0435\u0440\u044b \u0438\u043b\u0438 \u0441\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u0441\u0438\u0441\u0442\u0435\u043c\u044b.\n\n\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0443\u0435\u0442\u0441\u044f \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f\u043c, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u043f\u043e\u043d\u0438\u043c\u0430\u044e\u0442 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435 \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0439 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438.',
+  'tool_warning_windhawk_title':
+      '\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435 Windhawk',
+  'tool_warning_windhawk_message':
+      'Windhawk \u0438\u0437\u043c\u0435\u043d\u044f\u0435\u0442 \u043f\u043e\u0432\u0435\u0434\u0435\u043d\u0438\u0435 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 Windows \u0441 \u043f\u043e\u043c\u043e\u0449\u044c\u044e \u043f\u043b\u0430\u0433\u0438\u043d\u043e\u0432.\n\n\u041d\u0435\u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u043f\u043b\u0430\u0433\u0438\u043d\u044b \u043c\u043e\u0433\u0443\u0442 \u043f\u043e\u0432\u043b\u0438\u044f\u0442\u044c \u043d\u0430 \u0441\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c, \u0441\u043e\u0432\u043c\u0435\u0441\u0442\u0438\u043c\u043e\u0441\u0442\u044c \u0438\u043b\u0438 \u0431\u0443\u0434\u0443\u0449\u0438\u0435 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f Windows.\n\n\u041f\u0435\u0440\u0435\u0434 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u043e\u0439 \u0432\u043d\u0438\u043c\u0430\u0442\u0435\u043b\u044c\u043d\u043e \u0438\u0437\u0443\u0447\u0438\u0442\u0435 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043f\u043b\u0430\u0433\u0438\u043d\u0430.',
+  'tool_warning_expert_title':
+      '\u042d\u043a\u0441\u043f\u0435\u0440\u0442\u043d\u044b\u0439 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442',
+  'tool_warning_expert_message':
+      '\u042d\u0442\u043e\u0442 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442 \u043f\u0440\u0435\u0434\u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d \u0434\u043b\u044f \u043e\u043f\u044b\u0442\u043d\u044b\u0445 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439.\n\n\u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f, \u0432\u043d\u0435\u0441\u0451\u043d\u043d\u044b\u0435 \u044d\u0442\u0438\u043c \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u043e\u043c, \u043c\u043e\u0433\u0443\u0442 \u043f\u043e\u0432\u043b\u0438\u044f\u0442\u044c \u043d\u0430 \u0444\u0443\u043d\u043a\u0446\u0438\u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u044b, \u0446\u0435\u043b\u043e\u0441\u0442\u043d\u043e\u0441\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0445 \u0438\u043b\u0438 \u0441\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u041e\u0421.\n\n\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0430\u0439\u0442\u0435 \u0442\u043e\u043b\u044c\u043a\u043e \u0435\u0441\u043b\u0438 \u043f\u043e\u043d\u0438\u043c\u0430\u0435\u0442\u0435 \u0446\u0435\u043b\u044c \u0438 \u043f\u043e\u0441\u043b\u0435\u0434\u0441\u0442\u0432\u0438\u044f \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438.',
+  'tool_warning_do_not_show_again': 'Больше не показывать',
+  'activation_tool_notice_title': 'Уведомление об инструменте активации',
+  'activation_tool_notice_message':
+      'Этот инструмент предоставляется для обучения, тестирования, диагностики, исследований и системного администрирования.\n\nWinDeploy Studio не предоставляет лицензии на ПО, ключи продуктов, услуги активации или механизмы обхода авторизации.\n\nПользователь несет ответственность за соблюдение всех применимых лицензионных соглашений.\n\nДля рабочих сред, коммерческого использования и долгосрочного развертывания настоятельно рекомендуется получить действующую лицензию у поставщика ПО.\n\nПродолжайте только если понимаете назначение выбранного инструмента и его правовые последствия.',
+  'activation_tool_badge_tooltip':
+      'Может повлиять на лицензирование или состояние активации ПО.',
+  'activation_tool_disclaimer_title': 'Уведомление о лицензиях и активации',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio не поддерживает пиратство, несанкционированную активацию или обход лицензий.\n\nВсе утилиты, связанные с активацией, предоставляются как сторонние ресурсы.\n\nПользователи должны соблюдать условия лицензий Microsoft и других поставщиков ПО.',
+  'ai_notice_title':
+      '\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0435 AI-\u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043d\u0442\u0430',
+  'ai_notice_message':
+      '\u0421\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435, \u0441\u043e\u0437\u0434\u0430\u043d\u043d\u043e\u0435 AI, \u043c\u043e\u0436\u0435\u0442 \u0431\u044b\u0442\u044c \u043d\u0435\u0442\u043e\u0447\u043d\u044b\u043c \u0438\u043b\u0438 \u043d\u0435\u043f\u043e\u043b\u043d\u044b\u043c.\n\n\u0412\u0441\u0435\u0433\u0434\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u044f\u0439\u0442\u0435 \u0432\u0430\u0436\u043d\u044b\u0435 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438 \u043f\u0435\u0440\u0435\u0434 \u0432\u043d\u0435\u0441\u0435\u043d\u0438\u0435\u043c \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0439 \u0432 \u0441\u0438\u0441\u0442\u0435\u043c\u0443.\n\nAI-\u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043d\u0442 \u0434\u0430\u0451\u0442 \u0442\u043e\u043b\u044c\u043a\u043e \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u0438 \u043d\u0435 \u043c\u043e\u0436\u0435\u0442 \u0433\u0430\u0440\u0430\u043d\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u043e\u0432\u043c\u0435\u0441\u0442\u0438\u043c\u043e\u0441\u0442\u044c, \u0441\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u0438\u043b\u0438 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u044c.',
+  'ai_notice_got_it': '\u041f\u043e\u043d\u044f\u0442\u043d\u043e',
+  'ai_notice_do_not_show':
+      '\u0411\u043e\u043b\u044c\u0448\u0435 \u043d\u0435 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c',
   'webview_not_available': 'WebView2 не установлен',
-  'webview_download_desc': 'Для открытия страниц в приложении требуется WebView2 Runtime. Скачать сейчас?',
+  'webview_download_desc':
+      'Для открытия страниц в приложении требуется WebView2 Runtime. Скачать сейчас?',
   'webview_download': 'Скачать WebView2',
   'webview_open_in_browser': 'Открыть в браузере',
   'webview_open_external': 'Открыть в браузере',
@@ -1661,7 +1932,8 @@ const _ru = <String, String>{
   'webview_download_complete': 'Загрузка завершена',
   'webview_download_failed': 'Ошибка загрузки',
   'webview_downgrade_title': 'Сайт может быть несовместим',
-  'webview_downgrade_desc': 'Этот сайт может не работать во встроенном браузере. Рекомендуется открыть в системном браузере.',
+  'webview_downgrade_desc':
+      'Этот сайт может не работать во встроенном браузере. Рекомендуется открыть в системном браузере.',
   'webview_diag': 'Диагностика сети',
   'webview_diag_title': 'Диагностика сети',
   'dl_title': 'Загрузки',
@@ -1686,10 +1958,13 @@ const _ru = <String, String>{
   'ai_search_canary': 'Поиск AMD',
   'ai_search_wtg_tutorial': 'Поиск Linus Tech Tips',
   'ai_search_rufus': 'Поиск руководства WTG',
-  'ai_search_ms_update_prompt': 'Поиск информации о процессорах Intel, GPU, драйверах и продукции.',
-  'ai_search_canary_prompt': 'Поиск информации о процессорах AMD, GPU, драйверах и продукции.',
+  'ai_search_ms_update_prompt':
+      'Поиск информации о процессорах Intel, GPU, драйверах и продукции.',
+  'ai_search_canary_prompt':
+      'Поиск информации о процессорах AMD, GPU, драйверах и продукции.',
   'ai_search_wtg_tutorial_prompt': 'Поиск видео и обзоров Linus Tech Tips.',
-  'ai_search_rufus_prompt': 'Поиск руководств и лучших практик создания Windows To Go.',
+  'ai_search_rufus_prompt':
+      'Поиск руководств и лучших практик создания Windows To Go.',
   'intel_cpu': 'Процессор',
   'intel_gpu': 'Видеокарта',
   'intel_loading': 'Загрузка...',
@@ -1709,11 +1984,23 @@ const _ru = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Пользовательские',
   'mirror_category_tools': 'Инструменты',
+  'mirror_category_official_microsoft': 'Официальные образы Microsoft',
+  'mirror_category_community': 'Образы сообщества',
+  'mirror_badge_official': 'Официальный источник Microsoft',
+  'mirror_badge_community': 'Образ сообщества',
+  'mirror_desc_official': 'Скачивание напрямую с сайта Microsoft',
+  'mirror_desc_community': 'Образ, поддерживаемый сторонним сообществом',
+  'official_download_title': 'Официальная загрузка Microsoft',
+  'official_download_message':
+      'Вы собираетесь открыть официальный сайт загрузки Microsoft.\n\nMicrosoft может попросить вас:\n\n* выбрать язык\n* выбрать редакцию\n* выбрать архитектуру\n* использовать Media Creation Tool (зависит от устройства и региона)\n\nЗагрузка продолжится в системном браузере.',
+  'official_download_open': 'Открыть сайт Microsoft',
+  'official_download_open_failed': 'Не удалось открыть системный браузер.',
   'mirror_error_loading': 'Ошибка загрузки списка зеркал:',
   'safety_system_disk': 'Этот диск содержит работающую систему Windows',
   'safety_boot_disk': 'Этот диск является загрузочным',
   'safety_efi_partition': 'Этот диск содержит системный раздел EFI',
-  'safety_recovery_partition': 'Этот диск содержит раздел восстановления Windows',
+  'safety_recovery_partition':
+      'Этот диск содержит раздел восстановления Windows',
   'safety_windows_install': 'Этот диск содержит установку Windows ({drive})',
   'boot_preparing': 'Подготовка...',
   'boot_cleaning': 'Очистка диска...',
@@ -1731,7 +2018,7 @@ const _ru = <String, String>{
   'boot_writing_boot': 'Запись загрузочных файлов...',
   'boot_write_failed': 'Ошибка записи загрузочных файлов',
   'boot_setting_icon': 'Установка иконки тома...',
-  'boot_verifying': 'Проверка загрузочной USB...',
+  'boot_verifying': 'Проверка установочного носителя...',
   'boot_complete': 'Готово!',
   'boot_verify_failed': 'Ошибка проверки',
   'boot_no_drive_letter': 'Не удалось найти назначенную букву диска',
@@ -1749,20 +2036,25 @@ const _ru = <String, String>{
   'wtg_svc_verifying': 'Проверка WTG...',
   'wtg_svc_complete': 'Создание WTG завершено!',
   'wtg_svc_verify_failed': 'Ошибка проверки',
-  'wtg_svc_timeout': 'Время операции истекло: диск может быть занят или заблокирован. Закройте другие программы и повторите попытку.',
+  'wtg_svc_timeout':
+      'Время операции истекло: диск может быть занят или заблокирован. Закройте другие программы и повторите попытку.',
   'wtg_svc_applying_percent': 'Применение образа... {percent}%',
   'wtg_svc_image_applied': 'Образ применён',
 
   // AI промпты
-  'ai_prompt_system': 'Вы встроенный AI-помощник WinDeploy Studio, специализирующийся на развёртывании Windows.\n\n[ПРАВИЛА]\n- Кратко и по делу, без воды и повторов\n- Используйте таблицы или списки, избегайте длинных текстов\n- Если данных недостаточно, скажите «Нужно больше информации», не выдумывайте\n- Ответ не более 500 слов\n- Не обесценивайте себя (например, «я не могу получить доступ», «я как AI»), просто дайте анализ\n\n[ЭКСПЕРТИЗА]\nУстановка/развёртывание Windows, Windows To Go, создание загрузочных USB, DISM, BCDBoot, анализ ISO-образов, проблемы загрузки USB, использование WinDeploy Studio',
-  'ai_prompt_analyze_prefix': 'На основе следующих реальных данных проанализируйте кратко. Используйте таблицы или списки.\n\n[ПРАВИЛА АНАЛИЗА]\n- Анализируйте только на основе предоставленных данных, не выдумывайте\n- Риски отмечайте 🔴Высокий 🟡Средний 🟢Низкий\n- Выводы вначале, не более 3 строк\n- Подробный анализ ниже, в таблицах\n- Ответ не более 300 слов\n\n',
+  'ai_prompt_system':
+      'Вы встроенный AI-помощник WinDeploy Studio, специализирующийся на развёртывании Windows.\n\n[ПРАВИЛА]\n- Кратко и по делу, без воды и повторов\n- Используйте таблицы или списки, избегайте длинных текстов\n- Если данных недостаточно, скажите «Нужно больше информации», не выдумывайте\n- Ответ не более 500 слов\n- Не обесценивайте себя (например, «я не могу получить доступ», «я как AI»), просто дайте анализ\n\n[ЭКСПЕРТИЗА]\nУстановка/развёртывание Windows, Windows To Go, создание установочных носителей Windows, DISM, BCDBoot, анализ ISO-образов, проблемы загрузки USB, использование WinDeploy Studio',
+  'ai_prompt_analyze_prefix':
+      'На основе следующих реальных данных проанализируйте кратко. Используйте таблицы или списки.\n\n[ПРАВИЛА АНАЛИЗА]\n- Анализируйте только на основе предоставленных данных, не выдумывайте\n- Риски отмечайте 🔴Высокий 🟡Средний 🟢Низкий\n- Выводы вначале, не более 3 строк\n- Подробный анализ ниже, в таблицах\n- Ответ не более 300 слов\n\n',
   'ai_prompt_log_content': '[СОДЕРЖИМОЕ ЖУРНАЛА]',
   'ai_prompt_iso_info': '[ИНФОРМАЦИЯ ISO]',
   'ai_prompt_usb_info': '[ИНФОРМАЦИЯ ОБ USB-УСТРОЙСТВЕ]',
-  'ai_prompt_diagnose_prefix': 'Диагностируйте следующее состояние системы:\n\n',
+  'ai_prompt_diagnose_prefix':
+      'Диагностируйте следующее состояние системы:\n\n',
   'ai_prompt_log_summary': '[СВОДКА ЖУРНАЛОВ]',
   'ai_prompt_task_status': '[СТАТУС ЗАДАЧИ]',
-  'ai_prompt_diagnose_suffix': 'Предоставьте комплексный диагностический отчёт.',
+  'ai_prompt_diagnose_suffix':
+      'Предоставьте комплексный диагностический отчёт.',
   'ai_prompt_iso_logs': '[ЖУРНАЛЫ ОПЕРАЦИЙ ISO]',
   'ai_prompt_local_isos': '[ЛОКАЛЬНЫЕ ФАЙЛЫ ISO]',
   'ai_prompt_no_iso_found': '  ISO-файлы не найдены',
@@ -1790,48 +2082,47 @@ const _ru = <String, String>{
   'mirror_download_source': 'Источник загрузки',
   'mirror_download_unknown': 'Неизвестно',
   'mirror_source_label': 'Рекомендуемый источник',
-  'mirror_strategy_auto': 'Автоматический выбор (рекомендуется)',
-  'mirror_strategy_china': 'Принудительно китайское зеркало',
-  'mirror_strategy_global': 'Принудительно глобальное зеркало',
-  'settings_mirror_source': 'Источник загрузки',
-  'settings_mirror_source_desc': 'Стратегия источника зеркал',
-  'mirror_geo_failed': 'Не удалось определить регион, используется глобальное зеркало',
+  'mirror_geo_failed':
+      'Не удалось определить регион, используется глобальное зеркало',
   'mirror_speed_test_title': 'Статус зеркал',
   'mirror_speed_test_testing': 'Проверка зеркал...',
   'mirror_speed_test_refresh': 'Перепроверить',
   'mirror_speed_test_failed': 'Тест не удался',
-  'mirror_speed_test_all_offline': 'Не удаётся подключиться к серверам зеркал. Проверьте сеть.',
+  'mirror_speed_test_all_offline':
+      'Не удаётся подключиться к серверам зеркал. Проверьте сеть.',
   'mirror_speed_test_recommend': 'Рекомендуется',
   'mirror_download_latency': 'Задержка',
   'mirror_select_title': 'Выберите зеркало загрузки',
-  'mirror_select_desc': 'Пожалуйста, выберите зеркало загрузки для продолжения.',
+  'mirror_select_desc':
+      'Пожалуйста, выберите зеркало загрузки для продолжения.',
   'mirror_china_title': 'Китайское зеркало',
   'mirror_china_desc': '123 Cloud Drive · Стабильно · Рекомендуется для Китая',
   'mirror_china_tag': 'Китай',
   'mirror_global_title': 'Глобальное зеркало',
-  'mirror_global_desc': 'GoFile · Глобальный доступ · Без региональных ограничений',
+  'mirror_global_desc':
+      'GoFile · Глобальный доступ · Без региональных ограничений',
   'mirror_global_tag': 'Глобальное',
   'mirror_default_title': 'Скачать',
   'mirror_default_desc': 'Прямая ссылка для скачивания',
 };
 
-
 const _fr = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Créateur de USB amorçable & Windows To Go',
+  'app_subtitle': 'Créateur de support d\'installation Windows & Windows To Go',
   'nav_home': 'Accueil',
   'nav_images': 'Images',
-  'nav_creator': 'Créateur',
+  'nav_creator': 'Support',
   'nav_wtg': 'WTG',
   'nav_logs': 'Journaux',
   'nav_settings': 'Paramètres',
   'home_title': 'Boîte à outils de déploiement Windows',
-  'home_subtitle': 'Créateur de USB amorçable & Windows To Go',
+  'home_subtitle': 'Créateur de support d\'installation Windows & Windows To Go',
   'home_quick_start': 'Démarrage rapide',
   'home_image_library': 'Bibliothèque d\'images',
-  'home_image_library_desc': 'Parcourir les images Windows et obtenir les liens de téléchargement',
-  'home_bootable_usb': 'Créateur de USB amorçable',
-  'home_bootable_usb_desc': 'Créer une clé USB amorçable Windows',
+  'home_image_library_desc':
+      'Parcourir les images Windows et obtenir les liens de téléchargement',
+  'home_bootable_usb': 'Créateur de support d\'installation Windows',
+  'home_bootable_usb_desc': 'Créer une clé USB d\'installation Windows depuis un ISO',
   'home_font_pack': 'Télécharger le pack de polices',
   'home_font_pack_desc': 'Polices CJK pour les ISO Windows allégés',
   'home_wtg': 'Windows To Go',
@@ -1843,7 +2134,7 @@ const _fr = <String, String>{
   'home_platform': 'Plateforme',
   'home_engine': 'Moteur',
   'home_focus': 'Focus',
-  'home_focus_value': 'USB amorçable & WTG',
+  'home_focus_value': 'Support d\'installation & WTG',
   'home_license': 'Licence',
   'home_license_value': 'Open Source',
   'images_title': 'Bibliothèque d\'images',
@@ -1853,7 +2144,8 @@ const _fr = <String, String>{
   'images_empty': 'Aucune image disponible',
   'images_category_all': 'Tout',
   'images_local_library': 'Bibliothèque locale',
-  'images_local_empty': 'Aucun ISO local trouvé. Définissez un chemin dans les Paramètres.',
+  'images_local_empty':
+      'Aucun ISO local trouvé. Définissez un chemin dans les Paramètres.',
   'images_local_iso': 'ISO local',
   'images_close': 'Fermer',
   'detail_back': 'Retour à la bibliothèque d\'images',
@@ -1873,22 +2165,27 @@ const _fr = <String, String>{
   'images_error': 'Erreur inconnue',
   'mirror_not_found': 'Élément miroir introuvable',
   'cancel_title': 'Annuler',
-  'cancel_parse_desc': 'Annuler l\'analyse ISO ? L\'image montée sera démontée.',
+  'cancel_parse_desc':
+      'Annuler l\'analyse ISO ? L\'image montée sera démontée.',
   'cancel_confirm': 'Confirmer l\'annulation',
-  'cancel_create_desc': 'Annuler la création du USB amorçable ? Le processus ne pourra pas être repris.',
+  'cancel_create_desc':
+      'Annuler la création du support d\'installation Windows ? Le processus ne pourra pas être repris.',
   'fontpack_warning': 'Ce système pourrait ne pas avoir les polices chinoises',
-  'fontpack_recommend': 'Nous recommandons de télécharger et installer le pack de polices chinoises',
+  'fontpack_recommend':
+      'Nous recommandons de télécharger et installer le pack de polices chinoises',
   'fontpack_download': 'Télécharger le pack de polices',
-  'fontpack_desc': 'Pack de polices chinoises pour les ISO Windows allégés. Inclut les polices CJK courantes pour garantir l\'affichage correct du contenu chinois.',
-  'fontpack_feature_1': 'Inclut HarmonyOS Sans SC et d\'autres polices chinoises',
+  'fontpack_desc':
+      'Pack de polices chinoises pour les ISO Windows allégés. Inclut les polices CJK courantes pour garantir l\'affichage correct du contenu chinois.',
+  'fontpack_feature_1':
+      'Inclut HarmonyOS Sans SC et d\'autres polices chinoises',
   'fontpack_feature_2': 'Compatible Windows 10/11',
   'fontpack_feature_3': 'Installation en un clic pour tous les utilisateurs',
   'iso_step_mount': 'Montage de l\'ISO...',
   'iso_step_detect': 'Détection de l\'installateur...',
   'iso_step_info': 'Lecture des informations de l\'image...',
   'iso_step_cleanup': 'Nettoyage...',
-  'creator_title': 'Créateur de USB amorçable',
-  'creator_subtitle': 'Créer une clé USB amorçable Windows',
+  'creator_title': 'Créateur de support d\'installation Windows',
+  'creator_subtitle': 'Créer une clé USB d\'installation Windows depuis un ISO',
   'creator_step_iso': 'Sélectionner ISO',
   'creator_step_usb': 'Sélectionner USB',
   'creator_step_confirm': 'Confirmer',
@@ -1910,13 +2207,14 @@ const _fr = <String, String>{
   'creator_disk': 'Disque',
   'creator_model': 'Modèle',
   'creator_serial': 'Numéro de série',
-  'creator_warning': 'TOUTES les données sur ce USB seront définitivement effacées !',
+  'creator_warning':
+      'TOUTES les données sur ce USB seront définitivement effacées !',
   'creator_back': 'Retour',
   'creator_start': 'Commencer la création',
   'creator_creating': 'Création en cours...',
   'creator_parsing': 'Analyse du fichier ISO...',
-  'creator_complete_title': 'USB amorçable créé !',
-  'creator_complete_desc': 'Votre clé USB amorçable est prête à être utilisée',
+  'creator_complete_title': 'Support d\'installation Windows créé !',
+  'creator_complete_desc': 'Votre clé USB d\'installation Windows est prête à être utilisée',
   'creator_another': 'En créer un autre',
   'creator_parse_error': 'Échec de l\'analyse du fichier ISO',
   'creator_error': 'Erreur',
@@ -1960,7 +2258,19 @@ const _fr = <String, String>{
   'settings_license': 'Licence',
   'settings_license_value': 'Open Source',
   'settings_built_with': 'Construit avec :',
-  'settings_copyright': '©2026 Bob Steve. Tous droits réservés.',
+  'settings_copyright': '©2026 Bob Steve. Distribué sous licence MIT.',
+  'about_github_repository': 'Dépôt GitHub',
+  'special_thanks_title': 'Remerciements',
+  'special_thanks_intro':
+      'WinDeploy Studio remercie les personnes et communautés suivantes pour leurs retours, tests, idées, inspiration et soutien.',
+  'thanks_astra_desc':
+      'Premiers retours, tests et discussions autour du projet',
+  'thanks_timme_desc':
+      'Retours détaillés d’utilisateurs internationaux, recommandations sur la confiance et l’ergonomie, suggestions de sources Microsoft et revue communautaire',
+  'thanks_sysinternals_desc':
+      'Inspiration venue des outils de diagnostic et de dépannage Microsoft',
+  'thanks_open_source_desc':
+      'Pour la documentation, les rapports de bugs, les tests, les traductions et les suggestions',
   'close': 'Fermer',
   'copied': 'Copié',
   'ai_thinking': 'Réflexion...',
@@ -1973,7 +2283,8 @@ const _fr = <String, String>{
   'lang_select_title': 'Sélectionner la langue',
   'lang_select_desc': 'Choisissez votre langue préférée',
   'lang_select_confirm': 'Confirmer',
-  'lang_select_settings_hint': 'Vous pouvez changer cela plus tard dans les Paramètres',
+  'lang_select_settings_hint':
+      'Vous pouvez changer cela plus tard dans les Paramètres',
   'wtg_title': 'Créateur Windows To Go',
   'wtg_subtitle': 'Créer un espace de travail portable Windows To Go',
   'wtg_select_iso': 'Sélectionner un ISO Windows',
@@ -1982,7 +2293,8 @@ const _fr = <String, String>{
   'wtg_rescan': 'Rescanner',
   'wtg_iso_selected': 'ISO sélectionné',
   'wtg_step1_title': 'Étape 1 : Sélectionner l\'ISO',
-  'wtg_step1_desc': 'Sélectionnez un fichier ISO Windows pour créer Windows To Go',
+  'wtg_step1_desc':
+      'Sélectionnez un fichier ISO Windows pour créer Windows To Go',
   'wtg_step2_title': 'Étape 2 : Analyser l\'ISO',
   'wtg_step2_desc': 'Analyse du fichier ISO pour charger les images Windows',
   'wtg_loading_wim': 'Chargement des images Windows...',
@@ -2006,7 +2318,8 @@ const _fr = <String, String>{
   'wtg_recommendations': 'Recommandations',
   'wtg_next_confirm': 'Suivant : Confirmer',
   'wtg_step5_title': 'Étape 5 : Confirmer et créer',
-  'wtg_step5_desc': 'Vérifiez les paramètres et confirmez pour commencer la création',
+  'wtg_step5_desc':
+      'Vérifiez les paramètres et confirmez pour commencer la création',
   'wtg_selected_image': 'Image sélectionnée',
   'wtg_erase_confirm_word': 'EFFACER',
   'wtg_start_creation': 'Commencer la création',
@@ -2021,9 +2334,11 @@ const _fr = <String, String>{
   'wtg_step_complete_title': 'Étape 7 : Terminé',
   'wtg_step_complete_desc': 'Windows To Go a été créé avec succès',
   'wtg_creation_complete': 'Windows To Go créé !',
-  'wtg_creation_complete_desc': 'Votre espace de travail Windows To Go est prêt à être utilisé',
+  'wtg_creation_complete_desc':
+      'Votre espace de travail Windows To Go est prêt à être utilisé',
   'wtg_step_failed_title': 'Échec de la création',
-  'wtg_step_failed_desc': 'Une erreur s\'est produite lors de la création de Windows To Go',
+  'wtg_step_failed_desc':
+      'Une erreur s\'est produite lors de la création de Windows To Go',
   'wtg_creation_failed': 'Échec de la création',
   'wtg_debug_info': 'Informations de débogage',
   'wtg_debug_copied': 'Informations de débogage copiées dans le presse-papiers',
@@ -2035,10 +2350,13 @@ const _fr = <String, String>{
   'wtg_grade_d': 'Mauvais - Non recommandé pour Windows To Go',
   'wtg_grade_f': 'Échec - Non adapté pour Windows To Go',
   'wtg_grade_unknown': 'Inconnu - Test de vitesse requis',
-  'wtg_warn_disk_info_failed': 'Impossible de récupérer les informations du disque',
-  'wtg_warn_size_small': 'La taille du disque est inférieure à 32 Go - non recommandé pour Windows To Go',
+  'wtg_warn_disk_info_failed':
+      'Impossible de récupérer les informations du disque',
+  'wtg_warn_size_small':
+      'La taille du disque est inférieure à 32 Go - non recommandé pour Windows To Go',
   'wtg_warn_not_usb': 'Cela ne semble pas être un lecteur USB',
-  'wtg_warn_performance_low': 'Les performances peuvent être insuffisantes pour Windows To Go (nécessite ~80 Mo/s)',
+  'wtg_warn_performance_low':
+      'Les performances peuvent être insuffisantes pour Windows To Go (nécessite ~80 Mo/s)',
   'wtg_warn_speed_test_failed': 'Échec du test de vitesse',
   'wtg_err_drive_not_found': 'Racine du lecteur introuvable',
   'wtg_err_empty_drive_letter': 'Lettre de lecteur vide',
@@ -2049,7 +2367,8 @@ const _fr = <String, String>{
   'wtg_average_speed': 'Vitesse moyenne',
   'wtg_written': 'Écrit',
   'wtg_remaining': 'Restant',
-  'wtg_low_speed_warning': 'Performance d\'écriture aléatoire faible détectée. La création de Windows To Go peut prendre plus de temps que prévu. Veuillez patienter.',
+  'wtg_low_speed_warning':
+      'Performance d\'écriture aléatoire faible détectée. La création de Windows To Go peut prendre plus de temps que prévu. Veuillez patienter.',
   'wtg_images_found': '{count} images Windows trouvées',
   'wtg_image_fallback': 'Image {index}',
   'wtg_disk_number': 'Disque {number}',
@@ -2086,7 +2405,7 @@ const _fr = <String, String>{
   'logs_min_ago': 'il y a {n} min',
   'logs_hours_ago': 'il y a {n} h',
   'logs_days_ago': 'il y a {n} j',
-  'logs_cat_usb': 'Journaux USB',
+  'logs_cat_usb': 'Journaux du support',
   'logs_cat_wtg': 'Journaux WTG',
   'logs_cat_downloads': 'Téléchargements',
   'logs_cat_iso': 'Analyse ISO',
@@ -2104,7 +2423,8 @@ const _fr = <String, String>{
   'update_last_check': 'Dernière vérification',
   'update_never': 'Jamais',
   'update_available_title': 'Mise à jour disponible',
-  'update_available_desc': 'Une nouvelle version de WinDeploy Studio est disponible.',
+  'update_available_desc':
+      'Une nouvelle version de WinDeploy Studio est disponible.',
   'update_release_notes': 'Notes de version',
   'update_now': 'Mettre à jour maintenant',
   'update_open_browser': 'Ouvrir dans le navigateur',
@@ -2114,9 +2434,11 @@ const _fr = <String, String>{
   'update_progress': 'Progression',
   'update_speed': 'Vitesse',
   'update_install': 'Installer et redémarrer',
-  'update_install_desc': 'La mise à jour a été téléchargée. Installer maintenant ?',
+  'update_install_desc':
+      'La mise à jour a été téléchargée. Installer maintenant ?',
   'update_up_to_date': 'Vous êtes à jour',
   'update_checking': 'Vérification des mises à jour...',
+  'update_check_failed': 'Échec de la vérification des mises à jour',
   'update_channel': 'Canal de mise à jour',
   'update_channel_stable': 'Stable',
   'update_channel_beta': 'Bêta',
@@ -2132,8 +2454,10 @@ const _fr = <String, String>{
   'download_tip_connecting_2': 'Allocation du CDN optimal...',
   'download_tip_connecting_3': 'Établissement du canal sécurisé...',
   'download_tip_optimizing_1': 'Optimisation de la vitesse de transfert...',
-  'download_tip_optimizing_2': 'Amélioration de l\'efficacité du téléchargement...',
-  'download_tip_optimizing_3': 'Phase de transfert initial, veuillez patienter...',
+  'download_tip_optimizing_2':
+      'Amélioration de l\'efficacité du téléchargement...',
+  'download_tip_optimizing_3':
+      'Phase de transfert initial, veuillez patienter...',
   'download_tip_stable': 'Téléchargement en cours',
   'download_tip_failed': 'Fluctuation réseau, nouvelle tentative...',
   'download_tip_retrying_1': 'Fluctuation réseau, nouvelle tentative...',
@@ -2147,10 +2471,11 @@ const _fr = <String, String>{
   'ai_clear_chat': 'Effacer la conversation',
   'ai_input_hint': 'Posez une question sur le déploiement Windows...',
   'ai_welcome_title': 'Bonjour, je suis WinDeploy AI',
-  'ai_welcome_desc': 'Je peux vous aider avec le déploiement Windows, Windows To Go, la création de USB amorçable, et plus encore.',
+  'ai_welcome_desc':
+      'Je peux vous aider avec le déploiement Windows, Windows To Go, la création de supports d\'installation Windows, et plus encore.',
   'ai_ability_windows': 'Installation Windows',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'USB amorçable',
+  'ai_ability_usb': 'Support d\'installation',
   'ai_ability_iso': 'Analyse ISO',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -2158,7 +2483,8 @@ const _fr = <String, String>{
   'ai_ability_logs': 'Analyse des journaux',
   'ai_example_questions': 'Exemples de questions',
   'ai_example_q1': 'Pourquoi mon WTG ne démarre pas ?',
-  'ai_example_q2': 'Quelle est la différence entre Tiny11 et Windows original ?',
+  'ai_example_q2':
+      'Quelle est la différence entre Tiny11 et Windows original ?',
   'ai_example_q3': 'Ce USB est-il adapté pour Windows To Go ?',
   'ai_action_analyze_logs': 'Analyser les journaux',
   'ai_action_analyze_iso': 'Analyser l\'ISO',
@@ -2166,6 +2492,27 @@ const _fr = <String, String>{
   'ai_action_diagnose': 'Diagnostiquer',
   'ai_no_logs': 'Aucun fichier journal trouvé à analyser.',
   'ai_please_wait': 'Veuillez attendre la fin de la réponse en cours...',
+
+  'ai_settings_section': 'Assistant IA',
+  'ai_proxy_url': 'URL du proxy IA',
+  'ai_proxy_url_desc':
+      'Utilisez un point de terminaison proxy compatible OpenAI. Laissez vide ou reinitialisez pour utiliser le point de terminaison integre.',
+  'ai_proxy_url_loading': 'Chargement...',
+  'ai_proxy_url_invalid': 'Saisissez une URL HTTP ou HTTPS valide',
+  'ai_error_unauthorized': 'Le service IA n est pas autorise.',
+  'ai_error_rate_limited': 'Trop de requetes. Reessayez plus tard.',
+  'ai_error_unavailable': 'Le service IA est temporairement indisponible.',
+  'ai_error_http': 'Erreur du service IA ({status}).',
+  'ai_error_timeout':
+      'La connexion au service IA a expire. Verifiez le reseau ou changez l URL du proxy IA dans les parametres.',
+  'ai_error_unreachable':
+      'Impossible de se connecter au service IA. Votre reseau peut ne pas atteindre le proxy workers.dev integre. Changez l URL du proxy IA dans les parametres et reessayez.',
+  'ai_error_tls':
+      'Echec de la connexion TLS au service IA. Verifiez l heure systeme, le proxy reseau ou changez l URL du proxy IA.',
+  'ai_error_connection': 'Echec de connexion au service IA : {error}',
+  'settings_edit': 'Modifier',
+  'settings_save': 'Enregistrer',
+  'settings_reset_default': 'Reinitialiser',
   'nav_tools': 'Outils',
   'tools_title': 'Outils',
   'tools_subtitle': 'Outils recommandés pour le déploiement Windows',
@@ -2184,16 +2531,6 @@ const _fr = <String, String>{
   'tools_features': 'Fonctionnalités',
   'tools_website': 'Site web',
   'tools_download': 'Télécharger',
-  'adblock_on': 'AdBlock activé',
-  'adblock_off': 'AdBlock désactivé',
-  'adblock_stats': 'Statistiques AdBlock',
-  'adblock_ads': 'Publicités bloquées',
-  'adblock_trackers': 'Traqueurs bloqués',
-  'adblock_total': 'Total bloqué',
-  'adblock_enabled': 'Blocage de publicités activé',
-  'adblock_privacy': 'Protection de la vie privée activée',
-  'adblock_whitelist': 'Ajouter à la liste blanche',
-  'adblock_disable_site': 'Désactiver pour ce site',
   'tools_cat_system': 'Outils système',
   'tools_cat_disk': 'Outils disque',
   'tools_cat_driver': 'Pilotes',
@@ -2204,9 +2541,39 @@ const _fr = <String, String>{
   'tools_cat_optimize': 'Optimisation système',
   'tools_cat_rescue': 'Récupération système',
   'tools_cat_file': 'Outils fichiers',
-  'tools_cat_activation': 'Activation',
+  'tools_cat_activation': 'Licences et activation',
+  'tools_cat_advanced': 'Outils avanc\xe9s',
+  'tool_safety_beginner': 'D\xe9butant',
+  'tool_safety_advanced': 'Avanc\xe9',
+  'tool_safety_expert': 'Expert',
+  'tool_warning_continue': 'Continuer',
+  'tool_warning_cancel': 'Annuler',
+  'tool_warning_dism_title': 'Avis DISM++',
+  'tool_warning_dism_message':
+      'DISM++ est un puissant utilitaire de maintenance Windows.\n\nUne mauvaise utilisation peut affecter les composants Windows, les services, les mises \xe0 jour, les pilotes ou la stabilit\xe9 du syst\xe8me.\n\nRecommand\xe9 aux utilisateurs qui comprennent l\u2019objectif de l\u2019op\xe9ration choisie.',
+  'tool_warning_windhawk_title': 'Avis Windhawk',
+  'tool_warning_windhawk_message':
+      'Windhawk modifie le comportement de l\u2019interface Windows au moyen de plugins.\n\nCertains plugins peuvent affecter la stabilit\xe9, la compatibilit\xe9 ou de futures mises \xe0 jour Windows.\n\nLisez attentivement la description des plugins avant installation.',
+  'tool_warning_expert_title': 'Outil expert',
+  'tool_warning_expert_message':
+      'Cet outil est destin\xe9 aux utilisateurs exp\xe9riment\xe9s.\n\nLes changements effectu\xe9s par cet outil peuvent affecter les fonctions du syst\xe8me, l\u2019int\xe9grit\xe9 des donn\xe9es ou la stabilit\xe9 du syst\xe8me d\u2019exploitation.\n\nContinuez seulement si vous comprenez l\u2019objectif et l\u2019impact de l\u2019op\xe9ration.',
+  'tool_warning_do_not_show_again': 'Ne plus afficher',
+  'activation_tool_notice_title': 'Avis sur les outils d’activation',
+  'activation_tool_notice_message':
+      'Cet outil est fourni à des fins d’apprentissage, de test, de diagnostic, de recherche et d’administration système.\n\nWinDeploy Studio ne fournit pas de licences logicielles, de clés produit, de services d’activation ni de mécanismes de contournement d’autorisation.\n\nIl appartient aux utilisateurs de respecter tous les contrats de licence applicables.\n\nPour les environnements de production, les usages commerciaux ou les déploiements durables, il est fortement recommandé d’obtenir une licence valide auprès de l’éditeur du logiciel.\n\nContinuez seulement si vous comprenez l’objectif et les implications juridiques de l’outil sélectionné.',
+  'activation_tool_badge_tooltip':
+      'Peut affecter la licence ou l’état d’activation du logiciel.',
+  'activation_tool_disclaimer_title': 'Avis sur les licences et l’activation',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio ne cautionne pas le piratage logiciel, l’activation non autorisée ni le contournement de licence.\n\nTous les utilitaires liés à l’activation sont fournis comme ressources tierces.\n\nLes utilisateurs doivent respecter les conditions de licence de Microsoft et des autres éditeurs de logiciels.',
+  'ai_notice_title': 'Avis de l\u2019assistant AI',
+  'ai_notice_message':
+      'Le contenu g\xe9n\xe9r\xe9 par l\u2019AI peut \xeatre inexact ou incomplet.\n\nV\xe9rifiez toujours les op\xe9rations importantes avant d\u2019appliquer des changements \xe0 votre syst\xe8me.\n\nL\u2019assistant AI fournit uniquement des suggestions et ne peut pas garantir la compatibilit\xe9, la stabilit\xe9 ni la s\xe9curit\xe9.',
+  'ai_notice_got_it': 'Compris',
+  'ai_notice_do_not_show': 'Ne plus afficher',
   'webview_not_available': 'WebView2 non installé',
-  'webview_download_desc': 'Votre système a besoin de WebView2 Runtime pour ouvrir les pages dans l\'application. Le télécharger maintenant ?',
+  'webview_download_desc':
+      'Votre système a besoin de WebView2 Runtime pour ouvrir les pages dans l\'application. Le télécharger maintenant ?',
   'webview_download': 'Télécharger WebView2',
   'webview_open_in_browser': 'Ouvrir dans le navigateur',
   'webview_open_external': 'Ouvrir dans le navigateur',
@@ -2225,7 +2592,8 @@ const _fr = <String, String>{
   'webview_download_complete': 'Téléchargement terminé',
   'webview_download_failed': 'Échec du téléchargement',
   'webview_downgrade_title': 'Le site peut être incompatible',
-  'webview_downgrade_desc': 'Ce site peut ne pas fonctionner dans le navigateur intégré. Il est recommandé de l\'ouvrir dans le navigateur système.',
+  'webview_downgrade_desc':
+      'Ce site peut ne pas fonctionner dans le navigateur intégré. Il est recommandé de l\'ouvrir dans le navigateur système.',
   'webview_diag': 'Diagnostic réseau',
   'webview_diag_title': 'Diagnostic réseau',
   'dl_title': 'Téléchargements',
@@ -2250,10 +2618,14 @@ const _fr = <String, String>{
   'ai_search_canary': 'Rechercher AMD',
   'ai_search_wtg_tutorial': 'Rechercher Linus Tech Tips',
   'ai_search_rufus': 'Rechercher tutoriel WTG',
-  'ai_search_ms_update_prompt': 'Rechercher des informations sur les processeurs Intel, GPU, pilotes et produits.',
-  'ai_search_canary_prompt': 'Rechercher des informations sur les processeurs AMD, GPU, pilotes et produits.',
-  'ai_search_wtg_tutorial_prompt': 'Rechercher des vidéos et critiques Linus Tech Tips.',
-  'ai_search_rufus_prompt': 'Rechercher des tutoriels et meilleures pratiques de création de Windows To Go.',
+  'ai_search_ms_update_prompt':
+      'Rechercher des informations sur les processeurs Intel, GPU, pilotes et produits.',
+  'ai_search_canary_prompt':
+      'Rechercher des informations sur les processeurs AMD, GPU, pilotes et produits.',
+  'ai_search_wtg_tutorial_prompt':
+      'Rechercher des vidéos et critiques Linus Tech Tips.',
+  'ai_search_rufus_prompt':
+      'Rechercher des tutoriels et meilleures pratiques de création de Windows To Go.',
   'intel_cpu': 'Processeur',
   'intel_gpu': 'Carte graphique',
   'intel_loading': 'Chargement...',
@@ -2273,15 +2645,31 @@ const _fr = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Personnalisé',
   'mirror_category_tools': 'Outils',
+  'mirror_category_official_microsoft': 'Images officielles Microsoft',
+  'mirror_category_community': 'Images communautaires',
+  'mirror_badge_official': 'Source officielle Microsoft',
+  'mirror_badge_community': 'Image communautaire',
+  'mirror_desc_official': 'Téléchargement direct depuis Microsoft',
+  'mirror_desc_community': 'Image maintenue par une communauté tierce',
+  'official_download_title': 'Téléchargement officiel Microsoft',
+  'official_download_message':
+      'Vous allez ouvrir le site officiel de téléchargement de Microsoft.\n\nMicrosoft peut vous demander de :\n\n* choisir une langue\n* choisir une édition\n* choisir une architecture\n* utiliser Media Creation Tool (selon l’appareil et la région)\n\nLe téléchargement continuera dans le navigateur du système.',
+  'official_download_open': 'Ouvrir le site Microsoft',
+  'official_download_open_failed':
+      'Impossible d’ouvrir le navigateur du système.',
   'mirror_error_loading': 'Échec du chargement de la liste des miroirs :',
-  'safety_system_disk': 'Ce disque contient le système Windows en cours d\'exécution',
+  'safety_system_disk':
+      'Ce disque contient le système Windows en cours d\'exécution',
   'safety_boot_disk': 'Ce disque est le disque de démarrage',
   'safety_efi_partition': 'Ce disque contient une partition système EFI',
-  'safety_recovery_partition': 'Ce disque contient une partition de récupération Windows',
-  'safety_windows_install': 'Ce disque contient l\'installation Windows ({drive})',
+  'safety_recovery_partition':
+      'Ce disque contient une partition de récupération Windows',
+  'safety_windows_install':
+      'Ce disque contient l\'installation Windows ({drive})',
   'boot_preparing': 'Préparation...',
   'boot_cleaning': 'Nettoyage du disque...',
-  'boot_access_denied': 'Accès refusé - veuillez exécuter en tant qu\'administrateur',
+  'boot_access_denied':
+      'Accès refusé - veuillez exécuter en tant qu\'administrateur',
   'boot_partition_failed': 'Échec de la partition : {error}',
   'boot_format_verifying': 'Vérification du format...',
   'boot_format_failed': 'Échec du formatage',
@@ -2295,7 +2683,7 @@ const _fr = <String, String>{
   'boot_writing_boot': 'Écriture des fichiers de démarrage...',
   'boot_write_failed': 'Échec de l\'écriture des fichiers de démarrage',
   'boot_setting_icon': 'Définition de l\'icône du volume...',
-  'boot_verifying': 'Vérification du USB amorçable...',
+  'boot_verifying': 'Vérification du support d\'installation...',
   'boot_complete': 'Terminé !',
   'boot_verify_failed': 'Échec de la vérification',
   'boot_no_drive_letter': 'Impossible de trouver la lettre de lecteur assignée',
@@ -2313,20 +2701,25 @@ const _fr = <String, String>{
   'wtg_svc_verifying': 'Vérification du WTG...',
   'wtg_svc_complete': 'Création du WTG terminée !',
   'wtg_svc_verify_failed': 'Échec de la vérification',
-  'wtg_svc_timeout': 'Délai d\'attente dépassé : le disque peut être en cours d\'utilisation ou verrouillé. Veuillez fermer les autres programmes et réessayer.',
+  'wtg_svc_timeout':
+      'Délai d\'attente dépassé : le disque peut être en cours d\'utilisation ou verrouillé. Veuillez fermer les autres programmes et réessayer.',
   'wtg_svc_applying_percent': 'Application de l\'image... {percent}%',
   'wtg_svc_image_applied': 'Image appliquée',
 
   // Prompts IA
-  'ai_prompt_system': 'Vous êtes l\'assistant IA intégré de WinDeploy Studio, spécialisé dans le déploiement Windows.\n\n[RÈGLES]\n- Soyez concis et direct, pas de remplissage ni de répétition\n- Utilisez des tableaux ou listes, évitez les longs paragraphes\n- Si les données sont insuffisantes, dites « Plus d\'informations nécessaires », n\'inventez jamais\n- Réponse totale inférieure à 500 mots\n- Ne vous dévalorisez jamais (ex: « je ne peux pas accéder », « en tant qu\'IA »), donnez simplement l\'analyse\n\n[EXPERTISE]\nInstallation/déploiement Windows, Windows To Go, création de USB amorçable, DISM, BCDBoot, analyse d\'images ISO, problèmes de démarrage USB, utilisation de WinDeploy Studio',
-  'ai_prompt_analyze_prefix': 'En vous basant sur les données réelles suivantes, analysez de manière concise. Utilisez des tableaux ou des listes.\n\n[RÈGLES D\'ANALYSE]\n- Analysez uniquement les données fournies, n\'inventez pas\n- Marquez les risques avec 🔴Élevé 🟡Moyen 🟢Faible\n- Misez les conclusions en premier, pas plus de 3 lignes\n- Analyse détaillée ci-dessous, en tableaux\n- Réponse totale inférieure à 300 mots\n\n',
+  'ai_prompt_system':
+      'Vous êtes l\'assistant IA intégré de WinDeploy Studio, spécialisé dans le déploiement Windows.\n\n[RÈGLES]\n- Soyez concis et direct, pas de remplissage ni de répétition\n- Utilisez des tableaux ou listes, évitez les longs paragraphes\n- Si les données sont insuffisantes, dites « Plus d\'informations nécessaires », n\'inventez jamais\n- Réponse totale inférieure à 500 mots\n- Ne vous dévalorisez jamais (ex: « je ne peux pas accéder », « en tant qu\'IA »), donnez simplement l\'analyse\n\n[EXPERTISE]\nInstallation/déploiement Windows, Windows To Go, création de supports d\'installation Windows, DISM, BCDBoot, analyse d\'images ISO, problèmes de démarrage USB, utilisation de WinDeploy Studio',
+  'ai_prompt_analyze_prefix':
+      'En vous basant sur les données réelles suivantes, analysez de manière concise. Utilisez des tableaux ou des listes.\n\n[RÈGLES D\'ANALYSE]\n- Analysez uniquement les données fournies, n\'inventez pas\n- Marquez les risques avec 🔴Élevé 🟡Moyen 🟢Faible\n- Misez les conclusions en premier, pas plus de 3 lignes\n- Analyse détaillée ci-dessous, en tableaux\n- Réponse totale inférieure à 300 mots\n\n',
   'ai_prompt_log_content': '[CONTENU DU JOURNAL]',
   'ai_prompt_iso_info': '[INFORMATIONS ISO]',
   'ai_prompt_usb_info': '[INFORMATIONS PÉRIPHÉRIQUE USB]',
-  'ai_prompt_diagnose_prefix': 'Veuillez diagnostiquer l\'état du système suivant :\n\n',
+  'ai_prompt_diagnose_prefix':
+      'Veuillez diagnostiquer l\'état du système suivant :\n\n',
   'ai_prompt_log_summary': '[RÉSUMÉ DES JOURNAUX]',
   'ai_prompt_task_status': '[STATUT DE LA TÂCHE]',
-  'ai_prompt_diagnose_suffix': 'Veuillez fournir un rapport de diagnostic complet.',
+  'ai_prompt_diagnose_suffix':
+      'Veuillez fournir un rapport de diagnostic complet.',
   'ai_prompt_iso_logs': '[JOURNAUX D\'OPÉRATIONS ISO]',
   'ai_prompt_local_isos': '[FICHIERS ISO LOCAUX]',
   'ai_prompt_no_iso_found': '  Aucun fichier ISO trouvé',
@@ -2347,28 +2740,27 @@ const _fr = <String, String>{
   'ai_prompt_get_failed': '  Échec de récupération :',
   'ai_prompt_recent_errors': '[JOURNAUX D\'ERREURS RÉCENTS]',
   'ai_prompt_no_errors': '  Aucun journal d\'erreurs',
-  'ai_prompt_error_dir_missing': '  Le répertoire des journaux d\'erreurs n\'existe pas',
+  'ai_prompt_error_dir_missing':
+      '  Le répertoire des journaux d\'erreurs n\'existe pas',
   'mirror_download_confirm_title': 'Confirmer le téléchargement',
   'mirror_download_mirror': 'Image',
   'mirror_download_region': 'Région détectée',
   'mirror_download_source': 'Source de téléchargement',
   'mirror_download_unknown': 'Inconnu',
   'mirror_source_label': 'Source recommandée',
-  'mirror_strategy_auto': 'Sélection automatique (recommandé)',
-  'mirror_strategy_china': 'Forcer le miroir chinois',
-  'mirror_strategy_global': 'Forcer le miroir global',
-  'settings_mirror_source': 'Source de téléchargement',
-  'settings_mirror_source_desc': 'Stratégie de source de miroir',
-  'mirror_geo_failed': 'Impossible de déterminer la région, utilisation du miroir global',
+  'mirror_geo_failed':
+      'Impossible de déterminer la région, utilisation du miroir global',
   'mirror_speed_test_title': 'État des miroirs',
   'mirror_speed_test_testing': 'Test des miroirs en cours...',
   'mirror_speed_test_refresh': 'Retester',
   'mirror_speed_test_failed': 'Échec du test',
-  'mirror_speed_test_all_offline': 'Impossible de se connecter aux serveurs. Vérifiez votre réseau.',
+  'mirror_speed_test_all_offline':
+      'Impossible de se connecter aux serveurs. Vérifiez votre réseau.',
   'mirror_speed_test_recommend': 'Recommandé',
   'mirror_download_latency': 'Latence',
   'mirror_select_title': 'Sélectionner le miroir de téléchargement',
-  'mirror_select_desc': 'Veuillez sélectionner un miroir de téléchargement pour continuer.',
+  'mirror_select_desc':
+      'Veuillez sélectionner un miroir de téléchargement pour continuer.',
   'mirror_china_title': 'Miroir Chine',
   'mirror_china_desc': '123 Cloud Drive · Stable · Recommandé pour la Chine',
   'mirror_china_tag': 'Chine',
@@ -2379,23 +2771,22 @@ const _fr = <String, String>{
   'mirror_default_desc': 'Lien de téléchargement direct',
 };
 
-
 const _ja = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': '起動可能USB & Windows To Go作成ツール',
+  'app_subtitle': 'Windows インストールメディア & Windows To Go 作成ツール',
   'nav_home': 'ホーム',
   'nav_images': 'イメージ',
-  'nav_creator': '作成ツール',
+  'nav_creator': 'インストール',
   'nav_wtg': 'WTG',
   'nav_logs': 'ログ',
   'nav_settings': '設定',
   'home_title': 'Windowsデプロイメントツールキット',
-  'home_subtitle': '起動可能USB & Windows To Go作成ツール',
+  'home_subtitle': 'Windows インストールメディア & Windows To Go 作成ツール',
   'home_quick_start': 'クイックスタート',
   'home_image_library': 'イメージライブラリ',
   'home_image_library_desc': 'Windowsイメージを閲覧し、ダウンロードリンクを取得',
-  'home_bootable_usb': '起動可能USB作成ツール',
-  'home_bootable_usb_desc': 'Windows起動可能USBドライブを作成',
+  'home_bootable_usb': 'Windows インストールメディア作成',
+  'home_bootable_usb_desc': 'ISO から Windows インストール USB を作成',
   'home_font_pack': 'フォントパックのダウンロード',
   'home_font_pack_desc': '軽量Windows ISO用CJKフォント',
   'home_wtg': 'Windows To Go',
@@ -2407,7 +2798,7 @@ const _ja = <String, String>{
   'home_platform': 'プラットフォーム',
   'home_engine': 'エンジン',
   'home_focus': 'フォーカス',
-  'home_focus_value': '起動可能USB & WTG',
+  'home_focus_value': 'インストールメディア & WTG',
   'home_license': 'ライセンス',
   'home_license_value': 'オープンソース',
   'images_title': 'イメージライブラリ',
@@ -2439,7 +2830,7 @@ const _ja = <String, String>{
   'cancel_title': 'キャンセル',
   'cancel_parse_desc': 'ISO解析をキャンセルしますか？マウントされたイメージはアンマウントされます。',
   'cancel_confirm': 'キャンセルの確認',
-  'cancel_create_desc': '起動可能USBの作成をキャンセルしますか？処理を再開することはできません。',
+  'cancel_create_desc': 'Windows インストールメディアの作成をキャンセルしますか？処理を再開することはできません。',
   'fontpack_warning': 'このシステムには中国語フォントが含まれていない可能性があります',
   'fontpack_recommend': '中国語フォントパックのダウンロードとインストールをお勧めします',
   'fontpack_download': 'フォントパックをダウンロード',
@@ -2451,8 +2842,8 @@ const _ja = <String, String>{
   'iso_step_detect': 'インストーラーを検出中...',
   'iso_step_info': 'イメージ情報を読み取り中...',
   'iso_step_cleanup': 'クリーンアップ中...',
-  'creator_title': '起動可能USB作成ツール',
-  'creator_subtitle': 'Windows起動可能USBドライブを作成',
+  'creator_title': 'Windows インストールメディア作成ツール',
+  'creator_subtitle': 'ISO から Windows インストール USB を作成',
   'creator_step_iso': 'ISOを選択',
   'creator_step_usb': 'USBを選択',
   'creator_step_confirm': '確認',
@@ -2479,8 +2870,8 @@ const _ja = <String, String>{
   'creator_start': '作成開始',
   'creator_creating': '作成中...',
   'creator_parsing': 'ISOファイルを解析中...',
-  'creator_complete_title': '起動可能USBが作成されました！',
-  'creator_complete_desc': '起動可能USBドライブの使用準備が完了しました',
+  'creator_complete_title': 'Windows インストールメディアが作成されました！',
+  'creator_complete_desc': 'Windows インストール USB の使用準備が完了しました',
   'creator_another': 'もう一つ作成',
   'creator_parse_error': 'ISOファイルの解析に失敗しました',
   'creator_error': 'エラー',
@@ -2524,7 +2915,16 @@ const _ja = <String, String>{
   'settings_license': 'ライセンス',
   'settings_license_value': 'オープンソース',
   'settings_built_with': '使用ツール：',
-  'settings_copyright': '©2026 Bob Steve. All rights reserved.',
+  'settings_copyright': '©2026 Bob Steve. MIT License の下で配布されています。',
+  'about_github_repository': 'GitHub リポジトリ',
+  'special_thanks_title': '특별 감사',
+  'special_thanks_intro':
+      'WinDeploy Studio は、貴重なフィードバック、テスト、アイデア、インスピレーション、サポートを寄せてくださった皆さまとコミュニティに感謝します。',
+  'thanks_astra_desc': '初期フィードバック、テスト、プロジェクトに関する議論',
+  'thanks_timme_desc':
+      '国際ユーザー視点での詳細なフィードバック、信頼性と使いやすさの提案、Microsoft 公式ソースの提案、コミュニティレビュー',
+  'thanks_sysinternals_desc': 'Microsoft の診断およびトラブルシューティングツールからのインスピレーション',
+  'thanks_open_source_desc': 'ドキュメント、バグ報告、テスト、翻訳、提案への貢献',
   'close': '閉じる',
   'copied': 'コピーしました',
   'ai_thinking': '思考中...',
@@ -2602,7 +3002,8 @@ const _ja = <String, String>{
   'wtg_warn_disk_info_failed': 'ディスク情報を取得できません',
   'wtg_warn_size_small': 'ディスクサイズが32GB未満です - Windows To Goには推奨されません',
   'wtg_warn_not_usb': 'これはUSBドライブではないようです',
-  'wtg_warn_performance_low': 'Windows To Goに必要なパフォーマンスが不足している可能性があります（約80 MB/s必要）',
+  'wtg_warn_performance_low':
+      'Windows To Goに必要なパフォーマンスが不足している可能性があります（約80 MB/s必要）',
   'wtg_warn_speed_test_failed': '速度テストに失敗しました',
   'wtg_err_drive_not_found': 'ドライブルートが見つかりません',
   'wtg_err_empty_drive_letter': 'ドライブ文字が空です',
@@ -2613,7 +3014,8 @@ const _ja = <String, String>{
   'wtg_average_speed': '平均速度',
   'wtg_written': '書き込み済み',
   'wtg_remaining': '残り',
-  'wtg_low_speed_warning': 'ランダム書き込みパフォーマンスが低いことが検出されました。Windows To Goの作成に予想より時間がかかる場合があります。しばらくお待ちください。',
+  'wtg_low_speed_warning':
+      'ランダム書き込みパフォーマンスが低いことが検出されました。Windows To Goの作成に予想より時間がかかる場合があります。しばらくお待ちください。',
   'wtg_images_found': '{count}個のWindowsイメージが見つかりました',
   'wtg_image_fallback': 'イメージ {index}',
   'wtg_disk_number': 'ディスク {number}',
@@ -2650,7 +3052,7 @@ const _ja = <String, String>{
   'logs_min_ago': '{n}分前',
   'logs_hours_ago': '{n}時間前',
   'logs_days_ago': '{n}日前',
-  'logs_cat_usb': 'USBログ',
+  'logs_cat_usb': 'インストールメディアログ',
   'logs_cat_wtg': 'WTGログ',
   'logs_cat_downloads': 'ダウンロード',
   'logs_cat_iso': 'ISO解析',
@@ -2681,6 +3083,7 @@ const _ja = <String, String>{
   'update_install_desc': 'アップデートがダウンロードされました。今すぐインストールしますか？',
   'update_up_to_date': '最新バージョンです',
   'update_checking': 'アップデートを確認中...',
+  'update_check_failed': 'アップデートの確認に失敗しました',
   'update_channel': 'アップデートチャネル',
   'update_channel_stable': '安定版',
   'update_channel_beta': 'ベータ版',
@@ -2711,10 +3114,10 @@ const _ja = <String, String>{
   'ai_clear_chat': 'チャットをクリア',
   'ai_input_hint': 'Windowsデプロイメントについて質問してください...',
   'ai_welcome_title': 'こんにちは、WinDeploy AIです',
-  'ai_welcome_desc': 'Windowsデプロイメント、Windows To Go、起動可能USBの作成などをお手伝いします。',
+  'ai_welcome_desc': 'Windows デプロイメント、Windows To Go、インストールメディア作成などをお手伝いします。',
   'ai_ability_windows': 'Windowsインストール',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': '起動可能USB',
+  'ai_ability_usb': 'インストールメディア',
   'ai_ability_iso': 'ISO分析',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -2730,6 +3133,33 @@ const _ja = <String, String>{
   'ai_action_diagnose': '診断',
   'ai_no_logs': '分析可能なログファイルが見つかりません。',
   'ai_please_wait': '現在の回答が完了するまでお待ちください...',
+
+  'ai_settings_section': 'AI \u30A2\u30B7\u30B9\u30BF\u30F3\u30C8',
+  'ai_proxy_url': 'AI \u30D7\u30ED\u30AD\u30B7 URL',
+  'ai_proxy_url_desc':
+      'OpenAI \u4E92\u63DB\u306E\u30D7\u30ED\u30AD\u30B7\u30A8\u30F3\u30C9\u30DD\u30A4\u30F3\u30C8\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002\u7A7A\u6B04\u307E\u305F\u306F\u30EA\u30BB\u30C3\u30C8\u3067\u5185\u8535\u30A8\u30F3\u30C9\u30DD\u30A4\u30F3\u30C8\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002',
+  'ai_proxy_url_loading': '\u8AAD\u307F\u8FBC\u307F\u4E2D...',
+  'ai_proxy_url_invalid':
+      '\u6709\u52B9\u306A HTTP \u307E\u305F\u306F HTTPS URL \u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044',
+  'ai_error_unauthorized':
+      'AI \u30B5\u30FC\u30D3\u30B9\u304C\u8A8D\u8A3C\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002',
+  'ai_error_rate_limited':
+      '\u30EA\u30AF\u30A8\u30B9\u30C8\u304C\u591A\u3059\u304E\u307E\u3059\u3002\u3057\u3070\u3089\u304F\u3057\u3066\u304B\u3089\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+  'ai_error_unavailable':
+      'AI \u30B5\u30FC\u30D3\u30B9\u306F\u4E00\u6642\u7684\u306B\u5229\u7528\u3067\u304D\u307E\u305B\u3093\u3002',
+  'ai_error_http':
+      'AI \u30B5\u30FC\u30D3\u30B9\u30A8\u30E9\u30FC\uFF08{status}\uFF09\u3002',
+  'ai_error_timeout':
+      'AI \u30B5\u30FC\u30D3\u30B9\u3078\u306E\u63A5\u7D9A\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3092\u78BA\u8A8D\u3059\u308B\u304B\u3001\u8A2D\u5B9A\u3067 AI \u30D7\u30ED\u30AD\u30B7 URL \u3092\u5909\u66F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+  'ai_error_unreachable':
+      'AI \u30B5\u30FC\u30D3\u30B9\u306B\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3002\u73FE\u5728\u306E\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3067\u306F\u5185\u8535 workers.dev \u30D7\u30ED\u30AD\u30B7\u306B\u5230\u9054\u3067\u304D\u306A\u3044\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002\u8A2D\u5B9A\u3067 AI \u30D7\u30ED\u30AD\u30B7 URL \u3092\u5909\u66F4\u3057\u3066\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+  'ai_error_tls':
+      'AI \u30B5\u30FC\u30D3\u30B9\u306E TLS \u63A5\u7D9A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u30B7\u30B9\u30C6\u30E0\u6642\u523B\u3001\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u30D7\u30ED\u30AD\u30B7\u3001\u307E\u305F\u306F AI \u30D7\u30ED\u30AD\u30B7 URL \u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+  'ai_error_connection':
+      'AI \u30B5\u30FC\u30D3\u30B9\u63A5\u7D9A\u5931\u6557\uFF1A{error}',
+  'settings_edit': '\u7DE8\u96C6',
+  'settings_save': '\u4FDD\u5B58',
+  'settings_reset_default': '\u65E2\u5B9A\u306B\u623B\u3059',
   'nav_tools': 'ツール',
   'tools_title': 'ツール',
   'tools_subtitle': 'Windowsデプロイメント向け推奨ツール',
@@ -2748,16 +3178,6 @@ const _ja = <String, String>{
   'tools_features': '機能',
   'tools_website': 'ウェブサイト',
   'tools_download': 'ダウンロード',
-  'adblock_on': 'AdBlock ON',
-  'adblock_off': 'AdBlock OFF',
-  'adblock_stats': 'AdBlock統計',
-  'adblock_ads': 'ブロックされた広告',
-  'adblock_trackers': 'ブロックされたトラッカー',
-  'adblock_total': '合計ブロック数',
-  'adblock_enabled': '広告ブロックが有効',
-  'adblock_privacy': 'プライバシー保護が有効',
-  'adblock_whitelist': 'ホワイトリストに追加',
-  'adblock_disable_site': 'このサイトのブロックを無効にする',
   'tools_cat_system': 'システムツール',
   'tools_cat_disk': 'ディスクツール',
   'tools_cat_driver': 'ドライバー',
@@ -2768,7 +3188,37 @@ const _ja = <String, String>{
   'tools_cat_optimize': 'システム最適化',
   'tools_cat_rescue': 'システム復旧',
   'tools_cat_file': 'ファイルツール',
-  'tools_cat_activation': 'アクティベーション',
+  'tools_cat_activation': 'ライセンスとアクティベーション',
+  'tools_cat_advanced': '\u9ad8\u5ea6\u306a\u30c4\u30fc\u30eb',
+  'tool_safety_beginner': '\u521d\u7d1a',
+  'tool_safety_advanced': '\u4e0a\u7d1a',
+  'tool_safety_expert': '\u30a8\u30ad\u30b9\u30d1\u30fc\u30c8',
+  'tool_warning_continue': '\u7d9a\u884c',
+  'tool_warning_cancel': '\u30ad\u30e3\u30f3\u30bb\u30eb',
+  'tool_warning_dism_title': 'DISM++ \u306e\u6ce8\u610f',
+  'tool_warning_dism_message':
+      'DISM++ \u306f\u5f37\u529b\u306a Windows \u30e1\u30f3\u30c6\u30ca\u30f3\u30b9\u30e6\u30fc\u30c6\u30a3\u30ea\u30c6\u30a3\u3067\u3059\u3002\n\n\u8aa4\u3063\u305f\u4f7f\u3044\u65b9\u3092\u3059\u308b\u3068\u3001Windows \u30b3\u30f3\u30dd\u30fc\u30cd\u30f3\u30c8\u3001\u30b5\u30fc\u30d3\u30b9\u3001\u66f4\u65b0\u3001\u30c9\u30e9\u30a4\u30d0\u30fc\u3001\u307e\u305f\u306f\u30b7\u30b9\u30c6\u30e0\u306e\u5b89\u5b9a\u6027\u306b\u5f71\u97ff\u3059\u308b\u5834\u5408\u304c\u3042\u308a\u307e\u3059\u3002\n\n\u9078\u629e\u3057\u305f\u64cd\u4f5c\u306e\u76ee\u7684\u3092\u7406\u89e3\u3057\u3066\u3044\u308b\u30e6\u30fc\u30b6\u30fc\u306b\u63a8\u5968\u3055\u308c\u307e\u3059\u3002',
+  'tool_warning_windhawk_title': 'Windhawk \u306e\u6ce8\u610f',
+  'tool_warning_windhawk_message':
+      'Windhawk \u306f\u30d7\u30e9\u30b0\u30a4\u30f3\u3092\u901a\u3058\u3066 Windows \u306e\u30e6\u30fc\u30b6\u30fc\u30a4\u30f3\u30bf\u30fc\u30d5\u30a7\u30a4\u30b9\u52d5\u4f5c\u3092\u5909\u66f4\u3057\u307e\u3059\u3002\n\n\u4e00\u90e8\u306e\u30d7\u30e9\u30b0\u30a4\u30f3\u306f\u5b89\u5b9a\u6027\u3001\u4e92\u63db\u6027\u3001\u307e\u305f\u306f\u4eca\u5f8c\u306e Windows \u66f4\u65b0\u306b\u5f71\u97ff\u3059\u308b\u5834\u5408\u304c\u3042\u308a\u307e\u3059\u3002\n\n\u30a4\u30f3\u30b9\u30c8\u30fc\u30eb\u524d\u306b\u30d7\u30e9\u30b0\u30a4\u30f3\u306e\u8aac\u660e\u3092\u3088\u304f\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002',
+  'tool_warning_expert_title':
+      '\u30a8\u30ad\u30b9\u30d1\u30fc\u30c8\u30c4\u30fc\u30eb',
+  'tool_warning_expert_message':
+      '\u3053\u306e\u30c4\u30fc\u30eb\u306f\u7d4c\u9a13\u306e\u3042\u308b\u30e6\u30fc\u30b6\u30fc\u5411\u3051\u3067\u3059\u3002\n\n\u3053\u306e\u30c4\u30fc\u30eb\u306b\u3088\u308b\u5909\u66f4\u306f\u3001\u30b7\u30b9\u30c6\u30e0\u6a5f\u80fd\u3001\u30c7\u30fc\u30bf\u6574\u5408\u6027\u3001\u307e\u305f\u306f OS \u306e\u5b89\u5b9a\u6027\u306b\u5f71\u97ff\u3059\u308b\u5834\u5408\u304c\u3042\u308a\u307e\u3059\u3002\n\n\u64cd\u4f5c\u306e\u76ee\u7684\u3068\u5f71\u97ff\u3092\u7406\u89e3\u3057\u3066\u3044\u308b\u5834\u5408\u306e\u307f\u7d9a\u884c\u3057\u3066\u304f\u3060\u3055\u3044\u3002',
+  'tool_warning_do_not_show_again': '今後表示しない',
+  'activation_tool_notice_title': 'アクティベーションツールの注意',
+  'activation_tool_notice_message':
+      'このツールは、学習、テスト、トラブルシューティング、調査、システム管理を目的とした第三者リソースとして提供されています。\n\nWinDeploy Studio は、ソフトウェアライセンス、プロダクトキー、アクティベーションサービス、または認証を回避する仕組みを提供しません。\n\n適用されるすべてのソフトウェアライセンス契約を遵守する責任はユーザーにあります。\n\n本番環境、商用利用、長期運用では、ソフトウェア提供元から有効なライセンスを取得することを強くおすすめします。\n\n選択したツールの目的と法的な意味を理解している場合のみ続行してください。',
+  'activation_tool_badge_tooltip': 'ソフトウェアのライセンスまたはアクティベーション状態に影響する場合があります。',
+  'activation_tool_disclaimer_title': 'ライセンスとアクティベーションに関する注意',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio は、ソフトウェアの不正利用、許可されていないアクティベーション、ライセンス回避を推奨しません。\n\nアクティベーション関連ユーティリティはすべて第三者リソースとして提供されています。\n\nユーザーは Microsoft およびその他のソフトウェア提供元のライセンス条件を遵守する必要があります。',
+  'ai_notice_title':
+      'AI \u30a2\u30b7\u30b9\u30bf\u30f3\u30c8\u306e\u6ce8\u610f',
+  'ai_notice_message':
+      'AI \u304c\u751f\u6210\u3057\u305f\u5185\u5bb9\u306f\u4e0d\u6b63\u78ba\u307e\u305f\u306f\u4e0d\u5b8c\u5168\u306a\u5834\u5408\u304c\u3042\u308a\u307e\u3059\u3002\n\n\u30b7\u30b9\u30c6\u30e0\u306b\u5909\u66f4\u3092\u9069\u7528\u3059\u308b\u524d\u306b\u3001\u91cd\u8981\u306a\u64cd\u4f5c\u306f\u5fc5\u305a\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\nAI \u30a2\u30b7\u30b9\u30bf\u30f3\u30c8\u306f\u63d0\u6848\u306e\u307f\u3092\u63d0\u4f9b\u3057\u3001\u4e92\u63db\u6027\u3001\u5b89\u5b9a\u6027\u3001\u5b89\u5168\u6027\u3092\u4fdd\u8a3c\u3067\u304d\u307e\u305b\u3093\u3002',
+  'ai_notice_got_it': '\u4e86\u89e3',
+  'ai_notice_do_not_show': '\u4eca\u5f8c\u8868\u793a\u3057\u306a\u3044',
   'webview_not_available': 'WebView2がインストールされていません',
   'webview_download_desc': 'アプリ内でページを開くにはWebView2 Runtimeが必要です。今すぐダウンロードしますか？',
   'webview_download': 'WebView2をダウンロード',
@@ -2789,7 +3239,8 @@ const _ja = <String, String>{
   'webview_download_complete': 'ダウンロード完了',
   'webview_download_failed': 'ダウンロードに失敗しました',
   'webview_downgrade_title': 'サイトが非互換の可能性があります',
-  'webview_downgrade_desc': 'このサイトは内蔵ブラウザで正常に動作しない可能性があります。システムブラウザで開くことをお勧めします。',
+  'webview_downgrade_desc':
+      'このサイトは内蔵ブラウザで正常に動作しない可能性があります。システムブラウザで開くことをお勧めします。',
   'webview_diag': 'ネットワーク診断',
   'webview_diag_title': 'ネットワーク診断',
   'dl_title': 'ダウンロード',
@@ -2837,6 +3288,17 @@ const _ja = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'カスタム',
   'mirror_category_tools': 'ツール',
+  'mirror_category_official_microsoft': 'Microsoft 公式イメージ',
+  'mirror_category_community': 'コミュニティイメージ',
+  'mirror_badge_official': 'Microsoft 公式ソース',
+  'mirror_badge_community': 'コミュニティイメージ',
+  'mirror_desc_official': 'Microsoft から直接ダウンロード',
+  'mirror_desc_community': 'サードパーティコミュニティが管理するイメージ',
+  'official_download_title': 'Microsoft 公式ダウンロード',
+  'official_download_message':
+      'Microsoft の公式ダウンロードサイトを開きます。\n\nMicrosoft 側で次の操作が必要になる場合があります。\n\n* 言語の選択\n* エディションの選択\n* アーキテクチャの選択\n* Media Creation Tool の使用（デバイスや地域によって異なります）\n\nダウンロード手順はシステムブラウザーで続行されます。',
+  'official_download_open': 'Microsoft サイトを開く',
+  'official_download_open_failed': 'システムブラウザーを開けませんでした。',
   'mirror_error_loading': 'ミラーリストの読み込みに失敗しました：',
   'safety_system_disk': 'このディスクには実行中のWindowsシステムが含まれています',
   'safety_boot_disk': 'このディスクはブートディスクです',
@@ -2859,7 +3321,7 @@ const _ja = <String, String>{
   'boot_writing_boot': 'ブートファイルを書き込み中...',
   'boot_write_failed': 'ブートファイルの書き込みに失敗しました',
   'boot_setting_icon': 'ボリュームアイコンを設定中...',
-  'boot_verifying': '起動可能USBを検証中...',
+  'boot_verifying': 'インストールメディアを検証中...',
   'boot_complete': '完了！',
   'boot_verify_failed': '検証に失敗しました',
   'boot_no_drive_letter': '割り当てられたドライブ文字が見つかりません',
@@ -2877,13 +3339,16 @@ const _ja = <String, String>{
   'wtg_svc_verifying': 'WTGを検証中...',
   'wtg_svc_complete': 'WTGの作成が完了しました！',
   'wtg_svc_verify_failed': '検証に失敗しました',
-  'wtg_svc_timeout': '操作がタイムアウトしました：ディスクが使用中またはロックされている可能性があります。他のプログラムを閉じて再試行してください。',
+  'wtg_svc_timeout':
+      '操作がタイムアウトしました：ディスクが使用中またはロックされている可能性があります。他のプログラムを閉じて再試行してください。',
   'wtg_svc_applying_percent': 'イメージを適用中... {percent}%',
   'wtg_svc_image_applied': 'イメージが適用されました',
 
   // AI プロンプト
-  'ai_prompt_system': 'あなたはWinDeploy Studio内蔵のAIアシスタントで、Windowsデプロイメントを専門としています。\n\n【ルール】\n- 簡潔で直接的に、無駄や繰り返しは禁止\n- テーブルまたはリストを使用し、長い段落は禁止\n- データが不十分な場合は「追加情報が必要」と答え、推測は禁止\n- 回答は500語以内\n- 自己否定は禁止（「アクセスできません」「AIとして」など）、分析結果のみを提示\n\n【専門分野】\nWindowsインストール/デプロイメント、Windows To Go、起動可能USB作成、DISM、BCDBoot、ISOイメージ分析、USB起動問題、WinDeploy Studioの使い方',
-  'ai_prompt_analyze_prefix': '以下の実際のデータに基づいて、簡潔に分析してください。テーブルまたはリスト形式を使用してください。\n\n【分析ルール】\n- 提供されたデータのみに基づいて分析し、推測は禁止\n- リスクは 🔴高 🟡中 🟢低 でマーク\n- 結論を最初に、3行以内\n- 詳細分析は後に、テーブルで\n- 回答は300語以内\n\n',
+  'ai_prompt_system':
+      'あなたはWinDeploy Studio内蔵のAIアシスタントで、Windowsデプロイメントを専門としています。\n\n【ルール】\n- 簡潔で直接的に、無駄や繰り返しは禁止\n- テーブルまたはリストを使用し、長い段落は禁止\n- データが不十分な場合は「追加情報が必要」と答え、推測は禁止\n- 回答は500語以内\n- 自己否定は禁止（「アクセスできません」「AIとして」など）、分析結果のみを提示\n\n【専門分野】\nWindowsインストール/デプロイメント、Windows To Go、インストールメディア作成、DISM、BCDBoot、ISOイメージ分析、USB起動問題、WinDeploy Studioの使い方',
+  'ai_prompt_analyze_prefix':
+      '以下の実際のデータに基づいて、簡潔に分析してください。テーブルまたはリスト形式を使用してください。\n\n【分析ルール】\n- 提供されたデータのみに基づいて分析し、推測は禁止\n- リスクは 🔴高 🟡中 🟢低 でマーク\n- 結論を最初に、3行以内\n- 詳細分析は後に、テーブルで\n- 回答は300語以内\n\n',
   'ai_prompt_log_content': '【ログ内容】',
   'ai_prompt_iso_info': '【ISO情報】',
   'ai_prompt_usb_info': '【USBデバイス情報】',
@@ -2918,11 +3383,6 @@ const _ja = <String, String>{
   'mirror_download_source': 'ダウンロードソース',
   'mirror_download_unknown': '不明',
   'mirror_source_label': '推奨ソース',
-  'mirror_strategy_auto': '自動選択（推奨）',
-  'mirror_strategy_china': '中国ミラーを強制',
-  'mirror_strategy_global': 'グローバルミラーを強制',
-  'settings_mirror_source': 'ダウンロードソース',
-  'settings_mirror_source_desc': 'ミラーソース戦略',
   'mirror_geo_failed': '地域を特定できません。グローバルミラーを使用します。',
   'mirror_speed_test_title': 'ミラー状態',
   'mirror_speed_test_testing': 'ミラーソースをテスト中...',
@@ -2945,20 +3405,20 @@ const _ja = <String, String>{
 
 const _zhTW = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': '可開機 USB 與 Windows To Go 建立工具',
+  'app_subtitle': 'Windows 安裝盤與 Windows To Go 建立工具',
   'nav_home': '首頁',
   'nav_images': '映像',
-  'nav_creator': '建立',
+  'nav_creator': '安裝盤',
   'nav_wtg': 'WTG',
   'nav_logs': '記錄',
   'nav_settings': '設定',
   'home_title': 'Windows 部署工具箱',
-  'home_subtitle': '可開機 USB 與 Windows To Go 建立工具',
+  'home_subtitle': 'Windows 安裝盤與 Windows To Go 建立工具',
   'home_quick_start': '快速開始',
   'home_image_library': '映像庫',
   'home_image_library_desc': '瀏覽 Windows 映像並取得下載連結',
-  'home_bootable_usb': '可開機 USB 建立工具',
-  'home_bootable_usb_desc': '建立 Windows 可開機 USB 隨身碟',
+  'home_bootable_usb': 'Windows 安裝盤建立工具',
+  'home_bootable_usb_desc': '從 ISO 建立 Windows 安裝 USB 隨身碟',
   'home_font_pack': '下載字型套件',
   'home_font_pack_desc': '適用於精簡版 Windows ISO 的 CJK 字型',
   'home_wtg': 'Windows To Go',
@@ -2970,7 +3430,7 @@ const _zhTW = <String, String>{
   'home_platform': '平台',
   'home_engine': '引擎',
   'home_focus': '專注',
-  'home_focus_value': '可開機 USB 與 WTG',
+  'home_focus_value': '安裝盤與 WTG',
   'home_license': '授權',
   'home_license_value': '開源',
   'images_title': '映像庫',
@@ -3002,7 +3462,7 @@ const _zhTW = <String, String>{
   'cancel_title': '取消',
   'cancel_parse_desc': '取消 ISO 解析？已掛載的映像將被卸載。',
   'cancel_confirm': '確認取消',
-  'cancel_create_desc': '取消可開機 USB 建立？此操作無法復原。',
+  'cancel_create_desc': '取消 Windows 安裝盤建立？此操作無法復原。',
   'fontpack_warning': '此系統可能缺少中文字型',
   'fontpack_recommend': '建議下載並安裝中文字型套件',
   'fontpack_download': '下載字型套件',
@@ -3014,8 +3474,8 @@ const _zhTW = <String, String>{
   'iso_step_detect': '正在偵測安裝程式...',
   'iso_step_info': '正在讀取映像資訊...',
   'iso_step_cleanup': '正在清理...',
-  'creator_title': '可開機 USB 建立工具',
-  'creator_subtitle': '建立 Windows 可開機 USB 隨身碟',
+  'creator_title': 'Windows 安裝盤建立工具',
+  'creator_subtitle': '從 ISO 建立 Windows 安裝 USB 隨身碟',
   'creator_step_iso': '選擇 ISO',
   'creator_step_usb': '選擇 USB',
   'creator_step_confirm': '確認',
@@ -3042,8 +3502,8 @@ const _zhTW = <String, String>{
   'creator_start': '開始建立',
   'creator_creating': '正在建立...',
   'creator_parsing': '正在解析 ISO 檔案...',
-  'creator_complete_title': '可開機 USB 建立完成！',
-  'creator_complete_desc': '您的可開機 USB 隨身碟已準備就緒',
+  'creator_complete_title': 'Windows 安裝盤建立完成！',
+  'creator_complete_desc': '您的 Windows 安裝 USB 隨身碟已準備就緒',
   'creator_another': '再建立一個',
   'creator_parse_error': 'ISO 檔案解析失敗',
   'creator_error': '錯誤',
@@ -3087,7 +3547,14 @@ const _zhTW = <String, String>{
   'settings_license': '授權',
   'settings_license_value': '開源',
   'settings_built_with': '建構工具：',
-  'settings_copyright': '©2026 Bob Steve. All rights reserved.',
+  'settings_copyright': '©2026 Bob Steve. 基於 MIT License 發行。',
+  'about_github_repository': 'GitHub 儲存庫',
+  'special_thanks_title': '特別感謝',
+  'special_thanks_intro': 'WinDeploy Studio 感謝以下個人和社群在回饋、測試、想法、靈感和支持方面提供的寶貴幫助。',
+  'thanks_astra_desc': '早期回饋、測試和專案討論',
+  'thanks_timme_desc': '細緻的國際使用者回饋、信任與易用性建議、Microsoft 官方來源建議和社群審閱',
+  'thanks_sysinternals_desc': '來自 Microsoft 診斷與疑難排解工具的啟發',
+  'thanks_open_source_desc': '感謝文件、錯誤回報、測試、翻譯和建議',
   'close': '關閉',
   'copied': '已複製',
   'ai_thinking': '正在思考...',
@@ -3213,7 +3680,7 @@ const _zhTW = <String, String>{
   'logs_min_ago': '{n} 分鐘前',
   'logs_hours_ago': '{n} 小時前',
   'logs_days_ago': '{n} 天前',
-  'logs_cat_usb': 'USB 記錄',
+  'logs_cat_usb': '安裝盤記錄',
   'logs_cat_wtg': 'WTG 記錄',
   'logs_cat_downloads': '下載',
   'logs_cat_iso': 'ISO 解析',
@@ -3244,6 +3711,7 @@ const _zhTW = <String, String>{
   'update_install_desc': '更新已下載完成。是否立即安裝？',
   'update_up_to_date': '已是最新版本',
   'update_checking': '正在檢查更新...',
+  'update_check_failed': '檢查更新失敗',
   'update_channel': '更新通道',
   'update_channel_stable': '穩定版',
   'update_channel_beta': '測試版',
@@ -3274,10 +3742,10 @@ const _zhTW = <String, String>{
   'ai_clear_chat': '清除對話',
   'ai_input_hint': '詢問關於 Windows 部署的任何問題...',
   'ai_welcome_title': '你好，我是 WinDeploy AI',
-  'ai_welcome_desc': '我可以協助您進行 Windows 部署、Windows To Go、可開機 USB 建立等。',
+  'ai_welcome_desc': '我可以協助您進行 Windows 部署、Windows To Go、安裝盤建立等。',
   'ai_ability_windows': 'Windows 安裝',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': '可開機 USB',
+  'ai_ability_usb': '安裝盤',
   'ai_ability_iso': 'ISO 分析',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -3293,6 +3761,30 @@ const _zhTW = <String, String>{
   'ai_action_diagnose': '診斷',
   'ai_no_logs': '未找到可供分析的記錄檔案。',
   'ai_please_wait': '請等待目前回覆完成...',
+
+  'ai_settings_section': 'AI \u52A9\u624B',
+  'ai_proxy_url': 'AI \u4EE3\u7406\u4F4D\u5740',
+  'ai_proxy_url_desc':
+      '\u4F7F\u7528\u76F8\u5BB9 OpenAI \u7684\u4EE3\u7406\u7AEF\u9EDE\u3002\u7559\u7A7A\u6216\u6062\u5FA9\u9810\u8A2D\u5C07\u4F7F\u7528\u5167\u5EFA\u7AEF\u9EDE\u3002',
+  'ai_proxy_url_loading': '\u6B63\u5728\u8F09\u5165...',
+  'ai_proxy_url_invalid':
+      '\u8ACB\u8F38\u5165\u6709\u6548\u7684 HTTP \u6216 HTTPS \u4F4D\u5740',
+  'ai_error_unauthorized': 'AI \u670D\u52D9\u672A\u6388\u6B0A\u3002',
+  'ai_error_rate_limited':
+      '\u8ACB\u6C42\u904E\u65BC\u983B\u7E41\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002',
+  'ai_error_unavailable':
+      'AI \u670D\u52D9\u66AB\u6642\u7121\u6CD5\u4F7F\u7528\u3002',
+  'ai_error_http': 'AI \u670D\u52D9\u932F\u8AA4\uFF08{status}\uFF09\u3002',
+  'ai_error_timeout':
+      'AI \u670D\u52D9\u9023\u7DDA\u903E\u6642\u3002\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\uFF0C\u6216\u5728\u8A2D\u5B9A\u4E2D\u66F4\u63DB AI \u4EE3\u7406\u4F4D\u5740\u3002',
+  'ai_error_unreachable':
+      '\u7121\u6CD5\u9023\u7DDA AI \u670D\u52D9\u3002\u76EE\u524D\u7DB2\u8DEF\u53EF\u80FD\u7121\u6CD5\u5B58\u53D6\u5167\u5EFA workers.dev \u4EE3\u7406\uFF0C\u8ACB\u5728\u8A2D\u5B9A\u4E2D\u66F4\u63DB AI \u4EE3\u7406\u4F4D\u5740\u5F8C\u91CD\u8A66\u3002',
+  'ai_error_tls':
+      'AI \u670D\u52D9 TLS \u9023\u7DDA\u5931\u6557\u3002\u8ACB\u6AA2\u67E5\u7CFB\u7D71\u6642\u9593\u3001\u7DB2\u8DEF\u4EE3\u7406\uFF0C\u6216\u66F4\u63DB AI \u4EE3\u7406\u4F4D\u5740\u3002',
+  'ai_error_connection': 'AI \u670D\u52D9\u9023\u7DDA\u5931\u6557\uFF1A{error}',
+  'settings_edit': '\u7DE8\u8F2F',
+  'settings_save': '\u5132\u5B58',
+  'settings_reset_default': '\u6062\u5FA9\u9810\u8A2D',
   'nav_tools': '工具',
   'tools_title': '工具',
   'tools_subtitle': 'Windows 部署推薦工具',
@@ -3311,16 +3803,6 @@ const _zhTW = <String, String>{
   'tools_features': '功能特性',
   'tools_website': '網站',
   'tools_download': '下載',
-  'adblock_on': '廣告攔截已開啟',
-  'adblock_off': '廣告攔截已關閉',
-  'adblock_stats': '廣告攔截統計',
-  'adblock_ads': '已攔截廣告',
-  'adblock_trackers': '已攔截追蹤器',
-  'adblock_total': '攔截總數',
-  'adblock_enabled': '廣告攔截已啟用',
-  'adblock_privacy': '隱私保護已啟用',
-  'adblock_whitelist': '加入白名單',
-  'adblock_disable_site': '為此站台停用',
   'tools_cat_system': '系統工具',
   'tools_cat_disk': '磁碟工具',
   'tools_cat_driver': '驅動程式',
@@ -3331,7 +3813,35 @@ const _zhTW = <String, String>{
   'tools_cat_optimize': '系統最佳化',
   'tools_cat_rescue': '系統救援',
   'tools_cat_file': '檔案工具',
-  'tools_cat_activation': '啟用',
+  'tools_cat_activation': '授權與啟用工具',
+  'tools_cat_advanced': '\u9032\u968e\u5de5\u5177',
+  'tool_safety_beginner': '\u5165\u9580',
+  'tool_safety_advanced': '\u9032\u968e',
+  'tool_safety_expert': '\u5c08\u5bb6',
+  'tool_warning_continue': '\u7e7c\u7e8c',
+  'tool_warning_cancel': '\u53d6\u6d88',
+  'tool_warning_dism_title': 'DISM++ \u63d0\u793a',
+  'tool_warning_dism_message':
+      'DISM++ \u662f\u529f\u80fd\u5f37\u5927\u7684 Windows \u7dad\u8b77\u5de5\u5177\u3002\n\n\u4f7f\u7528\u4e0d\u7576\u53ef\u80fd\u5f71\u97ff Windows \u5143\u4ef6\u3001\u670d\u52d9\u3001\u66f4\u65b0\u3001\u9a45\u52d5\u7a0b\u5f0f\u6216\u7cfb\u7d71\u7a69\u5b9a\u6027\u3002\n\n\u5efa\u8b70\u4e86\u89e3\u6240\u9078\u64cd\u4f5c\u76ee\u7684\u7684\u4f7f\u7528\u8005\u4f7f\u7528\u3002',
+  'tool_warning_windhawk_title': 'Windhawk \u63d0\u793a',
+  'tool_warning_windhawk_message':
+      'Windhawk \u6703\u900f\u904e\u5916\u639b\u4fee\u6539 Windows \u4f7f\u7528\u8005\u4ecb\u9762\u7684\u884c\u70ba\u3002\n\n\u90e8\u5206\u5916\u639b\u53ef\u80fd\u5f71\u97ff\u7a69\u5b9a\u6027\u3001\u76f8\u5bb9\u6027\u6216\u672a\u4f86\u7684 Windows \u66f4\u65b0\u3002\n\n\u5b89\u88dd\u524d\u8acb\u4ed4\u7d30\u95b1\u8b80\u5916\u639b\u8aaa\u660e\u3002',
+  'tool_warning_expert_title': '\u5c08\u5bb6\u5de5\u5177',
+  'tool_warning_expert_message':
+      '\u6b64\u5de5\u5177\u9069\u5408\u6709\u7d93\u9a57\u7684\u4f7f\u7528\u8005\u3002\n\n\u6b64\u5de5\u5177\u6240\u505a\u7684\u8b8a\u66f4\u53ef\u80fd\u5f71\u97ff\u7cfb\u7d71\u529f\u80fd\u3001\u8cc7\u6599\u5b8c\u6574\u6027\u6216\u4f5c\u696d\u7cfb\u7d71\u7a69\u5b9a\u6027\u3002\n\n\u8acb\u50c5\u5728\u7406\u89e3\u8a72\u64cd\u4f5c\u76ee\u7684\u8207\u5f71\u97ff\u5f8c\u7e7c\u7e8c\u3002',
+  'tool_warning_do_not_show_again': '不再顯示',
+  'activation_tool_notice_title': '啟用工具提示',
+  'activation_tool_notice_message':
+      '此工具僅作為第三方資源提供，用於學習、測試、疑難排解、研究和系統管理情境。\n\nWinDeploy Studio 不提供軟體授權、產品金鑰、啟用服務或繞過授權的機制。\n\n使用者需自行確保符合所有適用的軟體授權協議。\n\n在生產環境、商業用途或長期部署中，強烈建議向軟體廠商取得有效授權。\n\n請僅在理解所選工具用途及相關法律含義後繼續。',
+  'activation_tool_badge_tooltip': '可能影響軟體授權或啟用狀態。',
+  'activation_tool_disclaimer_title': '授權與啟用說明',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio 不支持軟體盜版、未經授權的啟用或規避授權限制。\n\n所有啟用相關工具均作為第三方資源提供。\n\n使用者必須遵守 Microsoft 及其他軟體廠商的授權條款。',
+  'ai_notice_title': 'AI \u52a9\u7406\u63d0\u793a',
+  'ai_notice_message':
+      'AI \u7522\u751f\u7684\u5167\u5bb9\u53ef\u80fd\u4e0d\u6e96\u78ba\u6216\u4e0d\u5b8c\u6574\u3002\n\n\u5c0d\u7cfb\u7d71\u5957\u7528\u8b8a\u66f4\u524d\uff0c\u8acb\u52d9\u5fc5\u6aa2\u67e5\u4e26\u78ba\u8a8d\u91cd\u8981\u64cd\u4f5c\u3002\n\nAI \u52a9\u7406\u50c5\u63d0\u4f9b\u5efa\u8b70\uff0c\u7121\u6cd5\u4fdd\u8b49\u76f8\u5bb9\u6027\u3001\u7a69\u5b9a\u6027\u6216\u5b89\u5168\u6027\u3002',
+  'ai_notice_got_it': '\u77e5\u9053\u4e86',
+  'ai_notice_do_not_show': '\u4e0d\u518d\u986f\u793a',
   'webview_not_available': '未安裝 WebView2',
   'webview_download_desc': '您的系統需要 WebView2 Runtime 才能在應用程式內開啟頁面。立即下載？',
   'webview_download': '下載 WebView2',
@@ -3400,6 +3910,17 @@ const _zhTW = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': '自訂',
   'mirror_category_tools': '工具',
+  'mirror_category_official_microsoft': 'Microsoft 官方',
+  'mirror_category_community': '社群映像',
+  'mirror_badge_official': 'Microsoft 官方來源',
+  'mirror_badge_community': '社群映像',
+  'mirror_desc_official': '直接從 Microsoft 下載',
+  'mirror_desc_community': '由第三方社群維護的映像',
+  'official_download_title': 'Microsoft 官方下載',
+  'official_download_message':
+      '你即將開啟 Microsoft 官方下載網站。\n\nMicrosoft 可能會要求你：\n\n* 選擇語言\n* 選擇版本\n* 選擇架構\n* 使用 Media Creation Tool（視裝置與地區而定）\n\n下載流程會在系統預設瀏覽器中繼續。',
+  'official_download_open': '開啟 Microsoft 網站',
+  'official_download_open_failed': '無法開啟系統預設瀏覽器。',
   'mirror_error_loading': '載入映像列表失敗：',
   'safety_system_disk': '此磁碟包含正在執行的 Windows 系統',
   'safety_boot_disk': '此磁碟是開機磁碟',
@@ -3422,7 +3943,7 @@ const _zhTW = <String, String>{
   'boot_writing_boot': '正在寫入開機檔案...',
   'boot_write_failed': '開機檔案寫入失敗',
   'boot_setting_icon': '正在設定磁碟區圖示...',
-  'boot_verifying': '正在驗證可開機 USB...',
+  'boot_verifying': '正在驗證安裝盤...',
   'boot_complete': '完成！',
   'boot_verify_failed': '驗證失敗',
   'boot_no_drive_letter': '無法找到已指派的磁碟機代號',
@@ -3443,8 +3964,10 @@ const _zhTW = <String, String>{
   'wtg_svc_timeout': '操作逾時：磁碟可能正在使用中或被鎖定。請關閉其他程式後重試。',
   'wtg_svc_applying_percent': '正在套用映像... {percent}%',
   'wtg_svc_image_applied': '映像已套用',
-  'ai_prompt_system': '你是 WinDeploy Studio 內建 AI 助理，專精於 Windows 部署領域。\n\n【回答規則】\n- 簡潔直接，禁止廢話和重複\n- 使用表格或清單，禁止大段敘述\n- 資料不足時直接說「需要更多資訊」，禁止編造\n- 總回答不超過 500 字\n- 禁止自我否定（如「我無法存取」、「我作為AI」），直接給出分析結果\n\n【專業領域】\nWindows 安裝/部署、Windows To Go、開機碟製作、DISM、BCDBoot、ISO 映像分析、USB 開機問題、WinDeploy Studio 使用',
-  'ai_prompt_analyze_prefix': '根據以下真實資料分析，簡潔回答，用表格或清單格式。\n\n【分析規則】\n- 僅根據提供的資料分析，不要編造\n- 風險用 🔴高 🟡中 🟢低 標記\n- 結論放在最前面，不超過3行\n- 詳細分析放後面，用表格\n- 總回答不超過300字\n\n',
+  'ai_prompt_system':
+      '你是 WinDeploy Studio 內建 AI 助理，專精於 Windows 部署領域。\n\n【回答規則】\n- 簡潔直接，禁止廢話和重複\n- 使用表格或清單，禁止大段敘述\n- 資料不足時直接說「需要更多資訊」，禁止編造\n- 總回答不超過 500 字\n- 禁止自我否定（如「我無法存取」、「我作為AI」），直接給出分析結果\n\n【專業領域】\nWindows 安裝/部署、Windows To Go、開機碟製作、DISM、BCDBoot、ISO 映像分析、USB 開機問題、WinDeploy Studio 使用',
+  'ai_prompt_analyze_prefix':
+      '根據以下真實資料分析，簡潔回答，用表格或清單格式。\n\n【分析規則】\n- 僅根據提供的資料分析，不要編造\n- 風險用 🔴高 🟡中 🟢低 標記\n- 結論放在最前面，不超過3行\n- 詳細分析放後面，用表格\n- 總回答不超過300字\n\n',
   'ai_prompt_log_content': '【記錄內容】',
   'ai_prompt_iso_info': '【ISO 資訊】',
   'ai_prompt_usb_info': '【USB 裝置資訊】',
@@ -3479,11 +4002,6 @@ const _zhTW = <String, String>{
   'mirror_download_source': '下載來源',
   'mirror_download_unknown': '未知',
   'mirror_source_label': '推薦來源',
-  'mirror_strategy_auto': '自動選擇（推薦）',
-  'mirror_strategy_china': '強制中國鏡像',
-  'mirror_strategy_global': '強制全球鏡像',
-  'settings_mirror_source': '下載來源',
-  'settings_mirror_source_desc': '鏡像來源策略',
   'mirror_geo_failed': '無法確定地區，已切換到全球鏡像來源',
   'mirror_speed_test_title': '鏡像來源狀態',
   'mirror_speed_test_testing': '正在偵測鏡像來源...',
@@ -3506,20 +4024,21 @@ const _zhTW = <String, String>{
 
 const _es = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Creador de USB booteable y Windows To Go',
+  'app_subtitle': 'Creador de medios de instalación de Windows y Windows To Go',
   'nav_home': 'Inicio',
   'nav_images': 'Imágenes',
-  'nav_creator': 'Crear',
+  'nav_creator': 'Medio',
   'nav_wtg': 'WTG',
   'nav_logs': 'Registros',
   'nav_settings': 'Ajustes',
   'home_title': 'Herramienta de despliegue Windows',
-  'home_subtitle': 'Creador de USB booteable y Windows To Go',
+  'home_subtitle': 'Creador de medios de instalación de Windows y Windows To Go',
   'home_quick_start': 'Inicio rápido',
   'home_image_library': 'Biblioteca de imágenes',
-  'home_image_library_desc': 'Explorar imágenes de Windows y obtener enlaces de descarga',
-  'home_bootable_usb': 'Creador de USB booteable',
-  'home_bootable_usb_desc': 'Crear una memoria USB booteable de Windows',
+  'home_image_library_desc':
+      'Explorar imágenes de Windows y obtener enlaces de descarga',
+  'home_bootable_usb': 'Creador de medio de instalación de Windows',
+  'home_bootable_usb_desc': 'Crear un USB de instalación de Windows desde un ISO',
   'home_font_pack': 'Descargar paquete de fuentes',
   'home_font_pack_desc': 'Fuentes CJK para ISOs ligeros de Windows',
   'home_wtg': 'Windows To Go',
@@ -3531,7 +4050,7 @@ const _es = <String, String>{
   'home_platform': 'Plataforma',
   'home_engine': 'Motor',
   'home_focus': 'Enfoque',
-  'home_focus_value': 'USB booteable y WTG',
+  'home_focus_value': 'Medio de instalación y WTG',
   'home_license': 'Licencia',
   'home_license_value': 'Código abierto',
   'images_title': 'Biblioteca de imágenes',
@@ -3541,7 +4060,8 @@ const _es = <String, String>{
   'images_empty': 'No hay imágenes disponibles',
   'images_category_all': 'Todas',
   'images_local_library': 'Biblioteca local',
-  'images_local_empty': 'No se encontraron ISOs locales. Configure una ruta en Ajustes.',
+  'images_local_empty':
+      'No se encontraron ISOs locales. Configure una ruta en Ajustes.',
   'images_local_iso': 'ISO local',
   'images_close': 'Cerrar',
   'detail_back': 'Volver a la biblioteca',
@@ -3561,13 +4081,17 @@ const _es = <String, String>{
   'images_error': 'Error desconocido',
   'mirror_not_found': 'Elemento de imagen no encontrado',
   'cancel_title': 'Cancelar',
-  'cancel_parse_desc': '¿Cancelar el análisis del ISO? La imagen montada se desmontará.',
+  'cancel_parse_desc':
+      '¿Cancelar el análisis del ISO? La imagen montada se desmontará.',
   'cancel_confirm': 'Confirmar cancelación',
-  'cancel_create_desc': '¿Cancelar la creación del USB booteable? Esta acción no se puede deshacer.',
+  'cancel_create_desc':
+      '¿Cancelar la creación del medio de instalación de Windows? Esta acción no se puede deshacer.',
   'fontpack_warning': 'Este sistema puede carecer de fuentes chinas',
-  'fontpack_recommend': 'Se recomienda descargar e instalar el paquete de fuentes chinas',
+  'fontpack_recommend':
+      'Se recomienda descargar e instalar el paquete de fuentes chinas',
   'fontpack_download': 'Descargar paquete de fuentes',
-  'fontpack_desc': 'Paquete de fuentes chinas para ISOs ligeros de Windows. Incluye fuentes CJK habituales para garantizar la correcta visualización del contenido en chino.',
+  'fontpack_desc':
+      'Paquete de fuentes chinas para ISOs ligeros de Windows. Incluye fuentes CJK habituales para garantizar la correcta visualización del contenido en chino.',
   'fontpack_feature_1': 'Incluye HarmonyOS Sans SC y otras fuentes chinas',
   'fontpack_feature_2': 'Compatible con Windows 10/11',
   'fontpack_feature_3': 'Instalación con un clic para todos los usuarios',
@@ -3575,8 +4099,8 @@ const _es = <String, String>{
   'iso_step_detect': 'Detectando instalador...',
   'iso_step_info': 'Leyendo información de la imagen...',
   'iso_step_cleanup': 'Limpiando...',
-  'creator_title': 'Creador de USB booteable',
-  'creator_subtitle': 'Crear una memoria USB booteable de Windows',
+  'creator_title': 'Creador de medio de instalación de Windows',
+  'creator_subtitle': 'Crear un USB de instalación de Windows desde un ISO',
   'creator_step_iso': 'Seleccionar ISO',
   'creator_step_usb': 'Seleccionar USB',
   'creator_step_confirm': 'Confirmar',
@@ -3598,13 +4122,14 @@ const _es = <String, String>{
   'creator_disk': 'Disco',
   'creator_model': 'Modelo',
   'creator_serial': 'Número de serie',
-  'creator_warning': '¡Todos los datos de este USB se eliminarán permanentemente!',
+  'creator_warning':
+      '¡Todos los datos de este USB se eliminarán permanentemente!',
   'creator_back': 'Volver',
   'creator_start': 'Iniciar creación',
   'creator_creating': 'Creando...',
   'creator_parsing': 'Analizando archivo ISO...',
-  'creator_complete_title': '¡USB booteable creado!',
-  'creator_complete_desc': 'Su memoria USB booteable está lista para usar',
+  'creator_complete_title': '¡Medio de instalación de Windows creado!',
+  'creator_complete_desc': 'Su USB de instalación de Windows está listo para usar',
   'creator_another': 'Crear otro',
   'creator_parse_error': 'Error al analizar el archivo ISO',
   'creator_error': 'Error',
@@ -3648,7 +4173,19 @@ const _es = <String, String>{
   'settings_license': 'Licencia',
   'settings_license_value': 'Código abierto',
   'settings_built_with': 'Construido con:',
-  'settings_copyright': '©2026 Bob Steve. Todos los derechos reservados.',
+  'settings_copyright': '©2026 Bob Steve. Publicado bajo la licencia MIT.',
+  'about_github_repository': 'Repositorio de GitHub',
+  'special_thanks_title': 'Agradecimientos especiales',
+  'special_thanks_intro':
+      'WinDeploy Studio agradece a las siguientes personas y comunidades por sus comentarios, pruebas, ideas, inspiración y apoyo.',
+  'thanks_astra_desc':
+      'Comentarios iniciales, pruebas y conversaciones del proyecto',
+  'thanks_timme_desc':
+      'Comentarios internacionales detallados, recomendaciones sobre confianza y usabilidad, sugerencias de fuentes de Microsoft y revisión comunitaria',
+  'thanks_sysinternals_desc':
+      'Inspiración de las herramientas de diagnóstico y solución de problemas de Microsoft',
+  'thanks_open_source_desc':
+      'Por documentación, informes de errores, pruebas, traducciones y sugerencias',
   'close': 'Cerrar',
   'copied': 'Copiado',
   'ai_thinking': 'Pensando...',
@@ -3670,9 +4207,11 @@ const _es = <String, String>{
   'wtg_rescan': 'Reescanear',
   'wtg_iso_selected': 'ISO seleccionado',
   'wtg_step1_title': 'Paso 1: Seleccionar ISO',
-  'wtg_step1_desc': 'Seleccione un archivo ISO de Windows para crear Windows To Go',
+  'wtg_step1_desc':
+      'Seleccione un archivo ISO de Windows para crear Windows To Go',
   'wtg_step2_title': 'Paso 2: Analizar ISO',
-  'wtg_step2_desc': 'Analizando el archivo ISO para cargar las imágenes de Windows',
+  'wtg_step2_desc':
+      'Analizando el archivo ISO para cargar las imágenes de Windows',
   'wtg_loading_wim': 'Cargando imágenes de Windows...',
   'wtg_wim_loaded': 'Imágenes de Windows cargadas',
   'wtg_wim_count': '{count} imágenes de Windows encontradas',
@@ -3694,7 +4233,8 @@ const _es = <String, String>{
   'wtg_recommendations': 'Recomendaciones',
   'wtg_next_confirm': 'Siguiente: Confirmar',
   'wtg_step5_title': 'Paso 5: Confirmar y crear',
-  'wtg_step5_desc': 'Revise la configuración y confirme para iniciar la creación',
+  'wtg_step5_desc':
+      'Revise la configuración y confirme para iniciar la creación',
   'wtg_selected_image': 'Imagen seleccionada',
   'wtg_erase_confirm_word': 'CONFIRMAR',
   'wtg_start_creation': 'Iniciar creación',
@@ -3709,7 +4249,8 @@ const _es = <String, String>{
   'wtg_step_complete_title': 'Paso 7: Completado',
   'wtg_step_complete_desc': 'Windows To Go se ha creado correctamente',
   'wtg_creation_complete': '¡Windows To Go creado!',
-  'wtg_creation_complete_desc': 'Su espacio de trabajo Windows To Go está listo para usar',
+  'wtg_creation_complete_desc':
+      'Su espacio de trabajo Windows To Go está listo para usar',
   'wtg_step_failed_title': 'Error en la creación',
   'wtg_step_failed_desc': 'Ocurrió un error al crear Windows To Go',
   'wtg_creation_failed': 'Error en la creación',
@@ -3724,9 +4265,11 @@ const _es = <String, String>{
   'wtg_grade_f': 'Fallido - No apto para Windows To Go',
   'wtg_grade_unknown': 'Desconocido - Se requiere prueba de velocidad',
   'wtg_warn_disk_info_failed': 'No se pudo obtener la información del disco',
-  'wtg_warn_size_small': 'El disco es menor de 32 GB, no recomendado para Windows To Go',
+  'wtg_warn_size_small':
+      'El disco es menor de 32 GB, no recomendado para Windows To Go',
   'wtg_warn_not_usb': 'Este dispositivo no parece ser una unidad USB',
-  'wtg_warn_performance_low': 'El rendimiento puede ser insuficiente para Windows To Go (se requieren ~80 MB/s)',
+  'wtg_warn_performance_low':
+      'El rendimiento puede ser insuficiente para Windows To Go (se requieren ~80 MB/s)',
   'wtg_warn_speed_test_failed': 'Prueba de velocidad fallida',
   'wtg_err_drive_not_found': 'No se encontró la letra de unidad',
   'wtg_err_empty_drive_letter': 'Letra de unidad vacía',
@@ -3737,7 +4280,8 @@ const _es = <String, String>{
   'wtg_average_speed': 'Velocidad media',
   'wtg_written': 'Escrito',
   'wtg_remaining': 'Restante',
-  'wtg_low_speed_warning': 'Se detectó un rendimiento de escritura aleatoria bajo. La creación de Windows To Go puede tardar más de lo esperado. Por favor sea paciente.',
+  'wtg_low_speed_warning':
+      'Se detectó un rendimiento de escritura aleatoria bajo. La creación de Windows To Go puede tardar más de lo esperado. Por favor sea paciente.',
   'wtg_images_found': '{count} imágenes de Windows encontradas',
   'wtg_image_fallback': 'Imagen {index}',
   'wtg_disk_number': 'Disco {number}',
@@ -3774,7 +4318,7 @@ const _es = <String, String>{
   'logs_min_ago': 'Hace {n} min',
   'logs_hours_ago': 'Hace {n} horas',
   'logs_days_ago': 'Hace {n} días',
-  'logs_cat_usb': 'Registros USB',
+  'logs_cat_usb': 'Registros del medio',
   'logs_cat_wtg': 'Registros WTG',
   'logs_cat_downloads': 'Descargas',
   'logs_cat_iso': 'Análisis ISO',
@@ -3792,7 +4336,8 @@ const _es = <String, String>{
   'update_last_check': 'Última comprobación',
   'update_never': 'Nunca',
   'update_available_title': 'Actualización disponible',
-  'update_available_desc': 'Hay una nueva versión de WinDeploy Studio disponible.',
+  'update_available_desc':
+      'Hay una nueva versión de WinDeploy Studio disponible.',
   'update_release_notes': 'Notas de la versión',
   'update_now': 'Actualizar ahora',
   'update_open_browser': 'Abrir en el navegador',
@@ -3805,6 +4350,7 @@ const _es = <String, String>{
   'update_install_desc': 'La actualización se ha descargado. ¿Instalar ahora?',
   'update_up_to_date': 'Estás actualizado',
   'update_checking': 'Buscando actualizaciones...',
+  'update_check_failed': 'Error al buscar actualizaciones',
   'update_channel': 'Canal de actualización',
   'update_channel_stable': 'Estable',
   'update_channel_beta': 'Beta',
@@ -3835,10 +4381,11 @@ const _es = <String, String>{
   'ai_clear_chat': 'Borrar chat',
   'ai_input_hint': 'Pregunte sobre el despliegue de Windows...',
   'ai_welcome_title': 'Hola, soy WinDeploy AI',
-  'ai_welcome_desc': 'Puedo ayudarle con el despliegue de Windows, Windows To Go, creación de USB booteable y más.',
+  'ai_welcome_desc':
+      'Puedo ayudarle con el despliegue de Windows, Windows To Go, creación de medios de instalación y más.',
   'ai_ability_windows': 'Instalación Windows',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'USB booteable',
+  'ai_ability_usb': 'Medio de instalación',
   'ai_ability_iso': 'Análisis ISO',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -3854,6 +4401,27 @@ const _es = <String, String>{
   'ai_action_diagnose': 'Diagnosticar',
   'ai_no_logs': 'No se encontraron archivos de registro para analizar.',
   'ai_please_wait': 'Por favor espere a que termine la respuesta actual...',
+
+  'ai_settings_section': 'Asistente IA',
+  'ai_proxy_url': 'URL del proxy IA',
+  'ai_proxy_url_desc':
+      'Use un endpoint proxy compatible con OpenAI. Dejelo vacio o restablezcalo para usar el endpoint integrado.',
+  'ai_proxy_url_loading': 'Cargando...',
+  'ai_proxy_url_invalid': 'Introduce una URL HTTP o HTTPS valida',
+  'ai_error_unauthorized': 'El servicio de IA no esta autorizado.',
+  'ai_error_rate_limited': 'Demasiadas solicitudes. Intentalo mas tarde.',
+  'ai_error_unavailable': 'El servicio de IA no esta disponible temporalmente.',
+  'ai_error_http': 'Error del servicio de IA ({status}).',
+  'ai_error_timeout':
+      'La conexion al servicio de IA agoto el tiempo. Revisa la red o cambia la URL del proxy IA en Ajustes.',
+  'ai_error_unreachable':
+      'No se puede conectar al servicio de IA. Es posible que la red no alcance el proxy workers.dev integrado. Cambia la URL del proxy IA en Ajustes e intentalo de nuevo.',
+  'ai_error_tls':
+      'Fallo la conexion TLS del servicio de IA. Revisa la hora del sistema, el proxy de red o cambia la URL del proxy IA.',
+  'ai_error_connection': 'Error de conexion del servicio de IA: {error}',
+  'settings_edit': 'Editar',
+  'settings_save': 'Guardar',
+  'settings_reset_default': 'Restablecer',
   'nav_tools': 'Herramientas',
   'tools_title': 'Herramientas',
   'tools_subtitle': 'Herramientas recomendadas para despliegue Windows',
@@ -3872,16 +4440,6 @@ const _es = <String, String>{
   'tools_features': 'Funcionalidades',
   'tools_website': 'Sitio web',
   'tools_download': 'Descargar',
-  'adblock_on': 'AdBlock ACTIVADO',
-  'adblock_off': 'AdBlock DESACTIVADO',
-  'adblock_stats': 'Estadísticas de AdBlock',
-  'adblock_ads': 'Anuncios bloqueados',
-  'adblock_trackers': 'Rastreadores bloqueados',
-  'adblock_total': 'Total bloqueados',
-  'adblock_enabled': 'Bloqueo de anuncios activado',
-  'adblock_privacy': 'Protección de privacidad activada',
-  'adblock_whitelist': 'Añadir a la lista blanca',
-  'adblock_disable_site': 'Desactivar para este sitio',
   'tools_cat_system': 'Sistema',
   'tools_cat_disk': 'Discos',
   'tools_cat_driver': 'Controladores',
@@ -3892,9 +4450,39 @@ const _es = <String, String>{
   'tools_cat_optimize': 'Optimización',
   'tools_cat_rescue': 'Rescate',
   'tools_cat_file': 'Archivos',
-  'tools_cat_activation': 'Activación',
+  'tools_cat_activation': 'Licencias y activación',
+  'tools_cat_advanced': 'Herramientas avanzadas',
+  'tool_safety_beginner': 'Principiante',
+  'tool_safety_advanced': 'Avanzado',
+  'tool_safety_expert': 'Experto',
+  'tool_warning_continue': 'Continuar',
+  'tool_warning_cancel': 'Cancelar',
+  'tool_warning_dism_title': 'Aviso de DISM++',
+  'tool_warning_dism_message':
+      'DISM++ es una potente utilidad de mantenimiento de Windows.\n\nUn uso incorrecto puede afectar componentes de Windows, servicios, actualizaciones, controladores o la estabilidad del sistema.\n\nRecomendado para usuarios que entienden el prop\xf3sito de la operaci\xf3n seleccionada.',
+  'tool_warning_windhawk_title': 'Aviso de Windhawk',
+  'tool_warning_windhawk_message':
+      'Windhawk modifica el comportamiento de la interfaz de Windows mediante plugins.\n\nAlgunos plugins pueden afectar la estabilidad, la compatibilidad o futuras actualizaciones de Windows.\n\nRevisa cuidadosamente la descripci\xf3n de los plugins antes de instalarlos.',
+  'tool_warning_expert_title': 'Herramienta experta',
+  'tool_warning_expert_message':
+      'Esta herramienta est\xe1 pensada para usuarios con experiencia.\n\nLos cambios realizados por esta herramienta pueden afectar funciones del sistema, la integridad de los datos o la estabilidad del sistema operativo.\n\nContin\xfaa solo si entiendes el prop\xf3sito y el impacto de la operaci\xf3n.',
+  'tool_warning_do_not_show_again': 'No volver a mostrar',
+  'activation_tool_notice_title': 'Aviso sobre herramientas de activación',
+  'activation_tool_notice_message':
+      'Esta herramienta se proporciona con fines educativos, de prueba, diagnóstico, investigación y administración del sistema.\n\nWinDeploy Studio no proporciona licencias de software, claves de producto, servicios de activación ni mecanismos para eludir autorizaciones.\n\nLos usuarios son responsables de cumplir todos los acuerdos de licencia de software aplicables.\n\nPara entornos de producción, uso comercial o despliegues a largo plazo, se recomienda encarecidamente obtener una licencia válida del proveedor del software.\n\nContinúa solo si comprendes el propósito y las implicaciones legales de la herramienta seleccionada.',
+  'activation_tool_badge_tooltip':
+      'Puede afectar la licencia o el estado de activación del software.',
+  'activation_tool_disclaimer_title': 'Aviso sobre licencias y activación',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio no respalda la piratería de software, la activación no autorizada ni la elusión de licencias.\n\nTodas las utilidades relacionadas con la activación se ofrecen como recursos de terceros.\n\nLos usuarios deben cumplir los términos de licencia de Microsoft y otros proveedores de software.',
+  'ai_notice_title': 'Aviso del asistente AI',
+  'ai_notice_message':
+      'El contenido generado por AI puede ser inexacto o incompleto.\n\nRevisa y verifica siempre las operaciones importantes antes de aplicar cambios al sistema.\n\nEl asistente AI solo ofrece sugerencias y no puede garantizar compatibilidad, estabilidad ni seguridad.',
+  'ai_notice_got_it': 'Entendido',
+  'ai_notice_do_not_show': 'No volver a mostrar',
   'webview_not_available': 'WebView2 no instalado',
-  'webview_download_desc': 'Su sistema necesita WebView2 Runtime para abrir páginas dentro de la aplicación. ¿Descargar ahora?',
+  'webview_download_desc':
+      'Su sistema necesita WebView2 Runtime para abrir páginas dentro de la aplicación. ¿Descargar ahora?',
   'webview_download': 'Descargar WebView2',
   'webview_open_in_browser': 'Abrir en el navegador',
   'webview_open_external': 'Abrir en el navegador',
@@ -3913,7 +4501,8 @@ const _es = <String, String>{
   'webview_download_complete': 'Descarga completada',
   'webview_download_failed': 'Error en la descarga',
   'webview_downgrade_title': 'El sitio puede ser incompatible',
-  'webview_downgrade_desc': 'Este sitio puede no funcionar bien en el navegador integrado. Se recomienda abrirlo en el navegador del sistema.',
+  'webview_downgrade_desc':
+      'Este sitio puede no funcionar bien en el navegador integrado. Se recomienda abrirlo en el navegador del sistema.',
   'webview_diag': 'Diagnóstico de red',
   'webview_diag_title': 'Diagnóstico de red',
   'dl_title': 'Descargas',
@@ -3938,10 +4527,14 @@ const _es = <String, String>{
   'ai_search_canary': 'Buscar AMD',
   'ai_search_wtg_tutorial': 'Buscar Linus Tech Tips',
   'ai_search_rufus': 'Buscar tutorial WTG',
-  'ai_search_ms_update_prompt': 'Buscar CPU Intel, GPU, descargas de controladores e información de productos.',
-  'ai_search_canary_prompt': 'Buscar CPU AMD, GPU, descargas de controladores e información de productos.',
-  'ai_search_wtg_tutorial_prompt': 'Buscar vídeos y reseñas de Linus Tech Tips.',
-  'ai_search_rufus_prompt': 'Buscar tutoriales de creación de Windows To Go y mejores prácticas.',
+  'ai_search_ms_update_prompt':
+      'Buscar CPU Intel, GPU, descargas de controladores e información de productos.',
+  'ai_search_canary_prompt':
+      'Buscar CPU AMD, GPU, descargas de controladores e información de productos.',
+  'ai_search_wtg_tutorial_prompt':
+      'Buscar vídeos y reseñas de Linus Tech Tips.',
+  'ai_search_rufus_prompt':
+      'Buscar tutoriales de creación de Windows To Go y mejores prácticas.',
   'intel_cpu': 'CPU',
   'intel_gpu': 'GPU',
   'intel_loading': 'Cargando...',
@@ -3961,12 +4554,25 @@ const _es = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Personalizado',
   'mirror_category_tools': 'Herramientas',
+  'mirror_category_official_microsoft': 'Imágenes oficiales de Microsoft',
+  'mirror_category_community': 'Imágenes de la comunidad',
+  'mirror_badge_official': 'Fuente oficial de Microsoft',
+  'mirror_badge_community': 'Imagen de la comunidad',
+  'mirror_desc_official': 'Descarga directamente desde Microsoft',
+  'mirror_desc_community': 'Imagen mantenida por una comunidad externa',
+  'official_download_title': 'Descarga oficial de Microsoft',
+  'official_download_message':
+      'Estás a punto de visitar el sitio oficial de descargas de Microsoft.\n\nMicrosoft puede pedirte que:\n\n* selecciones el idioma\n* selecciones la edición\n* selecciones la arquitectura\n* uses Media Creation Tool (según el dispositivo y la región)\n\nEl proceso de descarga continuará en el navegador del sistema.',
+  'official_download_open': 'Abrir sitio de Microsoft',
+  'official_download_open_failed': 'No se pudo abrir el navegador del sistema.',
   'mirror_error_loading': 'Error al cargar la lista de imágenes:',
   'safety_system_disk': 'Este disco contiene el sistema Windows en ejecución',
   'safety_boot_disk': 'Este disco es el disco de arranque',
   'safety_efi_partition': 'Este disco contiene una partición EFI del sistema',
-  'safety_recovery_partition': 'Este disco contiene una partición de recuperación de Windows',
-  'safety_windows_install': 'Este disco contiene una instalación de Windows ({drive})',
+  'safety_recovery_partition':
+      'Este disco contiene una partición de recuperación de Windows',
+  'safety_windows_install':
+      'Este disco contiene una instalación de Windows ({drive})',
   'boot_preparing': 'Preparando...',
   'boot_cleaning': 'Limpiando disco...',
   'boot_access_denied': 'Acceso denegado, ejecute como administrador',
@@ -3983,7 +4589,7 @@ const _es = <String, String>{
   'boot_writing_boot': 'Escribiendo archivos de arranque...',
   'boot_write_failed': 'Error al escribir archivos de arranque',
   'boot_setting_icon': 'Configurando icono de volumen...',
-  'boot_verifying': 'Verificando USB booteable...',
+  'boot_verifying': 'Verificando medio de instalación...',
   'boot_complete': '¡Completado!',
   'boot_verify_failed': 'Error en la verificación',
   'boot_no_drive_letter': 'No se encontró la letra de unidad asignada',
@@ -4001,18 +4607,23 @@ const _es = <String, String>{
   'wtg_svc_verifying': 'Verificando WTG...',
   'wtg_svc_complete': '¡Creación de WTG completada!',
   'wtg_svc_verify_failed': 'Error en la verificación',
-  'wtg_svc_timeout': 'Tiempo de espera agotado: el disco puede estar en uso o bloqueado. Cierre otros programas e inténtelo de nuevo.',
+  'wtg_svc_timeout':
+      'Tiempo de espera agotado: el disco puede estar en uso o bloqueado. Cierre otros programas e inténtelo de nuevo.',
   'wtg_svc_applying_percent': 'Aplicando imagen... {percent}%',
   'wtg_svc_image_applied': 'Imagen aplicada',
-  'ai_prompt_system': 'Eres el asistente IA integrado de WinDeploy Studio, especializado en despliegue de Windows.\n\n[REGLAS]\n- Sé conciso y directo, sin rodeos ni repeticiones\n- Usa tablas o listas, evita párrafos largos\n- Si faltan datos, di "Se necesita más información", nunca inventes\n- Respuesta total inferior a 500 palabras\n- Nunca te autodenigres (p.ej. "No puedo acceder", "Como IA"), da directamente el análisis\n\n[EXPERIENCIA]\nInstalación/despliegue de Windows, Windows To Go, creación de USB booteable, DISM, BCDBoot, análisis de imágenes ISO, problemas de arranque USB, uso de WinDeploy Studio',
-  'ai_prompt_analyze_prefix': 'Basándose en los siguientes datos reales, analice de forma concisa. Use formato de tablas o listas.\n\n[REGLAS DE ANÁLISIS]\n- Analice solo con los datos proporcionados, no invente\n- Marque riesgos con 🔴Alto 🟡Medio 🟢Bajo\n- Conclusiones primero, máximo 3 líneas\n- Análisis detallado después, con tablas\n- Respuesta total inferior a 300 palabras\n\n',
+  'ai_prompt_system':
+      'Eres el asistente IA integrado de WinDeploy Studio, especializado en despliegue de Windows.\n\n[REGLAS]\n- Sé conciso y directo, sin rodeos ni repeticiones\n- Usa tablas o listas, evita párrafos largos\n- Si faltan datos, di "Se necesita más información", nunca inventes\n- Respuesta total inferior a 500 palabras\n- Nunca te autodenigres (p.ej. "No puedo acceder", "Como IA"), da directamente el análisis\n\n[EXPERIENCIA]\nInstalación/despliegue de Windows, Windows To Go, creación de medios de instalación, DISM, BCDBoot, análisis de imágenes ISO, problemas de arranque USB, uso de WinDeploy Studio',
+  'ai_prompt_analyze_prefix':
+      'Basándose en los siguientes datos reales, analice de forma concisa. Use formato de tablas o listas.\n\n[REGLAS DE ANÁLISIS]\n- Analice solo con los datos proporcionados, no invente\n- Marque riesgos con 🔴Alto 🟡Medio 🟢Bajo\n- Conclusiones primero, máximo 3 líneas\n- Análisis detallado después, con tablas\n- Respuesta total inferior a 300 palabras\n\n',
   'ai_prompt_log_content': '[CONTENIDO DEL REGISTRO]',
   'ai_prompt_iso_info': '[INFORMACIÓN ISO]',
   'ai_prompt_usb_info': '[INFORMACIÓN DEL DISPOSITIVO USB]',
-  'ai_prompt_diagnose_prefix': 'Diagnostique el siguiente estado del sistema:\n\n',
+  'ai_prompt_diagnose_prefix':
+      'Diagnostique el siguiente estado del sistema:\n\n',
   'ai_prompt_log_summary': '[RESUMEN DEL REGISTRO]',
   'ai_prompt_task_status': '[ESTADO DE LA TAREA]',
-  'ai_prompt_diagnose_suffix': 'Proporcione un informe de diagnóstico completo.',
+  'ai_prompt_diagnose_suffix':
+      'Proporcione un informe de diagnóstico completo.',
   'ai_prompt_iso_logs': '[REGISTROS DE OPERACIONES ISO]',
   'ai_prompt_local_isos': '[ARCHIVOS ISO LOCALES]',
   'ai_prompt_no_iso_found': '  No se encontraron archivos ISO',
@@ -4025,7 +4636,8 @@ const _es = <String, String>{
   'ai_prompt_partition_style': 'Tabla de particiones',
   'ai_prompt_drive_letters': 'Letras de unidad',
   'ai_prompt_partition_count': 'Particiones',
-  'ai_prompt_usb_get_failed': 'Error al obtener información del dispositivo USB:',
+  'ai_prompt_usb_get_failed':
+      'Error al obtener información del dispositivo USB:',
   'ai_prompt_files': 'archivos',
   'ai_prompt_no_logs': '  Sin registros',
   'ai_prompt_usb_devices': '[DISPOSITIVOS USB]',
@@ -4033,24 +4645,21 @@ const _es = <String, String>{
   'ai_prompt_get_failed': '  Error al obtener:',
   'ai_prompt_recent_errors': '[REGISTROS DE ERRORES RECIENTES]',
   'ai_prompt_no_errors': '  Sin registros de errores',
-  'ai_prompt_error_dir_missing': '  El directorio de registros de errores no existe',
+  'ai_prompt_error_dir_missing':
+      '  El directorio de registros de errores no existe',
   'mirror_download_confirm_title': 'Confirmar descarga',
   'mirror_download_mirror': 'Imagen',
   'mirror_download_region': 'Región detectada',
   'mirror_download_source': 'Fuente de descarga',
   'mirror_download_unknown': 'Desconocido',
   'mirror_source_label': 'Fuente recomendada',
-  'mirror_strategy_auto': 'Selección automática (recomendado)',
-  'mirror_strategy_china': 'Forzar espejo chino',
-  'mirror_strategy_global': 'Forzar espejo global',
-  'settings_mirror_source': 'Fuente de descarga',
-  'settings_mirror_source_desc': 'Estrategia de fuente de espejo',
   'mirror_geo_failed': 'No se pudo determinar la región, usando espejo global',
   'mirror_speed_test_title': 'Estado de espejos',
   'mirror_speed_test_testing': 'Probando fuentes de espejo...',
   'mirror_speed_test_refresh': 'Repetir prueba',
   'mirror_speed_test_failed': 'Prueba de velocidad fallida',
-  'mirror_speed_test_all_offline': 'No se puede conectar a los servidores. Verifique su red.',
+  'mirror_speed_test_all_offline':
+      'No se puede conectar a los servidores. Verifique su red.',
   'mirror_speed_test_recommend': 'Recomendado',
   'mirror_download_latency': 'Latencia',
   'mirror_select_title': 'Seleccionar espejo de descarga',
@@ -4067,20 +4676,20 @@ const _es = <String, String>{
 
 const _ar = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'أداة إنشاء قابل للتشغيل وWindows To Go',
+  'app_subtitle': 'أداة إنشاء وسائط تثبيت Windows وWindows To Go',
   'nav_home': 'الرئيسية',
   'nav_images': 'الصور',
-  'nav_creator': 'إنشاء',
+  'nav_creator': 'وسيط',
   'nav_wtg': 'WTG',
   'nav_logs': 'السجلات',
   'nav_settings': 'الإعدادات',
   'home_title': 'أدوات نشر Windows',
-  'home_subtitle': 'أداة إنشاء قابل للتشغيل وWindows To Go',
+  'home_subtitle': 'أداة إنشاء وسائط تثبيت Windows وWindows To Go',
   'home_quick_start': 'بدء سريع',
   'home_image_library': 'مكتبة الصور',
   'home_image_library_desc': 'تصفح صور Windows والحصول على روابط التنزيل',
-  'home_bootable_usb': 'إنشاء USB قابل للتشغيل',
-  'home_bootable_usb_desc': 'إنشاء USB قابل لتشغيل Windows',
+  'home_bootable_usb': 'إنشاء وسيط تثبيت Windows',
+  'home_bootable_usb_desc': 'إنشاء USB لتثبيت Windows من ملف ISO',
   'home_font_pack': 'تنزيل حزمة الخطوط',
   'home_font_pack_desc': 'خطوط CJK لإصدارات Windows المخففة',
   'home_wtg': 'Windows To Go',
@@ -4092,7 +4701,7 @@ const _ar = <String, String>{
   'home_platform': 'المنصة',
   'home_engine': 'المحرك',
   'home_focus': 'التركيز',
-  'home_focus_value': 'USB قابل للتشغيل وWTG',
+  'home_focus_value': 'وسائط التثبيت وWTG',
   'home_license': 'الترخيص',
   'home_license_value': 'مفتوح المصدر',
   'images_title': 'مكتبة الصور',
@@ -4102,7 +4711,8 @@ const _ar = <String, String>{
   'images_empty': 'لا توجد صور متاحة',
   'images_category_all': 'الكل',
   'images_local_library': 'المكتبة المحلية',
-  'images_local_empty': 'لم يتم العثور على ملفات ISO محلية. قم بتعيين مسار في الإعدادات.',
+  'images_local_empty':
+      'لم يتم العثور على ملفات ISO محلية. قم بتعيين مسار في الإعدادات.',
   'images_local_iso': 'ISO محلي',
   'images_close': 'إغلاق',
   'detail_back': 'العودة إلى المكتبة',
@@ -4124,11 +4734,13 @@ const _ar = <String, String>{
   'cancel_title': 'إلغاء',
   'cancel_parse_desc': 'هل تريد إلغاء تحليل ISO؟ سيتم إلغاء تركيب الصورة.',
   'cancel_confirm': 'تأكيد الإلغاء',
-  'cancel_create_desc': 'هل تريد إلغاء إنشاء USB القابل للتشغيل؟ لا يمكن التراجع عن هذا الإجراء.',
+  'cancel_create_desc':
+      'هل تريد إلغاء إنشاء وسيط تثبيت Windows؟ لا يمكن التراجع عن هذا الإجراء.',
   'fontpack_warning': 'قد يفتقر هذا النظام إلى الخطوط الصينية',
   'fontpack_recommend': 'يُوصى بتنزيل وتثبيت حزمة الخطوط الصينية',
   'fontpack_download': 'تنزيل حزمة الخطوط',
-  'fontpack_desc': 'حزمة خطوط صينية لإصدارات Windows المخففة. تتضمن خطوط CJK الشائعة لعرض المحتوى الصيني بشكل صحيح.',
+  'fontpack_desc':
+      'حزمة خطوط صينية لإصدارات Windows المخففة. تتضمن خطوط CJK الشائعة لعرض المحتوى الصيني بشكل صحيح.',
   'fontpack_feature_1': 'يتضمن HarmonyOS Sans SC وخطوطًا صينية أخرى',
   'fontpack_feature_2': 'متوافق مع Windows 10/11',
   'fontpack_feature_3': 'تثبيت بنقرة واحدة لجميع المستخدمين',
@@ -4136,8 +4748,8 @@ const _ar = <String, String>{
   'iso_step_detect': 'جاري الكشف عن المثبت...',
   'iso_step_info': 'جاري قراءة معلومات الصورة...',
   'iso_step_cleanup': 'جاري التنظيف...',
-  'creator_title': 'إنشاء USB قابل للتشغيل',
-  'creator_subtitle': 'إنشاء USB قابل لتشغيل Windows',
+  'creator_title': 'إنشاء وسيط تثبيت Windows',
+  'creator_subtitle': 'إنشاء USB لتثبيت Windows من ملف ISO',
   'creator_step_iso': 'اختيار ISO',
   'creator_step_usb': 'اختيار USB',
   'creator_step_confirm': 'تأكيد',
@@ -4164,8 +4776,8 @@ const _ar = <String, String>{
   'creator_start': 'بدء الإنشاء',
   'creator_creating': 'جاري الإنشاء...',
   'creator_parsing': 'جاري تحليل ملف ISO...',
-  'creator_complete_title': 'تم إنشاء USB القابل للتشغيل!',
-  'creator_complete_desc': 'جاهز للاستخدام',
+  'creator_complete_title': 'تم إنشاء وسيط تثبيت Windows!',
+  'creator_complete_desc': 'USB تثبيت Windows جاهز للاستخدام',
   'creator_another': 'إنشاء آخر',
   'creator_parse_error': 'فشل تحليل ملف ISO',
   'creator_error': 'خطأ',
@@ -4209,7 +4821,18 @@ const _ar = <String, String>{
   'settings_license': 'الترخيص',
   'settings_license_value': 'مفتوح المصدر',
   'settings_built_with': 'بُني بواسطة:',
-  'settings_copyright': '©2026 Bob Steve. جميع الحقوق محفوظة.',
+  'settings_copyright': '©2026 Bob Steve. يُوزَّع بموجب ترخيص MIT.',
+  'about_github_repository': 'مستودع GitHub',
+  'special_thanks_title': 'شكر خاص',
+  'special_thanks_intro':
+      'يشكر WinDeploy Studio الأشخاص والمجتمعات التالية على الملاحظات والاختبارات والأفكار والإلهام والدعم القيّم.',
+  'thanks_astra_desc': 'ملاحظات مبكرة واختبارات ونقاشات حول المشروع',
+  'thanks_timme_desc':
+      'ملاحظات دولية مفصلة وتوصيات حول الثقة وسهولة الاستخدام واقتراحات لمصادر Microsoft ومراجعة مجتمعية',
+  'thanks_sysinternals_desc':
+      'إلهام من أدوات Microsoft للتشخيص واستكشاف الأخطاء',
+  'thanks_open_source_desc':
+      'على التوثيق وتقارير الأخطاء والاختبار والترجمات والاقتراحات',
   'close': 'إغلاق',
   'copied': 'تم النسخ',
   'ai_thinking': 'جاري التفكير...',
@@ -4285,9 +4908,11 @@ const _ar = <String, String>{
   'wtg_grade_f': 'فاشل - غير مناسب لـ Windows To Go',
   'wtg_grade_unknown': 'غير معروف - يتطلب اختبار سرعة',
   'wtg_warn_disk_info_failed': 'تعذر الحصول على معلومات القرص',
-  'wtg_warn_size_small': 'حجم القرص أقل من 32 جيجابايت، غير موصى به لـ Windows To Go',
+  'wtg_warn_size_small':
+      'حجم القرص أقل من 32 جيجابايت، غير موصى به لـ Windows To Go',
   'wtg_warn_not_usb': 'لا يبدو أن هذا الجهاز وحدة USB',
-  'wtg_warn_performance_low': 'قد لا تكون الأداء كافية لـ Windows To Go (يتطلب ~80 ميجابايت/ثانية)',
+  'wtg_warn_performance_low':
+      'قد لا تكون الأداء كافية لـ Windows To Go (يتطلب ~80 ميجابايت/ثانية)',
   'wtg_warn_speed_test_failed': 'فشل اختبار السرعة',
   'wtg_err_drive_not_found': 'لم يتم العثور على حرف القرص',
   'wtg_err_empty_drive_letter': 'حرف القرص فارغ',
@@ -4298,7 +4923,8 @@ const _ar = <String, String>{
   'wtg_average_speed': 'متوسط السرعة',
   'wtg_written': 'تم الكتابة',
   'wtg_remaining': 'المتبقي',
-  'wtg_low_speed_warning': 'تم اكتشاف أداء منخفض للكتابة العشوائية. قد يستغرق إنشاء Windows To Go وقتًا أطول. يرجى التحلي بالصبر.',
+  'wtg_low_speed_warning':
+      'تم اكتشاف أداء منخفض للكتابة العشوائية. قد يستغرق إنشاء Windows To Go وقتًا أطول. يرجى التحلي بالصبر.',
   'wtg_images_found': 'تم العثور على {count} صورة Windows',
   'wtg_image_fallback': 'صورة {index}',
   'wtg_disk_number': 'قرص {number}',
@@ -4335,7 +4961,7 @@ const _ar = <String, String>{
   'logs_min_ago': 'منذ {n} دقيقة',
   'logs_hours_ago': 'منذ {n} ساعات',
   'logs_days_ago': 'منذ {n} أيام',
-  'logs_cat_usb': 'سجلات USB',
+  'logs_cat_usb': 'سجلات وسيط التثبيت',
   'logs_cat_wtg': 'سجلات WTG',
   'logs_cat_downloads': 'التنزيلات',
   'logs_cat_iso': 'تحليل ISO',
@@ -4366,6 +4992,7 @@ const _ar = <String, String>{
   'update_install_desc': 'تم تنزيل التحديث. هل تريد التثبيت الآن؟',
   'update_up_to_date': 'أنت تستخدم أحدث إصدار',
   'update_checking': 'جاري التحقق من التحديثات...',
+  'update_check_failed': 'فشل التحقق من التحديثات',
   'update_channel': 'قناة التحديث',
   'update_channel_stable': 'مستقر',
   'update_channel_beta': 'بيتا',
@@ -4396,10 +5023,11 @@ const _ar = <String, String>{
   'ai_clear_chat': 'مسح المحادثة',
   'ai_input_hint': 'اسأل عن أي شيء يتعلق بنشر Windows...',
   'ai_welcome_title': 'مرحبًا، أنا WinDeploy AI',
-  'ai_welcome_desc': 'يمكنني مساعدتك في نشر Windows، وWindows To Go، وإنشاء USB القابل للتشغيل وغيرها.',
+  'ai_welcome_desc':
+      'يمكنني مساعدتك في نشر Windows، وWindows To Go، وإنشاء وسائط تثبيت Windows وغيرها.',
   'ai_ability_windows': 'تثبيت Windows',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'USB قابل للتشغيل',
+  'ai_ability_usb': 'وسيط تثبيت',
   'ai_ability_iso': 'تحليل ISO',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -4415,6 +5043,27 @@ const _ar = <String, String>{
   'ai_action_diagnose': 'تشخيص',
   'ai_no_logs': 'لم يتم العثور على ملفات سجل للتحليل.',
   'ai_please_wait': 'يرجى الانتظار حتى تنتهي الاستجابة الحالية...',
+
+  'ai_settings_section': 'AI Assistant',
+  'ai_proxy_url': 'AI Proxy URL',
+  'ai_proxy_url_desc':
+      'Use an OpenAI-compatible proxy endpoint. Leave empty or reset to use the built-in endpoint.',
+  'ai_proxy_url_loading': 'Loading...',
+  'ai_proxy_url_invalid': 'Enter a valid HTTP or HTTPS URL',
+  'ai_error_unauthorized': 'AI service is not authorized.',
+  'ai_error_rate_limited': 'Too many requests. Please try again later.',
+  'ai_error_unavailable': 'AI service is temporarily unavailable.',
+  'ai_error_http': 'AI service error ({status}).',
+  'ai_error_timeout':
+      'AI service connection timed out. Check your network or change the AI proxy URL in Settings.',
+  'ai_error_unreachable':
+      'Cannot connect to the AI service. Your network may be unable to reach the built-in workers.dev proxy. Change the AI proxy URL in Settings and try again.',
+  'ai_error_tls':
+      'AI service TLS connection failed. Check system time, network proxy, or change the AI proxy URL.',
+  'ai_error_connection': 'AI service connection failed: {error}',
+  'settings_edit': 'Edit',
+  'settings_save': 'Save',
+  'settings_reset_default': 'Reset to Default',
   'nav_tools': 'الأدوات',
   'tools_title': 'الأدوات',
   'tools_subtitle': 'أدوات موصى بها لنشر Windows',
@@ -4433,16 +5082,6 @@ const _ar = <String, String>{
   'tools_features': 'الميزات',
   'tools_website': 'الموقع',
   'tools_download': 'تنزيل',
-  'adblock_on': 'حظر الإعلانات مفعّل',
-  'adblock_off': 'حظر الإعلانات معطّل',
-  'adblock_stats': 'إحصائيات حظر الإعلانات',
-  'adblock_ads': 'إعلانات محظورة',
-  'adblock_trackers': 'متتبعات محظورة',
-  'adblock_total': 'إجمالي المحظورات',
-  'adblock_enabled': 'تم تفعيل حظر الإعلانات',
-  'adblock_privacy': 'تم تفعيل حماية الخصوصية',
-  'adblock_whitelist': 'إضافة إلى القائمة البيضاء',
-  'adblock_disable_site': 'تعطيل لهذا الموقع',
   'tools_cat_system': 'أدوات النظام',
   'tools_cat_disk': 'أدوات الأقراص',
   'tools_cat_driver': 'تعريفات',
@@ -4453,9 +5092,42 @@ const _ar = <String, String>{
   'tools_cat_optimize': 'تحسين النظام',
   'tools_cat_rescue': 'إنقاذ النظام',
   'tools_cat_file': 'أدوات الملفات',
-  'tools_cat_activation': 'التفعيل',
+  'tools_cat_activation': 'أدوات الترخيص والتنشيط',
+  'tools_cat_advanced':
+      '\u0623\u062f\u0648\u0627\u062a \u0645\u062a\u0642\u062f\u0645\u0629',
+  'tool_safety_beginner': '\u0645\u0628\u062a\u062f\u0626',
+  'tool_safety_advanced': '\u0645\u062a\u0642\u062f\u0645',
+  'tool_safety_expert': '\u062e\u0628\u064a\u0631',
+  'tool_warning_continue': '\u0645\u062a\u0627\u0628\u0639\u0629',
+  'tool_warning_cancel': '\u0625\u0644\u063a\u0627\u0621',
+  'tool_warning_dism_title': '\u062a\u0646\u0628\u064a\u0647 DISM++',
+  'tool_warning_dism_message':
+      'DISM++ \u0623\u062f\u0627\u0629 \u0642\u0648\u064a\u0629 \u0644\u0635\u064a\u0627\u0646\u0629 Windows.\n\n\u0642\u062f \u064a\u0624\u062b\u0631 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u063a\u064a\u0631 \u0627\u0644\u0635\u062d\u064a\u062d \u0641\u064a \u0645\u0643\u0648\u0646\u0627\u062a Windows \u0623\u0648 \u0627\u0644\u062e\u062f\u0645\u0627\u062a \u0623\u0648 \u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0623\u0648 \u0627\u0644\u062a\u0639\u0631\u064a\u0641\u0627\u062a \u0623\u0648 \u0627\u0633\u062a\u0642\u0631\u0627\u0631 \u0627\u0644\u0646\u0638\u0627\u0645.\n\n\u064a\u0648\u0635\u0649 \u0628\u0647\u0627 \u0644\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u064a\u0646 \u0627\u0644\u0630\u064a\u0646 \u064a\u0641\u0647\u0645\u0648\u0646 \u063a\u0631\u0636 \u0627\u0644\u0639\u0645\u0644\u064a\u0629 \u0627\u0644\u0645\u062d\u062f\u062f\u0629.',
+  'tool_warning_windhawk_title': '\u062a\u0646\u0628\u064a\u0647 Windhawk',
+  'tool_warning_windhawk_message':
+      '\u064a\u0642\u0648\u0645 Windhawk \u0628\u062a\u0639\u062f\u064a\u0644 \u0633\u0644\u0648\u0643 \u0648\u0627\u062c\u0647\u0629 Windows \u0645\u0646 \u062e\u0644\u0627\u0644 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a.\n\n\u0642\u062f \u062a\u0624\u062b\u0631 \u0628\u0639\u0636 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a \u0641\u064a \u0627\u0644\u0627\u0633\u062a\u0642\u0631\u0627\u0631 \u0623\u0648 \u0627\u0644\u062a\u0648\u0627\u0641\u0642 \u0623\u0648 \u062a\u062d\u062f\u064a\u062b\u0627\u062a Windows \u0627\u0644\u0645\u0633\u062a\u0642\u0628\u0644\u064a\u0629.\n\n\u0631\u0627\u062c\u0639 \u0648\u0635\u0641 \u0627\u0644\u0625\u0636\u0627\u0641\u0627\u062a \u0628\u0639\u0646\u0627\u064a\u0629 \u0642\u0628\u0644 \u0627\u0644\u062a\u062b\u0628\u064a\u062a.',
+  'tool_warning_expert_title':
+      '\u0623\u062f\u0627\u0629 \u0644\u0644\u062e\u0628\u0631\u0627\u0621',
+  'tool_warning_expert_message':
+      '\u0647\u0630\u0647 \u0627\u0644\u0623\u062f\u0627\u0629 \u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u064a\u0646 \u0630\u0648\u064a \u0627\u0644\u062e\u0628\u0631\u0629.\n\n\u0642\u062f \u062a\u0624\u062b\u0631 \u0627\u0644\u062a\u063a\u064a\u064a\u0631\u0627\u062a \u0627\u0644\u062a\u064a \u062a\u062c\u0631\u064a\u0647\u0627 \u0647\u0630\u0647 \u0627\u0644\u0623\u062f\u0627\u0629 \u0641\u064a \u0648\u0638\u0627\u0626\u0641 \u0627\u0644\u0646\u0638\u0627\u0645 \u0623\u0648 \u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0623\u0648 \u0627\u0633\u062a\u0642\u0631\u0627\u0631 \u0646\u0638\u0627\u0645 \u0627\u0644\u062a\u0634\u063a\u064a\u0644.\n\n\u062a\u0627\u0628\u0639 \u0641\u0642\u0637 \u0625\u0630\u0627 \u0643\u0646\u062a \u062a\u0641\u0647\u0645 \u0647\u062f\u0641 \u0627\u0644\u0639\u0645\u0644\u064a\u0629 \u0648\u062a\u0623\u062b\u064a\u0631\u0647\u0627.',
+  'tool_warning_do_not_show_again': 'عدم العرض مرة أخرى',
+  'activation_tool_notice_title': 'تنبيه أداة التنشيط',
+  'activation_tool_notice_message':
+      'تُوفَّر هذه الأداة لأغراض التعليم والاختبار واستكشاف الأخطاء والبحث وإدارة الأنظمة.\n\nلا يوفر WinDeploy Studio تراخيص برامج أو مفاتيح منتجات أو خدمات تنشيط أو آليات لتجاوز التفويض.\n\nيتحمل المستخدمون مسؤولية الالتزام بجميع اتفاقيات ترخيص البرامج المعمول بها.\n\nلبيئات الإنتاج أو الاستخدام التجاري أو النشر طويل الأمد، يوصى بشدة بالحصول على ترخيص صالح من مورّد البرنامج.\n\nتابع فقط إذا كنت تفهم غرض الأداة المحددة وآثارها القانونية.',
+  'activation_tool_badge_tooltip': 'قد تؤثر في ترخيص البرنامج أو حالة تنشيطه.',
+  'activation_tool_disclaimer_title': 'تنبيه الترخيص والتنشيط',
+  'activation_tool_disclaimer_message':
+      'لا يؤيد WinDeploy Studio قرصنة البرامج أو التنشيط غير المصرح به أو التحايل على التراخيص.\n\nتُوفَّر جميع الأدوات المتعلقة بالتنشيط كموارد من جهات خارجية.\n\nيجب على المستخدمين الالتزام بشروط ترخيص Microsoft ومورّدي البرامج الآخرين.',
+  'ai_notice_title':
+      '\u062a\u0646\u0628\u064a\u0647 \u0645\u0633\u0627\u0639\u062f AI',
+  'ai_notice_message':
+      '\u0642\u062f \u064a\u0643\u0648\u0646 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0630\u064a \u064a\u0646\u0634\u0626\u0647 AI \u063a\u064a\u0631 \u062f\u0642\u064a\u0642 \u0623\u0648 \u063a\u064a\u0631 \u0645\u0643\u062a\u0645\u0644.\n\n\u0631\u0627\u062c\u0639 \u0627\u0644\u0639\u0645\u0644\u064a\u0627\u062a \u0627\u0644\u0645\u0647\u0645\u0629 \u0648\u062a\u062d\u0642\u0642 \u0645\u0646\u0647\u0627 \u062f\u0627\u0626\u0645\u064b\u0627 \u0642\u0628\u0644 \u062a\u0637\u0628\u064a\u0642 \u062a\u063a\u064a\u064a\u0631\u0627\u062a \u0639\u0644\u0649 \u0646\u0638\u0627\u0645\u0643.\n\n\u064a\u0642\u062f\u0645 \u0645\u0633\u0627\u0639\u062f AI \u0627\u0642\u062a\u0631\u0627\u062d\u0627\u062a \u0641\u0642\u0637 \u0648\u0644\u0627 \u064a\u0645\u0643\u0646\u0647 \u0636\u0645\u0627\u0646 \u0627\u0644\u062a\u0648\u0627\u0641\u0642 \u0623\u0648 \u0627\u0644\u0627\u0633\u062a\u0642\u0631\u0627\u0631 \u0623\u0648 \u0627\u0644\u0623\u0645\u0627\u0646.',
+  'ai_notice_got_it': '\u0641\u0647\u0645\u062a',
+  'ai_notice_do_not_show':
+      '\u0639\u062f\u0645 \u0627\u0644\u0639\u0631\u0636 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649',
   'webview_not_available': 'WebView2 غير مثبت',
-  'webview_download_desc': 'نظامك يحتاج إلى WebView2 Runtime لفتح الصفحات داخل التطبيق. هل تريد التنزيل الآن؟',
+  'webview_download_desc':
+      'نظامك يحتاج إلى WebView2 Runtime لفتح الصفحات داخل التطبيق. هل تريد التنزيل الآن؟',
   'webview_download': 'تنزيل WebView2',
   'webview_open_in_browser': 'فتح في المتصفح',
   'webview_open_external': 'فتح في المتصفح',
@@ -4474,7 +5146,8 @@ const _ar = <String, String>{
   'webview_download_complete': 'اكتمل التنزيل',
   'webview_download_failed': 'فشل التنزيل',
   'webview_downgrade_title': 'قد يكون الموقع غير متوافق',
-  'webview_downgrade_desc': 'قد لا يعمل هذا الموقع بشكل جيد في المدمج المتصفح. يوصى بفتحه في متصفح النظام.',
+  'webview_downgrade_desc':
+      'قد لا يعمل هذا الموقع بشكل جيد في المدمج المتصفح. يوصى بفتحه في متصفح النظام.',
   'webview_diag': 'تشخيص الشبكة',
   'webview_diag_title': 'تشخيص الشبكة',
   'dl_title': 'التنزيلات',
@@ -4499,10 +5172,14 @@ const _ar = <String, String>{
   'ai_search_canary': 'البحث عن AMD',
   'ai_search_wtg_tutorial': 'البحث عن Linus Tech Tips',
   'ai_search_rufus': 'البحث عن دليل WTG',
-  'ai_search_ms_update_prompt': 'البحث عن معالجات Intel وGPU وتعريفات التنزيل ومعلومات المنتجات.',
-  'ai_search_canary_prompt': 'البحث عن معالجات AMD وGPU وتعريفات التنزيل ومعلومات المنتجات.',
-  'ai_search_wtg_tutorial_prompt': 'البحث عن مقاطع فيديو ومراجعات Linus Tech Tips.',
-  'ai_search_rufus_prompt': 'البحث عن أدلة إنشاء Windows To Go وأفضل الممارسات.',
+  'ai_search_ms_update_prompt':
+      'البحث عن معالجات Intel وGPU وتعريفات التنزيل ومعلومات المنتجات.',
+  'ai_search_canary_prompt':
+      'البحث عن معالجات AMD وGPU وتعريفات التنزيل ومعلومات المنتجات.',
+  'ai_search_wtg_tutorial_prompt':
+      'البحث عن مقاطع فيديو ومراجعات Linus Tech Tips.',
+  'ai_search_rufus_prompt':
+      'البحث عن أدلة إنشاء Windows To Go وأفضل الممارسات.',
   'intel_cpu': 'المعالج',
   'intel_gpu': 'كرت الشاشة',
   'intel_loading': 'جاري التحميل...',
@@ -4522,6 +5199,17 @@ const _ar = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'مخصص',
   'mirror_category_tools': 'أدوات',
+  'mirror_category_official_microsoft': 'صور Microsoft الرسمية',
+  'mirror_category_community': 'صور المجتمع',
+  'mirror_badge_official': 'مصدر Microsoft الرسمي',
+  'mirror_badge_community': 'صورة مجتمع',
+  'mirror_desc_official': 'تنزيل مباشر من Microsoft',
+  'mirror_desc_community': 'صورة تديرها جهة مجتمعية خارجية',
+  'official_download_title': 'تنزيل Microsoft الرسمي',
+  'official_download_message':
+      'أنت على وشك زيارة موقع التنزيل الرسمي من Microsoft.\n\nقد تطلب منك Microsoft ما يلي:\n\n* اختيار اللغة\n* اختيار الإصدار\n* اختيار المعمارية\n* استخدام Media Creation Tool (بحسب الجهاز والمنطقة)\n\nستستمر عملية التنزيل في متصفح النظام.',
+  'official_download_open': 'فتح موقع Microsoft',
+  'official_download_open_failed': 'تعذر فتح متصفح النظام.',
   'mirror_error_loading': 'فشل تحميل قائمة الصور:',
   'safety_system_disk': 'يحتوي هذا القرص على نظام Windows قيد التشغيل',
   'safety_boot_disk': 'هذا القرص هو قرص الإقلاع',
@@ -4544,7 +5232,7 @@ const _ar = <String, String>{
   'boot_writing_boot': 'كتابة ملفات الإقلاع...',
   'boot_write_failed': 'فشل كتابة ملفات الإقلاع',
   'boot_setting_icon': 'تعيين أيقونة Volume...',
-  'boot_verifying': 'التحقق من USB القابل للتشغيل...',
+  'boot_verifying': 'التحقق من وسيط التثبيت...',
   'boot_complete': 'تم الإكمال!',
   'boot_verify_failed': 'فشل التحقق',
   'boot_no_drive_letter': 'لم يتم العثور على حرف القرص المعين',
@@ -4562,11 +5250,14 @@ const _ar = <String, String>{
   'wtg_svc_verifying': 'التحقق من WTG...',
   'wtg_svc_complete': 'اكتمل إنشاء WTG!',
   'wtg_svc_verify_failed': 'فشل التحقق',
-  'wtg_svc_timeout': 'انتهت مهلة العملية: قد يكون القرص قيد الاستخدام أو مقفلًا. يرجى إغلاق البرامج الأخرى وإعادة المحاولة.',
+  'wtg_svc_timeout':
+      'انتهت مهلة العملية: قد يكون القرص قيد الاستخدام أو مقفلًا. يرجى إغلاق البرامج الأخرى وإعادة المحاولة.',
   'wtg_svc_applying_percent': 'تطبيق الصورة... {percent}%',
   'wtg_svc_image_applied': 'تم تطبيق الصورة',
-  'ai_prompt_system': 'أنت مساعد الذكاء الاصطناعي المدمج في WinDeploy Studio، متخصص في نشر Windows.\n\n[القواعد]\n- كن مختصرًا ومباشرًا، بلا حشو أو تكرار\n- استخدم الجداول أو القوائم، تجنب الفقرات الطويلة\n- إذا كانت البيانات غير كافية، قل "مطلوب مزيد من المعلومات"، ولا تختلق أبدًا\n- إجمالي الإجابة أقل من 500 كلمة\n- لا تنتقص من نفسك أبدًا (مثل "لا أستطيع الوصول"، "بوصفي ذكاء اصطناعي")، قدم التحليل مباشرة\n\n[الخبرة]\nتثبيت/نشر Windows، وWindows To Go، وإنشاء USB القابل للتشغيل، وDISM، وBCDBoot، وتحليل صور ISO، ومشاكل إقلاع USB، واستخدام WinDeploy Studio',
-  'ai_prompt_analyze_prefix': 'بناءً على البيانات التالية، حلّل بإيجاز. استخدم صيغة الجداول أو القوائم.\n\n[قواعد التحليل]\n- حلّل فقط بناءً على البيانات المقدمة، لا تختلق\n- علّم المخاطر بـ 🔴عالي 🟡متوسط 🟢منخفض\n-ضع الاستنتاجات أولًا، بحد أقصى 3 أسطر\n- التحليل التفصيلي بعده، بالجداول\n- إجمالي الإجابة أقل من 300 كلمة\n\n',
+  'ai_prompt_system':
+      'أنت مساعد الذكاء الاصطناعي المدمج في WinDeploy Studio، متخصص في نشر Windows.\n\n[القواعد]\n- كن مختصرًا ومباشرًا، بلا حشو أو تكرار\n- استخدم الجداول أو القوائم، تجنب الفقرات الطويلة\n- إذا كانت البيانات غير كافية، قل "مطلوب مزيد من المعلومات"، ولا تختلق أبدًا\n- إجمالي الإجابة أقل من 500 كلمة\n- لا تنتقص من نفسك أبدًا (مثل "لا أستطيع الوصول"، "بوصفي ذكاء اصطناعي")، قدم التحليل مباشرة\n\n[الخبرة]\nتثبيت/نشر Windows، وWindows To Go، وإنشاء وسائط تثبيت Windows، وDISM، وBCDBoot، وتحليل صور ISO، ومشاكل إقلاع USB، واستخدام WinDeploy Studio',
+  'ai_prompt_analyze_prefix':
+      'بناءً على البيانات التالية، حلّل بإيجاز. استخدم صيغة الجداول أو القوائم.\n\n[قواعد التحليل]\n- حلّل فقط بناءً على البيانات المقدمة، لا تختلق\n- علّم المخاطر بـ 🔴عالي 🟡متوسط 🟢منخفض\n-ضع الاستنتاجات أولًا، بحد أقصى 3 أسطر\n- التحليل التفصيلي بعده، بالجداول\n- إجمالي الإجابة أقل من 300 كلمة\n\n',
   'ai_prompt_log_content': '[محتوى السجل]',
   'ai_prompt_iso_info': '[معلومات ISO]',
   'ai_prompt_usb_info': '[معلومات جهاز USB]',
@@ -4601,17 +5292,13 @@ const _ar = <String, String>{
   'mirror_download_source': 'مصدر التنزيل',
   'mirror_download_unknown': 'غير معروف',
   'mirror_source_label': 'المصدر الموصى به',
-  'mirror_strategy_auto': 'اختيار تلقائي (موصى به)',
-  'mirror_strategy_china': 'إجبار المرآة الصينية',
-  'mirror_strategy_global': 'إجبار المرآة العالمية',
-  'settings_mirror_source': 'مصدر التنزيل',
-  'settings_mirror_source_desc': 'استراتيجية مصدر المرآة',
   'mirror_geo_failed': 'تعذر تحديد المنطقة، يتم استخدام المرآة العالمية',
   'mirror_speed_test_title': 'حالة المرآة',
   'mirror_speed_test_testing': 'جاري اختبار مصادر المرآة...',
   'mirror_speed_test_refresh': 'إعادة الاختبار',
   'mirror_speed_test_failed': 'فشل اختبار السرعة',
-  'mirror_speed_test_all_offline': 'تعذر الاتصال بخوادم المرآة. يرجى التحقق من الشبكة.',
+  'mirror_speed_test_all_offline':
+      'تعذر الاتصال بخوادم المرآة. يرجى التحقق من الشبكة.',
   'mirror_speed_test_recommend': 'موصى به',
   'mirror_download_latency': 'زمن الاستجابة',
   'mirror_select_title': 'اختيار مرآة التنزيل',
@@ -4628,20 +5315,21 @@ const _ar = <String, String>{
 
 const _pt = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Criador de USB inicializável e Windows To Go',
+  'app_subtitle': 'Criador de mídia de instalação do Windows e Windows To Go',
   'nav_home': 'Início',
   'nav_images': 'Imagens',
-  'nav_creator': 'Criar',
+  'nav_creator': 'Mídia',
   'nav_wtg': 'WTG',
   'nav_logs': 'Registros',
   'nav_settings': 'Configurações',
   'home_title': 'Ferramenta de implantação Windows',
-  'home_subtitle': 'Criador de USB inicializável e Windows To Go',
+  'home_subtitle': 'Criador de mídia de instalação do Windows e Windows To Go',
   'home_quick_start': 'Início rápido',
   'home_image_library': 'Biblioteca de imagens',
-  'home_image_library_desc': 'Explorar imagens do Windows e obter links de download',
-  'home_bootable_usb': 'Criador de USB inicializável',
-  'home_bootable_usb_desc': 'Criar uma memória USB inicializável do Windows',
+  'home_image_library_desc':
+      'Explorar imagens do Windows e obter links de download',
+  'home_bootable_usb': 'Criador de mídia de instalação do Windows',
+  'home_bootable_usb_desc': 'Criar um USB de instalação do Windows a partir de um ISO',
   'home_font_pack': 'Baixar pacote de fontes',
   'home_font_pack_desc': 'Fontes CJK para ISOs leves do Windows',
   'home_wtg': 'Windows To Go',
@@ -4653,7 +5341,7 @@ const _pt = <String, String>{
   'home_platform': 'Plataforma',
   'home_engine': 'Motor',
   'home_focus': 'Foco',
-  'home_focus_value': 'USB inicializável e WTG',
+  'home_focus_value': 'Mídia de instalação e WTG',
   'home_license': 'Licença',
   'home_license_value': 'Código aberto',
   'images_title': 'Biblioteca de imagens',
@@ -4663,7 +5351,8 @@ const _pt = <String, String>{
   'images_empty': 'Nenhuma imagem disponível',
   'images_category_all': 'Todas',
   'images_local_library': 'Biblioteca local',
-  'images_local_empty': 'Nenhum ISO local encontrado. Defina um caminho nas Configurações.',
+  'images_local_empty':
+      'Nenhum ISO local encontrado. Defina um caminho nas Configurações.',
   'images_local_iso': 'ISO local',
   'images_close': 'Fechar',
   'detail_back': 'Voltar à biblioteca',
@@ -4683,13 +5372,17 @@ const _pt = <String, String>{
   'images_error': 'Erro desconhecido',
   'mirror_not_found': 'Item de imagem não encontrado',
   'cancel_title': 'Cancelar',
-  'cancel_parse_desc': 'Cancelar a análise do ISO? A imagem montada será desmontada.',
+  'cancel_parse_desc':
+      'Cancelar a análise do ISO? A imagem montada será desmontada.',
   'cancel_confirm': 'Confirmar cancelamento',
-  'cancel_create_desc': 'Cancelar a criação do USB inicializável? Esta ação não pode ser desfeita.',
+  'cancel_create_desc':
+      'Cancelar a criação da mídia de instalação do Windows? Esta ação não pode ser desfeita.',
   'fontpack_warning': 'Este sistema pode não ter fontes chinesas',
-  'fontpack_recommend': 'Recomenda-se baixar e instalar o pacote de fontes chinesas',
+  'fontpack_recommend':
+      'Recomenda-se baixar e instalar o pacote de fontes chinesas',
   'fontpack_download': 'Baixar pacote de fontes',
-  'fontpack_desc': 'Pacote de fontes chinesas para ISOs leves do Windows. Inclui fontes CJK comuns para garantir a exibição correta do conteúdo em chinês.',
+  'fontpack_desc':
+      'Pacote de fontes chinesas para ISOs leves do Windows. Inclui fontes CJK comuns para garantir a exibição correta do conteúdo em chinês.',
   'fontpack_feature_1': 'Inclui HarmonyOS Sans SC e outras fontes chinesas',
   'fontpack_feature_2': 'Compatível com Windows 10/11',
   'fontpack_feature_3': 'Instalação com um clique para todos os usuários',
@@ -4697,14 +5390,15 @@ const _pt = <String, String>{
   'iso_step_detect': 'Detectando instalador...',
   'iso_step_info': 'Lendo informações da imagem...',
   'iso_step_cleanup': 'Limpando...',
-  'creator_title': 'Criador de USB inicializável',
-  'creator_subtitle': 'Criar uma memória USB inicializável do Windows',
+  'creator_title': 'Criador de mídia de instalação do Windows',
+  'creator_subtitle': 'Criar um USB de instalação do Windows a partir de um ISO',
   'creator_step_iso': 'Selecionar ISO',
   'creator_step_usb': 'Selecionar USB',
   'creator_step_confirm': 'Confirmar',
   'creator_step_create': 'Criar',
   'creator_select_iso': 'Selecionar ISO do Windows',
-  'creator_select_iso_desc': 'Escolha um arquivo ISO do Windows 10/11 ou Server',
+  'creator_select_iso_desc':
+      'Escolha um arquivo ISO do Windows 10/11 ou Server',
   'creator_select_btn': 'Selecionar ISO local',
   'creator_next_usb': 'Próximo: Selecionar USB',
   'creator_select_usb': 'Selecionar USB de destino',
@@ -4725,8 +5419,8 @@ const _pt = <String, String>{
   'creator_start': 'Iniciar criação',
   'creator_creating': 'Criando...',
   'creator_parsing': 'Analisando arquivo ISO...',
-  'creator_complete_title': 'USB inicializável criado!',
-  'creator_complete_desc': 'Sua memória USB inicializável está pronta para uso',
+  'creator_complete_title': 'Mídia de instalação do Windows criada!',
+  'creator_complete_desc': 'Seu USB de instalação do Windows está pronto para uso',
   'creator_another': 'Criar outro',
   'creator_parse_error': 'Erro ao analisar o arquivo ISO',
   'creator_error': 'Erro',
@@ -4770,7 +5464,18 @@ const _pt = <String, String>{
   'settings_license': 'Licença',
   'settings_license_value': 'Código aberto',
   'settings_built_with': 'Construído com:',
-  'settings_copyright': '©2026 Bob Steve. Todos os direitos reservados.',
+  'settings_copyright': '©2026 Bob Steve. Distribuído sob a Licença MIT.',
+  'about_github_repository': 'Repositório GitHub',
+  'special_thanks_title': 'Agradecimentos especiais',
+  'special_thanks_intro':
+      'O WinDeploy Studio agradece às seguintes pessoas e comunidades pelo feedback, testes, ideias, inspiração e apoio.',
+  'thanks_astra_desc': 'Feedback inicial, testes e discussões do projeto',
+  'thanks_timme_desc':
+      'Feedback internacional detalhado, recomendações de confiança e usabilidade, sugestões de fontes da Microsoft e revisão da comunidade',
+  'thanks_sysinternals_desc':
+      'Inspiração nas ferramentas de diagnóstico e solução de problemas da Microsoft',
+  'thanks_open_source_desc':
+      'Por documentação, relatórios de bugs, testes, traduções e sugestões',
   'close': 'Fechar',
   'copied': 'Copiado',
   'ai_thinking': 'Pensando...',
@@ -4783,7 +5488,8 @@ const _pt = <String, String>{
   'lang_select_title': 'Selecionar idioma',
   'lang_select_desc': 'Escolha seu idioma preferido',
   'lang_select_confirm': 'Confirmar',
-  'lang_select_settings_hint': 'Você pode alterar isso depois nas Configurações',
+  'lang_select_settings_hint':
+      'Você pode alterar isso depois nas Configurações',
   'wtg_title': 'Criador de Windows To Go',
   'wtg_subtitle': 'Criar um espaço de trabalho portátil Windows To Go',
   'wtg_select_iso': 'Selecionar ISO do Windows',
@@ -4792,9 +5498,11 @@ const _pt = <String, String>{
   'wtg_rescan': 'Reescanear',
   'wtg_iso_selected': 'ISO selecionado',
   'wtg_step1_title': 'Passo 1: Selecionar ISO',
-  'wtg_step1_desc': 'Selecione um arquivo ISO do Windows para criar o Windows To Go',
+  'wtg_step1_desc':
+      'Selecione um arquivo ISO do Windows para criar o Windows To Go',
   'wtg_step2_title': 'Passo 2: Analisar ISO',
-  'wtg_step2_desc': 'Analisando o arquivo ISO para carregar as imagens do Windows',
+  'wtg_step2_desc':
+      'Analisando o arquivo ISO para carregar as imagens do Windows',
   'wtg_loading_wim': 'Carregando imagens do Windows...',
   'wtg_wim_loaded': 'Imagens do Windows carregadas',
   'wtg_wim_count': '{count} imagens do Windows encontradas',
@@ -4831,12 +5539,14 @@ const _pt = <String, String>{
   'wtg_step_complete_title': 'Passo 7: Concluído',
   'wtg_step_complete_desc': 'Windows To Go foi criado com sucesso',
   'wtg_creation_complete': 'Windows To Go criado!',
-  'wtg_creation_complete_desc': 'Seu espaço de trabalho Windows To Go está pronto para uso',
+  'wtg_creation_complete_desc':
+      'Seu espaço de trabalho Windows To Go está pronto para uso',
   'wtg_step_failed_title': 'Falha na criação',
   'wtg_step_failed_desc': 'Ocorreu um erro ao criar o Windows To Go',
   'wtg_creation_failed': 'Falha na criação',
   'wtg_debug_info': 'Informações de depuração',
-  'wtg_debug_copied': 'Informações de depuração copiadas para a área de transferência',
+  'wtg_debug_copied':
+      'Informações de depuração copiadas para a área de transferência',
   'wtg_copy_debug': 'Copiar informações de depuração',
   'wtg_speed_test_failed': 'Teste de velocidade falhou',
   'wtg_grade_a': 'Excelente - Ideal para Windows To Go',
@@ -4846,20 +5556,24 @@ const _pt = <String, String>{
   'wtg_grade_f': 'Falhou - Inadequado para Windows To Go',
   'wtg_grade_unknown': 'Desconhecido - Teste de velocidade necessário',
   'wtg_warn_disk_info_failed': 'Não foi possível obter informações do disco',
-  'wtg_warn_size_small': 'O disco tem menos de 32 GB, não recomendado para Windows To Go',
+  'wtg_warn_size_small':
+      'O disco tem menos de 32 GB, não recomendado para Windows To Go',
   'wtg_warn_not_usb': 'Este dispositivo não parece ser uma unidade USB',
-  'wtg_warn_performance_low': 'O desempenho pode ser insuficiente para Windows To Go (requer ~80 MB/s)',
+  'wtg_warn_performance_low':
+      'O desempenho pode ser insuficiente para Windows To Go (requer ~80 MB/s)',
   'wtg_warn_speed_test_failed': 'Teste de velocidade falhou',
   'wtg_err_drive_not_found': 'Letra da unidade não encontrada',
   'wtg_err_empty_drive_letter': 'Letra da unidade vazia',
-  'wtg_rec_retry_speed_test': 'Por favor, execute o teste de velocidade novamente',
+  'wtg_rec_retry_speed_test':
+      'Por favor, execute o teste de velocidade novamente',
   'wtg_elapsed': 'Decorrido',
   'wtg_eta': 'Restante',
   'wtg_current_speed': 'Velocidade atual',
   'wtg_average_speed': 'Velocidade média',
   'wtg_written': 'Gravado',
   'wtg_remaining': 'Restante',
-  'wtg_low_speed_warning': 'Desempenho de escrita aleatória baixo detectado. A criação do Windows To Go pode levar mais tempo do que o esperado. Por favor, seja paciente.',
+  'wtg_low_speed_warning':
+      'Desempenho de escrita aleatória baixo detectado. A criação do Windows To Go pode levar mais tempo do que o esperado. Por favor, seja paciente.',
   'wtg_images_found': '{count} imagens do Windows encontradas',
   'wtg_image_fallback': 'Imagem {index}',
   'wtg_disk_number': 'Disco {number}',
@@ -4896,7 +5610,7 @@ const _pt = <String, String>{
   'logs_min_ago': 'Há {n} min',
   'logs_hours_ago': 'Há {n} horas',
   'logs_days_ago': 'Há {n} dias',
-  'logs_cat_usb': 'Registros USB',
+  'logs_cat_usb': 'Registros da mídia',
   'logs_cat_wtg': 'Registros WTG',
   'logs_cat_downloads': 'Downloads',
   'logs_cat_iso': 'Análise ISO',
@@ -4914,7 +5628,8 @@ const _pt = <String, String>{
   'update_last_check': 'Última verificação',
   'update_never': 'Nunca',
   'update_available_title': 'Atualização disponível',
-  'update_available_desc': 'Uma nova versão do WinDeploy Studio está disponível.',
+  'update_available_desc':
+      'Uma nova versão do WinDeploy Studio está disponível.',
   'update_release_notes': 'Notas da versão',
   'update_now': 'Atualizar agora',
   'update_open_browser': 'Abrir no navegador',
@@ -4927,6 +5642,7 @@ const _pt = <String, String>{
   'update_install_desc': 'A atualização foi baixada. Instalar agora?',
   'update_up_to_date': 'Você está atualizado',
   'update_checking': 'Verificando atualizações...',
+  'update_check_failed': 'Falha ao verificar atualizações',
   'update_channel': 'Canal de atualização',
   'update_channel_stable': 'Estável',
   'update_channel_beta': 'Beta',
@@ -4957,10 +5673,11 @@ const _pt = <String, String>{
   'ai_clear_chat': 'Limpar conversa',
   'ai_input_hint': 'Pergunte sobre implantação do Windows...',
   'ai_welcome_title': 'Olá, sou o WinDeploy AI',
-  'ai_welcome_desc': 'Posso ajudá-lo com implantação do Windows, Windows To Go, criação de USB inicializável e mais.',
+  'ai_welcome_desc':
+      'Posso ajudá-lo com implantação do Windows, Windows To Go, criação de mídia de instalação e mais.',
   'ai_ability_windows': 'Instalação Windows',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'USB inicializável',
+  'ai_ability_usb': 'Mídia de instalação',
   'ai_ability_iso': 'Análise ISO',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -4976,6 +5693,27 @@ const _pt = <String, String>{
   'ai_action_diagnose': 'Diagnosticar',
   'ai_no_logs': 'Nenhum arquivo de registro encontrado para análise.',
   'ai_please_wait': 'Por favor, aguarde a resposta atual terminar...',
+
+  'ai_settings_section': 'Assistente IA',
+  'ai_proxy_url': 'URL do proxy de IA',
+  'ai_proxy_url_desc':
+      'Use um endpoint proxy compativel com OpenAI. Deixe em branco ou redefina para usar o endpoint integrado.',
+  'ai_proxy_url_loading': 'Carregando...',
+  'ai_proxy_url_invalid': 'Insira uma URL HTTP ou HTTPS valida',
+  'ai_error_unauthorized': 'O servico de IA nao esta autorizado.',
+  'ai_error_rate_limited': 'Muitas solicitacoes. Tente novamente mais tarde.',
+  'ai_error_unavailable': 'O servico de IA esta temporariamente indisponivel.',
+  'ai_error_http': 'Erro do servico de IA ({status}).',
+  'ai_error_timeout':
+      'A conexao com o servico de IA expirou. Verifique a rede ou altere a URL do proxy de IA nas Configuracoes.',
+  'ai_error_unreachable':
+      'Nao foi possivel conectar ao servico de IA. Sua rede pode nao alcancar o proxy workers.dev integrado. Altere a URL do proxy de IA nas Configuracoes e tente novamente.',
+  'ai_error_tls':
+      'Falha na conexao TLS do servico de IA. Verifique a hora do sistema, o proxy de rede ou altere a URL do proxy de IA.',
+  'ai_error_connection': 'Falha na conexao do servico de IA: {error}',
+  'settings_edit': 'Editar',
+  'settings_save': 'Salvar',
+  'settings_reset_default': 'Redefinir',
   'nav_tools': 'Ferramentas',
   'tools_title': 'Ferramentas',
   'tools_subtitle': 'Ferramentas recomendadas para implantação Windows',
@@ -4994,16 +5732,6 @@ const _pt = <String, String>{
   'tools_features': 'Funcionalidades',
   'tools_website': 'Site',
   'tools_download': 'Baixar',
-  'adblock_on': 'AdBlock ATIVADO',
-  'adblock_off': 'AdBlock DESATIVADO',
-  'adblock_stats': 'Estatísticas do AdBlock',
-  'adblock_ads': 'Anúncios bloqueados',
-  'adblock_trackers': 'Rastreadores bloqueados',
-  'adblock_total': 'Total bloqueado',
-  'adblock_enabled': 'Bloqueio de anúncios ativado',
-  'adblock_privacy': 'Proteção de privacidade ativada',
-  'adblock_whitelist': 'Adicionar à lista de permissões',
-  'adblock_disable_site': 'Desativar para este site',
   'tools_cat_system': 'Sistema',
   'tools_cat_disk': 'Discos',
   'tools_cat_driver': 'Drivers',
@@ -5014,9 +5742,39 @@ const _pt = <String, String>{
   'tools_cat_optimize': 'Otimização',
   'tools_cat_rescue': 'Recuperação',
   'tools_cat_file': 'Arquivos',
-  'tools_cat_activation': 'Ativação',
+  'tools_cat_activation': 'Licenças e ativação',
+  'tools_cat_advanced': 'Ferramentas avan\xe7adas',
+  'tool_safety_beginner': 'Iniciante',
+  'tool_safety_advanced': 'Avan\xe7ado',
+  'tool_safety_expert': 'Especialista',
+  'tool_warning_continue': 'Continuar',
+  'tool_warning_cancel': 'Cancelar',
+  'tool_warning_dism_title': 'Aviso do DISM++',
+  'tool_warning_dism_message':
+      'DISM++ \xe9 um utilit\xe1rio poderoso de manuten\xe7\xe3o do Windows.\n\nO uso incorreto pode afetar componentes do Windows, servi\xe7os, atualiza\xe7\xf5es, drivers ou a estabilidade do sistema.\n\nRecomendado para usu\xe1rios que entendem o objetivo da opera\xe7\xe3o selecionada.',
+  'tool_warning_windhawk_title': 'Aviso do Windhawk',
+  'tool_warning_windhawk_message':
+      'Windhawk modifica o comportamento da interface do Windows por meio de plugins.\n\nAlguns plugins podem afetar estabilidade, compatibilidade ou futuras atualiza\xe7\xf5es do Windows.\n\nLeia cuidadosamente as descri\xe7\xf5es dos plugins antes da instala\xe7\xe3o.',
+  'tool_warning_expert_title': 'Ferramenta especialista',
+  'tool_warning_expert_message':
+      'Esta ferramenta \xe9 destinada a usu\xe1rios experientes.\n\nAs altera\xe7\xf5es feitas por esta ferramenta podem afetar fun\xe7\xf5es do sistema, integridade dos dados ou estabilidade do sistema operacional.\n\nProssiga somente se voc\xea entende o objetivo e o impacto da opera\xe7\xe3o.',
+  'tool_warning_do_not_show_again': 'Não mostrar novamente',
+  'activation_tool_notice_title': 'Aviso sobre ferramenta de ativação',
+  'activation_tool_notice_message':
+      'Esta ferramenta é fornecida para fins educacionais, testes, solução de problemas, pesquisa e administração de sistemas.\n\nO WinDeploy Studio não fornece licenças de software, chaves de produto, serviços de ativação ou mecanismos para contornar autorização.\n\nOs usuários são responsáveis por cumprir todos os contratos de licença de software aplicáveis.\n\nPara ambientes de produção, uso comercial ou implantação de longo prazo, é altamente recomendável obter uma licença válida do fornecedor do software.\n\nProssiga somente se você entende o propósito e as implicações legais da ferramenta selecionada.',
+  'activation_tool_badge_tooltip':
+      'Pode afetar o licenciamento ou o estado de ativação do software.',
+  'activation_tool_disclaimer_title': 'Aviso sobre licenças e ativação',
+  'activation_tool_disclaimer_message':
+      'O WinDeploy Studio não apoia pirataria de software, ativação não autorizada ou contorno de licenças.\n\nTodos os utilitários relacionados à ativação são fornecidos como recursos de terceiros.\n\nOs usuários devem cumprir os termos de licença da Microsoft e de outros fornecedores de software.',
+  'ai_notice_title': 'Aviso do assistente AI',
+  'ai_notice_message':
+      'O conte\xfado gerado por AI pode ser impreciso ou incompleto.\n\nSempre revise e verifique opera\xe7\xf5es importantes antes de aplicar altera\xe7\xf5es ao sistema.\n\nO assistente AI fornece apenas sugest\xf5es e n\xe3o pode garantir compatibilidade, estabilidade ou seguran\xe7a.',
+  'ai_notice_got_it': 'Entendi',
+  'ai_notice_do_not_show': 'N\xe3o mostrar novamente',
   'webview_not_available': 'WebView2 não instalado',
-  'webview_download_desc': 'Seu sistema precisa do WebView2 Runtime para abrir páginas no aplicativo. Baixar agora?',
+  'webview_download_desc':
+      'Seu sistema precisa do WebView2 Runtime para abrir páginas no aplicativo. Baixar agora?',
   'webview_download': 'Baixar WebView2',
   'webview_open_in_browser': 'Abrir no navegador',
   'webview_open_external': 'Abrir no navegador',
@@ -5035,7 +5793,8 @@ const _pt = <String, String>{
   'webview_download_complete': 'Download concluído',
   'webview_download_failed': 'Falha no download',
   'webview_downgrade_title': 'O site pode ser incompatível',
-  'webview_downgrade_desc': 'Este site pode não funcionar bem no navegador integrado. Recomenda-se abri-lo no navegador do sistema.',
+  'webview_downgrade_desc':
+      'Este site pode não funcionar bem no navegador integrado. Recomenda-se abri-lo no navegador do sistema.',
   'webview_diag': 'Diagnóstico de rede',
   'webview_diag_title': 'Diagnóstico de rede',
   'dl_title': 'Downloads',
@@ -5060,10 +5819,14 @@ const _pt = <String, String>{
   'ai_search_canary': 'Pesquisar AMD',
   'ai_search_wtg_tutorial': 'Pesquisar Linus Tech Tips',
   'ai_search_rufus': 'Pesquisar tutorial WTG',
-  'ai_search_ms_update_prompt': 'Pesquisar CPU Intel, GPU, downloads de drivers e informações de produtos.',
-  'ai_search_canary_prompt': 'Pesquisar CPU AMD, GPU, downloads de drivers e informações de produtos.',
-  'ai_search_wtg_tutorial_prompt': 'Pesquisar vídeos e análises do Linus Tech Tips.',
-  'ai_search_rufus_prompt': 'Pesquisar tutoriais de criação do Windows To Go e melhores práticas.',
+  'ai_search_ms_update_prompt':
+      'Pesquisar CPU Intel, GPU, downloads de drivers e informações de produtos.',
+  'ai_search_canary_prompt':
+      'Pesquisar CPU AMD, GPU, downloads de drivers e informações de produtos.',
+  'ai_search_wtg_tutorial_prompt':
+      'Pesquisar vídeos e análises do Linus Tech Tips.',
+  'ai_search_rufus_prompt':
+      'Pesquisar tutoriais de criação do Windows To Go e melhores práticas.',
   'intel_cpu': 'CPU',
   'intel_gpu': 'GPU',
   'intel_loading': 'Carregando...',
@@ -5083,12 +5846,26 @@ const _pt = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Personalizado',
   'mirror_category_tools': 'Ferramentas',
+  'mirror_category_official_microsoft': 'Imagens oficiais da Microsoft',
+  'mirror_category_community': 'Imagens da comunidade',
+  'mirror_badge_official': 'Fonte oficial da Microsoft',
+  'mirror_badge_community': 'Imagem da comunidade',
+  'mirror_desc_official': 'Baixe diretamente da Microsoft',
+  'mirror_desc_community': 'Imagem mantida por uma comunidade de terceiros',
+  'official_download_title': 'Download oficial da Microsoft',
+  'official_download_message':
+      'Você está prestes a visitar o site oficial de download da Microsoft.\n\nA Microsoft pode solicitar que você:\n\n* selecione o idioma\n* selecione a edição\n* selecione a arquitetura\n* use o Media Creation Tool (dependendo do dispositivo e da região)\n\nO processo de download continuará no navegador do sistema.',
+  'official_download_open': 'Abrir site da Microsoft',
+  'official_download_open_failed':
+      'Não foi possível abrir o navegador do sistema.',
   'mirror_error_loading': 'Falha ao carregar lista de imagens:',
   'safety_system_disk': 'Este disco contém o sistema Windows em execução',
   'safety_boot_disk': 'Este disco é o disco de boot',
   'safety_efi_partition': 'Este disco contém uma partição EFI do sistema',
-  'safety_recovery_partition': 'Este disco contém uma partição de recuperação do Windows',
-  'safety_windows_install': 'Este disco contém uma instalação do Windows ({drive})',
+  'safety_recovery_partition':
+      'Este disco contém uma partição de recuperação do Windows',
+  'safety_windows_install':
+      'Este disco contém uma instalação do Windows ({drive})',
   'boot_preparing': 'Preparando...',
   'boot_cleaning': 'Limpando disco...',
   'boot_access_denied': 'Acesso negado, execute como administrador',
@@ -5105,10 +5882,11 @@ const _pt = <String, String>{
   'boot_writing_boot': 'Gravando arquivos de boot...',
   'boot_write_failed': 'Falha ao gravar arquivos de boot',
   'boot_setting_icon': 'Configurando ícone do volume...',
-  'boot_verifying': 'Verificando USB inicializável...',
+  'boot_verifying': 'Verificando mídia de instalação...',
   'boot_complete': 'Concluído!',
   'boot_verify_failed': 'Falha na verificação',
-  'boot_no_drive_letter': 'Não foi possível encontrar a letra da unidade atribuída',
+  'boot_no_drive_letter':
+      'Não foi possível encontrar a letra da unidade atribuída',
   'wtg_svc_preparing': 'Preparando...',
   'wtg_svc_partitioning': 'Particionando disco...',
   'wtg_svc_partition_failed': 'Falha no particionamento',
@@ -5123,11 +5901,14 @@ const _pt = <String, String>{
   'wtg_svc_verifying': 'Verificando WTG...',
   'wtg_svc_complete': 'Criação do WTG concluída!',
   'wtg_svc_verify_failed': 'Falha na verificação',
-  'wtg_svc_timeout': 'Tempo esgotado: o disco pode estar em uso ou bloqueado. Feche outros programas e tente novamente.',
+  'wtg_svc_timeout':
+      'Tempo esgotado: o disco pode estar em uso ou bloqueado. Feche outros programas e tente novamente.',
   'wtg_svc_applying_percent': 'Aplicando imagem... {percent}%',
   'wtg_svc_image_applied': 'Imagem aplicada',
-  'ai_prompt_system': 'Você é o assistente de IA integrado do WinDeploy Studio, especializado em implantação do Windows.\n\n[REGRAS]\n- Seja conciso e direto, sem rodeios ou repetições\n- Use tabelas ou listas, evite parágrafos longos\n- Se faltar dados, diga "Mais informações necessárias", nunca invente\n- Resposta total inferior a 500 palavras\n- Nunca se menospreze (ex. "Não consigo acessar", "Como IA"), dê apenas a análise\n\n[EXPERIENCIA]\nInstalação/implantação do Windows, Windows To Go, criação de USB inicializável, DISM, BCDBoot, análise de imagens ISO, problemas de boot USB, uso do WinDeploy Studio',
-  'ai_prompt_analyze_prefix': 'Com base nos seguintes dados reais, analise de forma concisa. Use formato de tabelas ou listas.\n\n[REGRAS DE ANÁLISE]\n- Analise apenas com os dados fornecidos, não invente\n- Marque riscos com 🔴Alto 🟡Médio 🟢Baixo\n- Conclusões primeiro, máximo 3 linhas\n- Análise detalhada depois, com tabelas\n- Resposta total inferior a 300 palavras\n\n',
+  'ai_prompt_system':
+      'Você é o assistente de IA integrado do WinDeploy Studio, especializado em implantação do Windows.\n\n[REGRAS]\n- Seja conciso e direto, sem rodeios ou repetições\n- Use tabelas ou listas, evite parágrafos longos\n- Se faltar dados, diga "Mais informações necessárias", nunca invente\n- Resposta total inferior a 500 palavras\n- Nunca se menospreze (ex. "Não consigo acessar", "Como IA"), dê apenas a análise\n\n[EXPERIENCIA]\nInstalação/implantação do Windows, Windows To Go, criação de mídia de instalação, DISM, BCDBoot, análise de imagens ISO, problemas de boot USB, uso do WinDeploy Studio',
+  'ai_prompt_analyze_prefix':
+      'Com base nos seguintes dados reais, analise de forma concisa. Use formato de tabelas ou listas.\n\n[REGRAS DE ANÁLISE]\n- Analise apenas com os dados fornecidos, não invente\n- Marque riscos com 🔴Alto 🟡Médio 🟢Baixo\n- Conclusões primeiro, máximo 3 linhas\n- Análise detalhada depois, com tabelas\n- Resposta total inferior a 300 palavras\n\n',
   'ai_prompt_log_content': '[CONTEÚDO DO REGISTRO]',
   'ai_prompt_iso_info': '[INFORMAÇÕES DO ISO]',
   'ai_prompt_usb_info': '[INFORMAÇÕES DO DISPOSITIVO USB]',
@@ -5155,24 +5936,22 @@ const _pt = <String, String>{
   'ai_prompt_get_failed': '  Falha ao obter:',
   'ai_prompt_recent_errors': '[REGISTROS DE ERROS RECENTES]',
   'ai_prompt_no_errors': '  Sem registros de erros',
-  'ai_prompt_error_dir_missing': '  O diretório de registros de erros não existe',
+  'ai_prompt_error_dir_missing':
+      '  O diretório de registros de erros não existe',
   'mirror_download_confirm_title': 'Confirmar download',
   'mirror_download_mirror': 'Imagem',
   'mirror_download_region': 'Região detectada',
   'mirror_download_source': 'Fonte do download',
   'mirror_download_unknown': 'Desconhecido',
   'mirror_source_label': 'Fonte recomendada',
-  'mirror_strategy_auto': 'Seleção automática (recomendado)',
-  'mirror_strategy_china': 'Forçar espelho chinês',
-  'mirror_strategy_global': 'Forçar espelho global',
-  'settings_mirror_source': 'Fonte do download',
-  'settings_mirror_source_desc': 'Estratégia de fonte de espelho',
-  'mirror_geo_failed': 'Não foi possível determinar a região, usando espelho global',
+  'mirror_geo_failed':
+      'Não foi possível determinar a região, usando espelho global',
   'mirror_speed_test_title': 'Status dos espelhos',
   'mirror_speed_test_testing': 'Testando fontes de espelho...',
   'mirror_speed_test_refresh': 'Repetir teste',
   'mirror_speed_test_failed': 'Teste de velocidade falhou',
-  'mirror_speed_test_all_offline': 'Não foi possível conectar aos servidores. Verifique sua rede.',
+  'mirror_speed_test_all_offline':
+      'Não foi possível conectar aos servidores. Verifique sua rede.',
   'mirror_speed_test_recommend': 'Recomendado',
   'mirror_download_latency': 'Latência',
   'mirror_select_title': 'Selecionar espelho de download',
@@ -5189,20 +5968,21 @@ const _pt = <String, String>{
 
 const _de = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Bootfähiger USB- & Windows To Go-Ersteller',
+  'app_subtitle': 'Windows-Installationsmedium- & Windows To Go-Ersteller',
   'nav_home': 'Startseite',
   'nav_images': 'Abbilder',
-  'nav_creator': 'Erstellen',
+  'nav_creator': 'Medium',
   'nav_wtg': 'WTG',
   'nav_logs': 'Protokolle',
   'nav_settings': 'Einstellungen',
   'home_title': 'Windows-Bereitstellungstool',
-  'home_subtitle': 'Bootfähiger USB- & Windows To Go-Ersteller',
+  'home_subtitle': 'Windows-Installationsmedium- & Windows To Go-Ersteller',
   'home_quick_start': 'Schnellstart',
   'home_image_library': 'Abbildbibliothek',
-  'home_image_library_desc': 'Windows-Abbilder durchsuchen und Download-Links erhalten',
-  'home_bootable_usb': 'Bootfähigen USB erstellen',
-  'home_bootable_usb_desc': 'Einen bootfähigen Windows-USB-Stick erstellen',
+  'home_image_library_desc':
+      'Windows-Abbilder durchsuchen und Download-Links erhalten',
+  'home_bootable_usb': 'Windows-Installationsmedium erstellen',
+  'home_bootable_usb_desc': 'Einen Windows-Installations-USB aus einer ISO erstellen',
   'home_font_pack': 'Schriftpaket herunterladen',
   'home_font_pack_desc': 'CJK-Schriften für schlanke Windows-ISOs',
   'home_wtg': 'Windows To Go',
@@ -5214,7 +5994,7 @@ const _de = <String, String>{
   'home_platform': 'Plattform',
   'home_engine': 'Engine',
   'home_focus': 'Schwerpunkt',
-  'home_focus_value': 'Bootfähiger USB & WTG',
+  'home_focus_value': 'Installationsmedium & WTG',
   'home_license': 'Lizenz',
   'home_license_value': 'Open Source',
   'images_title': 'Abbildbibliothek',
@@ -5224,7 +6004,8 @@ const _de = <String, String>{
   'images_empty': 'Keine Abbilder verfügbar',
   'images_category_all': 'Alle',
   'images_local_library': 'Lokale Bibliothek',
-  'images_local_empty': 'Keine lokalen ISOs gefunden. Pfad in den Einstellungen festlegen.',
+  'images_local_empty':
+      'Keine lokalen ISOs gefunden. Pfad in den Einstellungen festlegen.',
   'images_local_iso': 'Lokales ISO',
   'images_close': 'Schließen',
   'detail_back': 'Zurück zur Bibliothek',
@@ -5244,28 +6025,35 @@ const _de = <String, String>{
   'images_error': 'Unbekannter Fehler',
   'mirror_not_found': 'Abbild-Eintrag nicht gefunden',
   'cancel_title': 'Abbrechen',
-  'cancel_parse_desc': 'ISO-Analyse abbrechen? Das eingehängte Abbild wird ausgehängt.',
+  'cancel_parse_desc':
+      'ISO-Analyse abbrechen? Das eingehängte Abbild wird ausgehängt.',
   'cancel_confirm': 'Abbrechen bestätigen',
-  'cancel_create_desc': 'Erstellung des bootfähigen USB abbrechen? Dies kann nicht rückgängig gemacht werden.',
-  'fontpack_warning': 'Auf diesem System fehlen möglicherweise chinesische Schriftarten',
-  'fontpack_recommend': 'Es wird empfohlen, das chinesische Schriftpaket herunterzuladen und zu installieren',
+  'cancel_create_desc':
+      'Erstellung des Windows-Installationsmediums abbrechen? Dies kann nicht rückgängig gemacht werden.',
+  'fontpack_warning':
+      'Auf diesem System fehlen möglicherweise chinesische Schriftarten',
+  'fontpack_recommend':
+      'Es wird empfohlen, das chinesische Schriftpaket herunterzuladen und zu installieren',
   'fontpack_download': 'Schriftpaket herunterladen',
-  'fontpack_desc': 'Chinesisches Schriftpaket für schlanke Windows-ISOs. Enthält gängige CJK-Schriften für korrekte Darstellung chinesischer Inhalte.',
-  'fontpack_feature_1': 'Enthält HarmonyOS Sans SC und weitere chinesische Schriftarten',
+  'fontpack_desc':
+      'Chinesisches Schriftpaket für schlanke Windows-ISOs. Enthält gängige CJK-Schriften für korrekte Darstellung chinesischer Inhalte.',
+  'fontpack_feature_1':
+      'Enthält HarmonyOS Sans SC und weitere chinesische Schriftarten',
   'fontpack_feature_2': 'Kompatibel mit Windows 10/11',
   'fontpack_feature_3': 'Ein-Klick-Installation für alle Benutzer',
   'iso_step_mount': 'ISO wird eingehängt...',
   'iso_step_detect': 'Installationsprogramm wird erkannt...',
   'iso_step_info': 'Abbildinformationen werden gelesen...',
   'iso_step_cleanup': 'Aufräumen...',
-  'creator_title': 'Bootfähigen USB erstellen',
-  'creator_subtitle': 'Einen bootfähigen Windows-USB-Stick erstellen',
+  'creator_title': 'Windows-Installationsmedium erstellen',
+  'creator_subtitle': 'Einen Windows-Installations-USB aus einer ISO erstellen',
   'creator_step_iso': 'ISO auswählen',
   'creator_step_usb': 'USB auswählen',
   'creator_step_confirm': 'Bestätigen',
   'creator_step_create': 'Erstellen',
   'creator_select_iso': 'Windows-ISO auswählen',
-  'creator_select_iso_desc': 'Wählen Sie eine Windows 10/11- oder Server-ISO-Datei',
+  'creator_select_iso_desc':
+      'Wählen Sie eine Windows 10/11- oder Server-ISO-Datei',
   'creator_select_btn': 'Lokales ISO auswählen',
   'creator_next_usb': 'Weiter: USB auswählen',
   'creator_select_usb': 'Ziel-USB auswählen',
@@ -5286,8 +6074,8 @@ const _de = <String, String>{
   'creator_start': 'Erstellung starten',
   'creator_creating': 'Wird erstellt...',
   'creator_parsing': 'ISO-Datei wird analysiert...',
-  'creator_complete_title': 'Bootfähiger USB erstellt!',
-  'creator_complete_desc': 'Ihr bootfähiger USB-Stick ist einsatzbereit',
+  'creator_complete_title': 'Windows-Installationsmedium erstellt!',
+  'creator_complete_desc': 'Ihr Windows-Installations-USB ist einsatzbereit',
   'creator_another': 'Weiteren erstellen',
   'creator_parse_error': 'ISO-Datei konnte nicht analysiert werden',
   'creator_error': 'Fehler',
@@ -5331,7 +6119,18 @@ const _de = <String, String>{
   'settings_license': 'Lizenz',
   'settings_license_value': 'Open Source',
   'settings_built_with': 'Erstellt mit:',
-  'settings_copyright': '©2026 Bob Steve. Alle Rechte vorbehalten.',
+  'settings_copyright': '©2026 Bob Steve. Veröffentlicht unter der MIT-Lizenz.',
+  'about_github_repository': 'GitHub-Repository',
+  'special_thanks_title': 'Besonderer Dank',
+  'special_thanks_intro':
+      'WinDeploy Studio dankt den folgenden Personen und Communitys für wertvolles Feedback, Tests, Ideen, Inspiration und Unterstützung.',
+  'thanks_astra_desc': 'Frühes Feedback, Tests und Projektdiskussionen',
+  'thanks_timme_desc':
+      'Detailliertes internationales Nutzerfeedback, Empfehlungen zu Vertrauen und Benutzerfreundlichkeit, Vorschläge zu Microsoft-Quellen und Community-Review',
+  'thanks_sysinternals_desc':
+      'Inspiration durch Microsofts Diagnose- und Fehlerbehebungswerkzeuge',
+  'thanks_open_source_desc':
+      'Für Dokumentation, Fehlerberichte, Tests, Übersetzungen und Vorschläge',
   'close': 'Schließen',
   'copied': 'Kopiert',
   'ai_thinking': 'Denke nach...',
@@ -5344,7 +6143,8 @@ const _de = <String, String>{
   'lang_select_title': 'Sprache auswählen',
   'lang_select_desc': 'Wählen Sie Ihre bevorzugte Sprache',
   'lang_select_confirm': 'Bestätigen',
-  'lang_select_settings_hint': 'Sie können dies später in den Einstellungen ändern',
+  'lang_select_settings_hint':
+      'Sie können dies später in den Einstellungen ändern',
   'wtg_title': 'Windows To Go-Ersteller',
   'wtg_subtitle': 'Einen tragbaren Windows To Go-Arbeitsbereich erstellen',
   'wtg_select_iso': 'Windows-ISO auswählen',
@@ -5377,7 +6177,8 @@ const _de = <String, String>{
   'wtg_recommendations': 'Empfehlungen',
   'wtg_next_confirm': 'Weiter: Bestätigen',
   'wtg_step5_title': 'Schritt 5: Bestätigen und erstellen',
-  'wtg_step5_desc': 'Überprüfen Sie die Einstellungen und bestätigen Sie die Erstellung',
+  'wtg_step5_desc':
+      'Überprüfen Sie die Einstellungen und bestätigen Sie die Erstellung',
   'wtg_selected_image': 'Ausgewähltes Abbild',
   'wtg_erase_confirm_word': 'BESTÄTIGEN',
   'wtg_start_creation': 'Erstellung starten',
@@ -5392,9 +6193,11 @@ const _de = <String, String>{
   'wtg_step_complete_title': 'Schritt 7: Abgeschlossen',
   'wtg_step_complete_desc': 'Windows To Go wurde erfolgreich erstellt',
   'wtg_creation_complete': 'Windows To Go erstellt!',
-  'wtg_creation_complete_desc': 'Ihr Windows To Go-Arbeitsbereich ist einsatzbereit',
+  'wtg_creation_complete_desc':
+      'Ihr Windows To Go-Arbeitsbereich ist einsatzbereit',
   'wtg_step_failed_title': 'Erstellung fehlgeschlagen',
-  'wtg_step_failed_desc': 'Beim Erstellen von Windows To Go ist ein Fehler aufgetreten',
+  'wtg_step_failed_desc':
+      'Beim Erstellen von Windows To Go ist ein Fehler aufgetreten',
   'wtg_creation_failed': 'Erstellung fehlgeschlagen',
   'wtg_debug_info': 'Debug-Informationen',
   'wtg_debug_copied': 'Debug-Informationen in die Zwischenablage kopiert',
@@ -5406,21 +6209,26 @@ const _de = <String, String>{
   'wtg_grade_d': 'Mangelhaft – Nicht empfohlen für Windows To Go',
   'wtg_grade_f': 'Nicht bestanden – Ungeeignet für Windows To Go',
   'wtg_grade_unknown': 'Unbekannt – Geschwindigkeitstest erforderlich',
-  'wtg_warn_disk_info_failed': 'Datenträgerinformationen konnten nicht abgerufen werden',
-  'wtg_warn_size_small': 'Datenträger kleiner als 32 GB – nicht empfohlen für Windows To Go',
+  'wtg_warn_disk_info_failed':
+      'Datenträgerinformationen konnten nicht abgerufen werden',
+  'wtg_warn_size_small':
+      'Datenträger kleiner als 32 GB – nicht empfohlen für Windows To Go',
   'wtg_warn_not_usb': 'Dieses Gerät scheint kein USB-Laufwerk zu sein',
-  'wtg_warn_performance_low': 'Leistung möglicherweise nicht ausreichend für Windows To Go (erfordert ~80 MB/s)',
+  'wtg_warn_performance_low':
+      'Leistung möglicherweise nicht ausreichend für Windows To Go (erfordert ~80 MB/s)',
   'wtg_warn_speed_test_failed': 'Geschwindigkeitstest fehlgeschlagen',
   'wtg_err_drive_not_found': 'Laufwerksbuchstabe nicht gefunden',
   'wtg_err_empty_drive_letter': 'Leerer Laufwerksbuchstabe',
-  'wtg_rec_retry_speed_test': 'Bitte führen Sie den Geschwindigkeitstest erneut durch',
+  'wtg_rec_retry_speed_test':
+      'Bitte führen Sie den Geschwindigkeitstest erneut durch',
   'wtg_elapsed': 'Verstrichen',
   'wtg_eta': 'Verbleibend',
   'wtg_current_speed': 'Aktuelle Geschwindigkeit',
   'wtg_average_speed': 'Durchschnittliche Geschwindigkeit',
   'wtg_written': 'Geschrieben',
   'wtg_remaining': 'Verbleibend',
-  'wtg_low_speed_warning': 'Geringe zufällige Schreibleistung erkannt. Die Erstellung von Windows To Go kann länger dauern als erwartet. Bitte haben Sie Geduld.',
+  'wtg_low_speed_warning':
+      'Geringe zufällige Schreibleistung erkannt. Die Erstellung von Windows To Go kann länger dauern als erwartet. Bitte haben Sie Geduld.',
   'wtg_images_found': '{count} Windows-Abbilder gefunden',
   'wtg_image_fallback': 'Abbild {index}',
   'wtg_disk_number': 'Datenträger {number}',
@@ -5457,7 +6265,7 @@ const _de = <String, String>{
   'logs_min_ago': 'Vor {n} Min',
   'logs_hours_ago': 'Vor {n} Std',
   'logs_days_ago': 'Vor {n} Tagen',
-  'logs_cat_usb': 'USB-Protokolle',
+  'logs_cat_usb': 'Medium-Protokolle',
   'logs_cat_wtg': 'WTG-Protokolle',
   'logs_cat_downloads': 'Downloads',
   'logs_cat_iso': 'ISO-Analyse',
@@ -5475,7 +6283,8 @@ const _de = <String, String>{
   'update_last_check': 'Letzte Prüfung',
   'update_never': 'Nie',
   'update_available_title': 'Update verfügbar',
-  'update_available_desc': 'Eine neue Version von WinDeploy Studio ist verfügbar.',
+  'update_available_desc':
+      'Eine neue Version von WinDeploy Studio ist verfügbar.',
   'update_release_notes': 'Versionshinweise',
   'update_now': 'Jetzt aktualisieren',
   'update_open_browser': 'Im Browser öffnen',
@@ -5485,9 +6294,11 @@ const _de = <String, String>{
   'update_progress': 'Fortschritt',
   'update_speed': 'Geschwindigkeit',
   'update_install': 'Installieren und neu starten',
-  'update_install_desc': 'Das Update wurde heruntergeladen. Jetzt installieren?',
+  'update_install_desc':
+      'Das Update wurde heruntergeladen. Jetzt installieren?',
   'update_up_to_date': 'Sie sind auf dem neuesten Stand',
   'update_checking': 'Suche nach Updates...',
+  'update_check_failed': 'Suche nach Updates fehlgeschlagen',
   'update_channel': 'Update-Kanal',
   'update_channel_stable': 'Stabil',
   'update_channel_beta': 'Beta',
@@ -5508,7 +6319,8 @@ const _de = <String, String>{
   'download_tip_stable': 'Download läuft',
   'download_tip_failed': 'Netzwerkfluktuation, Wiederholung...',
   'download_tip_retrying_1': 'Netzwerkfluktuation, Wiederholung...',
-  'download_tip_retrying_2': 'Verbindung zum Download-Knoten wiederherstellen...',
+  'download_tip_retrying_2':
+      'Verbindung zum Download-Knoten wiederherstellen...',
 
   'nav_ai': 'KI-Assistent',
   'ai_new_chat': 'Neuer Chat',
@@ -5518,10 +6330,11 @@ const _de = <String, String>{
   'ai_clear_chat': 'Chat löschen',
   'ai_input_hint': 'Fragen Sie alles über Windows-Bereitstellung...',
   'ai_welcome_title': 'Hallo, ich bin WinDeploy AI',
-  'ai_welcome_desc': 'Ich helfe Ihnen bei der Windows-Bereitstellung, Windows To Go, der Erstellung bootfähiger USBs und mehr.',
+  'ai_welcome_desc':
+      'Ich helfe Ihnen bei der Windows-Bereitstellung, Windows To Go, der Erstellung von Installationsmedien und mehr.',
   'ai_ability_windows': 'Windows-Installation',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': 'Bootfähiger USB',
+  'ai_ability_usb': 'Installationsmedium',
   'ai_ability_iso': 'ISO-Analyse',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -5529,14 +6342,37 @@ const _de = <String, String>{
   'ai_ability_logs': 'Protokollanalyse',
   'ai_example_questions': 'Beispielfragen',
   'ai_example_q1': 'Warum startet mein WTG nicht?',
-  'ai_example_q2': 'Was ist der Unterschied zwischen Tiny11 und dem Original-Windows?',
+  'ai_example_q2':
+      'Was ist der Unterschied zwischen Tiny11 und dem Original-Windows?',
   'ai_example_q3': 'Ist dieser USB für Windows To Go geeignet?',
   'ai_action_analyze_logs': 'Protokolle analysieren',
   'ai_action_analyze_iso': 'ISO analysieren',
   'ai_action_analyze_usb': 'USB analysieren',
   'ai_action_diagnose': 'Diagnose',
   'ai_no_logs': 'Keine Protokolldateien zur Analyse gefunden.',
-  'ai_please_wait': 'Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist...',
+  'ai_please_wait':
+      'Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist...',
+  'ai_settings_section': 'KI-Assistent',
+  'ai_proxy_url': 'KI-Proxy-URL',
+  'ai_proxy_url_desc':
+      'Verwenden Sie einen OpenAI-kompatiblen Proxy-Endpunkt. Leer lassen oder zuruecksetzen, um den integrierten Endpunkt zu nutzen.',
+  'ai_proxy_url_loading': 'Wird geladen...',
+  'ai_proxy_url_invalid': 'Geben Sie eine gueltige HTTP- oder HTTPS-URL ein',
+  'ai_error_unauthorized': 'Der KI-Dienst ist nicht autorisiert.',
+  'ai_error_rate_limited':
+      'Zu viele Anfragen. Bitte versuchen Sie es spaeter erneut.',
+  'ai_error_unavailable': 'Der KI-Dienst ist voruebergehend nicht verfuegbar.',
+  'ai_error_http': 'KI-Dienstfehler ({status}).',
+  'ai_error_timeout':
+      'Zeitueberschreitung bei der Verbindung zum KI-Dienst. Pruefen Sie das Netzwerk oder aendern Sie die KI-Proxy-URL in den Einstellungen.',
+  'ai_error_unreachable':
+      'Keine Verbindung zum KI-Dienst moeglich. Ihr Netzwerk erreicht den integrierten workers.dev-Proxy moeglicherweise nicht. Aendern Sie die KI-Proxy-URL in den Einstellungen und versuchen Sie es erneut.',
+  'ai_error_tls':
+      'TLS-Verbindung zum KI-Dienst fehlgeschlagen. Pruefen Sie Systemzeit, Netzwerkproxy oder aendern Sie die KI-Proxy-URL.',
+  'ai_error_connection': 'Verbindung zum KI-Dienst fehlgeschlagen: {error}',
+  'settings_edit': 'Bearbeiten',
+  'settings_save': 'Speichern',
+  'settings_reset_default': 'Zuruecksetzen',
   'nav_tools': 'Werkzeuge',
   'tools_title': 'Werkzeuge',
   'tools_subtitle': 'Empfohlene Werkzeuge für Windows-Bereitstellung',
@@ -5555,16 +6391,6 @@ const _de = <String, String>{
   'tools_features': 'Funktionen',
   'tools_website': 'Webseite',
   'tools_download': 'Herunterladen',
-  'adblock_on': 'AdBlock EIN',
-  'adblock_off': 'AdBlock AUS',
-  'adblock_stats': 'AdBlock-Statistiken',
-  'adblock_ads': 'Blockierte Werbung',
-  'adblock_trackers': 'Blockierte Tracker',
-  'adblock_total': 'Gesamt blockiert',
-  'adblock_enabled': 'Werbeblocker aktiviert',
-  'adblock_privacy': 'Datenschutz aktiviert',
-  'adblock_whitelist': 'Zur Whitelist hinzufügen',
-  'adblock_disable_site': 'Für diese Seite deaktivieren',
   'tools_cat_system': 'System',
   'tools_cat_disk': 'Datenträger',
   'tools_cat_driver': 'Treiber',
@@ -5575,9 +6401,39 @@ const _de = <String, String>{
   'tools_cat_optimize': 'Optimierung',
   'tools_cat_rescue': 'Rettung',
   'tools_cat_file': 'Dateien',
-  'tools_cat_activation': 'Aktivierung',
+  'tools_cat_activation': 'Lizenzierung und Aktivierung',
+  'tools_cat_advanced': 'Erweiterte Werkzeuge',
+  'tool_safety_beginner': 'Einsteiger',
+  'tool_safety_advanced': 'Fortgeschritten',
+  'tool_safety_expert': 'Experte',
+  'tool_warning_continue': 'Fortfahren',
+  'tool_warning_cancel': 'Abbrechen',
+  'tool_warning_dism_title': 'DISM++-Hinweis',
+  'tool_warning_dism_message':
+      'DISM++ ist ein leistungsstarkes Wartungswerkzeug f\xfcr Windows.\n\nFalsche Verwendung kann Windows-Komponenten, Dienste, Updates, Treiber oder die Systemstabilit\xe4t beeintr\xe4chtigen.\n\nEmpfohlen f\xfcr Benutzer, die den Zweck der ausgew\xe4hlten Aktion verstehen.',
+  'tool_warning_windhawk_title': 'Windhawk-Hinweis',
+  'tool_warning_windhawk_message':
+      'Windhawk ver\xe4ndert das Verhalten der Windows-Benutzeroberfl\xe4che \xfcber Plugins.\n\nEinige Plugins k\xf6nnen Stabilit\xe4t, Kompatibilit\xe4t oder zuk\xfcnftige Windows-Updates beeinflussen.\n\nLesen Sie Plugin-Beschreibungen vor der Installation sorgf\xe4ltig.',
+  'tool_warning_expert_title': 'Expertenwerkzeug',
+  'tool_warning_expert_message':
+      'Dieses Werkzeug ist f\xfcr erfahrene Benutzer vorgesehen.\n\n\xc4nderungen durch dieses Werkzeug k\xf6nnen Systemfunktionen, Datenintegrit\xe4t oder die Stabilit\xe4t des Betriebssystems beeinflussen.\n\nFahren Sie nur fort, wenn Sie Zweck und Auswirkungen der Aktion verstehen.',
+  'tool_warning_do_not_show_again': 'Nicht mehr anzeigen',
+  'activation_tool_notice_title': 'Hinweis zu Aktivierungswerkzeugen',
+  'activation_tool_notice_message':
+      'Dieses Werkzeug wird für Bildung, Tests, Fehlerbehebung, Forschung und Systemadministration bereitgestellt.\n\nWinDeploy Studio stellt keine Softwarelizenzen, Produktschlüssel, Aktivierungsdienste oder Mechanismen zum Umgehen von Autorisierung bereit.\n\nBenutzer sind dafür verantwortlich, alle geltenden Softwarelizenzvereinbarungen einzuhalten.\n\nFür Produktionsumgebungen, kommerzielle Nutzung oder langfristige Bereitstellung wird dringend empfohlen, eine gültige Lizenz vom Softwareanbieter zu beziehen.\n\nFahren Sie nur fort, wenn Sie Zweck und rechtliche Auswirkungen des ausgewählten Werkzeugs verstehen.',
+  'activation_tool_badge_tooltip':
+      'Kann Softwarelizenzierung oder Aktivierungsstatus beeinflussen.',
+  'activation_tool_disclaimer_title': 'Hinweis zu Lizenzierung und Aktivierung',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio unterstützt keine Softwarepiraterie, unautorisierte Aktivierung oder Lizenzumgehung.\n\nAlle aktivierungsbezogenen Dienstprogramme werden als Ressourcen von Drittanbietern bereitgestellt.\n\nBenutzer müssen die Lizenzbedingungen von Microsoft und anderen Softwareanbietern einhalten.',
+  'ai_notice_title': 'Hinweis zum AI-Assistenten',
+  'ai_notice_message':
+      'Von AI erzeugte Inhalte k\xf6nnen ungenau oder unvollst\xe4ndig sein.\n\nPr\xfcfen und best\xe4tigen Sie wichtige Vorg\xe4nge immer, bevor Sie \xc4nderungen am System anwenden.\n\nDer AI-Assistent gibt nur Vorschl\xe4ge und kann Kompatibilit\xe4t, Stabilit\xe4t oder Sicherheit nicht garantieren.',
+  'ai_notice_got_it': 'Verstanden',
+  'ai_notice_do_not_show': 'Nicht mehr anzeigen',
   'webview_not_available': 'WebView2 nicht installiert',
-  'webview_download_desc': 'Ihr System benötigt WebView2 Runtime, um Seiten in der App zu öffnen. Jetzt herunterladen?',
+  'webview_download_desc':
+      'Ihr System benötigt WebView2 Runtime, um Seiten in der App zu öffnen. Jetzt herunterladen?',
   'webview_download': 'WebView2 herunterladen',
   'webview_open_in_browser': 'Im Browser öffnen',
   'webview_open_external': 'Im Browser öffnen',
@@ -5596,7 +6452,8 @@ const _de = <String, String>{
   'webview_download_complete': 'Download abgeschlossen',
   'webview_download_failed': 'Download fehlgeschlagen',
   'webview_downgrade_title': 'Website möglicherweise nicht kompatibel',
-  'webview_downgrade_desc': 'Diese Website funktioniert möglicherweise nicht im integrierten Browser. Es wird empfohlen, sie im Systembrowser zu öffnen.',
+  'webview_downgrade_desc':
+      'Diese Website funktioniert möglicherweise nicht im integrierten Browser. Es wird empfohlen, sie im Systembrowser zu öffnen.',
   'webview_diag': 'Netzwerkdiagnose',
   'webview_diag_title': 'Netzwerkdiagnose',
   'dl_title': 'Downloads',
@@ -5621,10 +6478,14 @@ const _de = <String, String>{
   'ai_search_canary': 'AMD suchen',
   'ai_search_wtg_tutorial': 'Linus Tech Tips suchen',
   'ai_search_rufus': 'WTG-Anleitung suchen',
-  'ai_search_ms_update_prompt': 'Nach Intel CPU, GPU, Treiber-Downloads und Produktinformationen suchen.',
-  'ai_search_canary_prompt': 'Nach AMD CPU, GPU, Treiber-Downloads und Produktinformationen suchen.',
-  'ai_search_wtg_tutorial_prompt': 'Nach Linus Tech Tips-Videos und Bewertungen suchen.',
-  'ai_search_rufus_prompt': 'Nach Windows To Go-Erstellungsanleitungen und bewährten Verfahren suchen.',
+  'ai_search_ms_update_prompt':
+      'Nach Intel CPU, GPU, Treiber-Downloads und Produktinformationen suchen.',
+  'ai_search_canary_prompt':
+      'Nach AMD CPU, GPU, Treiber-Downloads und Produktinformationen suchen.',
+  'ai_search_wtg_tutorial_prompt':
+      'Nach Linus Tech Tips-Videos und Bewertungen suchen.',
+  'ai_search_rufus_prompt':
+      'Nach Windows To Go-Erstellungsanleitungen und bewährten Verfahren suchen.',
   'intel_cpu': 'CPU',
   'intel_gpu': 'GPU',
   'intel_loading': 'Wird geladen...',
@@ -5644,15 +6505,32 @@ const _de = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Benutzerdefiniert',
   'mirror_category_tools': 'Werkzeuge',
+  'mirror_category_official_microsoft': 'Offizielle Microsoft-Abbilder',
+  'mirror_category_community': 'Community-Abbilder',
+  'mirror_badge_official': 'Offizielle Microsoft-Quelle',
+  'mirror_badge_community': 'Community-Abbild',
+  'mirror_desc_official': 'Direkt von Microsoft herunterladen',
+  'mirror_desc_community':
+      'Von einer Drittanbieter-Community gepflegtes Abbild',
+  'official_download_title': 'Offizieller Microsoft-Download',
+  'official_download_message':
+      'Sie öffnen gleich die offizielle Downloadwebsite von Microsoft.\n\nMicrosoft kann Sie auffordern:\n\n* die Sprache auszuwählen\n* die Edition auszuwählen\n* die Architektur auszuwählen\n* das Media Creation Tool zu verwenden (je nach Gerät und Region)\n\nDer Download wird im Systembrowser fortgesetzt.',
+  'official_download_open': 'Microsoft-Website öffnen',
+  'official_download_open_failed':
+      'Der Systembrowser konnte nicht geöffnet werden.',
   'mirror_error_loading': 'Fehler beim Laden der Abbildliste:',
-  'safety_system_disk': 'Dieser Datenträger enthält das laufende Windows-System',
+  'safety_system_disk':
+      'Dieser Datenträger enthält das laufende Windows-System',
   'safety_boot_disk': 'Dieser Datenträger ist der Startdatenträger',
   'safety_efi_partition': 'Dieser Datenträger enthält eine EFI-Systempartition',
-  'safety_recovery_partition': 'Dieser Datenträger enthält eine Windows-Wiederherstellungspartition',
-  'safety_windows_install': 'Dieser Datenträger enthält eine Windows-Installation ({drive})',
+  'safety_recovery_partition':
+      'Dieser Datenträger enthält eine Windows-Wiederherstellungspartition',
+  'safety_windows_install':
+      'Dieser Datenträger enthält eine Windows-Installation ({drive})',
   'boot_preparing': 'Vorbereitung...',
   'boot_cleaning': 'Datenträger wird bereinigt...',
-  'boot_access_denied': 'Zugriff verweigert – bitte als Administrator ausführen',
+  'boot_access_denied':
+      'Zugriff verweigert – bitte als Administrator ausführen',
   'boot_partition_failed': 'Partitionierung fehlgeschlagen: {error}',
   'boot_format_verifying': 'Format wird überprüft...',
   'boot_format_failed': 'Formatierung fehlgeschlagen',
@@ -5666,7 +6544,7 @@ const _de = <String, String>{
   'boot_writing_boot': 'Startdateien werden geschrieben...',
   'boot_write_failed': 'Startdateien konnten nicht geschrieben werden',
   'boot_setting_icon': 'Laufwerkssymbol wird gesetzt...',
-  'boot_verifying': 'Bootfähiger USB wird überprüft...',
+  'boot_verifying': 'Installationsmedium wird überprüft...',
   'boot_complete': 'Abgeschlossen!',
   'boot_verify_failed': 'Überprüfung fehlgeschlagen',
   'boot_no_drive_letter': 'Zugewiesener Laufwerksbuchstabe nicht gefunden',
@@ -5684,18 +6562,23 @@ const _de = <String, String>{
   'wtg_svc_verifying': 'WTG wird überprüft...',
   'wtg_svc_complete': 'WTG-Erstellung abgeschlossen!',
   'wtg_svc_verify_failed': 'Überprüfung fehlgeschlagen',
-  'wtg_svc_timeout': 'Zeitüberschreitung: Datenträger möglicherweise in Verwendung oder gesperrt. Bitte schließen Sie andere Programme und versuchen Sie es erneut.',
+  'wtg_svc_timeout':
+      'Zeitüberschreitung: Datenträger möglicherweise in Verwendung oder gesperrt. Bitte schließen Sie andere Programme und versuchen Sie es erneut.',
   'wtg_svc_applying_percent': 'Abbild wird angewendet... {percent}%',
   'wtg_svc_image_applied': 'Abbild angewendet',
-  'ai_prompt_system': 'Sie sind der integrierte KI-Assistent von WinDeploy Studio, spezialisiert auf Windows-Bereitstellung.\n\n[REGELN]\n- Kurz und direkt, ohne Füllsel oder Wiederholungen\n- Tabellen oder Listen verwenden, keine langen Absätze\n- Bei unzureichenden Daten "Mehr Informationen erforderlich" sagen, nie erfinden\n- Gesamtantwort unter 500 Wörtern\n- Nie selbst abwerten (z.B. "Ich kann nicht zugreifen", "Als KI"), nur Analyseergebnisse liefern\n\n[FACHGEBIETE]\nWindows-Installation/-Bereitstellung, Windows To Go, bootfähige USB-Erstellung, DISM, BCDBoot, ISO-Abbildanalyse, USB-Startprobleme, WinDeploy Studio-Nutzung',
-  'ai_prompt_analyze_prefix': 'Basierend auf den folgenden realen Daten, analysieren Sie kurz. Verwenden Sie Tabellen- oder Listenformat.\n\n[ANALYSEREGELN]\n- Nur mit bereitgestellten Daten analysieren, nicht erfinden\n- Risiken mit 🔴Hoch 🟡Mittel 🟢Niedrig markieren\n- Schlussfolgerungen zuerst, maximal 3 Zeilen\n- Detaillierte Analyse danach, mit Tabellen\n- Gesamtantwort unter 300 Wörtern\n\n',
+  'ai_prompt_system':
+      'Sie sind der integrierte KI-Assistent von WinDeploy Studio, spezialisiert auf Windows-Bereitstellung.\n\n[REGELN]\n- Kurz und direkt, ohne Füllsel oder Wiederholungen\n- Tabellen oder Listen verwenden, keine langen Absätze\n- Bei unzureichenden Daten "Mehr Informationen erforderlich" sagen, nie erfinden\n- Gesamtantwort unter 500 Wörtern\n- Nie selbst abwerten (z.B. "Ich kann nicht zugreifen", "Als KI"), nur Analyseergebnisse liefern\n\n[FACHGEBIETE]\nWindows-Installation/-Bereitstellung, Windows To Go, Erstellung von Windows-Installationsmedien, DISM, BCDBoot, ISO-Abbildanalyse, USB-Startprobleme, WinDeploy Studio-Nutzung',
+  'ai_prompt_analyze_prefix':
+      'Basierend auf den folgenden realen Daten, analysieren Sie kurz. Verwenden Sie Tabellen- oder Listenformat.\n\n[ANALYSEREGELN]\n- Nur mit bereitgestellten Daten analysieren, nicht erfinden\n- Risiken mit 🔴Hoch 🟡Mittel 🟢Niedrig markieren\n- Schlussfolgerungen zuerst, maximal 3 Zeilen\n- Detaillierte Analyse danach, mit Tabellen\n- Gesamtantwort unter 300 Wörtern\n\n',
   'ai_prompt_log_content': '[PROTOKOLLINHALT]',
   'ai_prompt_iso_info': '[ISO-INFORMATIONEN]',
   'ai_prompt_usb_info': '[USB-GERÄTEINFORMATIONEN]',
-  'ai_prompt_diagnose_prefix': 'Bitte diagnostizieren Sie den folgenden Systemzustand:\n\n',
+  'ai_prompt_diagnose_prefix':
+      'Bitte diagnostizieren Sie den folgenden Systemzustand:\n\n',
   'ai_prompt_log_summary': '[PROTOKOLLZUSAMMENFASSUNG]',
   'ai_prompt_task_status': '[AUFGABENSTATUS]',
-  'ai_prompt_diagnose_suffix': 'Bitte erstellen Sie einen umfassenden Diagnosebericht.',
+  'ai_prompt_diagnose_suffix':
+      'Bitte erstellen Sie einen umfassenden Diagnosebericht.',
   'ai_prompt_iso_logs': '[ISO-VORGANGSPROTOKOLLE]',
   'ai_prompt_local_isos': '[LOKALE ISO-DATEIEN]',
   'ai_prompt_no_iso_found': '  Keine ISO-Dateien gefunden',
@@ -5708,7 +6591,8 @@ const _de = <String, String>{
   'ai_prompt_partition_style': 'Partitionstabelle',
   'ai_prompt_drive_letters': 'Laufwerksbuchstaben',
   'ai_prompt_partition_count': 'Partitionen',
-  'ai_prompt_usb_get_failed': 'USB-Geräteinformationen konnten nicht abgerufen werden:',
+  'ai_prompt_usb_get_failed':
+      'USB-Geräteinformationen konnten nicht abgerufen werden:',
   'ai_prompt_files': 'Dateien',
   'ai_prompt_no_logs': '  Keine Protokolle',
   'ai_prompt_usb_devices': '[USB-GERÄTE]',
@@ -5723,26 +6607,25 @@ const _de = <String, String>{
   'mirror_download_source': 'Download-Quelle',
   'mirror_download_unknown': 'Unbekannt',
   'mirror_source_label': 'Empfohlene Quelle',
-  'mirror_strategy_auto': 'Automatische Auswahl (empfohlen)',
-  'mirror_strategy_china': 'China-Spiegel erzwingen',
-  'mirror_strategy_global': 'Globalen Spiegel erzwingen',
-  'settings_mirror_source': 'Download-Quelle',
-  'settings_mirror_source_desc': 'Spiegelquellen-Strategie',
-  'mirror_geo_failed': 'Region konnte nicht ermittelt werden, globaler Spiegel wird verwendet',
+  'mirror_geo_failed':
+      'Region konnte nicht ermittelt werden, globaler Spiegel wird verwendet',
   'mirror_speed_test_title': 'Spiegelstatus',
   'mirror_speed_test_testing': 'Spiegelquellen werden getestet...',
   'mirror_speed_test_refresh': 'Erneut testen',
   'mirror_speed_test_failed': 'Geschwindigkeitstest fehlgeschlagen',
-  'mirror_speed_test_all_offline': 'Verbindung zu Servern nicht möglich. Netzwerk prüfen.',
+  'mirror_speed_test_all_offline':
+      'Verbindung zu Servern nicht möglich. Netzwerk prüfen.',
   'mirror_speed_test_recommend': 'Empfohlen',
   'mirror_download_latency': 'Latenz',
   'mirror_select_title': 'Download-Mirror auswählen',
-  'mirror_select_desc': 'Bitte wählen Sie einen Download-Mirror zum Fortfahren.',
+  'mirror_select_desc':
+      'Bitte wählen Sie einen Download-Mirror zum Fortfahren.',
   'mirror_china_title': 'China-Mirror',
   'mirror_china_desc': '123 Cloud Drive · Stabil · Empfohlen für China-Nutzer',
   'mirror_china_tag': 'China',
   'mirror_global_title': 'Globaler Mirror',
-  'mirror_global_desc': 'GoFile · Globaler Zugang · Keine regionale Einschränkung',
+  'mirror_global_desc':
+      'GoFile · Globaler Zugang · Keine regionale Einschränkung',
   'mirror_global_tag': 'Global',
   'mirror_default_title': 'Herunterladen',
   'mirror_default_desc': 'Direkter Download-Link',
@@ -5750,20 +6633,20 @@ const _de = <String, String>{
 
 const _ko = <String, String>{
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': '부팅 가능 USB 및 Windows To Go 생성 도구',
+  'app_subtitle': 'Windows 설치 미디어 및 Windows To Go 생성 도구',
   'nav_home': '홈',
   'nav_images': '이미지',
-  'nav_creator': '생성',
+  'nav_creator': '설치 미디어',
   'nav_wtg': 'WTG',
   'nav_logs': '로그',
   'nav_settings': '설정',
   'home_title': 'Windows 배포 도구',
-  'home_subtitle': '부팅 가능 USB 및 Windows To Go 생성 도구',
+  'home_subtitle': 'Windows 설치 미디어 및 Windows To Go 생성 도구',
   'home_quick_start': '빠른 시작',
   'home_image_library': '이미지 라이브러리',
   'home_image_library_desc': 'Windows 이미지 탐색 및 다운로드 링크 확인',
-  'home_bootable_usb': '부팅 가능 USB 생성',
-  'home_bootable_usb_desc': 'Windows 부팅 가능 USB 드라이브 만들기',
+  'home_bootable_usb': 'Windows 설치 미디어 생성',
+  'home_bootable_usb_desc': 'ISO에서 Windows 설치 USB 만들기',
   'home_font_pack': '폰트 패키지 다운로드',
   'home_font_pack_desc': '경량 Windows ISO용 CJK 폰트',
   'home_wtg': 'Windows To Go',
@@ -5775,7 +6658,7 @@ const _ko = <String, String>{
   'home_platform': '플랫폼',
   'home_engine': '엔진',
   'home_focus': '주요 기능',
-  'home_focus_value': '부팅 가능 USB 및 WTG',
+  'home_focus_value': '설치 미디어 및 WTG',
   'home_license': '라이선스',
   'home_license_value': '오픈 소스',
   'images_title': '이미지 라이브러리',
@@ -5807,11 +6690,12 @@ const _ko = <String, String>{
   'cancel_title': '취소',
   'cancel_parse_desc': 'ISO 분석을 취소하시겠습니까? 마운트된 이미지가 해제됩니다.',
   'cancel_confirm': '취소 확인',
-  'cancel_create_desc': '부팅 가능 USB 생성을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+  'cancel_create_desc': 'Windows 설치 미디어 생성을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
   'fontpack_warning': '이 시스템에 중국어 폰트가 없을 수 있습니다',
   'fontpack_recommend': '중국어 폰트 패키지를 다운로드하여 설치하는 것을 권장합니다',
   'fontpack_download': '폰트 패키지 다운로드',
-  'fontpack_desc': '경량 Windows ISO용 중국어 폰트 패키지. 중국어 콘텐츠가 올바르게 표시되도록 일반 CJK 폰트가 포함되어 있습니다.',
+  'fontpack_desc':
+      '경량 Windows ISO용 중국어 폰트 패키지. 중국어 콘텐츠가 올바르게 표시되도록 일반 CJK 폰트가 포함되어 있습니다.',
   'fontpack_feature_1': 'HarmonyOS Sans SC 등 중국어 폰트 포함',
   'fontpack_feature_2': 'Windows 10/11 지원',
   'fontpack_feature_3': '모든 사용자를 위한 원클릭 설치',
@@ -5819,8 +6703,8 @@ const _ko = <String, String>{
   'iso_step_detect': '설치 프로그램 감지 중...',
   'iso_step_info': '이미지 정보 읽기 중...',
   'iso_step_cleanup': '정리 중...',
-  'creator_title': '부팅 가능 USB 생성',
-  'creator_subtitle': 'Windows 부팅 가능 USB 드라이브 만들기',
+  'creator_title': 'Windows 설치 미디어 생성 도구',
+  'creator_subtitle': 'ISO에서 Windows 설치 USB 만들기',
   'creator_step_iso': 'ISO 선택',
   'creator_step_usb': 'USB 선택',
   'creator_step_confirm': '확인',
@@ -5847,8 +6731,8 @@ const _ko = <String, String>{
   'creator_start': '생성 시작',
   'creator_creating': '생성 중...',
   'creator_parsing': 'ISO 파일 분석 중...',
-  'creator_complete_title': '부팅 가능 USB 생성 완료!',
-  'creator_complete_desc': '부팅 가능 USB 드라이브가 준비되었습니다',
+  'creator_complete_title': 'Windows 설치 미디어 생성 완료!',
+  'creator_complete_desc': 'Windows 설치 USB가 준비되었습니다',
   'creator_another': '다른 것 만들기',
   'creator_parse_error': 'ISO 파일 분석 실패',
   'creator_error': '오류',
@@ -5892,7 +6776,16 @@ const _ko = <String, String>{
   'settings_license': '라이선스',
   'settings_license_value': '오픈 소스',
   'settings_built_with': '빌드 도구:',
-  'settings_copyright': '©2026 Bob Steve. 모든 권리 보유.',
+  'settings_copyright': '©2026 Bob Steve. MIT License에 따라 배포됩니다.',
+  'about_github_repository': 'GitHub 저장소',
+  'special_thanks_title': 'Special Thanks',
+  'special_thanks_intro':
+      'WinDeploy Studio는 소중한 피드백, 테스트, 아이디어, 영감과 지원을 보내 준 다음 분들과 커뮤니티에 감사드립니다.',
+  'thanks_astra_desc': '초기 피드백, 테스트 및 프로젝트 논의',
+  'thanks_timme_desc':
+      '상세한 국제 사용자 피드백, 신뢰와 사용성 제안, Microsoft 공식 소스 제안 및 커뮤니티 검토',
+  'thanks_sysinternals_desc': 'Microsoft 진단 및 문제 해결 도구에서 얻은 영감',
+  'thanks_open_source_desc': '문서, 버그 보고, 테스트, 번역 및 제안에 대한 기여',
   'close': '닫기',
   'copied': '복사됨',
   'ai_thinking': '생각 중...',
@@ -5981,7 +6874,8 @@ const _ko = <String, String>{
   'wtg_average_speed': '평균 속도',
   'wtg_written': '기록됨',
   'wtg_remaining': '남은 용량',
-  'wtg_low_speed_warning': '랜덤 쓰기 성능이 낮게 감지되었습니다. Windows To Go 생성이 예상보다 오래 걸릴 수 있습니다. 인내심을 가져 주세요.',
+  'wtg_low_speed_warning':
+      '랜덤 쓰기 성능이 낮게 감지되었습니다. Windows To Go 생성이 예상보다 오래 걸릴 수 있습니다. 인내심을 가져 주세요.',
   'wtg_images_found': '{count}개의 Windows 이미지 발견',
   'wtg_image_fallback': '이미지 {index}',
   'wtg_disk_number': '디스크 {number}',
@@ -6018,7 +6912,7 @@ const _ko = <String, String>{
   'logs_min_ago': '{n}분 전',
   'logs_hours_ago': '{n}시간 전',
   'logs_days_ago': '{n}일 전',
-  'logs_cat_usb': 'USB 로그',
+  'logs_cat_usb': '설치 미디어 로그',
   'logs_cat_wtg': 'WTG 로그',
   'logs_cat_downloads': '다운로드',
   'logs_cat_iso': 'ISO 분석',
@@ -6049,6 +6943,7 @@ const _ko = <String, String>{
   'update_install_desc': '업데이트가 다운로드되었습니다. 지금 설치하시겠습니까?',
   'update_up_to_date': '최신 버전입니다',
   'update_checking': '업데이트 확인 중...',
+  'update_check_failed': '업데이트 확인 실패',
   'update_channel': '업데이트 채널',
   'update_channel_stable': '안정版',
   'update_channel_beta': '베타',
@@ -6079,10 +6974,10 @@ const _ko = <String, String>{
   'ai_clear_chat': '대화 삭제',
   'ai_input_hint': 'Windows 배포에 대해 질문하세요...',
   'ai_welcome_title': '안녕하세요, WinDeploy AI입니다',
-  'ai_welcome_desc': 'Windows 배포, Windows To Go, 부팅 가능 USB 생성 등을 도와드립니다.',
+  'ai_welcome_desc': 'Windows 배포, Windows To Go, 설치 미디어 생성 등을 도와드립니다.',
   'ai_ability_windows': 'Windows 설치',
   'ai_ability_wtg': 'Windows To Go',
-  'ai_ability_usb': '부팅 가능 USB',
+  'ai_ability_usb': '설치 미디어',
   'ai_ability_iso': 'ISO 분석',
   'ai_ability_dism': 'DISM',
   'ai_ability_bcdboot': 'BCDBoot',
@@ -6098,6 +6993,32 @@ const _ko = <String, String>{
   'ai_action_diagnose': '진단',
   'ai_no_logs': '분석할 로그 파일이 없습니다.',
   'ai_please_wait': '현재 응답이 완료될 때까지 기다려 주세요...',
+
+  'ai_settings_section': 'AI \uC5B4\uC2DC\uC2A4\uD134\uD2B8',
+  'ai_proxy_url': 'AI \uD504\uB85D\uC2DC URL',
+  'ai_proxy_url_desc':
+      'OpenAI \uD638\uD658 \uD504\uB85D\uC2DC \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB97C \uC0AC\uC6A9\uD569\uB2C8\uB2E4. \uBE44\uC6CC \uB450\uAC70\uB098 \uCD08\uAE30\uD654\uD558\uBA74 \uB0B4\uC7A5 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB97C \uC0AC\uC6A9\uD569\uB2C8\uB2E4.',
+  'ai_proxy_url_loading': '\uB85C\uB529 \uC911...',
+  'ai_proxy_url_invalid':
+      '\uC62C\uBC14\uB978 HTTP \uB610\uB294 HTTPS URL\uC744 \uC785\uB825\uD558\uC138\uC694',
+  'ai_error_unauthorized':
+      'AI \uC11C\uBE44\uC2A4\uAC00 \uC778\uC99D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.',
+  'ai_error_rate_limited':
+      '\uC694\uCCAD\uC774 \uB108\uBB34 \uB9CE\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.',
+  'ai_error_unavailable':
+      'AI \uC11C\uBE44\uC2A4\uB97C \uC77C\uC2DC\uC801\uC73C\uB85C \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.',
+  'ai_error_http': 'AI \uC11C\uBE44\uC2A4 \uC624\uB958({status}).',
+  'ai_error_timeout':
+      'AI \uC11C\uBE44\uC2A4 \uC5F0\uACB0 \uC2DC\uAC04\uC774 \uCD08\uACFC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uB97C \uD655\uC778\uD558\uAC70\uB098 \uC124\uC815\uC5D0\uC11C AI \uD504\uB85D\uC2DC URL\uC744 \uBCC0\uACBD\uD558\uC138\uC694.',
+  'ai_error_unreachable':
+      'AI \uC11C\uBE44\uC2A4\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB124\uD2B8\uC6CC\uD06C\uC5D0\uC11C \uB0B4\uC7A5 workers.dev \uD504\uB85D\uC2DC\uC5D0 \uC811\uADFC\uD558\uC9C0 \uBABB\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C AI \uD504\uB85D\uC2DC URL\uC744 \uBCC0\uACBD\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.',
+  'ai_error_tls':
+      'AI \uC11C\uBE44\uC2A4 TLS \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC2DC\uC2A4\uD15C \uC2DC\uAC04, \uB124\uD2B8\uC6CC\uD06C \uD504\uB85D\uC2DC \uB610\uB294 AI \uD504\uB85D\uC2DC URL\uC744 \uD655\uC778\uD558\uC138\uC694.',
+  'ai_error_connection':
+      'AI \uC11C\uBE44\uC2A4 \uC5F0\uACB0 \uC2E4\uD328: {error}',
+  'settings_edit': '\uD3B8\uC9D1',
+  'settings_save': '\uC800\uC7A5',
+  'settings_reset_default': '\uAE30\uBCF8\uAC12 \uBCF5\uC6D0',
   'nav_tools': '도구',
   'tools_title': '도구',
   'tools_subtitle': 'Windows 배포 추천 도구',
@@ -6116,16 +7037,6 @@ const _ko = <String, String>{
   'tools_features': '기능',
   'tools_website': '웹사이트',
   'tools_download': '다운로드',
-  'adblock_on': 'AdBlock 켜짐',
-  'adblock_off': 'AdBlock 꺼짐',
-  'adblock_stats': 'AdBlock 통계',
-  'adblock_ads': '차단된 광고',
-  'adblock_trackers': '차단된 트래커',
-  'adblock_total': '총 차단',
-  'adblock_enabled': '광고 차단 활성화',
-  'adblock_privacy': '개인정보 보호 활성화',
-  'adblock_whitelist': '허용 목록에 추가',
-  'adblock_disable_site': '이 사이트에 대해 비활성화',
   'tools_cat_system': '시스템',
   'tools_cat_disk': '디스크',
   'tools_cat_driver': '드라이버',
@@ -6136,9 +7047,38 @@ const _ko = <String, String>{
   'tools_cat_optimize': '시스템 최적화',
   'tools_cat_rescue': '시스템 복구',
   'tools_cat_file': '파일 도구',
-  'tools_cat_activation': '활성화',
+  'tools_cat_activation': '라이선스 및 인증 도구',
+  'tools_cat_advanced': '\uace0\uae09 \ub3c4\uad6c',
+  'tool_safety_beginner': '\uc785\ubb38',
+  'tool_safety_advanced': '\uace0\uae09',
+  'tool_safety_expert': '\uc804\ubb38\uac00',
+  'tool_warning_continue': '\uacc4\uc18d',
+  'tool_warning_cancel': '\ucde8\uc18c',
+  'tool_warning_dism_title': 'DISM++ \uc548\ub0b4',
+  'tool_warning_dism_message':
+      'DISM++\ub294 \uac15\ub825\ud55c Windows \uc720\uc9c0 \uad00\ub9ac \uc720\ud2f8\ub9ac\ud2f0\uc785\ub2c8\ub2e4.\n\n\uc798\ubabb \uc0ac\uc6a9\ud558\uba74 Windows \uad6c\uc131 \uc694\uc18c, \uc11c\ube44\uc2a4, \uc5c5\ub370\uc774\ud2b8, \ub4dc\ub77c\uc774\ubc84 \ub610\ub294 \uc2dc\uc2a4\ud15c \uc548\uc815\uc131\uc5d0 \uc601\ud5a5\uc744 \uc904 \uc218 \uc788\uc2b5\ub2c8\ub2e4.\n\n\uc120\ud0dd\ud55c \uc791\uc5c5\uc758 \ubaa9\uc801\uc744 \uc774\ud574\ud558\ub294 \uc0ac\uc6a9\uc790\uc5d0\uac8c \uad8c\uc7a5\ub429\ub2c8\ub2e4.',
+  'tool_warning_windhawk_title': 'Windhawk \uc548\ub0b4',
+  'tool_warning_windhawk_message':
+      'Windhawk\ub294 \ud50c\ub7ec\uadf8\uc778\uc744 \ud1b5\ud574 Windows \uc0ac\uc6a9\uc790 \uc778\ud130\ud398\uc774\uc2a4 \ub3d9\uc791\uc744 \uc218\uc815\ud569\ub2c8\ub2e4.\n\n\uc77c\ubd80 \ud50c\ub7ec\uadf8\uc778\uc740 \uc548\uc815\uc131, \ud638\ud658\uc131 \ub610\ub294 \ud5a5\ud6c4 Windows \uc5c5\ub370\uc774\ud2b8\uc5d0 \uc601\ud5a5\uc744 \uc904 \uc218 \uc788\uc2b5\ub2c8\ub2e4.\n\n\uc124\uce58 \uc804\uc5d0 \ud50c\ub7ec\uadf8\uc778 \uc124\uba85\uc744 \uc8fc\uc758 \uae4a\uac8c \ud655\uc778\ud558\uc138\uc694.',
+  'tool_warning_expert_title': '\uc804\ubb38\uac00 \ub3c4\uad6c',
+  'tool_warning_expert_message':
+      '\uc774 \ub3c4\uad6c\ub294 \uc219\ub828\ub41c \uc0ac\uc6a9\uc790\ub97c \uc704\ud55c \uac83\uc785\ub2c8\ub2e4.\n\n\uc774 \ub3c4\uad6c\uac00 \uc218\ud589\ud558\ub294 \ubcc0\uacbd\uc740 \uc2dc\uc2a4\ud15c \uae30\ub2a5, \ub370\uc774\ud130 \ubb34\uacb0\uc131 \ub610\ub294 \uc6b4\uc601 \uccb4\uc81c \uc548\uc815\uc131\uc5d0 \uc601\ud5a5\uc744 \uc904 \uc218 \uc788\uc2b5\ub2c8\ub2e4.\n\n\uc791\uc5c5\uc758 \ubaa9\uc801\uacfc \uc601\ud5a5\uc744 \uc774\ud574\ud55c \uacbd\uc6b0\uc5d0\ub9cc \uacc4\uc18d\ud558\uc138\uc694.',
+  'tool_warning_do_not_show_again': '다시 표시하지 않기',
+  'activation_tool_notice_title': '인증 도구 안내',
+  'activation_tool_notice_message':
+      '이 도구는 교육, 테스트, 문제 해결, 연구 및 시스템 관리 목적으로 제공되는 타사 리소스입니다.\n\nWinDeploy Studio는 소프트웨어 라이선스, 제품 키, 인증 서비스 또는 권한 우회 메커니즘을 제공하지 않습니다.\n\n사용자는 적용되는 모든 소프트웨어 라이선스 계약을 준수할 책임이 있습니다.\n\n운영 환경, 상업적 사용 또는 장기 배포에는 소프트웨어 공급업체에서 유효한 라이선스를 받는 것을 강력히 권장합니다.\n\n선택한 도구의 목적과 법적 의미를 이해하는 경우에만 계속하세요.',
+  'activation_tool_badge_tooltip': '소프트웨어 라이선스 또는 인증 상태에 영향을 줄 수 있습니다.',
+  'activation_tool_disclaimer_title': '라이선스 및 인증 안내',
+  'activation_tool_disclaimer_message':
+      'WinDeploy Studio는 소프트웨어 불법 복제, 무단 인증 또는 라이선스 우회를 지지하지 않습니다.\n\n모든 인증 관련 유틸리티는 타사 리소스로 제공됩니다.\n\n사용자는 Microsoft 및 기타 소프트웨어 공급업체의 라이선스 조건을 준수해야 합니다.',
+  'ai_notice_title': 'AI \ub3c4\uc6b0\ubbf8 \uc548\ub0b4',
+  'ai_notice_message':
+      'AI\uac00 \uc0dd\uc131\ud55c \ub0b4\uc6a9\uc740 \ubd80\uc815\ud655\ud558\uac70\ub098 \ubd88\uc644\uc804\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.\n\n\uc2dc\uc2a4\ud15c\uc5d0 \ubcc0\uacbd \uc0ac\ud56d\uc744 \uc801\uc6a9\ud558\uae30 \uc804\uc5d0 \uc911\uc694\ud55c \uc791\uc5c5\uc740 \ud56d\uc0c1 \uac80\ud1a0\ud558\uace0 \ud655\uc778\ud558\uc138\uc694.\n\nAI \ub3c4\uc6b0\ubbf8\ub294 \uc81c\uc548\ub9cc \uc81c\uacf5\ud558\uba70 \ud638\ud658\uc131, \uc548\uc815\uc131 \ub610\ub294 \uc548\uc804\uc131\uc744 \ubcf4\uc7a5\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.',
+  'ai_notice_got_it': '\ud655\uc778',
+  'ai_notice_do_not_show': '\ub2e4\uc2dc \ud45c\uc2dc\ud558\uc9c0 \uc54a\uae30',
   'webview_not_available': 'WebView2가 설치되지 않았습니다',
-  'webview_download_desc': '앱 내에서 페이지를 열려면 WebView2 Runtime이 필요합니다. 지금 다운로드하시겠습니까?',
+  'webview_download_desc':
+      '앱 내에서 페이지를 열려면 WebView2 Runtime이 필요합니다. 지금 다운로드하시겠습니까?',
   'webview_download': 'WebView2 다운로드',
   'webview_open_in_browser': '브라우저에서 열기',
   'webview_open_external': '브라우저에서 열기',
@@ -6157,7 +7097,8 @@ const _ko = <String, String>{
   'webview_download_complete': '다운로드 완료',
   'webview_download_failed': '다운로드 실패',
   'webview_downgrade_title': '사이트가 비호환될 수 있습니다',
-  'webview_downgrade_desc': '이 사이트는 내장 브라우저에서 제대로 작동하지 않을 수 있습니다. 시스템 브라우저에서 열 것을 권장합니다.',
+  'webview_downgrade_desc':
+      '이 사이트는 내장 브라우저에서 제대로 작동하지 않을 수 있습니다. 시스템 브라우저에서 열 것을 권장합니다.',
   'webview_diag': '네트워크 진단',
   'webview_diag_title': '네트워크 진단',
   'dl_title': '다운로드',
@@ -6205,6 +7146,17 @@ const _ko = <String, String>{
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': '사용자 정의',
   'mirror_category_tools': '도구',
+  'mirror_category_official_microsoft': 'Microsoft 공식 이미지',
+  'mirror_category_community': '커뮤니티 이미지',
+  'mirror_badge_official': 'Microsoft 공식 출처',
+  'mirror_badge_community': '커뮤니티 이미지',
+  'mirror_desc_official': 'Microsoft에서 직접 다운로드',
+  'mirror_desc_community': '타사 커뮤니티가 유지 관리하는 이미지',
+  'official_download_title': 'Microsoft 공식 다운로드',
+  'official_download_message':
+      'Microsoft 공식 다운로드 웹사이트로 이동합니다.\n\nMicrosoft에서 다음을 요청할 수 있습니다.\n\n* 언어 선택\n* 에디션 선택\n* 아키텍처 선택\n* Media Creation Tool 사용(장치 및 지역에 따라 다름)\n\n다운로드 과정은 시스템 브라우저에서 계속됩니다.',
+  'official_download_open': 'Microsoft 웹사이트 열기',
+  'official_download_open_failed': '시스템 브라우저를 열 수 없습니다.',
   'mirror_error_loading': '이미지 목록 로드 실패:',
   'safety_system_disk': '이 디스크에 실행 중인 Windows 시스템이 포함되어 있습니다',
   'safety_boot_disk': '이 디스크는 부팅 디스크입니다',
@@ -6227,7 +7179,7 @@ const _ko = <String, String>{
   'boot_writing_boot': '부트 파일 쓰기 중...',
   'boot_write_failed': '부트 파일 쓰기 실패',
   'boot_setting_icon': '볼륨 아이콘 설정 중...',
-  'boot_verifying': '부팅 가능 USB 검증 중...',
+  'boot_verifying': '설치 미디어 검증 중...',
   'boot_complete': '완료!',
   'boot_verify_failed': '검증 실패',
   'boot_no_drive_letter': '할당된 드라이브 문자를 찾을 수 없습니다',
@@ -6248,8 +7200,10 @@ const _ko = <String, String>{
   'wtg_svc_timeout': '시간 초과: 디스크가 사용 중이거나 잠겨 있을 수 있습니다. 다른 프로그램을 닫고 다시 시도하세요.',
   'wtg_svc_applying_percent': '이미지 적용 중... {percent}%',
   'wtg_svc_image_applied': '이미지 적용됨',
-  'ai_prompt_system': '당신은 WinDeploy Studio의 내장 AI 어시스턴트이며, Windows 배포를 전문으로 합니다.\n\n[규칙]\n- 간결하고 직접적으로, 불필요한 말이나 반복 금지\n- 표 또는 목록 사용, 긴 단락 금지\n- 데이터가 부족하면 "추가 정보 필요"라고 말하고, 절대 꾸며내지 않기\n- 전체 답변 500단어 미만\n- 자기 비하 금지 (예: "접근할 수 없습니다", "AI로서"), 분석 결과만 제시\n\n[전문 분야]\nWindows 설치/배포, Windows To Go, 부팅 가능 USB 생성, DISM, BCDBoot, ISO 이미지 분석, USB 부팅 문제, WinDeploy Studio 사용법',
-  'ai_prompt_analyze_prefix': '다음 실제 데이터를 기반으로 간결하게 분석하세요. 표 또는 목록 형식을 사용하세요.\n\n[분석 규칙]\n- 제공된 데이터로만 분석, 꾸미지 않기\n- 위험을 🔴높음 🟡보통 🟢낮음으로 표시\n- 결론을 먼저, 최대 3줄\n- 상세 분석은 뒤에, 표로\n- 전체 답변 300단어 미만\n\n',
+  'ai_prompt_system':
+      '당신은 WinDeploy Studio의 내장 AI 어시스턴트이며, Windows 배포를 전문으로 합니다.\n\n[규칙]\n- 간결하고 직접적으로, 불필요한 말이나 반복 금지\n- 표 또는 목록 사용, 긴 단락 금지\n- 데이터가 부족하면 "추가 정보 필요"라고 말하고, 절대 꾸며내지 않기\n- 전체 답변 500단어 미만\n- 자기 비하 금지 (예: "접근할 수 없습니다", "AI로서"), 분석 결과만 제시\n\n[전문 분야]\nWindows 설치/배포, Windows To Go, Windows 설치 미디어 생성, DISM, BCDBoot, ISO 이미지 분석, USB 부팅 문제, WinDeploy Studio 사용법',
+  'ai_prompt_analyze_prefix':
+      '다음 실제 데이터를 기반으로 간결하게 분석하세요. 표 또는 목록 형식을 사용하세요.\n\n[분석 규칙]\n- 제공된 데이터로만 분석, 꾸미지 않기\n- 위험을 🔴높음 🟡보통 🟢낮음으로 표시\n- 결론을 먼저, 최대 3줄\n- 상세 분석은 뒤에, 표로\n- 전체 답변 300단어 미만\n\n',
   'ai_prompt_log_content': '[로그 내용]',
   'ai_prompt_iso_info': '[ISO 정보]',
   'ai_prompt_usb_info': '[USB 장치 정보]',
@@ -6284,11 +7238,6 @@ const _ko = <String, String>{
   'mirror_download_source': '다운로드 소스',
   'mirror_download_unknown': '알 수 없음',
   'mirror_source_label': '추천 소스',
-  'mirror_strategy_auto': '자동 선택 (권장)',
-  'mirror_strategy_china': '중국 미러 강제',
-  'mirror_strategy_global': '글로벌 미러 강제',
-  'settings_mirror_source': '다운로드 소스',
-  'settings_mirror_source_desc': '미러 소스 전략',
   'mirror_geo_failed': '지역을 확인할 수 없습니다. 글로벌 미러를 사용합니다.',
   'mirror_speed_test_title': '미러 상태',
   'mirror_speed_test_testing': '미러 소스 테스트 중...',

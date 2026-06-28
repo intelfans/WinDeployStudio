@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../core/config/ai_config.dart';
+import '../../../core/localization/strings.dart';
 import '../../logs/services/log_center_service.dart';
 
 enum SearchMode { off, auto, force }
@@ -22,14 +23,32 @@ class AiService {
   String _mapErrorCode(int statusCode) {
     switch (statusCode) {
       case 401:
-        return 'AI 服务未授权';
+        return trCurrent('ai_error_unauthorized');
       case 429:
-        return '请求过于频繁';
+        return trCurrent('ai_error_rate_limited');
       case 500:
-        return 'AI 服务暂时不可用';
+        return trCurrent('ai_error_unavailable');
       default:
-        return 'AI 服务错误 ($statusCode)';
+        return trCurrent('ai_error_http').replaceAll('{status}', '$statusCode');
     }
+  }
+
+  String _mapNetworkError(Object error) {
+    if (error is TimeoutException) {
+      return trCurrent('ai_error_timeout');
+    }
+    final text = error.toString();
+    if (text.contains('SocketException') ||
+        text.contains('ClientException') ||
+        text.contains('errno = 121') ||
+        text.contains('Connection timed out') ||
+        text.contains('信号灯超时时间已到')) {
+      return trCurrent('ai_error_unreachable');
+    }
+    if (text.contains('HandshakeException')) {
+      return trCurrent('ai_error_tls');
+    }
+    return trCurrent('ai_error_connection').replaceAll('{error}', text);
   }
 
   Future<void> sendMessage({
@@ -41,11 +60,21 @@ class AiService {
     SearchMode searchMode = SearchMode.off,
     CancelToken? cancelToken,
   }) async {
-    final url = '${AiConfig.proxyUrl}chat/completions';
+    final proxyUrl = await AiConfig.getProxyUrl();
+    final url = '${proxyUrl}chat/completions';
 
     LogCenterService().logSystem(
-      '[AI]\nProvider=CloudflareWorker\nURL=${AiConfig.proxyUrl}',
+      '[AI]\nProvider=OpenAICompatibleProxy\nURL=$proxyUrl',
     );
+
+    http.Client? client;
+    var completed = false;
+
+    void completeOnce() {
+      if (completed) return;
+      completed = true;
+      onComplete();
+    }
 
     try {
       final request = http.Request('POST', Uri.parse(url));
@@ -62,7 +91,9 @@ class AiService {
           {
             'type': 'web_search',
             'web_search': {
-              'search_context_size': searchMode == SearchMode.force ? 'high' : 'medium',
+              'search_context_size': searchMode == SearchMode.force
+                  ? 'high'
+                  : 'medium',
             },
           },
         ];
@@ -70,14 +101,15 @@ class AiService {
 
       request.body = jsonEncode(body);
 
-      final client = http.Client();
+      client = http.Client();
       cancelToken?.client = client;
 
-      final response = await client.send(request);
+      final response = await client
+          .send(request)
+          .timeout(AiConfig.requestTimeout);
 
       if (response.statusCode != 200) {
         await response.stream.bytesToString();
-        client.close();
         final errorMsg = _mapErrorCode(response.statusCode);
 
         LogCenterService().logSystem(
@@ -93,10 +125,12 @@ class AiService {
       String buffer = '';
       final List<SearchSource> sources = [];
 
-      await for (final chunk in response.stream.transform(utf8.decoder)) {
+      await for (final chunk
+          in response.stream
+              .transform(utf8.decoder)
+              .timeout(AiConfig.streamIdleTimeout)) {
         if (cancelToken?.cancelled ?? false) {
-          client.close();
-          onComplete();
+          completeOnce();
           return;
         }
 
@@ -110,7 +144,7 @@ class AiService {
           final data = trimmed.substring(6);
           if (data == '[DONE]') {
             if (sources.isNotEmpty) onSources(sources);
-            onComplete();
+            completeOnce();
             return;
           }
 
@@ -130,16 +164,19 @@ class AiService {
         }
       }
       if (sources.isNotEmpty) onSources(sources);
-      onComplete();
+      completeOnce();
     } catch (e) {
       if (cancelToken?.cancelled ?? false) {
-        onComplete();
+        completeOnce();
       } else {
+        final errorMsg = _mapNetworkError(e);
         LogCenterService().logSystem(
-          '[AI]\nRequestSuccess=false\nError=$e',
+          '[AI]\nRequestSuccess=false\nError=$e\nUserMessage=$errorMsg',
         );
-        onError(e.toString());
+        onError(errorMsg);
       }
+    } finally {
+      client?.close();
     }
   }
 

@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.tools/
 
 # IntelliJ related
 *.iml
@@ -31,7 +32,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/dist/
 /coverage/
+windows/flutter/ephemeral/
 
 # Symbolication related
 app.*.symbols

@@ -45,7 +45,8 @@ class DownloadManager extends ChangeNotifier {
   final List<DownloadItem> _items = [];
 
   List<DownloadItem> get items => List.unmodifiable(_items);
-  bool get hasActiveDownloads => _items.any((i) => i.status == DownloadStatus.downloading);
+  bool get hasActiveDownloads =>
+      _items.any((i) => i.status == DownloadStatus.downloading);
 
   Future<void> startDownload({
     required String url,
@@ -69,10 +70,18 @@ class DownloadManager extends ChangeNotifier {
       final client = http.Client();
       item._client = client;
 
+      final existingFile = File(item.savePath);
+      final resumeFrom = item.receivedBytes > 0 && await existingFile.exists()
+          ? await existingFile.length()
+          : 0;
       final request = http.Request('GET', Uri.parse(item.url));
+      if (resumeFrom > 0) {
+        request.headers['Range'] = 'bytes=$resumeFrom-';
+      }
       final response = await client.send(request);
 
-      if (response.statusCode != 200) {
+      final isPartial = response.statusCode == 206 && resumeFrom > 0;
+      if (response.statusCode != 200 && !isPartial) {
         item.status = DownloadStatus.error;
         item.error = 'HTTP ${response.statusCode}';
         notifyListeners();
@@ -84,17 +93,27 @@ class DownloadManager extends ChangeNotifier {
       if (disposition != null) {
         final realName = _parseContentDisposition(disposition);
         if (realName != null && realName.isNotEmpty) {
-          item.fileName = realName;
-          item.savePath = p.join(p.dirname(item.savePath), realName);
+          final safeName = _sanitizeFileName(realName);
+          item.fileName = safeName;
+          item.savePath = p.join(p.dirname(item.savePath), safeName);
         }
       }
 
-      item.totalBytes = response.contentLength ?? 0;
-      item.receivedBytes = 0;
-      item.progress = 0;
+      final contentRangeTotal = _parseContentRangeTotal(
+        response.headers['content-range'],
+      );
+      item.totalBytes =
+          contentRangeTotal ??
+          ((response.contentLength ?? 0) + (isPartial ? resumeFrom : 0));
+      item.receivedBytes = isPartial ? resumeFrom : 0;
+      item.progress = item.totalBytes > 0
+          ? item.receivedBytes / item.totalBytes
+          : 0;
 
       final file = File(item.savePath);
-      final sink = file.openWrite();
+      final sink = file.openWrite(
+        mode: isPartial ? FileMode.append : FileMode.write,
+      );
       item._sink = sink;
 
       int lastBytes = 0;
@@ -128,7 +147,9 @@ class DownloadManager extends ChangeNotifier {
           await sink.close();
           item._sink = null;
           if (item.status == DownloadStatus.cancelled) {
-            try { await file.delete(); } catch (_) {}
+            try {
+              await file.delete();
+            } catch (_) {}
           } else if (item.status != DownloadStatus.paused) {
             item.status = DownloadStatus.completed;
             item.progress = 1.0;
@@ -199,37 +220,103 @@ class DownloadManager extends ChangeNotifier {
   }
 
   void clearCompleted() {
-    _items.removeWhere((i) =>
-        i.status == DownloadStatus.completed ||
-        i.status == DownloadStatus.cancelled ||
-        i.status == DownloadStatus.error);
+    _items.removeWhere(
+      (i) =>
+          i.status == DownloadStatus.completed ||
+          i.status == DownloadStatus.cancelled ||
+          i.status == DownloadStatus.error,
+    );
     notifyListeners();
   }
 
   String? _parseContentDisposition(String disposition) {
-    final rfc5987 = RegExp(r"filename\*\s*=\s*UTF-8''(.+)", caseSensitive: false);
+    final rfc5987 = RegExp(
+      r"filename\*\s*=\s*UTF-8''(.+)",
+      caseSensitive: false,
+    );
     final m1 = rfc5987.firstMatch(disposition);
     if (m1 != null) return Uri.decodeComponent(m1.group(1)!.trim());
 
-    final rfc5987any = RegExp(r"filename\*\s*=\s*[^']+'[^']*'(.+)", caseSensitive: false);
+    final rfc5987any = RegExp(
+      r"filename\*\s*=\s*[^']+'[^']*'(.+)",
+      caseSensitive: false,
+    );
     final m2 = rfc5987any.firstMatch(disposition);
     if (m2 != null) return Uri.decodeComponent(m2.group(1)!.trim());
 
-    final plain = RegExp(r'filename\s*=\s*("?)([^";\r\n]*)\1', caseSensitive: false);
+    final plain = RegExp(
+      r'filename\s*=\s*("?)([^";\r\n]*)\1',
+      caseSensitive: false,
+    );
     final m3 = plain.firstMatch(disposition);
     if (m3 != null) {
       var name = m3.group(2)!.trim();
       if (name.contains('%')) {
-        try { name = Uri.decodeComponent(name); } catch (_) {}
+        try {
+          name = Uri.decodeComponent(name);
+        } catch (_) {}
       }
       return name;
     }
     return null;
   }
 
+  String _sanitizeFileName(String name) {
+    var safe = p
+        .basename(name)
+        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
+        .trim();
+    while (safe.startsWith('.')) {
+      safe = safe.substring(1).trimLeft();
+    }
+    if (safe.isEmpty || safe == '.' || safe == '..') {
+      safe = 'download';
+    }
+    const reserved = {
+      'CON',
+      'PRN',
+      'AUX',
+      'NUL',
+      'COM1',
+      'COM2',
+      'COM3',
+      'COM4',
+      'COM5',
+      'COM6',
+      'COM7',
+      'COM8',
+      'COM9',
+      'LPT1',
+      'LPT2',
+      'LPT3',
+      'LPT4',
+      'LPT5',
+      'LPT6',
+      'LPT7',
+      'LPT8',
+      'LPT9',
+    };
+    final stem = p.basenameWithoutExtension(safe).toUpperCase();
+    if (reserved.contains(stem)) {
+      safe = '_$safe';
+    }
+    return safe;
+  }
+
+  int? _parseContentRangeTotal(String? contentRange) {
+    if (contentRange == null) return null;
+    final match = RegExp(r'/(\d+)$').firstMatch(contentRange.trim());
+    if (match == null) return null;
+    return int.tryParse(match.group(1)!);
+  }
+
   String _formatSpeed(double bytesPerSec) {
-    if (bytesPerSec < 1024) return '${bytesPerSec.toStringAsFixed(0)} B/s';
-    if (bytesPerSec < 1024 * 1024) return '${(bytesPerSec / 1024).toStringAsFixed(1)} KB/s';
+    if (bytesPerSec < 1024) {
+      return '${bytesPerSec.toStringAsFixed(0)} B/s';
+    }
+    if (bytesPerSec < 1024 * 1024) {
+      return '${(bytesPerSec / 1024).toStringAsFixed(1)} KB/s';
+    }
     return '${(bytesPerSec / (1024 * 1024)).toStringAsFixed(1)} MB/s';
   }
 }

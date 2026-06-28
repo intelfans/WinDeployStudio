@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/localization/strings.dart';
 import '../../app/typography.dart';
+import '../../shared/widgets/special_thanks_section.dart';
 import '../update/models/update_models.dart';
 import '../update/providers/update_provider.dart';
 import '../update/screens/update_dialog.dart';
@@ -65,19 +66,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     color: colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(Icons.desktop_windows_rounded,
-                      size: 32, color: colorScheme.onPrimaryContainer),
+                  child: Icon(
+                    Icons.desktop_windows_rounded,
+                    size: 32,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr(context, 'home_title'),
-                          style: AppTypography.pageTitleWith(colorScheme.onSurface)),
+                      Text(
+                        tr(context, 'home_title'),
+                        style: AppTypography.pageTitleWith(
+                          colorScheme.onSurface,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(tr(context, 'home_subtitle'),
-                          style: AppTypography.bodyWith(colorScheme.onSurfaceVariant)),
+                      Text(
+                        tr(context, 'home_subtitle'),
+                        style: AppTypography.bodyWith(
+                          colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -86,8 +98,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 40),
 
             // Quick Actions
-            Text(tr(context, 'home_quick_start'),
-                style: AppTypography.sectionTitleWith(colorScheme.onSurface)),
+            Text(
+              tr(context, 'home_quick_start'),
+              style: AppTypography.sectionTitleWith(colorScheme.onSurface),
+            ),
             const SizedBox(height: 20),
 
             // Quick Actions Grid
@@ -99,8 +113,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 40),
 
             // About Section
-            Text(tr(context, 'home_about'),
-                style: AppTypography.sectionTitleWith(colorScheme.onSurface)),
+            Text(
+              tr(context, 'home_about'),
+              style: AppTypography.sectionTitleWith(colorScheme.onSurface),
+            ),
             const SizedBox(height: 20),
             _buildAboutCard(context, colorScheme),
           ],
@@ -115,21 +131,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         IntrinsicHeight(
           child: Row(
             children: [
-              Expanded(child: _QuickActionCard(
-                icon: Icons.usb_outlined,
-                title: tr(context, 'home_bootable_usb'),
-                subtitle: tr(context, 'home_bootable_usb_desc'),
-                color: const Color(0xFF0071C5),
-                onTap: () => context.go('/creator'),
-              )),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.usb_outlined,
+                  title: tr(context, 'home_bootable_usb'),
+                  subtitle: tr(context, 'home_bootable_usb_desc'),
+                  color: const Color(0xFF0071C5),
+                  onTap: () => context.go('/creator'),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _QuickActionCard(
-                icon: Icons.computer_outlined,
-                title: tr(context, 'home_wtg'),
-                subtitle: tr(context, 'home_wtg_desc'),
-                color: const Color(0xFF7B61FF),
-                onTap: () => context.go('/wtg'),
-              )),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.computer_outlined,
+                  title: tr(context, 'home_wtg'),
+                  subtitle: tr(context, 'home_wtg_desc'),
+                  color: const Color(0xFF7B61FF),
+                  onTap: () => context.go('/wtg'),
+                ),
+              ),
             ],
           ),
         ),
@@ -137,22 +157,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         IntrinsicHeight(
           child: Row(
             children: [
-              Expanded(child: _QuickActionCard(
-                icon: Icons.cloud_outlined,
-                title: tr(context, 'home_image_library'),
-                subtitle: tr(context, 'home_image_library_desc'),
-                color: const Color(0xFF00A4EF),
-                onTap: () => context.go('/mirror'),
-              )),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.cloud_outlined,
+                  title: tr(context, 'home_image_library'),
+                  subtitle: tr(context, 'home_image_library_desc'),
+                  color: const Color(0xFF00A4EF),
+                  onTap: () => context.go('/mirror'),
+                ),
+              ),
               if (_isChineseLocale(context)) ...[
                 const SizedBox(width: 12),
-                Expanded(child: _QuickActionCard(
-                  icon: Icons.font_download_outlined,
-                  title: tr(context, 'home_font_pack'),
-                  subtitle: tr(context, 'home_font_pack_desc'),
-                  color: const Color(0xFF107C10),
-                  onTap: () => context.go('/mirror/font-pack'),
-                )),
+                Expanded(
+                  child: _QuickActionCard(
+                    icon: Icons.font_download_outlined,
+                    title: tr(context, 'home_font_pack'),
+                    subtitle: tr(context, 'home_font_pack_desc'),
+                    color: const Color(0xFF107C10),
+                    onTap: () => context.go('/mirror/font-pack'),
+                  ),
+                ),
               ],
             ],
           ),
@@ -165,38 +189,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return IntrinsicHeight(
       child: Row(
         children: [
-          Expanded(child: _QuickActionCard(
-            icon: Icons.usb_outlined,
-            title: tr(context, 'home_bootable_usb'),
-            subtitle: tr(context, 'home_bootable_usb_desc'),
-            color: const Color(0xFF0071C5),
-            onTap: () => context.go('/creator'),
-          )),
+          Expanded(
+            child: _QuickActionCard(
+              icon: Icons.usb_outlined,
+              title: tr(context, 'home_bootable_usb'),
+              subtitle: tr(context, 'home_bootable_usb_desc'),
+              color: const Color(0xFF0071C5),
+              onTap: () => context.go('/creator'),
+            ),
+          ),
           const SizedBox(width: 16),
-          Expanded(child: _QuickActionCard(
-            icon: Icons.computer_outlined,
-            title: tr(context, 'home_wtg'),
-            subtitle: tr(context, 'home_wtg_desc'),
-            color: const Color(0xFF7B61FF),
-            onTap: () => context.go('/wtg'),
-          )),
+          Expanded(
+            child: _QuickActionCard(
+              icon: Icons.computer_outlined,
+              title: tr(context, 'home_wtg'),
+              subtitle: tr(context, 'home_wtg_desc'),
+              color: const Color(0xFF7B61FF),
+              onTap: () => context.go('/wtg'),
+            ),
+          ),
           const SizedBox(width: 16),
-          Expanded(child: _QuickActionCard(
-            icon: Icons.cloud_outlined,
-            title: tr(context, 'home_image_library'),
-            subtitle: tr(context, 'home_image_library_desc'),
-            color: const Color(0xFF00A4EF),
-            onTap: () => context.go('/mirror'),
-          )),
+          Expanded(
+            child: _QuickActionCard(
+              icon: Icons.cloud_outlined,
+              title: tr(context, 'home_image_library'),
+              subtitle: tr(context, 'home_image_library_desc'),
+              color: const Color(0xFF00A4EF),
+              onTap: () => context.go('/mirror'),
+            ),
+          ),
           if (_isChineseLocale(context)) ...[
             const SizedBox(width: 16),
-            Expanded(child: _QuickActionCard(
-              icon: Icons.font_download_outlined,
-              title: tr(context, 'home_font_pack'),
-              subtitle: tr(context, 'home_font_pack_desc'),
-              color: const Color(0xFF107C10),
-              onTap: () => context.go('/mirror/font-pack'),
-            )),
+            Expanded(
+              child: _QuickActionCard(
+                icon: Icons.font_download_outlined,
+                title: tr(context, 'home_font_pack'),
+                subtitle: tr(context, 'home_font_pack_desc'),
+                color: const Color(0xFF107C10),
+                onTap: () => context.go('/mirror/font-pack'),
+              ),
+            ),
           ],
         ],
       ),
@@ -218,8 +250,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _InfoRow(tr(context, 'home_platform'), 'Windows Desktop'),
             _InfoRow(tr(context, 'home_engine'), 'Flutter 3.44'),
             const Divider(),
-            _InfoRow(tr(context, 'home_focus'), tr(context, 'home_focus_value')),
-            _InfoRow(tr(context, 'home_license'), tr(context, 'home_license_value')),
+            _InfoRow(
+              tr(context, 'home_focus'),
+              tr(context, 'home_focus_value'),
+            ),
+            _InfoRow(tr(context, 'home_license'), AppConstants.licenseName),
+            _InfoRow(
+              tr(context, 'about_github_repository'),
+              AppConstants.githubRepository,
+            ),
+            const SizedBox(height: 12),
+            const SpecialThanksSection(compact: true),
           ],
         ),
       ),
@@ -264,11 +305,17 @@ class _QuickActionCard extends StatelessWidget {
                 child: Icon(icon, size: 28, color: color),
               ),
               const SizedBox(height: 16),
-              Text(title,
-                  style: AppTypography.cardTitleWith(theme.colorScheme.onSurface)),
+              Text(
+                title,
+                style: AppTypography.cardTitleWith(theme.colorScheme.onSurface),
+              ),
               const SizedBox(height: 4),
-              Text(subtitle,
-                  style: AppTypography.captionWith(theme.colorScheme.onSurfaceVariant)),
+              Text(
+                subtitle,
+                style: AppTypography.captionWith(
+                  theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
@@ -284,17 +331,30 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: AppTypography.bodyWith(
-            Theme.of(context).colorScheme.onSurfaceVariant,
-          )),
-          Text(value, style: AppTypography.body.copyWith(
-            fontWeight: FontWeight.w500,
-          )),
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: AppTypography.bodyWith(colorScheme.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: SelectableText(
+              value,
+              textAlign: TextAlign.end,
+              style: AppTypography.body.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );

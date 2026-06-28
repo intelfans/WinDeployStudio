@@ -12,7 +12,7 @@ Recursos principais:
   🖼️ Biblioteca de imagens
     Navegar pelas imagens do Windows e links de download
     
-  💿 Ferramenta de criação USB inicializável  
+  💿 Criador de mídia de instalação do Windows  
     Criar mídia de instalação do Windows a partir de arquivos ISO
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@ Requisitos do sistema:
 
 Clique em "Avançar" para continuar a instalação.
 
-© 2026 Bob Steve. Todos os direitos reservados.
+© 2026 Bob Steve. Distribuído sob a Licença MIT.

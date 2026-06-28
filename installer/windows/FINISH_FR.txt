@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                 Installation terminée - Merci !                 │
-└─────────────────────────────────────────────────────────────┘
+﻿Installation terminée - Merci !
 
-WinDeploy Studio a été installé avec succès !
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio a été installé avec succès.
 
 Prochaines étapes :
 
-  • Lancez WinDeploy Studio depuis le menu Démarrer ou le raccourci bureau
-  
-  • Parcourez la bibliothèque d'images pour les images Windows
-  
-  • Créez votre première clé USB amorçable ou Windows To Go
-  
-  • Partagez vos retours pour nous aider à améliorer !
+- Lancez WinDeploy Studio depuis le menu Démarrer ou le raccourci bureau.
+- Parcourez la bibliothèque d'images pour les images Windows.
+- Créez votre première clé USB d'installation Windows ou Windows To Go.
+- Partagez vos retours pour nous aider à améliorer.
 
-═══════════════════════════════════════════════════════════════
+Licence : MIT License
+Profil GitHub : https://github.com/intelfans
+Dépôt GitHub : https://github.com/intelfans/WinDeployStudio
 
-Merci d'avoir choisi WinDeploy Studio !
+Remerciements
 
-Nous apprécions vos retours et nous nous engageons à améliorer WinDeploy Studio.
+WinDeploy Studio remercie les personnes et communautés suivantes pour leurs retours, tests, idées, inspiration et soutien.
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  Premiers retours, tests et discussions autour du projet
 
-© 2026 Bob Steve. Tous droits réservés.
+- Timme
+  Retours détaillés d'utilisateurs internationaux, recommandations sur la confiance et l'ergonomie, suggestions de sources Microsoft et revue communautaire
 
-Site web : https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  Inspiration venue des outils de diagnostic et de dépannage Microsoft
+
+- Open Source Community
+  Pour la documentation, les rapports de bugs, les tests, les traductions et les suggestions

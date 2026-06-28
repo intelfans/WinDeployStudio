@@ -33,17 +33,17 @@ class UsbRecord {
   });
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'device_name': deviceName,
-        'device_path': devicePath,
-        'device_size': deviceSize,
-        'device_serial': deviceSerial,
-        'iso_name': isoName,
-        'iso_path': isoPath,
-        'status': status,
-        'created_at': createdAt,
-        'completed_at': completedAt,
-      };
+    'id': id,
+    'device_name': deviceName,
+    'device_path': devicePath,
+    'device_size': deviceSize,
+    'device_serial': deviceSerial,
+    'iso_name': isoName,
+    'iso_path': isoPath,
+    'status': status,
+    'created_at': createdAt,
+    'completed_at': completedAt,
+  };
 
   factory UsbRecord.fromMap(Map<String, dynamic> map) {
     return UsbRecord(
@@ -77,10 +77,7 @@ class DatabaseService {
 
     return await databaseFactoryFfi.openDatabase(
       dbPath,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: _onCreate,
-      ),
+      options: OpenDatabaseOptions(version: 1, onCreate: _onCreate),
     );
   }
 
@@ -110,17 +107,17 @@ class DatabaseService {
     );
   }
 
-  Future<void> updateUsbStatus(String id, String status, {String? completedAt}) async {
+  Future<void> updateUsbStatus(
+    String id,
+    String status, {
+    String? completedAt,
+  }) async {
     final db = await database;
-    await db.update(
-      'usb_history',
-      {
-        'status': status,
-        if (completedAt != null) 'completed_at': completedAt,
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final values = {'status': status};
+    if (completedAt != null) {
+      values['completed_at'] = completedAt;
+    }
+    await db.update('usb_history', values, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<List<UsbRecord>> getUsbHistory({int limit = 50}) async {

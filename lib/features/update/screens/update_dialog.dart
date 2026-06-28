@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/special_thanks_section.dart';
 import '../models/update_models.dart';
 import '../providers/update_provider.dart';
 
@@ -36,7 +37,9 @@ class UpdateDialog extends ConsumerWidget {
       return _InstallDialog(
         info: state.info!,
         onInstall: () async {
-          final success = await ref.read(updateProvider.notifier).installUpdate();
+          final success = await ref
+              .read(updateProvider.notifier)
+              .installUpdate();
           if (success && context.mounted) {
             Navigator.of(context).pop();
           }
@@ -143,9 +146,15 @@ class _AvailableDialog extends StatelessWidget {
                   data: info.body,
                   styleSheet: MarkdownStyleSheet(
                     p: theme.textTheme.bodySmall,
-                    h1: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                    h2: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                    h3: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    h1: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    h2: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    h3: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                     code: theme.textTheme.bodySmall?.copyWith(
                       fontFamily: 'Consolas',
                       backgroundColor: colorScheme.surfaceContainerHighest,
@@ -159,6 +168,8 @@ class _AvailableDialog extends StatelessWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            const SpecialThanksSection(compact: true),
           ],
         ),
       ),
@@ -236,9 +247,10 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _progressAnim = Tween<double>(begin: 0, end: widget.progress).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _progressAnim = Tween<double>(
+      begin: 0,
+      end: widget.progress,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
     _startTipRotation();
   }
@@ -247,12 +259,13 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
   void didUpdateWidget(_DownloadingDialog oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.progress != widget.progress) {
-      _progressAnim = Tween<double>(
-        begin: _progressAnim.value,
-        end: widget.progress,
-      ).animate(
-        CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-      );
+      _progressAnim =
+          Tween<double>(
+            begin: _progressAnim.value,
+            end: widget.progress,
+          ).animate(
+            CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+          );
       _animController.forward(from: 0);
     }
     if (oldWidget.phase != widget.phase) {
@@ -325,11 +338,7 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
           color: colorScheme.primaryContainer,
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          _getPhaseIcon(),
-          size: 32,
-          color: colorScheme.primary,
-        ),
+        child: Icon(_getPhaseIcon(), size: 32, color: colorScheme.primary),
       ),
       title: Text(
         tr(context, 'update_downloading'),
@@ -434,10 +443,7 @@ class _InstallDialog extends StatelessWidget {
           color: colorScheme.primary,
         ),
       ),
-      title: Text(
-        tr(context, 'update_install'),
-        textAlign: TextAlign.center,
-      ),
+      title: Text(tr(context, 'update_install'), textAlign: TextAlign.center),
       content: Text(
         tr(context, 'update_install_desc'),
         textAlign: TextAlign.center,

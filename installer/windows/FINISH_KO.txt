@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                     설치 완료 - 감사합니다!                     │
-└─────────────────────────────────────────────────────────────┘
+﻿설치 완료 - 감사합니다!
 
-WinDeploy Studio가 성공적으로 설치되었습니다!
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio가 성공적으로 설치되었습니다.
 
 다음 단계:
 
-  • 시작 메뉴 또는 바탕화면 바로가기에서 WinDeploy Studio 실행
-  
-  • 이미지 라이브러리에서 Windows 이미지 탐색
-  
-  • 첫 번째 부팅 USB 또는 Windows To Go 만들기
-  
-  • 피드백을 공유하여 개선에 도움을 주세요!
+- 시작 메뉴 또는 바탕화면 바로가기에서 WinDeploy Studio를 실행하세요.
+- 이미지 라이브러리에서 Windows 이미지를 살펴보세요.
+- 첫 번째 Windows 설치 USB 또는 Windows To Go를 만들어 보세요.
+- 피드백을 공유하여 개선에 도움을 주세요.
 
-═══════════════════════════════════════════════════════════════
+라이선스: MIT License
+GitHub 프로필: https://github.com/intelfans
+GitHub 저장소: https://github.com/intelfans/WinDeployStudio
 
-WinDeploy Studio를 선택해 주셔서 감사합니다!
+특별 감사
 
-여러분의 소중한 피드백을 바탕으로 WinDeploy Studio를 개선하겠습니다.
+WinDeploy Studio는 소중한 피드백, 테스트, 아이디어, 영감과 지원을 보내 준 다음 분들과 커뮤니티에 감사드립니다.
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  초기 피드백, 테스트 및 프로젝트 논의
 
-© 2026 Bob Steve. All rights reserved.
+- Timme
+  상세한 국제 사용자 피드백, 신뢰와 사용성 제안, Microsoft 공식 소스 제안 및 커뮤니티 검토
 
-Website: https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  Microsoft 진단 및 문제 해결 도구에서 얻은 영감
+
+- Open Source Community
+  문서, 버그 보고, 테스트, 번역 및 제안에 대한 기여

@@ -10,8 +10,7 @@ class WinDeployStudioApp extends ConsumerStatefulWidget {
   const WinDeployStudioApp({super.key});
 
   @override
-  ConsumerState<WinDeployStudioApp> createState() =>
-      _WinDeployStudioAppState();
+  ConsumerState<WinDeployStudioApp> createState() => _WinDeployStudioAppState();
 }
 
 class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
@@ -55,10 +54,11 @@ class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
     if (!_initialized) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(ref.watch(seedColorProvider), ref.watch(fontFamilyProvider)),
-        home: const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
+        theme: AppTheme.light(
+          ref.watch(seedColorProvider),
+          ref.watch(fontFamilyProvider),
         ),
+        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
 
@@ -97,10 +97,9 @@ class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
       builder: (context, child) {
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: MediaQuery.of(context).textScaler.clamp(
-              minScaleFactor: 0.8,
-              maxScaleFactor: 2.0,
-            ),
+            textScaler: MediaQuery.of(
+              context,
+            ).textScaler.clamp(minScaleFactor: 0.8, maxScaleFactor: 2.0),
           ),
           child: child ?? const SizedBox.shrink(),
         );
@@ -120,23 +119,7 @@ class _LanguageSelectPage extends ConsumerStatefulWidget {
 class _LanguageSelectPageState extends ConsumerState<_LanguageSelectPage> {
   String _selected = 'zh';
 
-  String _tr(String key) {
-    final map = switch (_selected) {
-      'zh' => L.zh,
-      'zh_TW' => L.zhTW,
-      'en' => L.en,
-      'fr' => L.fr,
-      'de' => L.de,
-      'es' => L.es,
-      'pt' => L.pt,
-      'ru' => L.ru,
-      'ar' => L.ar,
-      'ko' => L.ko,
-      'ja' => L.ja,
-      _ => L.en,
-    };
-    return map[key] ?? L.en[key] ?? key;
-  }
+  String _tr(String key) => trByCode(_selected, key);
 
   @override
   Widget build(BuildContext context) {
@@ -193,27 +176,71 @@ class _LanguageSelectPageState extends ConsumerState<_LanguageSelectPage> {
                   ),
                   const SizedBox(height: 32),
                   // Language options
-                  _LangOption(label: '简体中文', sublabel: 'Simplified Chinese', isSelected: _selected == 'zh', onTap: () => setState(() => _selected = 'zh')),
+                  _LangOption(
+                    label: '简体中文',
+                    isSelected: _selected == 'zh',
+                    onTap: () => setState(() => _selected = 'zh'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: '繁體中文', sublabel: 'Traditional Chinese', isSelected: _selected == 'zh_TW', onTap: () => setState(() => _selected = 'zh_TW')),
+                  _LangOption(
+                    label: '繁體中文',
+                    isSelected: _selected == 'zh_TW',
+                    onTap: () => setState(() => _selected = 'zh_TW'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'English', sublabel: 'English', isSelected: _selected == 'en', onTap: () => setState(() => _selected = 'en')),
+                  _LangOption(
+                    label: 'English',
+                    isSelected: _selected == 'en',
+                    onTap: () => setState(() => _selected = 'en'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'Français', sublabel: 'French', isSelected: _selected == 'fr', onTap: () => setState(() => _selected = 'fr')),
+                  _LangOption(
+                    label: 'Français',
+                    isSelected: _selected == 'fr',
+                    onTap: () => setState(() => _selected = 'fr'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'Deutsch', sublabel: 'German', isSelected: _selected == 'de', onTap: () => setState(() => _selected = 'de')),
+                  _LangOption(
+                    label: 'Deutsch',
+                    isSelected: _selected == 'de',
+                    onTap: () => setState(() => _selected = 'de'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'Español', sublabel: 'Spanish', isSelected: _selected == 'es', onTap: () => setState(() => _selected = 'es')),
+                  _LangOption(
+                    label: 'Español',
+                    isSelected: _selected == 'es',
+                    onTap: () => setState(() => _selected = 'es'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'Português', sublabel: 'Portuguese', isSelected: _selected == 'pt', onTap: () => setState(() => _selected = 'pt')),
+                  _LangOption(
+                    label: 'Português',
+                    isSelected: _selected == 'pt',
+                    onTap: () => setState(() => _selected = 'pt'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'Русский', sublabel: 'Russian', isSelected: _selected == 'ru', onTap: () => setState(() => _selected = 'ru')),
+                  _LangOption(
+                    label: 'Русский',
+                    isSelected: _selected == 'ru',
+                    onTap: () => setState(() => _selected = 'ru'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: 'العربية', sublabel: 'Arabic', isSelected: _selected == 'ar', onTap: () => setState(() => _selected = 'ar')),
+                  _LangOption(
+                    label: 'العربية',
+                    isSelected: _selected == 'ar',
+                    onTap: () => setState(() => _selected = 'ar'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: '한국어', sublabel: 'Korean', isSelected: _selected == 'ko', onTap: () => setState(() => _selected = 'ko')),
+                  _LangOption(
+                    label: '한국어',
+                    isSelected: _selected == 'ko',
+                    onTap: () => setState(() => _selected = 'ko'),
+                  ),
                   const SizedBox(height: 10),
-                  _LangOption(label: '日本語', sublabel: 'Japanese', isSelected: _selected == 'ja', onTap: () => setState(() => _selected = 'ja')),
+                  _LangOption(
+                    label: '日本語',
+                    isSelected: _selected == 'ja',
+                    onTap: () => setState(() => _selected = 'ja'),
+                  ),
                   const SizedBox(height: 32),
                   // Confirm button
                   SizedBox(
@@ -224,7 +251,9 @@ class _LanguageSelectPageState extends ConsumerState<_LanguageSelectPage> {
                         final locale = _selected == 'zh_TW'
                             ? const Locale('zh', 'TW')
                             : Locale(_selected);
-                        await ref.read(localeProvider.notifier).setLocale(locale);
+                        await ref
+                            .read(localeProvider.notifier)
+                            .setLocale(locale);
                         if (context.mounted) Navigator.pop(context);
                       },
                       child: Text(
@@ -254,13 +283,11 @@ class _LanguageSelectPageState extends ConsumerState<_LanguageSelectPage> {
 
 class _LangOption extends StatelessWidget {
   final String label;
-  final String sublabel;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _LangOption({
     required this.label,
-    required this.sublabel,
     required this.isSelected,
     required this.onTap,
   });
@@ -295,18 +322,11 @@ class _LangOption extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      )),
-                  Text(sublabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      )),
-                ],
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             if (isSelected)

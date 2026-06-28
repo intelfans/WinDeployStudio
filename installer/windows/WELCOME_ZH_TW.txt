@@ -12,7 +12,7 @@
   🖼️ 鏡像中心
     瀏覽精選的 Windows 鏡像和下載連結
     
-  💿 啟動盤製作工具  
+  💿 Windows 安裝盤建立工具  
     從 ISO 檔案建立 Windows 安裝媒體
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@
 
 點擊「下一步」繼續安裝。
 
-© 2026 Bob Steve. 保留所有權利。
+© 2026 Bob Steve. 基於 MIT License 發行。

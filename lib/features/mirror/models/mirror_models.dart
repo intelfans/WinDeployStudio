@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../../../core/localization/strings.dart';
+
 class MirrorItem {
   final String id;
   final Map<String, String> _name;
@@ -20,18 +22,18 @@ class MirrorItem {
   final String? chinaUrl;
   final String? globalUrl;
 
-  const MirrorItem({
+  const MirrorItem._({
     required this.id,
-    required Map<String, String> name,
+    required this._name,
     required this.category,
-    Map<String, String>? type,
+    this._type,
     this.version,
     this.build,
     this.architecture,
-    Map<String, String>? description,
-    Map<String, String>? audience,
-    Map<String, List<String>> pros = const {},
-    Map<String, List<String>> notes = const {},
+    this._description,
+    this._audience,
+    this._pros = const {},
+    this._notes = const {},
     required this.downloadUrl,
     this.sha256,
     this.size,
@@ -39,21 +41,32 @@ class MirrorItem {
     this.fontPackUrl,
     this.chinaUrl,
     this.globalUrl,
-  })  : _name = name,
-        _type = type,
-        _description = description,
-        _audience = audience,
-        _pros = pros,
-        _notes = notes;
+  });
 
   String _localize(Map<String, String>? map, Locale locale) {
     if (map == null) return '';
-    return map[locale.languageCode] ?? map['en'] ?? map['zh'] ?? '';
+    final code = _localeCode(locale);
+    final isSupported = isSupportedLocaleCode(code);
+    final localized = isSupported && code.contains('_')
+        ? map[code]
+        : map[code] ?? map[locale.languageCode];
+    if (localized != null) return localized;
+    return '';
   }
 
   List<String> _localizeList(Map<String, List<String>>? map, Locale locale) {
     if (map == null) return [];
-    return map[locale.languageCode] ?? map['en'] ?? map['zh'] ?? [];
+    final code = _localeCode(locale);
+    final isSupported = isSupportedLocaleCode(code);
+    final localized = isSupported && code.contains('_')
+        ? map[code]
+        : map[code] ?? map[locale.languageCode];
+    if (localized != null) return localized;
+    return [];
+  }
+
+  String _localeCode(Locale locale) {
+    return normalizeLocaleCode(localeCodeFromLocale(locale));
   }
 
   String getName(Locale locale) => _localize(_name, locale);
@@ -62,6 +75,30 @@ class MirrorItem {
   String getAudience(Locale locale) => _localize(_audience, locale);
   List<String> getPros(Locale locale) => _localizeList(_pros, locale);
   List<String> getNotes(Locale locale) => _localizeList(_notes, locale);
+
+  bool get isOfficialMicrosoft => category == 'Official Microsoft';
+  bool get isCommunityImage => category == 'Community Images';
+  bool get isImageCenterItem => isOfficialMicrosoft || isCommunityImage;
+  bool get isStarValleyX => id == 'starvalleyx';
+
+  String get productLogName {
+    return switch (id) {
+      'official-win11' => 'Windows11',
+      'official-win10' => 'Windows10',
+      'tiny11' => 'Tiny11',
+      'tiny10' => 'Tiny10',
+      'xlite11' => 'WindowsXLite11',
+      'xlite10' => 'WindowsXLite10',
+      'starvalleyx' => 'StarValleyX',
+      _ => id,
+    };
+  }
+
+  bool isVisibleInLocale(Locale locale) {
+    if (!isImageCenterItem) return false;
+    if (!isStarValleyX) return true;
+    return normalizeLocaleCode(localeCodeFromLocale(locale)).startsWith('zh');
+  }
 
   factory MirrorItem.fromJson(Map<String, dynamic> json) {
     Map<String, String>? parseStringMap(dynamic value) {
@@ -78,13 +115,17 @@ class MirrorItem {
         return {'zh': list, 'en': list};
       }
       if (value is Map) {
-        return value.map((k, v) => MapEntry(
-            k.toString(), (v as List).map((e) => e.toString()).toList()));
+        return value.map(
+          (k, v) => MapEntry(
+            k.toString(),
+            (v as List).map((e) => e.toString()).toList(),
+          ),
+        );
       }
       return null;
     }
 
-    return MirrorItem(
+    return MirrorItem._(
       id: json['id'] as String? ?? '',
       name: parseStringMap(json['name']) ?? {},
       category: json['category'] as String? ?? 'Other',
@@ -107,33 +148,35 @@ class MirrorItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': _name,
-        'category': category,
-        if (_type != null) 'type': _type,
-        if (version != null) 'version': version,
-        if (build != null) 'build': build,
-        if (architecture != null) 'architecture': architecture,
-        if (_description != null) 'description': _description,
-        if (_audience != null) 'audience': _audience,
-        if (_pros.isNotEmpty) 'pros': _pros,
-        if (_notes.isNotEmpty) 'notes': _notes,
-        'downloadUrl': downloadUrl,
-        if (sha256 != null) 'sha256': sha256,
-        if (size != null) 'size': size,
-        'needsFontPack': needsFontPack,
-        if (fontPackUrl != null) 'fontPackUrl': fontPackUrl,
-        if (chinaUrl != null) 'chinaUrl': chinaUrl,
-        if (globalUrl != null) 'globalUrl': globalUrl,
-      };
+    'id': id,
+    'name': _name,
+    'category': category,
+    if (_type != null) 'type': _type,
+    if (version != null) 'version': version,
+    if (build != null) 'build': build,
+    if (architecture != null) 'architecture': architecture,
+    if (_description != null) 'description': _description,
+    if (_audience != null) 'audience': _audience,
+    if (_pros.isNotEmpty) 'pros': _pros,
+    if (_notes.isNotEmpty) 'notes': _notes,
+    'downloadUrl': downloadUrl,
+    if (sha256 != null) 'sha256': sha256,
+    if (size != null) 'size': size,
+    'needsFontPack': needsFontPack,
+    if (fontPackUrl != null) 'fontPackUrl': fontPackUrl,
+    if (chinaUrl != null) 'chinaUrl': chinaUrl,
+    if (globalUrl != null) 'globalUrl': globalUrl,
+  };
 }
 
 class MirrorCategory {
+  final String id;
   final String name;
   final String icon;
   final List<MirrorItem> items;
 
   const MirrorCategory({
+    required this.id,
     required this.name,
     required this.icon,
     required this.items,
@@ -144,10 +187,7 @@ class MirrorListData {
   final String lastUpdate;
   final List<MirrorItem> items;
 
-  const MirrorListData({
-    required this.lastUpdate,
-    required this.items,
-  });
+  const MirrorListData({required this.lastUpdate, required this.items});
 
   factory MirrorListData.fromJson(Map<String, dynamic> json) {
     final itemsJson = json['items'] as List<dynamic>? ?? [];
@@ -162,73 +202,39 @@ class MirrorListData {
   List<MirrorCategory> categories(Locale locale) {
     final map = <String, List<MirrorItem>>{};
     for (final item in items) {
+      if (!item.isVisibleInLocale(locale)) continue;
       map.putIfAbsent(item.category, () => []).add(item);
     }
     return map.entries
-        .map((e) => MirrorCategory(
-              name: _categoryName(e.key, locale),
-              icon: _categoryIcon(e.key),
-              items: e.value,
-            ))
+        .map(
+          (e) => MirrorCategory(
+            id: e.key,
+            name: _categoryName(e.key, locale),
+            icon: _categoryIcon(e.key),
+            items: e.value,
+          ),
+        )
         .toList();
   }
 
   static String _categoryName(String category, Locale locale) {
-    final code = locale.languageCode;
-    switch (category) {
-      case 'Official Original':
-        return switch (code) {
-          'zh' => '官方原版',
-          'ru' => 'Официальные',
-          'fr' => 'Officiel',
-          'ja' => '公式',
-          _ => 'Official',
-        };
-      case 'Official LTSC':
-        return 'LTSC';
-      case 'TinyOS':
-        return 'TinyOS';
-      case 'X-Lite':
-        return 'X-Lite';
-      case 'Custom':
-        return switch (code) {
-          'zh' => '美化版',
-          'ru' => 'Пользовательские',
-          'fr' => 'Personnalisé',
-          'ja' => 'カスタム',
-          _ => 'Custom',
-        };
-      case 'Tools':
-        return switch (code) {
-          'zh' => '工具',
-          'ru' => 'Инструменты',
-          'fr' => 'Outils',
-          'ja' => 'ツール',
-          _ => 'Tools',
-        };
-      default:
-        return switch (code) {
-          'zh' => '其他',
-          'ru' => 'Другие',
-          'fr' => 'Autre',
-          'ja' => 'その他',
-          _ => 'Other',
-        };
-    }
+    final code = localeCodeFromLocale(locale);
+    return switch (category) {
+      'Official Microsoft' => trByCode(
+        code,
+        'mirror_category_official_microsoft',
+      ),
+      'Community Images' => trByCode(code, 'mirror_category_community'),
+      _ => category,
+    };
   }
 
   static String _categoryIcon(String category) {
     switch (category) {
-      case 'Official Original':
-      case 'Official LTSC':
-      case 'Official Insider':
+      case 'Official Microsoft':
         return 'official';
-      case 'TinyOS':
-        return 'tiny';
-      case 'X-Lite':
-        return 'xlite';
-      case 'Custom':
-        return 'custom';
+      case 'Community Images':
+        return 'community';
       default:
         return 'other';
     }

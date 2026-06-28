@@ -68,12 +68,18 @@ class UpdateService {
 
   Future<void> _saveLastCheckTime() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefKeyLastCheck, DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(
+      _prefKeyLastCheck,
+      DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   Future<UpdateChannel> getChannel() async {
     final prefs = await SharedPreferences.getInstance();
     final index = prefs.getInt(_prefKeyChannel) ?? 0;
+    if (index < 0 || index >= UpdateChannel.values.length) {
+      return UpdateChannel.stable;
+    }
     return UpdateChannel.values[index];
   }
 
@@ -106,13 +112,15 @@ class UpdateService {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(_apiUrl),
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
-        },
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(
+            Uri.parse(_apiUrl),
+            headers: {
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         log.logUpdate('[Update] API failed: ${response.statusCode}');
@@ -150,7 +158,9 @@ class UpdateService {
       final cachedJson = prefs.getString(_prefKeyCachedInfo);
       if (cachedJson == null) return null;
 
-      return UpdateInfo.fromJson(jsonDecode(cachedJson) as Map<String, dynamic>);
+      return UpdateInfo.fromJson(
+        jsonDecode(cachedJson) as Map<String, dynamic>,
+      );
     } catch (_) {
       return null;
     }
@@ -158,18 +168,25 @@ class UpdateService {
 
   Future<void> _saveCachedInfo(UpdateInfo info) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKeyCachedInfo, jsonEncode({
-      'tag_name': info.tagName,
-      'name': info.name,
-      'body': info.body,
-      'published_at': info.publishedAt.toIso8601String(),
-      'assets': info.assets.map((a) => {
-        'name': a.name,
-        'browser_download_url': a.url,
-        'size': a.sizeBytes,
-        'content_type': a.contentType,
-      }).toList(),
-    }));
+    await prefs.setString(
+      _prefKeyCachedInfo,
+      jsonEncode({
+        'tag_name': info.tagName,
+        'name': info.name,
+        'body': info.body,
+        'published_at': info.publishedAt.toIso8601String(),
+        'assets': info.assets
+            .map(
+              (a) => {
+                'name': a.name,
+                'browser_download_url': a.url,
+                'size': a.sizeBytes,
+                'content_type': a.contentType,
+              },
+            )
+            .toList(),
+      }),
+    );
   }
 
   bool isUpdateAvailable(UpdateInfo? info) {
@@ -186,7 +203,7 @@ class UpdateService {
   bool isUrlAllowed(String url) {
     try {
       final uri = Uri.parse(url);
-      return _allowedHosts.contains(uri.host);
+      return uri.scheme == 'https' && _allowedHosts.contains(uri.host);
     } catch (_) {
       return false;
     }
@@ -194,18 +211,28 @@ class UpdateService {
 
   Future<String?> downloadUpdate(
     UpdateInfo info,
-    void Function(double progress, String speed, String remaining, DownloadPhase phase) onProgress,
+    void Function(
+      double progress,
+      String speed,
+      String remaining,
+      DownloadPhase phase,
+    )
+    onProgress,
     CancelToken cancelToken,
   ) async {
     final asset = info.bestAsset;
     if (asset == null) {
-      LogCenterService().logUpdate('[Download] State=Failed\nReason=No asset found');
+      LogCenterService().logUpdate(
+        '[Download] State=Failed\nReason=No asset found',
+      );
       return null;
     }
 
     final downloadUrl = info.generateDownloadUrl();
     if (!isUrlAllowed(downloadUrl)) {
-      LogCenterService().logUpdate('[Download] State=Failed\nReason=Blocked URL');
+      LogCenterService().logUpdate(
+        '[Download] State=Failed\nReason=Blocked URL',
+      );
       return null;
     }
 
@@ -226,15 +253,15 @@ class UpdateService {
         await Future.delayed(Duration(seconds: attempt * 2));
       }
 
-      final result = await _doDownload(
-        downloadUrl,
-        asset,
-        (progress, speed, remaining, phase) {
-          log.logUpdate('[Download] State=$phase\nSpeed=$speed');
-          onProgress(progress, speed, remaining, phase);
-        },
-        cancelToken,
-      );
+      final result = await _doDownload(downloadUrl, asset, (
+        progress,
+        speed,
+        remaining,
+        phase,
+      ) {
+        log.logUpdate('[Download] State=$phase\nSpeed=$speed');
+        onProgress(progress, speed, remaining, phase);
+      }, cancelToken);
 
       if (result != null) {
         log.logUpdate('[Download] State=Stable\nPath=$result');
@@ -254,7 +281,13 @@ class UpdateService {
   Future<String?> _doDownload(
     String url,
     UpdateAsset asset,
-    void Function(double progress, String speed, String remaining, DownloadPhase phase) onProgress,
+    void Function(
+      double progress,
+      String speed,
+      String remaining,
+      DownloadPhase phase,
+    )
+    onProgress,
     CancelToken cancelToken,
   ) async {
     try {
@@ -272,7 +305,8 @@ class UpdateService {
       cancelToken.client = client;
 
       final request = http.Request('GET', Uri.parse(url));
-      request.headers['User-Agent'] = 'WinDeployStudio/${AppConstants.appVersion}';
+      request.headers['User-Agent'] =
+          'WinDeployStudio/${AppConstants.appVersion}';
 
       final response = await client.send(request);
 
@@ -355,7 +389,9 @@ class UpdateService {
   }
 
   String _formatSpeed(double bytesPerSecond) {
-    if (bytesPerSecond < 1024) return '${bytesPerSecond.toStringAsFixed(0)} B/s';
+    if (bytesPerSecond < 1024) {
+      return '${bytesPerSecond.toStringAsFixed(0)} B/s';
+    }
     if (bytesPerSecond < 1024 * 1024) {
       return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
     }
@@ -376,8 +412,20 @@ class UpdateService {
       final isExe = filePath.toLowerCase().endsWith('.exe');
 
       if (isExe) {
+        final signature = await _verifyInstallerSignature(filePath);
+        if (!signature.valid) {
+          log.logUpdate(
+            '[Update] InstallFail: Signature invalid\n'
+            'Status=${signature.status}\n'
+            'Subject=${signature.subject}',
+          );
+          return false;
+        }
+
         try {
-          await Process.start(filePath, ['/silent'], mode: ProcessStartMode.detached);
+          await Process.start(filePath, [
+            '/silent',
+          ], mode: ProcessStartMode.detached);
           log.logUpdate('[Update] Started with /silent');
           return true;
         } catch (_) {
@@ -396,11 +444,55 @@ class UpdateService {
     }
   }
 
+  Future<_SignatureCheck> _verifyInstallerSignature(String filePath) async {
+    try {
+      final quotedPath = _psQuote(filePath);
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        '''
+        \$sig = Get-AuthenticodeSignature -LiteralPath $quotedPath
+        [PSCustomObject]@{
+          Status = \$sig.Status.ToString()
+          Subject = if (\$sig.SignerCertificate) { \$sig.SignerCertificate.Subject } else { '' }
+        } | ConvertTo-Json -Compress
+        ''',
+      ]).timeout(const Duration(seconds: 15));
+
+      if (result.exitCode != 0) {
+        return _SignatureCheck(
+          false,
+          'PowerShellFailed',
+          result.stderr.toString(),
+        );
+      }
+
+      final data = jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
+      final status = data['Status']?.toString() ?? '';
+      final subject = data['Subject']?.toString() ?? '';
+      return _SignatureCheck(status == 'Valid', status, subject);
+    } catch (e) {
+      return _SignatureCheck(false, 'Exception', e.toString());
+    }
+  }
+
+  String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
+
   void clearCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefKeyCachedInfo);
     await prefs.remove(_prefKeyLastCheck);
   }
+}
+
+class _SignatureCheck {
+  final bool valid;
+  final String status;
+  final String subject;
+
+  const _SignatureCheck(this.valid, this.status, this.subject);
 }
 
 class CancelToken {

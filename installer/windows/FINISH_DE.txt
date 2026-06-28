@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                 Installation abgeschlossen - Danke!                 │
-└─────────────────────────────────────────────────────────────┘
+﻿Installation abgeschlossen - Danke!
 
-WinDeploy Studio wurde erfolgreich installiert!
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio wurde erfolgreich installiert.
 
 Nächste Schritte:
 
-  • Starten Sie WinDeploy Studio über das Startmenü oder die Desktop-Verknüpfung
-  
-  • Durchsuchen Sie die Image-Bibliothek für Windows-Images
-  
-  • Erstellen Sie Ihren ersten bootfähigen USB oder Windows To Go
-  
-  • Teilen Sie Ihr Feedback zur Verbesserung bei!
+- Starten Sie WinDeploy Studio über das Startmenü oder die Desktop-Verknüpfung.
+- Durchsuchen Sie die Image-Bibliothek für Windows-Images.
+- Erstellen Sie Ihren ersten Windows-Installations-USB oder Windows To Go.
+- Teilen Sie Ihr Feedback, um uns zu helfen.
 
-═══════════════════════════════════════════════════════════════
+Lizenz: MIT License
+GitHub-Profil: https://github.com/intelfans
+GitHub-Repository: https://github.com/intelfans/WinDeployStudio
 
-Vielen Dank für die Wahl von WinDeploy Studio!
+Besonderer Dank
 
-Wir schätzen Ihr Feedback und sind bestrebt, WinDeploy Studio zu verbessern.
+WinDeploy Studio dankt den folgenden Personen und Communitys für wertvolles Feedback, Tests, Ideen, Inspiration und Unterstützung.
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  Frühes Feedback, Tests und Projektdiskussionen
 
-© 2026 Bob Steve. Alle Rechte vorbehalten.
+- Timme
+  Detailliertes internationales Nutzerfeedback, Empfehlungen zu Vertrauen und Benutzerfreundlichkeit, Vorschläge zu Microsoft-Quellen und Community-Review
 
-Website: https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  Inspiration durch Microsofts Diagnose- und Fehlerbehebungswerkzeuge
+
+- Open Source Community
+  Für Dokumentation, Fehlerberichte, Tests, Übersetzungen und Vorschläge

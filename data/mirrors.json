@@ -3,86 +3,512 @@
   "items": [
     {
       "id": "official-win10",
-      "name": {"zh": "官方原版 Windows 10", "en": "Official Windows 10", "ru": "Официальная Windows 10", "fr": "Windows 10 Officielle", "ja": "公式 Windows 10"},
-      "category": "Official Original",
-      "type": {"zh": "微软官方镜像", "en": "Microsoft Official", "ru": "Официальная Microsoft", "fr": "Microsoft Officiel", "ja": "Microsoft公式"},
+      "name": {
+        "zh": "官方 Windows 10",
+        "zh_TW": "官方 Windows 10",
+        "en": "Official Windows 10",
+        "fr": "Windows 10 officiel",
+        "de": "Offizielles Windows 10",
+        "es": "Windows 10 oficial",
+        "pt": "Windows 10 oficial",
+        "ru": "Официальная Windows 10",
+        "ar": "Windows 10 الرسمي",
+        "ko": "공식 Windows 10",
+        "ja": "公式 Windows 10"
+      },
+      "category": "Official Microsoft",
+      "type": {
+        "zh": "微软官方镜像",
+        "zh_TW": "微軟官方映像",
+        "en": "Microsoft official image",
+        "fr": "Image officielle Microsoft",
+        "de": "Offizielles Microsoft-Abbild",
+        "es": "Imagen oficial de Microsoft",
+        "pt": "Imagem oficial da Microsoft",
+        "ru": "Официальный образ Microsoft",
+        "ar": "صورة Microsoft الرسمية",
+        "ko": "Microsoft 공식 이미지",
+        "ja": "Microsoft 公式イメージ"
+      },
       "version": "Windows 10",
       "build": "22H2",
       "architecture": "x64",
-      "audience": {"zh": "普通用户、办公、学习、老电脑", "en": "General users, office, study, older PCs", "ru": "Обычные пользователи, офис, учёба, старые ПК", "fr": "Utilisateurs généraux, bureau, étude, anciens PC", "ja": "一般ユーザー、オフィス、学習、古いPC"},
+      "audience": {
+        "zh": "日常使用、办公学习和较旧电脑",
+        "zh_TW": "日常使用、辦公學習和較舊電腦",
+        "en": "General users, office work, study, and older PCs",
+        "fr": "Usage courant, bureautique, études et anciens PC",
+        "de": "Alltag, Büro, Studium und ältere PCs",
+        "es": "Uso general, oficina, estudios y equipos antiguos",
+        "pt": "Uso geral, escritório, estudos e PCs mais antigos",
+        "ru": "Повседневная работа, учеба и старые ПК",
+        "ar": "الاستخدام اليومي والعمل والدراسة والأجهزة الأقدم",
+        "ko": "일상 사용, 업무, 학습, 오래된 PC",
+        "ja": "日常利用、仕事、学習、古いPC向け"
+      },
       "pros": {
-        "zh": ["兼容性最好", "驱动支持完整", "软件支持完整", "稳定可靠", "适合作为长期主力系统"],
-        "en": ["Best compatibility", "Full driver support", "Full software support", "Stable and reliable", "Suitable as daily driver"],
-        "ru": ["Лучшая совместимость", "Полная поддержка драйверов", "Полная поддержка ПО", "Стабильность и надёжность", "Подходит как основная система"],
-        "fr": ["Meilleure compatibilité", "Support complet des pilotes", "Support complet des logiciels", "Stable et fiable", "Adapté comme système principal"],
-        "ja": ["最高の互換性", "完全なドライバー対応", "完全なソフトウェア対応", "安定性と信頼性", "日常使用に最適"]
+        "zh": [
+          "兼容性最好",
+          "驱动和软件支持完整",
+          "稳定可靠",
+          "适合作为长期主力系统"
+        ],
+        "zh_TW": [
+          "相容性最好",
+          "驅動與軟體支援完整",
+          "穩定可靠",
+          "適合作為長期主力系統"
+        ],
+        "en": [
+          "Best compatibility",
+          "Full driver and software support",
+          "Stable and reliable",
+          "Suitable as a long-term main system"
+        ],
+        "fr": [
+          "Compatibilité maximale",
+          "Prise en charge complète des pilotes et logiciels",
+          "Stable et fiable",
+          "Adapté comme système principal durable"
+        ],
+        "de": [
+          "Beste Kompatibilität",
+          "Vollständige Treiber- und Softwareunterstützung",
+          "Stabil und zuverlässig",
+          "Gut als dauerhaftes Hauptsystem geeignet"
+        ],
+        "es": [
+          "Máxima compatibilidad",
+          "Compatibilidad completa con controladores y software",
+          "Estable y fiable",
+          "Adecuado como sistema principal a largo plazo"
+        ],
+        "pt": [
+          "Máxima compatibilidade",
+          "Suporte completo a drivers e software",
+          "Estável e confiável",
+          "Adequado como sistema principal de longo prazo"
+        ],
+        "ru": [
+          "Лучшая совместимость",
+          "Полная поддержка драйверов и программ",
+          "Стабильная и надежная работа",
+          "Подходит как основная система на долгое время"
+        ],
+        "ar": [
+          "أفضل توافق",
+          "دعم كامل للتعريفات والبرامج",
+          "مستقر وموثوق",
+          "مناسب كنظام أساسي طويل الأمد"
+        ],
+        "ko": [
+          "가장 넓은 호환성",
+          "드라이버와 소프트웨어 지원이 완전함",
+          "안정적이고 신뢰성 높음",
+          "장기 주 사용 시스템에 적합"
+        ],
+        "ja": [
+          "互換性が最も高い",
+          "ドライバーとソフトウェアのサポートが充実",
+          "安定して信頼性が高い",
+          "長期運用のメイン環境に適している"
+        ]
       },
       "notes": {
-        "zh": ["体积较大", "更新较多", "占用空间相对较高"],
-        "en": ["Larger file size", "More updates", "Higher disk usage"],
-        "ru": ["Большой размер файла", "Много обновлений", "Высокое использование диска"],
-        "fr": ["Fichier de grande taille", "Nombreuses mises à jour", "Utilisation élevée du disque"],
-        "ja": ["ファイルサイズが大きい", "更新が多い", "ディスク使用量が多い"]
+        "zh": [
+          "镜像体积较大",
+          "更新较频繁",
+          "磁盘占用相对较高"
+        ],
+        "zh_TW": [
+          "映像檔體積較大",
+          "更新較頻繁",
+          "磁碟占用相對較高"
+        ],
+        "en": [
+          "Large image size",
+          "Frequent updates",
+          "Relatively high disk usage"
+        ],
+        "fr": [
+          "Image volumineuse",
+          "Mises à jour fréquentes",
+          "Occupation disque relativement élevée"
+        ],
+        "de": [
+          "Großes Abbild",
+          "Häufige Updates",
+          "Relativ hoher Speicherbedarf"
+        ],
+        "es": [
+          "Imagen de gran tamaño",
+          "Actualizaciones frecuentes",
+          "Uso de disco relativamente alto"
+        ],
+        "pt": [
+          "Imagem grande",
+          "Atualizações frequentes",
+          "Uso de disco relativamente alto"
+        ],
+        "ru": [
+          "Большой размер образа",
+          "Частые обновления",
+          "Сравнительно высокий расход места"
+        ],
+        "ar": [
+          "حجم الصورة كبير",
+          "تحديثات متكررة",
+          "استهلاك مساحة مرتفع نسبيًا"
+        ],
+        "ko": [
+          "이미지 용량이 큼",
+          "업데이트가 잦음",
+          "디스크 사용량이 비교적 높음"
+        ],
+        "ja": [
+          "イメージサイズが大きい",
+          "更新頻度が高い",
+          "ディスク使用量が比較的多い"
+        ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-KMR0h",
+      "downloadUrl": "https://www.microsoft.com/en-us/software-download/windows10",
       "sha256": "",
       "size": "6.68 GB",
-      "needsFontPack": false,
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-KMR0h",
-      "globalUrl": "https://gofile.io/d/2fIV8u"
+      "needsFontPack": false
     },
     {
       "id": "official-win11",
-      "name": {"zh": "官方原版 Windows 11", "en": "Official Windows 11", "ru": "Официальная Windows 11", "fr": "Windows 11 Officielle", "ja": "公式 Windows 11"},
-      "category": "Official Original",
-      "type": {"zh": "微软官方镜像", "en": "Microsoft Official", "ru": "Официальная Microsoft", "fr": "Microsoft Officiel", "ja": "Microsoft公式"},
+      "name": {
+        "zh": "官方 Windows 11",
+        "zh_TW": "官方 Windows 11",
+        "en": "Official Windows 11",
+        "fr": "Windows 11 officiel",
+        "de": "Offizielles Windows 11",
+        "es": "Windows 11 oficial",
+        "pt": "Windows 11 oficial",
+        "ru": "Официальная Windows 11",
+        "ar": "Windows 11 الرسمي",
+        "ko": "공식 Windows 11",
+        "ja": "公式 Windows 11"
+      },
+      "category": "Official Microsoft",
+      "type": {
+        "zh": "微软官方镜像",
+        "zh_TW": "微軟官方映像",
+        "en": "Microsoft official image",
+        "fr": "Image officielle Microsoft",
+        "de": "Offizielles Microsoft-Abbild",
+        "es": "Imagen oficial de Microsoft",
+        "pt": "Imagem oficial da Microsoft",
+        "ru": "Официальный образ Microsoft",
+        "ar": "صورة Microsoft الرسمية",
+        "ko": "Microsoft 공식 이미지",
+        "ja": "Microsoft 公式イメージ"
+      },
       "version": "Windows 11",
       "build": "25H2",
       "architecture": "x64",
-      "audience": {"zh": "新电脑、游戏玩家、开发者", "en": "New PCs, gamers, developers", "ru": "Новые ПК, геймеры, разработчики", "fr": "Nouveaux PC, joueurs, développeurs", "ja": "新しいPC、ゲーマー、開発者"},
+      "audience": {
+        "zh": "新电脑、游戏玩家和开发者",
+        "zh_TW": "新電腦、遊戲玩家和開發者",
+        "en": "New PCs, gamers, and developers",
+        "fr": "PC récents, joueurs et développeurs",
+        "de": "Neue PCs, Spieler und Entwickler",
+        "es": "Equipos nuevos, jugadores y desarrolladores",
+        "pt": "PCs novos, gamers e desenvolvedores",
+        "ru": "Новые ПК, игроки и разработчики",
+        "ar": "الأجهزة الحديثة واللاعبون والمطورون",
+        "ko": "새 PC, 게이머, 개발자",
+        "ja": "新しいPC、ゲーマー、開発者向け"
+      },
       "pros": {
-        "zh": ["最新功能", "最佳安全性", "长期支持", "Windows 11 完整体验"],
-        "en": ["Latest features", "Best security", "Long-term support", "Full Windows 11 experience"],
-        "ru": ["Последние функции", "Лучшая безопасность", "Долгосрочная поддержка", "Полный опыт Windows 11"],
-        "fr": ["Dernières fonctionnalités", "Meilleure sécurité", "Support à long terme", "Expérience Windows 11 complète"],
-        "ja": ["最新機能", "最高のセキュリティ", "長期サポート", "Windows 11の完全な体験"]
+        "zh": [
+          "功能最新",
+          "安全基线最好",
+          "长期支持",
+          "完整 Windows 11 体验"
+        ],
+        "zh_TW": [
+          "功能最新",
+          "安全基線最好",
+          "長期支援",
+          "完整 Windows 11 體驗"
+        ],
+        "en": [
+          "Latest features",
+          "Best security baseline",
+          "Long-term support",
+          "Complete Windows 11 experience"
+        ],
+        "fr": [
+          "Fonctionnalités les plus récentes",
+          "Meilleure base de sécurité",
+          "Support à long terme",
+          "Expérience Windows 11 complète"
+        ],
+        "de": [
+          "Neueste Funktionen",
+          "Beste Sicherheitsbasis",
+          "Langfristige Unterstützung",
+          "Vollständige Windows-11-Erfahrung"
+        ],
+        "es": [
+          "Funciones más recientes",
+          "Mejor base de seguridad",
+          "Soporte a largo plazo",
+          "Experiencia completa de Windows 11"
+        ],
+        "pt": [
+          "Recursos mais recentes",
+          "Melhor base de segurança",
+          "Suporte de longo prazo",
+          "Experiência completa do Windows 11"
+        ],
+        "ru": [
+          "Самые новые функции",
+          "Лучшая базовая безопасность",
+          "Долгосрочная поддержка",
+          "Полный опыт Windows 11"
+        ],
+        "ar": [
+          "أحدث الميزات",
+          "أفضل أساس أمني",
+          "دعم طويل الأمد",
+          "تجربة Windows 11 كاملة"
+        ],
+        "ko": [
+          "최신 기능",
+          "가장 좋은 보안 기준",
+          "장기 지원",
+          "완전한 Windows 11 경험"
+        ],
+        "ja": [
+          "最新機能",
+          "最も優れたセキュリティ基盤",
+          "長期サポート",
+          "完全な Windows 11 体験"
+        ]
       },
       "notes": {
-        "zh": ["对硬件要求较高", "占用空间较大"],
-        "en": ["Higher hardware requirements", "Larger disk usage"],
-        "ru": ["Высокие требования к оборудованию", "Большое использование диска"],
-        "fr": ["Configuration matérielle élevée requise", "Utilisation élevée du disque"],
-        "ja": ["ハードウェア要件が高い", "ディスク使用量が多い"]
+        "zh": [
+          "硬件要求较高",
+          "磁盘占用较大"
+        ],
+        "zh_TW": [
+          "硬體需求較高",
+          "磁碟占用較大"
+        ],
+        "en": [
+          "Higher hardware requirements",
+          "Larger disk usage"
+        ],
+        "fr": [
+          "Exigences matérielles plus élevées",
+          "Occupation disque plus importante"
+        ],
+        "de": [
+          "Höhere Hardwareanforderungen",
+          "Höherer Speicherbedarf"
+        ],
+        "es": [
+          "Requisitos de hardware más altos",
+          "Mayor uso de disco"
+        ],
+        "pt": [
+          "Requisitos de hardware mais altos",
+          "Maior uso de disco"
+        ],
+        "ru": [
+          "Более высокие требования к оборудованию",
+          "Больше занимает на диске"
+        ],
+        "ar": [
+          "متطلبات عتاد أعلى",
+          "استهلاك أكبر لمساحة القرص"
+        ],
+        "ko": [
+          "하드웨어 요구 사항이 높음",
+          "디스크 사용량이 큼"
+        ],
+        "ja": [
+          "ハードウェア要件が高い",
+          "ディスク使用量が多い"
+        ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-FjXKh",
+      "downloadUrl": "https://www.microsoft.com/en-au/software-download/windows11",
       "sha256": "",
       "size": "7.96 GB",
-      "needsFontPack": false,
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-FjXKh",
-      "globalUrl": "https://gofile.io/d/2fIV8u"
+      "needsFontPack": false
     },
     {
       "id": "tiny10",
-      "name": {"zh": "Tiny10", "en": "Tiny10", "ru": "Tiny10", "fr": "Tiny10", "ja": "Tiny10"},
-      "category": "TinyOS",
-      "type": {"zh": "精简版系统", "en": "Lite OS", "ru": "Облегчённая ОС", "fr": "OS Léger", "ja": "軽量OS"},
+      "name": {
+        "zh": "Tiny10",
+        "zh_TW": "Tiny10",
+        "en": "Tiny10",
+        "fr": "Tiny10",
+        "de": "Tiny10",
+        "es": "Tiny10",
+        "pt": "Tiny10",
+        "ru": "Tiny10",
+        "ar": "Tiny10",
+        "ko": "Tiny10",
+        "ja": "Tiny10"
+      },
+      "category": "Community Images",
+      "type": {
+        "zh": "精简系统",
+        "zh_TW": "精簡系統",
+        "en": "Lightweight system",
+        "fr": "Système allégé",
+        "de": "Schlankes System",
+        "es": "Sistema ligero",
+        "pt": "Sistema leve",
+        "ru": "Облегченная система",
+        "ar": "نظام خفيف",
+        "ko": "경량 시스템",
+        "ja": "軽量システム"
+      },
       "version": "Windows 10",
       "build": "22H2",
       "architecture": "x64",
-      "audience": {"zh": "低配置电脑、虚拟机、测试环境", "en": "Low-end PCs, VMs, testing", "ru": "Слабые ПК, виртуальные машины, тестирование", "fr": "PC bas de gamme, machines virtuelles, test", "ja": "低スペックPC、仮想マシン、テスト環境"},
+      "audience": {
+        "zh": "低配置电脑、虚拟机和测试环境",
+        "zh_TW": "低配置電腦、虛擬機和測試環境",
+        "en": "Low-end PCs, virtual machines, and test environments",
+        "fr": "PC modestes, machines virtuelles et environnements de test",
+        "de": "Schwächere PCs, virtuelle Maschinen und Testumgebungen",
+        "es": "Equipos modestos, máquinas virtuales y entornos de prueba",
+        "pt": "PCs modestos, máquinas virtuais e ambientes de teste",
+        "ru": "Слабые ПК, виртуальные машины и тестовые среды",
+        "ar": "الأجهزة الضعيفة والآلات الافتراضية وبيئات الاختبار",
+        "ko": "저사양 PC, 가상 머신, 테스트 환경",
+        "ja": "低スペックPC、仮想マシン、テスト環境向け"
+      },
       "pros": {
-        "zh": ["占用极低", "内存占用少", "启动速度快"],
-        "en": ["Minimal footprint", "Low memory usage", "Fast boot"],
-        "ru": ["Минимальный объём", "Низкое потребление памяти", "Быстрая загрузка"],
-        "fr": ["Empreinte minimale", "Faible utilisation mémoire", "Démarrage rapide"],
-        "ja": ["最小限のフットプリント", "メモリ使用量が少ない", "高速起動"]
+        "zh": [
+          "体积很小",
+          "内存占用低",
+          "启动快"
+        ],
+        "zh_TW": [
+          "體積很小",
+          "記憶體占用低",
+          "啟動快"
+        ],
+        "en": [
+          "Very small footprint",
+          "Low memory usage",
+          "Fast startup"
+        ],
+        "fr": [
+          "Empreinte très réduite",
+          "Faible consommation mémoire",
+          "Démarrage rapide"
+        ],
+        "de": [
+          "Sehr kleiner Platzbedarf",
+          "Geringer Speicherverbrauch",
+          "Schneller Start"
+        ],
+        "es": [
+          "Huella muy reducida",
+          "Bajo uso de memoria",
+          "Arranque rápido"
+        ],
+        "pt": [
+          "Ocupação muito reduzida",
+          "Baixo uso de memória",
+          "Inicialização rápida"
+        ],
+        "ru": [
+          "Очень малый размер",
+          "Низкое потребление памяти",
+          "Быстрый запуск"
+        ],
+        "ar": [
+          "حجم صغير جدًا",
+          "استهلاك منخفض للذاكرة",
+          "إقلاع سريع"
+        ],
+        "ko": [
+          "매우 작은 설치 공간",
+          "낮은 메모리 사용량",
+          "빠른 시작"
+        ],
+        "ja": [
+          "非常に小さいフットプリント",
+          "メモリ使用量が少ない",
+          "起動が速い"
+        ]
       },
       "notes": {
-        "zh": ["部分组件已移除", "某些软件可能无法运行", "建议安装字体包"],
-        "en": ["Some components removed", "Some software may not work", "Font pack recommended"],
-        "ru": ["Некоторые компоненты удалены", "Некоторые программы могут не работать", "Рекомендуется установить пакет шрифтов"],
-        "fr": ["Certains composants supprimés", "Certains logiciels peuvent ne pas fonctionner", "Pack de polices recommandé"],
-        "ja": ["一部のコンポーネントが削除されています", "一部のソフトウェアが動作しない場合があります", "フォントパックのインストールをお勧めします"]
+        "zh": [
+          "非官方系统",
+          "部分组件被移除",
+          "某些软件可能无法运行",
+          "建议安装字体包"
+        ],
+        "zh_TW": [
+          "非官方系統",
+          "部分元件已移除",
+          "某些軟體可能無法執行",
+          "建議安裝字體包"
+        ],
+        "en": [
+          "Unofficial system",
+          "Some components are removed",
+          "Some software may not work",
+          "Font pack recommended"
+        ],
+        "fr": [
+          "Système non officiel",
+          "Certains composants sont supprimés",
+          "Certains logiciels peuvent ne pas fonctionner",
+          "Pack de polices recommandé"
+        ],
+        "de": [
+          "Inoffizielles System",
+          "Einige Komponenten wurden entfernt",
+          "Manche Programme funktionieren möglicherweise nicht",
+          "Schriftpaket empfohlen"
+        ],
+        "es": [
+          "Sistema no oficial",
+          "Algunos componentes fueron eliminados",
+          "Algunos programas pueden no funcionar",
+          "Se recomienda el paquete de fuentes"
+        ],
+        "pt": [
+          "Sistema não oficial",
+          "Alguns componentes foram removidos",
+          "Alguns programas podem não funcionar",
+          "Pacote de fontes recomendado"
+        ],
+        "ru": [
+          "Неофициальная система",
+          "Некоторые компоненты удалены",
+          "Некоторые программы могут не работать",
+          "Рекомендуется пакет шрифтов"
+        ],
+        "ar": [
+          "نظام غير رسمي",
+          "تمت إزالة بعض المكونات",
+          "قد لا تعمل بعض البرامج",
+          "يوصى بحزمة الخطوط"
+        ],
+        "ko": [
+          "비공식 시스템",
+          "일부 구성 요소가 제거됨",
+          "일부 소프트웨어가 작동하지 않을 수 있음",
+          "글꼴 팩 권장"
+        ],
+        "ja": [
+          "非公式システム",
+          "一部のコンポーネントが削除済み",
+          "一部のソフトが動作しない場合あり",
+          "フォントパック推奨"
+        ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-NRSKh",
       "sha256": "",
@@ -94,26 +520,162 @@
     },
     {
       "id": "tiny11",
-      "name": {"zh": "Tiny11", "en": "Tiny11", "ru": "Tiny11", "fr": "Tiny11", "ja": "Tiny11"},
-      "category": "TinyOS",
-      "type": {"zh": "精简版系统", "en": "Lite OS", "ru": "Облегчённая ОС", "fr": "OS Léger", "ja": "軽量OS"},
+      "name": {
+        "zh": "Tiny11",
+        "zh_TW": "Tiny11",
+        "en": "Tiny11",
+        "fr": "Tiny11",
+        "de": "Tiny11",
+        "es": "Tiny11",
+        "pt": "Tiny11",
+        "ru": "Tiny11",
+        "ar": "Tiny11",
+        "ko": "Tiny11",
+        "ja": "Tiny11"
+      },
+      "category": "Community Images",
+      "type": {
+        "zh": "精简系统",
+        "zh_TW": "精簡系統",
+        "en": "Lightweight system",
+        "fr": "Système allégé",
+        "de": "Schlankes System",
+        "es": "Sistema ligero",
+        "pt": "Sistema leve",
+        "ru": "Облегченная система",
+        "ar": "نظام خفيف",
+        "ko": "경량 시스템",
+        "ja": "軽量システム"
+      },
       "version": "Windows 11",
       "build": "25H2",
       "architecture": "x64",
-      "audience": {"zh": "低配置电脑、虚拟机、测试环境", "en": "Low-end PCs, VMs, testing", "ru": "Слабые ПК, виртуальные машины, тестирование", "fr": "PC bas de gamme, machines virtuelles, test", "ja": "低スペックPC、仮想マシン、テスト環境"},
+      "audience": {
+        "zh": "低配置电脑、虚拟机和测试环境",
+        "zh_TW": "低配置電腦、虛擬機和測試環境",
+        "en": "Low-end PCs, virtual machines, and test environments",
+        "fr": "PC modestes, machines virtuelles et environnements de test",
+        "de": "Schwächere PCs, virtuelle Maschinen und Testumgebungen",
+        "es": "Equipos modestos, máquinas virtuales y entornos de prueba",
+        "pt": "PCs modestos, máquinas virtuais e ambientes de teste",
+        "ru": "Слабые ПК, виртуальные машины и тестовые среды",
+        "ar": "الأجهزة الضعيفة والآلات الافتراضية وبيئات الاختبار",
+        "ko": "저사양 PC, 가상 머신, 테스트 환경",
+        "ja": "低スペックPC、仮想マシン、テスト環境向け"
+      },
       "pros": {
-        "zh": ["占用极低", "系统更轻量", "更新负担更小"],
-        "en": ["Minimal footprint", "Lighter system", "Less update overhead"],
-        "ru": ["Минимальный объём", "Более лёгкая система", "Меньше обновлений"],
-        "fr": ["Empreinte minimale", "Système plus léger", "Moins de mises à jour"],
-        "ja": ["最小限のフットプリント", "より軽いシステム", "更新の負担が少ない"]
+        "zh": [
+          "体积很小",
+          "系统更轻",
+          "更新负担更低"
+        ],
+        "zh_TW": [
+          "體積很小",
+          "系統更輕",
+          "更新負擔更低"
+        ],
+        "en": [
+          "Very small footprint",
+          "Lighter system",
+          "Lower update overhead"
+        ],
+        "fr": [
+          "Empreinte très réduite",
+          "Système plus léger",
+          "Moins de charge liée aux mises à jour"
+        ],
+        "de": [
+          "Sehr kleiner Platzbedarf",
+          "Leichteres System",
+          "Weniger Update-Aufwand"
+        ],
+        "es": [
+          "Huella muy reducida",
+          "Sistema más ligero",
+          "Menor carga de actualizaciones"
+        ],
+        "pt": [
+          "Ocupação muito reduzida",
+          "Sistema mais leve",
+          "Menor carga de atualizações"
+        ],
+        "ru": [
+          "Очень малый размер",
+          "Более легкая система",
+          "Меньше нагрузки от обновлений"
+        ],
+        "ar": [
+          "حجم صغير جدًا",
+          "نظام أخف",
+          "عبء تحديث أقل"
+        ],
+        "ko": [
+          "매우 작은 설치 공간",
+          "더 가벼운 시스템",
+          "낮은 업데이트 부담"
+        ],
+        "ja": [
+          "非常に小さいフットプリント",
+          "より軽いシステム",
+          "更新負担が少ない"
+        ]
       },
       "notes": {
-        "zh": ["部分功能已移除", "可能缺少中文字体", "强烈建议安装字体包"],
-        "en": ["Some features removed", "May lack CJK fonts", "Font pack strongly recommended"],
-        "ru": ["Некоторые функции удалены", "Могут отсутствовать шрифты CJK", "Настоятельно рекомендуется установить пакет шрифтов"],
-        "fr": ["Certaines fonctionnalités supprimées", "Polices CJK possiblement manquantes", "Pack de polices fortement recommandé"],
-        "ja": ["一部の機能が削除されています", "CJKフォントが不足している可能性があります", "フォントパックのインストールを強くお勧めします"]
+        "zh": [
+          "非官方系统",
+          "可能缺少 CJK 字体",
+          "强烈建议安装字体包"
+        ],
+        "zh_TW": [
+          "非官方系統",
+          "可能缺少 CJK 字體",
+          "強烈建議安裝字體包"
+        ],
+        "en": [
+          "Unofficial system",
+          "CJK fonts may be missing",
+          "Font pack strongly recommended"
+        ],
+        "fr": [
+          "Système non officiel",
+          "Les polices CJK peuvent manquer",
+          "Pack de polices fortement recommandé"
+        ],
+        "de": [
+          "Inoffizielles System",
+          "CJK-Schriften können fehlen",
+          "Schriftpaket dringend empfohlen"
+        ],
+        "es": [
+          "Sistema no oficial",
+          "Pueden faltar fuentes CJK",
+          "Paquete de fuentes muy recomendado"
+        ],
+        "pt": [
+          "Sistema não oficial",
+          "Fontes CJK podem estar ausentes",
+          "Pacote de fontes altamente recomendado"
+        ],
+        "ru": [
+          "Неофициальная система",
+          "Могут отсутствовать шрифты CJK",
+          "Настоятельно рекомендуется пакет шрифтов"
+        ],
+        "ar": [
+          "نظام غير رسمي",
+          "قد تكون خطوط CJK مفقودة",
+          "يوصى بشدة بحزمة الخطوط"
+        ],
+        "ko": [
+          "비공식 시스템",
+          "CJK 글꼴이 없을 수 있음",
+          "글꼴 팩 강력 권장"
+        ],
+        "ja": [
+          "非公式システム",
+          "CJK フォントが不足する場合あり",
+          "フォントパックを強く推奨"
+        ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-uMR0h",
       "sha256": "",
@@ -125,25 +687,172 @@
     },
     {
       "id": "xlite10",
-      "name": {"zh": "Windows X-Lite 10", "en": "Windows X-Lite 10", "ru": "Windows X-Lite 10", "fr": "Windows X-Lite 10", "ja": "Windows X-Lite 10"},
-      "category": "X-Lite",
-      "type": {"zh": "深度优化版系统", "en": "Deep optimized OS", "ru": "Глубоко оптимизированная ОС", "fr": "OS profondément optimisé", "ja": "深く最適化されたOS"},
+      "name": {
+        "zh": "X-Lite Windows 10",
+        "zh_TW": "X-Lite Windows 10",
+        "en": "X-Lite Windows 10",
+        "fr": "X-Lite Windows 10",
+        "de": "X-Lite Windows 10",
+        "es": "X-Lite Windows 10",
+        "pt": "X-Lite Windows 10",
+        "ru": "X-Lite Windows 10",
+        "ar": "X-Lite Windows 10",
+        "ko": "X-Lite Windows 10",
+        "ja": "X-Lite Windows 10"
+      },
+      "category": "Community Images",
+      "type": {
+        "zh": "深度优化系统",
+        "zh_TW": "深度最佳化系統",
+        "en": "Heavily optimized system",
+        "fr": "Système fortement optimisé",
+        "de": "Stark optimiertes System",
+        "es": "Sistema muy optimizado",
+        "pt": "Sistema altamente otimizado",
+        "ru": "Сильно оптимизированная система",
+        "ar": "نظام محسن بعمق",
+        "ko": "고도로 최적화된 시스템",
+        "ja": "高度に最適化されたシステム"
+      },
       "version": "Windows 10",
       "architecture": "x64",
-      "audience": {"zh": "游戏玩家、性能爱好者", "en": "Gamers, performance enthusiasts", "ru": "Геймеры, энтузиасты производительности", "fr": "Joueurs, passionnés de performance", "ja": "ゲーマー、パフォーマンス愛好家"},
+      "audience": {
+        "zh": "游戏玩家和性能爱好者",
+        "zh_TW": "遊戲玩家和效能愛好者",
+        "en": "Gamers and performance enthusiasts",
+        "fr": "Joueurs et passionnés de performances",
+        "de": "Spieler und Performance-Enthusiasten",
+        "es": "Jugadores y entusiastas del rendimiento",
+        "pt": "Gamers e entusiastas de desempenho",
+        "ru": "Игроки и ценители производительности",
+        "ar": "اللاعبون ومحبو الأداء",
+        "ko": "게이머와 성능 중시 사용자",
+        "ja": "ゲーマーとパフォーマンス重視のユーザー向け"
+      },
       "pros": {
-        "zh": ["后台进程更少", "更流畅", "更低资源占用"],
-        "en": ["Fewer background processes", "Smoother", "Lower resource usage"],
-        "ru": ["Меньше фоновых процессов", "Более плавная работа", "Низкое потребление ресурсов"],
-        "fr": ["Moins de processus arrière-plan", "Plus fluide", "Utilisation réduite des ressources"],
-        "ja": ["バックグラウンドプロセスの削減", "よりスムーズ", "リソース使用量の削減"]
+        "zh": [
+          "运行更流畅",
+          "后台进程更少",
+          "资源占用更低"
+        ],
+        "zh_TW": [
+          "運作更流暢",
+          "背景程序更少",
+          "資源占用更低"
+        ],
+        "en": [
+          "Smoother operation",
+          "Fewer background processes",
+          "Lower resource usage"
+        ],
+        "fr": [
+          "Fonctionnement plus fluide",
+          "Moins de processus en arrière-plan",
+          "Consommation de ressources réduite"
+        ],
+        "de": [
+          "Flüssigere Bedienung",
+          "Weniger Hintergrundprozesse",
+          "Geringerer Ressourcenverbrauch"
+        ],
+        "es": [
+          "Funcionamiento más fluido",
+          "Menos procesos en segundo plano",
+          "Menor uso de recursos"
+        ],
+        "pt": [
+          "Funcionamento mais fluido",
+          "Menos processos em segundo plano",
+          "Menor uso de recursos"
+        ],
+        "ru": [
+          "Более плавная работа",
+          "Меньше фоновых процессов",
+          "Ниже расход ресурсов"
+        ],
+        "ar": [
+          "تشغيل أكثر سلاسة",
+          "عمليات خلفية أقل",
+          "استهلاك موارد أقل"
+        ],
+        "ko": [
+          "더 부드러운 동작",
+          "백그라운드 프로세스 감소",
+          "낮은 리소스 사용량"
+        ],
+        "ja": [
+          "より滑らかな動作",
+          "バックグラウンドプロセスが少ない",
+          "リソース使用量が低い"
+        ]
       },
       "notes": {
-        "zh": ["非微软官方系统", "可能缺少部分组件", "建议安装字体包"],
-        "en": ["Unofficial system", "May lack some components", "Font pack recommended"],
-        "ru": ["Неофициальная система", "Могут отсутствовать некоторые компоненты", "Рекомендуется установить пакет шрифтов"],
-        "fr": ["Système non officiel", "Certains composants peuvent manquer", "Pack de polices recommandé"],
-        "ja": ["非公式システム", "一部のコンポーネントが不足している可能性があります", "フォントパックのインストールをお勧めします"]
+        "zh": [
+          "非官方系统",
+          "可能缺少部分组件",
+          "建议提前备份数据",
+          "建议安装字体包"
+        ],
+        "zh_TW": [
+          "非官方系統",
+          "可能缺少部分元件",
+          "建議先備份資料",
+          "建議安裝字體包"
+        ],
+        "en": [
+          "Unofficial system",
+          "Some components may be missing",
+          "Back up data first",
+          "Font pack recommended"
+        ],
+        "fr": [
+          "Système non officiel",
+          "Certains composants peuvent manquer",
+          "Sauvegarde préalable recommandée",
+          "Pack de polices recommandé"
+        ],
+        "de": [
+          "Inoffizielles System",
+          "Einige Komponenten können fehlen",
+          "Daten vorher sichern",
+          "Schriftpaket empfohlen"
+        ],
+        "es": [
+          "Sistema no oficial",
+          "Pueden faltar algunos componentes",
+          "Haz una copia de seguridad antes",
+          "Se recomienda el paquete de fuentes"
+        ],
+        "pt": [
+          "Sistema não oficial",
+          "Alguns componentes podem estar ausentes",
+          "Faça backup dos dados antes",
+          "Pacote de fontes recomendado"
+        ],
+        "ru": [
+          "Неофициальная система",
+          "Некоторые компоненты могут отсутствовать",
+          "Сначала сделайте резервную копию данных",
+          "Рекомендуется пакет шрифтов"
+        ],
+        "ar": [
+          "نظام غير رسمي",
+          "قد تكون بعض المكونات مفقودة",
+          "انسخ بياناتك احتياطيًا أولًا",
+          "يوصى بحزمة الخطوط"
+        ],
+        "ko": [
+          "비공식 시스템",
+          "일부 구성 요소가 없을 수 있음",
+          "먼저 데이터를 백업하세요",
+          "글꼴 팩 권장"
+        ],
+        "ja": [
+          "非公式システム",
+          "一部のコンポーネントが不足する場合あり",
+          "事前にデータをバックアップしてください",
+          "フォントパック推奨"
+        ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-1ZRKh",
       "sha256": "",
@@ -155,25 +864,161 @@
     },
     {
       "id": "xlite11",
-      "name": {"zh": "Windows X-Lite 11", "en": "Windows X-Lite 11", "ru": "Windows X-Lite 11", "fr": "Windows X-Lite 11", "ja": "Windows X-Lite 11"},
-      "category": "X-Lite",
-      "type": {"zh": "深度优化版系统", "en": "Deep optimized OS", "ru": "Глубоко оптимизированная ОС", "fr": "OS profondément optimisé", "ja": "深く最適化されたOS"},
+      "name": {
+        "zh": "X-Lite Windows 11",
+        "zh_TW": "X-Lite Windows 11",
+        "en": "X-Lite Windows 11",
+        "fr": "X-Lite Windows 11",
+        "de": "X-Lite Windows 11",
+        "es": "X-Lite Windows 11",
+        "pt": "X-Lite Windows 11",
+        "ru": "X-Lite Windows 11",
+        "ar": "X-Lite Windows 11",
+        "ko": "X-Lite Windows 11",
+        "ja": "X-Lite Windows 11"
+      },
+      "category": "Community Images",
+      "type": {
+        "zh": "深度优化系统",
+        "zh_TW": "深度最佳化系統",
+        "en": "Heavily optimized system",
+        "fr": "Système fortement optimisé",
+        "de": "Stark optimiertes System",
+        "es": "Sistema muy optimizado",
+        "pt": "Sistema altamente otimizado",
+        "ru": "Сильно оптимизированная система",
+        "ar": "نظام محسن بعمق",
+        "ko": "고도로 최적화된 시스템",
+        "ja": "高度に最適化されたシステム"
+      },
       "version": "Windows 11",
       "architecture": "x64",
-      "audience": {"zh": "游戏玩家、性能爱好者", "en": "Gamers, performance enthusiasts", "ru": "Геймеры, энтузиасты производительности", "fr": "Joueurs, passionnés de performance", "ja": "ゲーマー、パフォーマンス愛好家"},
+      "audience": {
+        "zh": "游戏玩家和性能爱好者",
+        "zh_TW": "遊戲玩家和效能愛好者",
+        "en": "Gamers and performance enthusiasts",
+        "fr": "Joueurs et passionnés de performances",
+        "de": "Spieler und Performance-Enthusiasten",
+        "es": "Jugadores y entusiastas del rendimiento",
+        "pt": "Gamers e entusiastas de desempenho",
+        "ru": "Игроки и ценители производительности",
+        "ar": "اللاعبون ومحبو الأداء",
+        "ko": "게이머와 성능 중시 사용자",
+        "ja": "ゲーマーとパフォーマンス重視のユーザー向け"
+      },
       "pros": {
-        "zh": ["精简优化", "更低资源占用", "更适合游戏"],
-        "en": ["Optimized", "Lower resource usage", "Better for gaming"],
-        "ru": ["Оптимизирована", "Низкое потребление ресурсов", "Лучше для игр"],
-        "fr": ["Optimisé", "Utilisation réduite des ressources", "Meilleur pour le jeu"],
-        "ja": ["最適化済み", "リソース使用量の削減", "ゲーミングに最適"]
+        "zh": [
+          "更轻更快",
+          "资源占用更低",
+          "更适合游戏"
+        ],
+        "zh_TW": [
+          "更輕更快",
+          "資源占用更低",
+          "更適合遊戲"
+        ],
+        "en": [
+          "Lighter and faster",
+          "Lower resource usage",
+          "Better suited for gaming"
+        ],
+        "fr": [
+          "Allégé et optimisé",
+          "Consommation de ressources réduite",
+          "Mieux adapté au jeu"
+        ],
+        "de": [
+          "Schlanker und schneller",
+          "Geringerer Ressourcenverbrauch",
+          "Besser für Spiele geeignet"
+        ],
+        "es": [
+          "Más ligero y rápido",
+          "Menor uso de recursos",
+          "Más adecuado para juegos"
+        ],
+        "pt": [
+          "Mais leve e rápido",
+          "Menor uso de recursos",
+          "Mais adequado para jogos"
+        ],
+        "ru": [
+          "Легче и быстрее",
+          "Ниже расход ресурсов",
+          "Лучше подходит для игр"
+        ],
+        "ar": [
+          "أخف وأسرع",
+          "استهلاك موارد أقل",
+          "أنسب للألعاب"
+        ],
+        "ko": [
+          "더 가볍고 빠름",
+          "낮은 리소스 사용량",
+          "게임에 더 적합"
+        ],
+        "ja": [
+          "より軽く高速",
+          "リソース使用量が低い",
+          "ゲームにより適している"
+        ]
       },
       "notes": {
-        "zh": ["非微软官方系统", "可能缺少部分功能", "强烈建议安装字体包"],
-        "en": ["Unofficial system", "May lack some features", "Font pack strongly recommended"],
-        "ru": ["Неофициальная система", "Могут отсутствовать некоторые функции", "Настоятельно рекомендуется установить пакет шрифтов"],
-        "fr": ["Système non officiel", "Certaines fonctionnalités peuvent manquer", "Pack de polices fortement recommandé"],
-        "ja": ["非公式システム", "一部の機能が不足している可能性があります", "フォントパックのインストールを強くお勧めします"]
+        "zh": [
+          "非官方系统",
+          "可能缺少部分功能",
+          "强烈建议安装字体包"
+        ],
+        "zh_TW": [
+          "非官方系統",
+          "可能缺少部分功能",
+          "強烈建議安裝字體包"
+        ],
+        "en": [
+          "Unofficial system",
+          "Some features may be missing",
+          "Font pack strongly recommended"
+        ],
+        "fr": [
+          "Système non officiel",
+          "Certaines fonctions peuvent manquer",
+          "Pack de polices fortement recommandé"
+        ],
+        "de": [
+          "Inoffizielles System",
+          "Einige Funktionen können fehlen",
+          "Schriftpaket dringend empfohlen"
+        ],
+        "es": [
+          "Sistema no oficial",
+          "Pueden faltar algunas funciones",
+          "Paquete de fuentes muy recomendado"
+        ],
+        "pt": [
+          "Sistema não oficial",
+          "Algumas funções podem estar ausentes",
+          "Pacote de fontes altamente recomendado"
+        ],
+        "ru": [
+          "Неофициальная система",
+          "Некоторые функции могут отсутствовать",
+          "Настоятельно рекомендуется пакет шрифтов"
+        ],
+        "ar": [
+          "نظام غير رسمي",
+          "قد تكون بعض الميزات مفقودة",
+          "يوصى بشدة بحزمة الخطوط"
+        ],
+        "ko": [
+          "비공식 시스템",
+          "일부 기능이 없을 수 있음",
+          "글꼴 팩 강력 권장"
+        ],
+        "ja": [
+          "非公式システム",
+          "一部の機能が不足する場合あり",
+          "フォントパックを強く推奨"
+        ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-UMR0h",
       "sha256": "",
@@ -185,25 +1030,161 @@
     },
     {
       "id": "starvalleyx",
-      "name": {"zh": "StarValleyX", "en": "StarValleyX", "ru": "StarValleyX", "fr": "StarValleyX", "ja": "StarValleyX"},
-      "category": "Custom",
-      "type": {"zh": "美化增强版 Windows 10", "en": "Beautified Windows 10", "ru": "Украшенная Windows 10", "fr": "Windows 10 Embelli", "ja": "カスタマイズされたWindows 10"},
+      "name": {
+        "zh": "StarValleyX",
+        "zh_TW": "StarValleyX",
+        "en": "StarValleyX",
+        "fr": "StarValleyX",
+        "de": "StarValleyX",
+        "es": "StarValleyX",
+        "pt": "StarValleyX",
+        "ru": "StarValleyX",
+        "ar": "StarValleyX",
+        "ko": "StarValleyX",
+        "ja": "StarValleyX"
+      },
+      "category": "Community Images",
+      "type": {
+        "zh": "视觉增强版 Windows 10",
+        "zh_TW": "視覺增強版 Windows 10",
+        "en": "Visual-enhanced Windows 10",
+        "fr": "Windows 10 avec interface enrichie",
+        "de": "Visuell erweitertes Windows 10",
+        "es": "Windows 10 con mejoras visuales",
+        "pt": "Windows 10 com melhorias visuais",
+        "ru": "Windows 10 с улучшенным оформлением",
+        "ar": "Windows 10 محسّن بصريًا",
+        "ko": "시각 효과 강화 Windows 10",
+        "ja": "ビジュアル強化版 Windows 10"
+      },
       "version": "Windows 10",
       "architecture": "x64",
-      "audience": {"zh": "桌面美化爱好者", "en": "Desktop customization enthusiasts", "ru": "Энтузиасты настройки рабочего стола", "fr": "Passionnés de personnalisation du bureau", "ja": "デスクトップカスタマイズ愛好家"},
+      "audience": {
+        "zh": "桌面美化爱好者",
+        "zh_TW": "桌面美化愛好者",
+        "en": "Desktop customization enthusiasts",
+        "fr": "Passionnés de personnalisation du bureau",
+        "de": "Fans von Desktop-Anpassungen",
+        "es": "Entusiastas de la personalización del escritorio",
+        "pt": "Entusiastas de personalização da área de trabalho",
+        "ru": "Любители настройки рабочего стола",
+        "ar": "محبو تخصيص سطح المكتب",
+        "ko": "데스크톱 꾸미기를 좋아하는 사용자",
+        "ja": "デスクトップのカスタマイズが好きなユーザー向け"
+      },
       "pros": {
-        "zh": ["预置动画效果", "视觉风格增强", "开箱即用"],
-        "en": ["Pre-configured animations", "Enhanced visual style", "Ready to use"],
-        "ru": ["Предустановленные анимации", "Улучшенный визуальный стиль", "Готов к использованию"],
-        "fr": ["Animations préconfigurées", "Style visuel amélioré", "Prêt à l'emploi"],
-        "ja": ["プリコンフィグ済みアニメーション", "ビジュアルスタイルの強化", "すぐに使用可能"]
+        "zh": [
+          "预设动画效果",
+          "视觉风格更完整",
+          "开箱即用"
+        ],
+        "zh_TW": [
+          "預設動畫效果",
+          "視覺風格更完整",
+          "開箱即用"
+        ],
+        "en": [
+          "Preconfigured animations",
+          "Enhanced visual style",
+          "Ready to use"
+        ],
+        "fr": [
+          "Animations préconfigurées",
+          "Style visuel enrichi",
+          "Prêt à l’emploi"
+        ],
+        "de": [
+          "Vorkonfigurierte Animationen",
+          "Verbesserter visueller Stil",
+          "Sofort einsatzbereit"
+        ],
+        "es": [
+          "Animaciones preconfiguradas",
+          "Estilo visual mejorado",
+          "Listo para usar"
+        ],
+        "pt": [
+          "Animações pré-configuradas",
+          "Estilo visual aprimorado",
+          "Pronto para usar"
+        ],
+        "ru": [
+          "Преднастроенные анимации",
+          "Улучшенный визуальный стиль",
+          "Готово к использованию"
+        ],
+        "ar": [
+          "حركات معدة مسبقًا",
+          "أسلوب بصري محسّن",
+          "جاهز للاستخدام"
+        ],
+        "ko": [
+          "미리 구성된 애니메이션",
+          "강화된 시각 스타일",
+          "바로 사용 가능"
+        ],
+        "ja": [
+          "アニメーション設定済み",
+          "強化されたビジュアルスタイル",
+          "すぐに使える"
+        ]
       },
       "notes": {
-        "zh": ["非微软官方系统", "建议提前备份数据", "推荐安装字体包"],
-        "en": ["Unofficial system", "Backup data recommended", "Font pack recommended"],
-        "ru": ["Неофициальная система", "Рекомендуется сделать резервную копию", "Рекомендуется установить пакет шрифтов"],
-        "fr": ["Système non officiel", "Sauvegarde des données recommandée", "Pack de polices recommandé"],
-        "ja": ["非公式システム", "データのバックアップをお勧めします", "フォントパックのインストールをお勧めします"]
+        "zh": [
+          "非官方系统",
+          "建议先备份数据",
+          "建议安装字体包"
+        ],
+        "zh_TW": [
+          "非官方系統",
+          "建議先備份資料",
+          "建議安裝字體包"
+        ],
+        "en": [
+          "Unofficial system",
+          "Back up data first",
+          "Font pack recommended"
+        ],
+        "fr": [
+          "Système non officiel",
+          "Sauvegarde préalable recommandée",
+          "Pack de polices recommandé"
+        ],
+        "de": [
+          "Inoffizielles System",
+          "Daten vorher sichern",
+          "Schriftpaket empfohlen"
+        ],
+        "es": [
+          "Sistema no oficial",
+          "Haz una copia de seguridad antes",
+          "Se recomienda el paquete de fuentes"
+        ],
+        "pt": [
+          "Sistema não oficial",
+          "Faça backup dos dados antes",
+          "Pacote de fontes recomendado"
+        ],
+        "ru": [
+          "Неофициальная система",
+          "Сначала сделайте резервную копию данных",
+          "Рекомендуется пакет шрифтов"
+        ],
+        "ar": [
+          "نظام غير رسمي",
+          "انسخ بياناتك احتياطيًا أولًا",
+          "يوصى بحزمة الخطوط"
+        ],
+        "ko": [
+          "비공식 시스템",
+          "먼저 데이터를 백업하세요",
+          "글꼴 팩 권장"
+        ],
+        "ja": [
+          "非公式システム",
+          "事前にデータをバックアップしてください",
+          "フォントパック推奨"
+        ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
       "sha256": "",
@@ -215,30 +1196,161 @@
     },
     {
       "id": "font-pack",
-      "name": {"zh": "中文字体补充包", "en": "CJK Font Pack", "ru": "Пакет шрифтов CJK", "fr": "Pack de polices CJK", "ja": "CJKフォントパック"},
-      "category": "Tools",
-      "type": {"zh": "字体包", "en": "Font Pack", "ru": "Пакет шрифтов", "fr": "Pack de polices", "ja": "フォントパック"},
-      "description": {
-        "zh": "为 TinyOS、Windows X-Lite、StarValleyX 补充缺失中文字体。安装方式：打开字体包目录，全选字体文件，右键选择「为所有用户安装」。",
-        "en": "Adds missing CJK fonts for TinyOS, Windows X-Lite, and StarValleyX. Installation: open the font pack folder, select all font files, right-click and choose 'Install for all users'.",
-        "ru": "Добавляет отсутствующие шрифты CJK для TinyOS, Windows X-Lite и StarValleyX. Установка: откройте папку со шрифтами, выберите все файлы шрифтов, щёлкните правой кнопкой мыши и выберите «Установить для всех пользователей».",
-        "fr": "Ajoute les polices CJK manquantes pour TinyOS, Windows X-Lite et StarValleyX. Installation : ouvrez le dossier des polices, sélectionnez tous les fichiers de polices, faites un clic droit et choisissez « Installer pour tous les utilisateurs ».",
-        "ja": "TinyOS、Windows X-Lite、StarValleyXに不足しているCJKフォントを追加します。インストール方法：フォントパックフォルダを開き、すべてのフォントファイルを選択、右クリックして「すべてのユーザーにインストール」を選択してください。"
+      "name": {
+        "zh": "CJK 字体包",
+        "zh_TW": "CJK 字體包",
+        "en": "CJK Font Pack",
+        "fr": "Pack de polices CJK",
+        "de": "CJK-Schriftpaket",
+        "es": "Paquete de fuentes CJK",
+        "pt": "Pacote de fontes CJK",
+        "ru": "Пакет шрифтов CJK",
+        "ar": "حزمة خطوط CJK",
+        "ko": "CJK 글꼴 팩",
+        "ja": "CJK フォントパック"
       },
-      "audience": {"zh": "TinyOS / X-Lite / StarValleyX 用户", "en": "TinyOS / X-Lite / StarValleyX users", "ru": "Пользователи TinyOS / X-Lite / StarValleyX", "fr": "Utilisateurs TinyOS / X-Lite / StarValleyX", "ja": "TinyOS / X-Lite / StarValleyXユーザー"},
+      "category": "Tools",
+      "type": {
+        "zh": "字体包",
+        "zh_TW": "字體包",
+        "en": "Font pack",
+        "fr": "Pack de polices",
+        "de": "Schriftpaket",
+        "es": "Paquete de fuentes",
+        "pt": "Pacote de fontes",
+        "ru": "Пакет шрифтов",
+        "ar": "حزمة خطوط",
+        "ko": "글꼴 팩",
+        "ja": "フォントパック"
+      },
+      "description": {
+        "zh": "为 TinyOS、Windows X-Lite 和 StarValleyX 补齐缺失的 CJK 字体。安装时打开字体包文件夹，全选字体文件，右键选择“为所有用户安装”。",
+        "zh_TW": "為 TinyOS、Windows X-Lite 和 StarValleyX 補齊缺少的 CJK 字體。安裝時開啟字體包資料夾，全選字體檔案，右鍵選擇「為所有使用者安裝」。",
+        "en": "Adds missing CJK fonts for TinyOS, Windows X-Lite, and StarValleyX. To install, open the font pack folder, select all font files, right-click, then choose Install for all users.",
+        "fr": "Ajoute les polices CJK manquantes pour TinyOS, Windows X-Lite et StarValleyX. Pour l’installer, ouvrez le dossier, sélectionnez toutes les polices, faites un clic droit, puis choisissez Installer pour tous les utilisateurs.",
+        "de": "Ergänzt fehlende CJK-Schriften für TinyOS, Windows X-Lite und StarValleyX. Öffnen Sie zur Installation den Ordner, markieren Sie alle Schriftdateien, klicken Sie mit der rechten Maustaste und wählen Sie Für alle Benutzer installieren.",
+        "es": "Agrega las fuentes CJK que faltan en TinyOS, Windows X-Lite y StarValleyX. Para instalarlo, abre la carpeta, selecciona todos los archivos de fuente, haz clic derecho y elige Instalar para todos los usuarios.",
+        "pt": "Adiciona fontes CJK ausentes no TinyOS, Windows X-Lite e StarValleyX. Para instalar, abra a pasta, selecione todos os arquivos de fonte, clique com o botão direito e escolha Instalar para todos os usuários.",
+        "ru": "Добавляет недостающие шрифты CJK для TinyOS, Windows X-Lite и StarValleyX. Для установки откройте папку, выделите все файлы шрифтов, щелкните правой кнопкой и выберите установку для всех пользователей.",
+        "ar": "يضيف خطوط CJK الناقصة في TinyOS وWindows X-Lite وStarValleyX. للتثبيت، افتح مجلد الحزمة، وحدد كل ملفات الخطوط، ثم انقر بزر الماوس الأيمن واختر التثبيت لكل المستخدمين.",
+        "ko": "TinyOS, Windows X-Lite, StarValleyX에 누락된 CJK 글꼴을 추가합니다. 설치하려면 글꼴 팩 폴더를 열고 모든 글꼴 파일을 선택한 뒤, 마우스 오른쪽 버튼을 눌러 모든 사용자용 설치를 선택하세요.",
+        "ja": "TinyOS、Windows X-Lite、StarValleyX で不足しがちな CJK フォントを追加します。インストールするにはフォントパックのフォルダーを開き、すべてのフォントファイルを選択して右クリックし、すべてのユーザーにインストールを選んでください。"
+      },
+      "audience": {
+        "zh": "TinyOS / X-Lite / StarValleyX 用户",
+        "zh_TW": "TinyOS / X-Lite / StarValleyX 使用者",
+        "en": "TinyOS / X-Lite / StarValleyX users",
+        "fr": "Utilisateurs de TinyOS / X-Lite / StarValleyX",
+        "de": "Nutzer von TinyOS / X-Lite / StarValleyX",
+        "es": "Usuarios de TinyOS / X-Lite / StarValleyX",
+        "pt": "Usuários do TinyOS / X-Lite / StarValleyX",
+        "ru": "Пользователи TinyOS / X-Lite / StarValleyX",
+        "ar": "مستخدمو TinyOS / X-Lite / StarValleyX",
+        "ko": "TinyOS / X-Lite / StarValleyX 사용자",
+        "ja": "TinyOS / X-Lite / StarValleyX ユーザー"
+      },
       "pros": {
-        "zh": ["补充缺失中文字体", "解决乱码问题", "安装简单"],
-        "en": ["Adds missing CJK fonts", "Fixes garbled text", "Easy to install"],
-        "ru": ["Добавляет отсутствующие шрифты CJK", "Исправляет иероглифы", "Простая установка"],
-        "fr": ["Ajoute les polices CJK manquantes", "Corrige le texte illisible", "Installation facile"],
-        "ja": ["不足しているCJKフォントを追加", "文字化けを修正", "簡単なインストール"]
+        "zh": [
+          "补齐缺失的 CJK 字体",
+          "修复中日韩文字乱码",
+          "安装简单"
+        ],
+        "zh_TW": [
+          "補齊缺少的 CJK 字體",
+          "修正中日韓文字亂碼",
+          "安裝簡單"
+        ],
+        "en": [
+          "Adds missing CJK fonts",
+          "Fixes garbled CJK text",
+          "Easy to install"
+        ],
+        "fr": [
+          "Ajoute les polices CJK manquantes",
+          "Corrige le texte CJK illisible",
+          "Installation simple"
+        ],
+        "de": [
+          "Ergänzt fehlende CJK-Schriften",
+          "Behebt unleserlichen CJK-Text",
+          "Einfach zu installieren"
+        ],
+        "es": [
+          "Agrega fuentes CJK faltantes",
+          "Corrige texto CJK ilegible",
+          "Instalación sencilla"
+        ],
+        "pt": [
+          "Adiciona fontes CJK ausentes",
+          "Corrige texto CJK ilegível",
+          "Fácil de instalar"
+        ],
+        "ru": [
+          "Добавляет недостающие шрифты CJK",
+          "Исправляет нечитаемый CJK-текст",
+          "Простая установка"
+        ],
+        "ar": [
+          "يضيف خطوط CJK الناقصة",
+          "يصلح النصوص المشوشة للغات CJK",
+          "سهل التثبيت"
+        ],
+        "ko": [
+          "누락된 CJK 글꼴 추가",
+          "깨진 CJK 텍스트 수정",
+          "설치가 쉬움"
+        ],
+        "ja": [
+          "不足している CJK フォントを追加",
+          "文字化けした CJK テキストを修正",
+          "簡単にインストール可能"
+        ]
       },
       "notes": {
-        "zh": ["下载后请手动安装", "建议为所有用户安装"],
-        "en": ["Manual installation required", "Install for all users recommended"],
-        "ru": ["Требуется ручная установка", "Рекомендуется установить для всех пользователей"],
-        "fr": ["Installation manuelle requise", "Installation pour tous les utilisateurs recommandée"],
-        "ja": ["手動インストールが必要", "すべてのユーザーへのインストールをお勧めします"]
+        "zh": [
+          "需要手动安装",
+          "建议为所有用户安装"
+        ],
+        "zh_TW": [
+          "需要手動安裝",
+          "建議為所有使用者安裝"
+        ],
+        "en": [
+          "Manual installation required",
+          "Install for all users recommended"
+        ],
+        "fr": [
+          "Installation manuelle requise",
+          "Installation pour tous les utilisateurs recommandée"
+        ],
+        "de": [
+          "Manuelle Installation erforderlich",
+          "Installation für alle Benutzer empfohlen"
+        ],
+        "es": [
+          "Requiere instalación manual",
+          "Se recomienda instalar para todos los usuarios"
+        ],
+        "pt": [
+          "Instalação manual necessária",
+          "Recomendado instalar para todos os usuários"
+        ],
+        "ru": [
+          "Требуется ручная установка",
+          "Рекомендуется установить для всех пользователей"
+        ],
+        "ar": [
+          "يتطلب تثبيتًا يدويًا",
+          "يوصى بالتثبيت لكل المستخدمين"
+        ],
+        "ko": [
+          "수동 설치 필요",
+          "모든 사용자용 설치 권장"
+        ],
+        "ja": [
+          "手動インストールが必要",
+          "すべてのユーザーへのインストールを推奨"
+        ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
       "sha256": "",

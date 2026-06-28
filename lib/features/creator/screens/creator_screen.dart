@@ -52,7 +52,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       final logCenter = LogCenterService();
       await logCenter.logUsb('检测到 ${disks.length} 个可移动磁盘');
       for (final disk in disks) {
-        await logCenter.logUsb('  磁盘 ${disk.diskNumber}: ${disk.model} | 容量: ${disk.sizeFormatted} | 总线: ${disk.busType} | 序列号: ${disk.serialNumber} | 分区表: ${disk.partitionStyle} | 盘符: ${disk.driveLetters.join(", ")}');
+        await logCenter.logUsb(
+          '  磁盘 ${disk.diskNumber}: ${disk.model} | 容量: ${disk.sizeFormatted} | 总线: ${disk.busType} | 序列号: ${disk.serialNumber} | 分区表: ${disk.partitionStyle} | 盘符: ${disk.driveLetters.join(", ")}',
+        );
       }
     } catch (e) {
       debugPrint('Detect disks error: $e');
@@ -63,7 +65,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   Future<void> _selectIsoFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['iso'],
         dialogTitle: tr(context, 'creator_select_iso'),
@@ -114,11 +116,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 });
               },
             )
-            .timeout(const Duration(seconds: 30), onTimeout: () {
-          debugPrint('ISO parse overall timeout');
-          isoService.cancel();
-          return null;
-        });
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                debugPrint('ISO parse overall timeout');
+                isoService.cancel();
+                return null;
+              },
+            );
       } catch (e) {
         debugPrint('ISO parse error: $e');
       }
@@ -135,8 +140,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
       if (metadata != null) {
         final logCenter = LogCenterService();
-        await logCenter.logIso('ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"} | 构建: ${metadata.buildNumber ?? "未知"}');
+        await logCenter.logIso(
+          'ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"} | 构建: ${metadata.buildNumber ?? "未知"}',
+        );
       }
+
+      if (!mounted) return;
 
       if (metadata == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +193,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   Future<void> _startCreation() async {
-    debugPrint('[WDS] _startCreation called: disk=${_selectedDisk?.diskNumber}, iso=${_selectedIso?.fileName}');
+    debugPrint(
+      '[WDS] _startCreation called: disk=${_selectedDisk?.diskNumber}, iso=${_selectedIso?.fileName}',
+    );
     if (_selectedDisk == null || _selectedIso == null) {
       debugPrint('[WDS] _startCreation: disk or iso is null, returning');
       return;
@@ -226,7 +237,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         setState(() {
           _createProgress = CreateProgress(
             step: CreateStep.failed,
-            message: 'Error: $e',
+            message: 'creator_error\n$e',
           );
         });
       }
@@ -340,8 +351,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   width: 48,
                   height: 48,
                   child: CircularProgressIndicator(
-                    value:
-                        _parsePercent > 0 ? _parsePercent / 100.0 : null,
+                    value: _parsePercent > 0 ? _parsePercent / 100.0 : null,
                     strokeWidth: 4,
                   ),
                 ),
@@ -354,8 +364,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 ),
                 if (_parsePercent > 0) ...[
                   const SizedBox(height: 4),
-                  Text('$_parsePercent%',
-                      style: theme.textTheme.bodySmall),
+                  Text('$_parsePercent%', style: theme.textTheme.bodySmall),
                 ],
                 const SizedBox(height: 16),
                 SizedBox(
@@ -381,8 +390,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
             children: [
               Icon(Icons.album, size: 64, color: theme.colorScheme.primary),
               const SizedBox(height: 16),
-              Text(tr(context, 'creator_select_iso'),
-                  style: theme.textTheme.titleLarge),
+              Text(
+                tr(context, 'creator_select_iso'),
+                style: theme.textTheme.titleLarge,
+              ),
               const SizedBox(height: 8),
               Text(
                 tr(context, 'creator_select_iso_desc'),
@@ -428,8 +439,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(tr(context, 'creator_select_usb'),
-                style: theme.textTheme.titleMedium),
+            Text(
+              tr(context, 'creator_select_usb'),
+              style: theme.textTheme.titleMedium,
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _isDetecting ? null : _detectDisks,
@@ -452,9 +465,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.usb_off,
-                        size: 48,
-                        color: theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.usb_off,
+                      size: 48,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(height: 16),
                     Text(tr(context, 'creator_no_usb')),
                     const SizedBox(height: 8),
@@ -542,20 +557,28 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr(context, 'creator_confirm_title'),
-                    style: theme.textTheme.titleLarge),
+                Text(
+                  tr(context, 'creator_confirm_title'),
+                  style: theme.textTheme.titleLarge,
+                ),
                 const SizedBox(height: 16),
                 _ConfirmSection(
                   title: tr(context, 'creator_iso_section'),
                   rows: [
                     _ConfirmRow(
-                        label: tr(context, 'creator_file'), value: _selectedIso?.fileName ?? '-'),
+                      label: tr(context, 'creator_file'),
+                      value: _selectedIso?.fileName ?? '-',
+                    ),
                     _ConfirmRow(
-                        label: tr(context, 'creator_version'),
-                        value: _selectedIso?.windowsVersion ?? tr(context, 'creator_unknown')),
+                      label: tr(context, 'creator_version'),
+                      value:
+                          _selectedIso?.windowsVersion ??
+                          tr(context, 'creator_unknown'),
+                    ),
                     _ConfirmRow(
-                        label: tr(context, 'creator_size'),
-                        value: _selectedIso?.displaySize ?? '-'),
+                      label: tr(context, 'creator_size'),
+                      value: _selectedIso?.displaySize ?? '-',
+                    ),
                   ],
                 ),
                 const Divider(),
@@ -563,17 +586,22 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   title: tr(context, 'creator_usb_section'),
                   rows: [
                     _ConfirmRow(
-                        label: tr(context, 'creator_disk'),
-                        value: '${tr(context, 'creator_disk_prefix')} ${_selectedDisk?.diskNumber}'),
+                      label: tr(context, 'creator_disk'),
+                      value:
+                          '${tr(context, 'creator_disk_prefix')} ${_selectedDisk?.diskNumber}',
+                    ),
                     _ConfirmRow(
-                        label: tr(context, 'creator_model'),
-                        value: _selectedDisk?.model ?? '-'),
+                      label: tr(context, 'creator_model'),
+                      value: _selectedDisk?.model ?? '-',
+                    ),
                     _ConfirmRow(
-                        label: tr(context, 'creator_size'),
-                        value: _selectedDisk?.sizeFormatted ?? '-'),
+                      label: tr(context, 'creator_size'),
+                      value: _selectedDisk?.sizeFormatted ?? '-',
+                    ),
                     _ConfirmRow(
-                        label: tr(context, 'creator_serial'),
-                        value: _selectedDisk?.serialNumber ?? '-'),
+                      label: tr(context, 'creator_serial'),
+                      value: _selectedDisk?.serialNumber ?? '-',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -585,8 +613,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber,
-                          color: theme.colorScheme.error),
+                      Icon(Icons.warning_amber, color: theme.colorScheme.error),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -624,14 +651,19 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   String _resolveLocalizedMessage(BuildContext context, String key) {
-    // If the key contains newlines, it's a composite message with log path
+    // Composite progress messages keep the first line as a localization key.
     final parts = key.split('\n\nLog: ');
-    final actualKey = parts[0];
+    final messageLines = parts[0].split('\n');
+    final actualKey = messageLines.first;
+    final details = messageLines.skip(1).where((line) => line.isNotEmpty);
     final logPath = parts.length > 1 ? parts[1] : null;
-    
+
     var resolved = tr(context, actualKey);
+    if (details.isNotEmpty) {
+      resolved = '$resolved\n${details.join('\n')}';
+    }
     if (logPath != null) {
-      resolved = '$resolved\n\nLog: $logPath';
+      resolved = '$resolved\n\n${tr(context, 'logs_title')}: $logPath';
     }
     return resolved;
   }
@@ -654,8 +686,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (isFailed) ...[
-                Icon(Icons.error_outline,
-                    size: 48, color: theme.colorScheme.error),
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: theme.colorScheme.error,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   tr(context, 'step_failed'),
@@ -665,18 +700,19 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(message,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 24),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton(
-                      onPressed: () =>
-                          setState(() => _currentStep = 2),
+                      onPressed: () => setState(() => _currentStep = 2),
                       child: Text(tr(context, 'creator_back')),
                     ),
                     const SizedBox(width: 12),
@@ -692,16 +728,20 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 const SizedBox(height: 24),
                 Text(
                   _stepDisplayName(
-                      context, progress?.step ?? CreateStep.preparing),
+                    context,
+                    progress?.step ?? CreateStep.preparing,
+                  ),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(message,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    )),
+                Text(
+                  message,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: 300,
@@ -758,11 +798,16 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.check_circle,
-                  size: 64, color: theme.colorScheme.primary),
+              Icon(
+                Icons.check_circle,
+                size: 64,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(height: 24),
-              Text(tr(context, 'creator_complete_title'),
-                  style: theme.textTheme.titleLarge),
+              Text(
+                tr(context, 'creator_complete_title'),
+                style: theme.textTheme.titleLarge,
+              ),
               const SizedBox(height: 8),
               Text(
                 tr(context, 'creator_complete_desc'),
@@ -809,7 +854,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    '${tr(dialogContext, 'erase_desc_prefix')} $confirmWord ${tr(dialogContext, 'erase_desc_suffix')}'),
+                  '${tr(dialogContext, 'erase_desc_prefix')} $confirmWord ${tr(dialogContext, 'erase_desc_suffix')}',
+                ),
                 const SizedBox(height: 8),
                 Text(
                   '${tr(dialogContext, 'creator_disk')} ${_selectedDisk?.diskNumber}: ${_selectedDisk?.model}',
@@ -822,11 +868,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 TextField(
                   controller: controller,
                   autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: confirmWord,
-                  ),
+                  decoration: InputDecoration(hintText: confirmWord),
                   onSubmitted: (value) {
-                    debugPrint('[WDS] onSubmitted: value="$value", matches=${matches()}');
+                    debugPrint(
+                      '[WDS] onSubmitted: value="$value", matches=${matches()}',
+                    );
                     if (matches()) {
                       Navigator.pop(dialogContext);
                       _startCreation();
@@ -843,7 +889,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
             ),
             FilledButton(
               onPressed: () {
-                debugPrint('[WDS] Button pressed: text="${controller.text}", matches=${matches()}');
+                debugPrint(
+                  '[WDS] Button pressed: text="${controller.text}", matches=${matches()}',
+                );
                 if (matches()) {
                   Navigator.pop(dialogContext);
                   _startCreation();
@@ -868,8 +916,7 @@ class _IsoInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      color:
-          theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -880,21 +927,26 @@ class _IsoInfoCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(iso.fileName,
-                      style: theme.textTheme.titleSmall,
-                      overflow: TextOverflow.ellipsis),
+                  Text(
+                    iso.fileName,
+                    style: theme.textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   Wrap(
                     spacing: 12,
                     runSpacing: 2,
                     children: [
                       if (iso.windowsVersion != null)
-                        Text(iso.windowsVersion!,
-                            style: theme.textTheme.bodySmall),
+                        Text(
+                          iso.windowsVersion!,
+                          style: theme.textTheme.bodySmall,
+                        ),
                       if (iso.buildNumber != null)
-                        Text('${tr(context, 'creator_build_prefix')} ${iso.buildNumber}',
-                            style: theme.textTheme.bodySmall),
-                      Text(iso.displaySize,
-                          style: theme.textTheme.bodySmall),
+                        Text(
+                          '${tr(context, 'creator_build_prefix')} ${iso.buildNumber}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      Text(iso.displaySize, style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ],
@@ -920,7 +972,10 @@ class _DiskCard extends StatelessWidget {
     required this.onTap,
   });
 
-  String _resolveSafetyReasonLocal(BuildContext context, SafetyCheckResult result) {
+  String _resolveSafetyReasonLocal(
+    BuildContext context,
+    SafetyCheckResult result,
+  ) {
     final params = result.params;
     var localized = tr(context, result.reason);
     if (params != null) {
@@ -939,8 +994,8 @@ class _DiskCard extends StatelessWidget {
     return Card(
       color: isSelected
           ? (isSafe
-              ? theme.colorScheme.primaryContainer
-              : theme.colorScheme.errorContainer)
+                ? theme.colorScheme.primaryContainer
+                : theme.colorScheme.errorContainer)
           : null,
       child: InkWell(
         onTap: onTap,
@@ -949,20 +1004,25 @@ class _DiskCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(Icons.usb,
-                  color: isSelected
-                      ? (isSafe
+              Icon(
+                Icons.usb,
+                color: isSelected
+                    ? (isSafe
                           ? theme.colorScheme.primary
                           : theme.colorScheme.error)
-                      : theme.colorScheme.onSurfaceVariant),
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${tr(context, 'creator_disk_prefix')} ${disk.diskNumber}: ${disk.model}',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600)),
+                    Text(
+                      '${tr(context, 'creator_disk_prefix')} ${disk.diskNumber}: ${disk.model}',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       '${disk.sizeFormatted}  |  ${tr(context, 'creator_sn_prefix')} ${disk.serialNumber}',
@@ -972,11 +1032,13 @@ class _DiskCard extends StatelessWidget {
                     ),
                     if (safetyResult != null && !isSafe) ...[
                       const SizedBox(height: 4),
-                      Text(_resolveSafetyReasonLocal(context, safetyResult!),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.error,
-                            fontWeight: FontWeight.w600,
-                          )),
+                      Text(
+                        _resolveSafetyReasonLocal(context, safetyResult!),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -1002,11 +1064,12 @@ class _ConfirmSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: Theme.of(context)
-                .textTheme
-                .labelLarge
-                ?.copyWith(color: Theme.of(context).colorScheme.primary)),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
         const SizedBox(height: 4),
         ...rows,
       ],
@@ -1028,16 +1091,20 @@ class _ConfirmRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 80,
-            child: Text(label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w500)),
+            child: Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+            ),
           ),
         ],
       ),
@@ -1073,26 +1140,30 @@ class _StepItem extends StatelessWidget {
             color: isCompleted
                 ? cs.primary
                 : isActive
-                    ? cs.primaryContainer
-                    : cs.surfaceContainerHighest,
+                ? cs.primaryContainer
+                : cs.surfaceContainerHighest,
           ),
           child: Center(
             child: isCompleted
                 ? Icon(Icons.check, size: 16, color: cs.onPrimary)
-                : Text('$number',
+                : Text(
+                    '$number',
                     style: TextStyle(
                       color: isActive
                           ? cs.onPrimaryContainer
                           : cs.onSurfaceVariant,
                       fontWeight: FontWeight.bold,
-                    )),
+                    ),
+                  ),
           ),
         ),
         const SizedBox(height: 4),
-        Text(label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isActive ? cs.primary : cs.onSurfaceVariant,
-            )),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: isActive ? cs.primary : cs.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }

@@ -1,0 +1,111 @@
+# Changelog
+
+All notable changes to WinDeploy Studio are documented here.
+
+## v1.1.0
+
+### New Features
+
+- Added Image Center top-level categories:
+  - Official Microsoft
+  - Community Images
+- Added official Microsoft download flow for Windows 10 and Windows 11.
+  - Shows a confirmation dialog.
+  - Opens Microsoft official download pages in the system browser.
+  - Does not use mirror selection, WebView2, China mirror, or GoFile mirror.
+- Added community image trust labels and descriptions.
+- Added StarValleyX language filter.
+  - Visible only in Simplified Chinese and Traditional Chinese.
+  - Hidden in English, Japanese, Korean, German, French, Spanish, Portuguese, Russian, and Arabic.
+- Added advanced tool safety levels:
+  - Beginner
+  - Advanced
+  - Expert
+- Added professional warnings for DISM++, Windhawk, expert-level tools, and activation-related utilities.
+- Added Sysinternals Suite to Toolbox.
+- Added AI Assistant Notice with local "Do not show again" preference.
+- Added MIT-friendly installer Open Source Notice.
+- Added Special Thanks section in About and installer acknowledgement text.
+- Added WTG waiting mini-game during image application.
+
+### Improvements
+
+- Renamed the Windows installation media feature to a clearer beginner-friendly name.
+- Improved Image Center trust and transparency by separating official Microsoft sources from community-maintained images.
+- Improved WTG progress UI by showing only reliable elapsed time during image application.
+- Improved WTG compatibility detection by using selected disk metadata as fallback source of truth.
+- Improved installer licensing language to align with MIT License.
+- Updated version numbers across the app, Windows metadata, installer, scripts, and documentation to 1.1.0.
+- Removed default download source selection from Settings and cleaned related UI remnants.
+- Replaced project website entry in the app with focused repository/contact information.
+- Improved AI connection error text to avoid unreadable placeholder characters.
+
+### Fixes
+
+- Fixed external USB/NVMe disks sometimes showing `0 B`, `Unknown`, and `N/A` in the WTG compatibility card.
+- Fixed WTG image application details showing misleading written size, write speed, and remaining size values.
+- Fixed low-speed warning appearing based on unreliable synthetic progress data.
+- Fixed English navigation labels showing localization keys such as `nav_xxx`.
+- Fixed text clipping in recommendation and tool cards.
+- Fixed stale Settings UI where removed download source options could still appear.
+- Fixed installer version and metadata consistency for v1.1.0.
+- Fixed several mojibake and placeholder text issues in user-facing messages.
+
+### Removed
+
+- Removed inactive AdBlock-related code path for now.
+- Removed default mirror/source selection setting from the app.
+- Removed restrictive installer EULA wording incompatible with MIT License.
+
+### Notes
+
+Official Microsoft images now always redirect users to Microsoft's official download websites. Community images remain available through the existing mirror-based flow.
+
+WTG creation behavior was intentionally kept stable. The v1.1.0 WTG progress change only affects display logic: unreliable synthetic write metrics were removed from the UI, while the creation pipeline remains unchanged.
+
+## v1.0.2
+
+### New Features
+
+- Added WTG real-time progress metrics dashboard.
+- Added elapsed time, write speed, written size, and remaining size display during imaging.
+- Added Markdown rendering for update release notes.
+- Added browser download button in the update dialog.
+
+### Improvements
+
+- Improved WTG progress calculation and UI responsiveness.
+- Improved update dialog readability.
+- Updated project version to 1.0.2.
+
+### Fixes
+
+- Fixed inaccurate remaining time estimation in WTG module.
+- Fixed UI lag when updating progress under high-speed write conditions.
+- Fixed mismatch between displayed and actual written size in some cases.
+
+## v1.0.1
+
+### New Features
+
+- Added manual mirror selection for image downloads.
+- Added China and Global mirror options.
+
+### Improvements
+
+- Improved download experience.
+- Improved auto update flow.
+- Improved general UI polish.
+
+## v1.0.0
+
+### Initial Release
+
+- Windows installation media creation.
+- Windows To Go creation.
+- Image Center.
+- Toolbox.
+- AI Assistant.
+- Log Center.
+- 11-language UI.
+- Auto update support.

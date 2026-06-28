@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/typography.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
@@ -23,13 +24,16 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
 }
 
 class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
+  static const _noticePrefKey = 'ai_assistant_notice_hidden';
   final _scrollController = ScrollController();
   bool _showSidebar = true;
   bool _initialPromptSent = false;
+  bool _showNotice = false;
 
   @override
   void initState() {
     super.initState();
+    _loadNoticePreference();
     // Send initial prompt after first frame
     if (widget.initialPrompt != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -39,6 +43,23 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         }
       });
     }
+  }
+
+  Future<void> _loadNoticePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _showNotice = !(prefs.getBool(_noticePrefKey) ?? false);
+    });
+  }
+
+  Future<void> _dismissNotice({required bool persist}) async {
+    if (persist) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_noticePrefKey, true);
+    }
+    if (!mounted) return;
+    setState(() => _showNotice = false);
   }
 
   @override
@@ -67,7 +88,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final messages = session?.messages ?? [];
 
     ref.listen<ChatState>(chatProvider, (prev, next) {
-      if (next.activeSession?.messages.length != prev?.activeSession?.messages.length ||
+      if (next.activeSession?.messages.length !=
+              prev?.activeSession?.messages.length ||
           next.isGenerating) {
         _scrollToBottom();
       }
@@ -82,11 +104,14 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               children: [
                 _buildHeader(context, chatState, colorScheme),
                 const Divider(height: 1),
+                if (_showNotice) _buildAiNotice(context, colorScheme),
                 Expanded(
                   child: messages.isEmpty
                       ? Column(
                           children: [
-                            Expanded(child: WelcomeScreen(onSendPrompt: _handleSend)),
+                            Expanded(
+                              child: WelcomeScreen(onSendPrompt: _handleSend),
+                            ),
                             _buildQuickActions(context, colorScheme),
                           ],
                         )
@@ -104,15 +129,82 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, ChatState chatState, ColorScheme colorScheme) {
+  Widget _buildAiNotice(BuildContext context, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 20,
+            color: colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr(context, 'ai_notice_title'),
+                  style: AppTypography.cardTitleWith(
+                    colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  tr(context, 'ai_notice_message'),
+                  style: AppTypography.bodyWith(
+                    colorScheme.onSecondaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: () => _dismissNotice(persist: false),
+                      child: Text(tr(context, 'ai_notice_got_it')),
+                    ),
+                    TextButton(
+                      onPressed: () => _dismissNotice(persist: true),
+                      child: Text(tr(context, 'ai_notice_do_not_show')),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    ChatState chatState,
+    ColorScheme colorScheme,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           IconButton(
-            icon: Icon(_showSidebar ? Icons.menu_open_rounded : Icons.menu_rounded),
+            icon: Icon(
+              _showSidebar ? Icons.menu_open_rounded : Icons.menu_rounded,
+            ),
             onPressed: () => setState(() => _showSidebar = !_showSidebar),
-            tooltip: _showSidebar ? tr(context, 'ai_hide_sidebar') : tr(context, 'ai_show_sidebar'),
+            tooltip: _showSidebar
+                ? tr(context, 'ai_hide_sidebar')
+                : tr(context, 'ai_show_sidebar'),
           ),
           const SizedBox(width: 8),
           Container(
@@ -124,7 +216,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Text('WinDeploy AI', style: AppTypography.cardTitleWith(colorScheme.onSurface)),
+          Text(
+            'WinDeploy AI',
+            style: AppTypography.cardTitleWith(colorScheme.onSurface),
+          ),
           const SizedBox(width: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -132,8 +227,13 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               color: colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text('MiMo 2.5 Pro',
-                style: TextStyle(fontSize: 10, color: colorScheme.onPrimaryContainer)),
+            child: Text(
+              'MiMo 2.5 Pro',
+              style: TextStyle(
+                fontSize: 10,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
           ),
           const Spacer(),
           _buildSearchToggle(context, chatState.searchMode, colorScheme),
@@ -141,7 +241,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           if (chatState.activeSession != null) ...[
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded, size: 20),
-              onPressed: () => ref.read(chatProvider.notifier).clearActiveSession(),
+              onPressed: () =>
+                  ref.read(chatProvider.notifier).clearActiveSession(),
               tooltip: tr(context, 'ai_clear_chat'),
             ),
           ],
@@ -155,44 +256,75 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     );
   }
 
-  Widget _buildSearchToggle(BuildContext context, SearchMode mode, ColorScheme colorScheme) {
+  Widget _buildSearchToggle(
+    BuildContext context,
+    SearchMode mode,
+    ColorScheme colorScheme,
+  ) {
     return PopupMenuButton<SearchMode>(
       onSelected: (m) => ref.read(chatProvider.notifier).setSearchMode(m),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: mode != SearchMode.off ? colorScheme.primaryContainer : colorScheme.surfaceContainerHigh,
+          color: mode != SearchMode.off
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: mode != SearchMode.off ? colorScheme.primary : colorScheme.outlineVariant,
+            color: mode != SearchMode.off
+                ? colorScheme.primary
+                : colorScheme.outlineVariant,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.language_rounded, size: 16,
-                color: mode != SearchMode.off ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.language_rounded,
+              size: 16,
+              color: mode != SearchMode.off
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 6),
             Text(
-              mode == SearchMode.off ? tr(context, 'ai_search_off')
-                  : mode == SearchMode.auto ? tr(context, 'ai_search_auto')
+              mode == SearchMode.off
+                  ? tr(context, 'ai_search_off')
+                  : mode == SearchMode.auto
+                  ? tr(context, 'ai_search_auto')
                   : tr(context, 'ai_search_force'),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: mode != SearchMode.off ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                color: mode != SearchMode.off
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.arrow_drop_down_rounded, size: 16,
-                color: mode != SearchMode.off ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 16,
+              color: mode != SearchMode.off
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
       ),
       itemBuilder: (context) => [
-        PopupMenuItem(value: SearchMode.off, child: _searchMenuItem(context, SearchMode.off)),
-        PopupMenuItem(value: SearchMode.auto, child: _searchMenuItem(context, SearchMode.auto)),
-        PopupMenuItem(value: SearchMode.force, child: _searchMenuItem(context, SearchMode.force)),
+        PopupMenuItem(
+          value: SearchMode.off,
+          child: _searchMenuItem(context, SearchMode.off),
+        ),
+        PopupMenuItem(
+          value: SearchMode.auto,
+          child: _searchMenuItem(context, SearchMode.auto),
+        ),
+        PopupMenuItem(
+          value: SearchMode.force,
+          child: _searchMenuItem(context, SearchMode.force),
+        ),
       ],
     );
   }
@@ -201,23 +333,35 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     return Row(
       children: [
         Icon(
-          mode == SearchMode.off ? Icons.language_outlined
-              : mode == SearchMode.auto ? Icons.auto_mode_rounded : Icons.travel_explore_rounded,
+          mode == SearchMode.off
+              ? Icons.language_outlined
+              : mode == SearchMode.auto
+              ? Icons.auto_mode_rounded
+              : Icons.travel_explore_rounded,
           size: 18,
         ),
         const SizedBox(width: 8),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(mode == SearchMode.off ? tr(context, 'ai_search_off')
-                : mode == SearchMode.auto ? tr(context, 'ai_search_auto')
-                : tr(context, 'ai_search_force'),
-                style: const TextStyle(fontWeight: FontWeight.w500)),
             Text(
-              mode == SearchMode.off ? tr(context, 'ai_search_off_desc')
-                  : mode == SearchMode.auto ? tr(context, 'ai_search_auto_desc')
+              mode == SearchMode.off
+                  ? tr(context, 'ai_search_off')
+                  : mode == SearchMode.auto
+                  ? tr(context, 'ai_search_auto')
+                  : tr(context, 'ai_search_force'),
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            Text(
+              mode == SearchMode.off
+                  ? tr(context, 'ai_search_off_desc')
+                  : mode == SearchMode.auto
+                  ? tr(context, 'ai_search_auto_desc')
                   : tr(context, 'ai_search_force_desc'),
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -225,7 +369,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     );
   }
 
-  Widget _buildMessageList(List<ChatMessage> messages, ColorScheme colorScheme) {
+  Widget _buildMessageList(
+    List<ChatMessage> messages,
+    ColorScheme colorScheme,
+  ) {
     return Column(
       children: [
         Expanded(
@@ -283,17 +430,20 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_ms_update'),
-                onTap: () => _handleSend(tr(context, 'ai_search_ms_update_prompt')),
+                onTap: () =>
+                    _handleSend(tr(context, 'ai_search_ms_update_prompt')),
               ),
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_canary'),
-                onTap: () => _handleSend(tr(context, 'ai_search_canary_prompt')),
+                onTap: () =>
+                    _handleSend(tr(context, 'ai_search_canary_prompt')),
               ),
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_wtg_tutorial'),
-                onTap: () => _handleSend(tr(context, 'ai_search_wtg_tutorial_prompt')),
+                onTap: () =>
+                    _handleSend(tr(context, 'ai_search_wtg_tutorial_prompt')),
               ),
               _QuickActionChip(
                 icon: Icons.search_rounded,
@@ -317,24 +467,34 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       );
       return;
     }
-    ref.read(chatProvider.notifier).sendMessage(
-      text,
-      systemPrompt: getSystemPrompt(context),
-    );
+    ref
+        .read(chatProvider.notifier)
+        .sendMessage(text, systemPrompt: getSystemPrompt(context));
   }
 
   Future<void> _handleAnalyzeLogs() async {
+    final noLogsText = tr(context, 'ai_no_logs');
+    final analyzePromptBuilder = buildAnalyzeLogsPrompt;
     final logsPath = p.join(
       AppConstants.appDataPath,
-      'WinDeployStudio', 'logs',
+      'WinDeployStudio',
+      'logs',
     );
 
     final buffer = StringBuffer();
     for (final category in ['errors', 'wtg', 'usb', 'system']) {
       final dir = Directory(p.join(logsPath, category));
-      if (!dir.existsSync()) continue;
-      final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.log')).toList();
-      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      if (!dir.existsSync()) {
+        continue;
+      }
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.log'))
+          .toList();
+      files.sort(
+        (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+      );
       for (final file in files.take(5)) {
         buffer.writeln('=== ${file.path} ===');
         try {
@@ -346,32 +506,52 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       }
     }
 
-    if (buffer.isEmpty) {
-      _handleSend(tr(context, 'ai_no_logs'));
+    if (!mounted) {
       return;
     }
 
-    _handleSend(buildAnalyzeLogsPrompt(context, buffer.toString()));
+    if (buffer.isEmpty) {
+      _handleSend(noLogsText);
+      return;
+    }
+
+    _handleSend(analyzePromptBuilder(context, buffer.toString()));
   }
 
   Future<void> _handleAnalyzeIso() async {
+    final promptPrefix = getAnalyzePromptPrefix(context);
+    final isoLogsLabel = tr(context, 'ai_prompt_iso_logs');
+    final localIsosLabel = tr(context, 'ai_prompt_local_isos');
+    final noIsoFoundLabel = tr(context, 'ai_prompt_no_iso_found');
     final logsPath = p.join(
       AppConstants.appDataPath,
-      'WinDeployStudio', 'logs', 'iso',
+      'WinDeployStudio',
+      'logs',
+      'iso',
     );
-    final buffer = StringBuffer(getAnalyzePromptPrefix(context));
+    final buffer = StringBuffer(promptPrefix);
 
     // Read ISO logs
     final dir = Directory(logsPath);
     if (dir.existsSync()) {
-      final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.log')).toList();
-      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.log'))
+          .toList();
+      files.sort(
+        (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+      );
       if (files.isNotEmpty) {
-        buffer.writeln(tr(context, 'ai_prompt_iso_logs'));
+        buffer.writeln(isoLogsLabel);
         for (final file in files.take(3)) {
           try {
             final content = await file.readAsString();
-            buffer.writeln(content.length > 300 ? '${content.substring(0, 300)}...' : content);
+            buffer.writeln(
+              content.length > 300
+                  ? '${content.substring(0, 300)}...'
+                  : content,
+            );
           } catch (_) {}
         }
         buffer.writeln();
@@ -383,14 +563,19 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       AppConstants.downloadsPath,
       '${AppConstants.userProfilePath}\\Desktop',
     ];
-    buffer.writeln(tr(context, 'ai_prompt_local_isos'));
+    buffer.writeln(localIsosLabel);
     int isoCount = 0;
     for (final dirPath in isoDirs) {
-      if (dirPath.isEmpty) continue;
+      if (dirPath.isEmpty) {
+        continue;
+      }
       final d = Directory(dirPath);
-      if (!d.existsSync()) continue;
+      if (!d.existsSync()) {
+        continue;
+      }
       try {
-        final files = d.listSync(recursive: false)
+        final files = d
+            .listSync(recursive: false)
             .whereType<File>()
             .where((f) => f.path.toLowerCase().endsWith('.iso'))
             .toList();
@@ -404,102 +589,167 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         }
       } catch (_) {}
     }
-    if (isoCount == 0) buffer.writeln(tr(context, 'ai_prompt_no_iso_found'));
+    if (isoCount == 0) {
+      buffer.writeln(noIsoFoundLabel);
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     _handleSend(buffer.toString());
   }
 
   Future<void> _handleAnalyzeUsb() async {
-    final buffer = StringBuffer(getAnalyzePromptPrefix(context));
+    final promptPrefix = getAnalyzePromptPrefix(context);
+    final noUsbText = tr(context, 'ai_prompt_no_usb_detected');
+    final usbDetectedTemplate = tr(context, 'ai_prompt_usb_detected');
+    final diskLabel = tr(context, 'ai_prompt_disk');
+    final capacityLabel = tr(context, 'ai_prompt_capacity');
+    final busTypeLabel = tr(context, 'ai_prompt_bus_type');
+    final serialLabel = tr(context, 'ai_prompt_serial');
+    final partitionStyleLabel = tr(context, 'ai_prompt_partition_style');
+    final driveLettersLabel = tr(context, 'ai_prompt_drive_letters');
+    final partitionCountLabel = tr(context, 'ai_prompt_partition_count');
+    final usbGetFailedLabel = tr(context, 'ai_prompt_usb_get_failed');
+    final buffer = StringBuffer(promptPrefix);
 
     try {
       final safety = ref.read(diskSafetyServiceProvider);
       final disks = await safety.getRemovableDisks();
 
       if (disks.isEmpty) {
-        buffer.writeln(tr(context, 'ai_prompt_no_usb_detected'));
+        buffer.writeln(noUsbText);
       } else {
-        buffer.writeln(tr(context, 'ai_prompt_usb_detected').replaceAll('{count}', '${disks.length}'));
+        buffer.writeln(
+          usbDetectedTemplate.replaceAll('{count}', '${disks.length}'),
+        );
         buffer.writeln();
         for (final disk in disks) {
-          buffer.writeln('${tr(context, 'ai_prompt_disk')} ${disk.diskNumber}: ${disk.model}');
-          buffer.writeln('  ${tr(context, 'ai_prompt_capacity')}: ${disk.sizeFormatted}');
-          buffer.writeln('  ${tr(context, 'ai_prompt_bus_type')}: ${disk.busType}');
-          buffer.writeln('  ${tr(context, 'ai_prompt_serial')}: ${disk.serialNumber.isNotEmpty ? disk.serialNumber : "N/A"}');
-          buffer.writeln('  ${tr(context, 'ai_prompt_partition_style')}: ${disk.partitionStyle}');
-          buffer.writeln('  ${tr(context, 'ai_prompt_drive_letters')}: ${disk.driveLetters.isNotEmpty ? disk.driveLetters.join(", ") : "-"}');
-          buffer.writeln('  ${tr(context, 'ai_prompt_partition_count')}: ${disk.partitions.length}');
+          buffer.writeln('$diskLabel ${disk.diskNumber}: ${disk.model}');
+          buffer.writeln('  $capacityLabel: ${disk.sizeFormatted}');
+          buffer.writeln('  $busTypeLabel: ${disk.busType}');
+          buffer.writeln(
+            '  $serialLabel: ${disk.serialNumber.isNotEmpty ? disk.serialNumber : "N/A"}',
+          );
+          buffer.writeln('  $partitionStyleLabel: ${disk.partitionStyle}');
+          buffer.writeln(
+            '  $driveLettersLabel: ${disk.driveLetters.isNotEmpty ? disk.driveLetters.join(", ") : "-"}',
+          );
+          buffer.writeln('  $partitionCountLabel: ${disk.partitions.length}');
           for (final p2 in disk.partitions) {
-            buffer.writeln('    - ${p2.type} ${p2.sizeBytes < 1024 * 1024 * 1024 ? "${(p2.sizeBytes / (1024 * 1024)).toStringAsFixed(0)} MB" : "${(p2.sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB"}${p2.driveLetter != null ? " (${p2.driveLetter}:)" : ""}');
+            buffer.writeln(
+              '    - ${p2.type} ${p2.sizeBytes < 1024 * 1024 * 1024 ? "${(p2.sizeBytes / (1024 * 1024)).toStringAsFixed(0)} MB" : "${(p2.sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB"}${p2.driveLetter != null ? " (${p2.driveLetter}:)" : ""}',
+            );
           }
           buffer.writeln();
         }
       }
     } catch (e) {
-      buffer.writeln('${tr(context, 'ai_prompt_usb_get_failed')} $e');
+      buffer.writeln('$usbGetFailedLabel $e');
+    }
+
+    if (!mounted) {
+      return;
     }
 
     _handleSend(buffer.toString());
   }
 
   Future<void> _handleDiagnose() async {
-    final buffer = StringBuffer(getAnalyzePromptPrefix(context));
+    final promptPrefix = getAnalyzePromptPrefix(context);
+    final logSummaryLabel = tr(context, 'ai_prompt_log_summary');
+    final filesLabel = tr(context, 'ai_prompt_files');
+    final noLogsLabel = tr(context, 'ai_prompt_no_logs');
+    final usbDevicesLabel = tr(context, 'ai_prompt_usb_devices');
+    final noRemovableLabel = tr(context, 'ai_prompt_no_removable');
+    final diskLabel = tr(context, 'ai_prompt_disk');
+    final getFailedLabel = tr(context, 'ai_prompt_get_failed');
+    final recentErrorsLabel = tr(context, 'ai_prompt_recent_errors');
+    final noErrorsLabel = tr(context, 'ai_prompt_no_errors');
+    final errorDirMissingLabel = tr(context, 'ai_prompt_error_dir_missing');
+    final buffer = StringBuffer(promptPrefix);
 
     // Logs summary
     final logsPath = p.join(
       AppConstants.appDataPath,
-      'WinDeployStudio', 'logs',
+      'WinDeployStudio',
+      'logs',
     );
     int totalLogs = 0;
-    buffer.writeln(tr(context, 'ai_prompt_log_summary'));
+    buffer.writeln(logSummaryLabel);
     for (final category in ['errors', 'wtg', 'usb', 'iso', 'system']) {
       final dir = Directory(p.join(logsPath, category));
-      if (!dir.existsSync()) continue;
-      final count = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.log')).length;
+      if (!dir.existsSync()) {
+        continue;
+      }
+      final count = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.log'))
+          .length;
       if (count > 0) {
-        buffer.writeln('  $category: $count ${tr(context, 'ai_prompt_files')}');
+        buffer.writeln('  $category: $count $filesLabel');
         totalLogs += count;
       }
     }
-    if (totalLogs == 0) buffer.writeln(tr(context, 'ai_prompt_no_logs'));
+    if (totalLogs == 0) {
+      buffer.writeln(noLogsLabel);
+    }
     buffer.writeln();
 
     // USB info
-    buffer.writeln(tr(context, 'ai_prompt_usb_devices'));
+    buffer.writeln(usbDevicesLabel);
     try {
       final safety = ref.read(diskSafetyServiceProvider);
       final disks = await safety.getRemovableDisks();
       if (disks.isEmpty) {
-        buffer.writeln(tr(context, 'ai_prompt_no_removable'));
+        buffer.writeln(noRemovableLabel);
       } else {
         for (final disk in disks) {
-          buffer.writeln('  ${tr(context, 'ai_prompt_disk')} ${disk.diskNumber}: ${disk.model} (${disk.sizeFormatted}, ${disk.busType})');
+          buffer.writeln(
+            '  $diskLabel ${disk.diskNumber}: ${disk.model} (${disk.sizeFormatted}, ${disk.busType})',
+          );
         }
       }
     } catch (e) {
-      buffer.writeln('  ${tr(context, 'ai_prompt_get_failed')} $e');
+      buffer.writeln('  $getFailedLabel $e');
     }
     buffer.writeln();
 
     // Recent error logs
-    buffer.writeln(tr(context, 'ai_prompt_recent_errors'));
+    buffer.writeln(recentErrorsLabel);
     final errorDir = Directory(p.join(logsPath, 'errors'));
     if (errorDir.existsSync()) {
-      final files = errorDir.listSync().whereType<File>().where((f) => f.path.endsWith('.log')).toList();
-      files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      final files = errorDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.log'))
+          .toList();
+      files.sort(
+        (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+      );
       if (files.isNotEmpty) {
         for (final file in files.take(3)) {
           buffer.writeln('--- ${p.basename(file.path)} ---');
           try {
             final content = await file.readAsString();
-            buffer.writeln(content.length > 500 ? '${content.substring(0, 500)}...' : content);
+            buffer.writeln(
+              content.length > 500
+                  ? '${content.substring(0, 500)}...'
+                  : content,
+            );
           } catch (_) {}
         }
       } else {
-        buffer.writeln(tr(context, 'ai_prompt_no_errors'));
+        buffer.writeln(noErrorsLabel);
       }
     } else {
-      buffer.writeln(tr(context, 'ai_prompt_error_dir_missing'));
+      buffer.writeln(errorDirMissingLabel);
+    }
+
+    if (!mounted) {
+      return;
     }
 
     _handleSend(buffer.toString());
@@ -511,19 +761,29 @@ class _QuickActionChip extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
-  const _QuickActionChip({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
+  const _QuickActionChip({required this.icon, required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDisabled = onTap == null;
     return ActionChip(
-      avatar: Icon(icon, size: 16, color: isDisabled ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4) : colorScheme.primary),
-      label: Text(label, style: TextStyle(fontSize: 12, color: isDisabled ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4) : colorScheme.onSurface)),
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: isDisabled
+            ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+            : colorScheme.primary,
+      ),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDisabled
+              ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+              : colorScheme.onSurface,
+        ),
+      ),
       onPressed: onTap,
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

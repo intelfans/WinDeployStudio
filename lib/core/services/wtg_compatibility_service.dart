@@ -2,15 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'disk_safety_service.dart';
 
-enum WtgCompatibilityGrade {
-  a,
-  b,
-  c,
-  d,
-  f,
-  unknown,
-}
+enum WtgCompatibilityGrade { a, b, c, d, f, unknown }
 
 class WtgCompatibilityResult {
   final WtgCompatibilityGrade grade;
@@ -87,19 +81,21 @@ class WtgCompatibilityResult {
     }
   }
 
-  bool get isRecommended => grade == WtgCompatibilityGrade.a || 
-                            grade == WtgCompatibilityGrade.b;
+  bool get isRecommended =>
+      grade == WtgCompatibilityGrade.a || grade == WtgCompatibilityGrade.b;
 }
 
-final wtgCompatibilityServiceProvider = Provider<WtgCompatibilityService>((ref) {
+final wtgCompatibilityServiceProvider = Provider<WtgCompatibilityService>((
+  ref,
+) {
   return WtgCompatibilityService();
 });
 
 class WtgCompatibilityService {
   final List<String> _debugLogs = [];
-  
+
   List<String> get debugLogs => List.unmodifiable(_debugLogs);
-  
+
   void _addDebug(String message) {
     final line = '[${DateTime.now().toIso8601String()}] $message';
     _debugLogs.add(line);
@@ -109,26 +105,38 @@ class WtgCompatibilityService {
   Future<WtgCompatibilityResult> checkCompatibility({
     required int diskNumber,
     required String driveLetter,
+    DiskInfo? fallbackDisk,
   }) async {
     _debugLogs.clear();
     _addDebug('=== WTG Compatibility Check ===');
     _addDebug('Disk Number: $diskNumber');
     _addDebug('Drive Letter: $driveLetter');
 
-    String model = 'Unknown';
-    String friendlyName = 'Unknown';
-    int sizeBytes = 0;
-    String sizeFormatted = '0 GB';
-    String busType = 'Unknown';
+    String model = _usableString(fallbackDisk?.model) ?? 'Unknown';
+    String friendlyName = _usableString(fallbackDisk?.friendlyName) ?? model;
+    int sizeBytes = fallbackDisk?.sizeBytes ?? 0;
+    String sizeFormatted = sizeBytes > 0
+        ? _formatSize(sizeBytes)
+        : (fallbackDisk?.sizeFormatted ?? '0 B');
+    String busType = _usableString(fallbackDisk?.busType) ?? 'Unknown';
     String usbVersion = 'Unknown';
-    bool isRemovable = false;
-    bool isUsb = false;
+    bool isRemovable = fallbackDisk?.isRemovable ?? false;
+    bool isUsb = _looksLikeUsb(busType, isRemovable);
     int readSpeedMBps = 0;
     int writeSpeedMBps = 0;
     bool speedTestSuccess = false;
     String? speedTestError;
     final warnings = <String>[];
     final recommendations = <String>[];
+
+    if (fallbackDisk != null) {
+      _addDebug('Fallback Disk Info:');
+      _addDebug('  model: ${fallbackDisk.model}');
+      _addDebug('  friendlyName: ${fallbackDisk.friendlyName}');
+      _addDebug('  sizeBytes: ${fallbackDisk.sizeBytes}');
+      _addDebug('  busType: ${fallbackDisk.busType}');
+      _addDebug('  isRemovable: ${fallbackDisk.isRemovable}');
+    }
 
     // Get disk info using PowerShell
     try {
@@ -137,41 +145,52 @@ class WtgCompatibilityService {
       diskInfo.forEach((key, value) {
         _addDebug('  $key: $value');
       });
-      
-      model = diskInfo['Model']?.toString() ?? 'Unknown';
-      friendlyName = diskInfo['FriendlyName']?.toString() ?? 'Unknown';
-      sizeBytes = diskInfo['SizeBytes'] is int ? diskInfo['SizeBytes'] : 0;
-      sizeFormatted = _formatSize(sizeBytes);
-      busType = diskInfo['BusType']?.toString() ?? 'Unknown';
-      isRemovable = diskInfo['IsRemovable'] == true;
-      
-      // Improved USB detection
-      final busTypeUpper = busType.toUpperCase();
-      isUsb = busTypeUpper == 'USB' || 
-              (busTypeUpper == 'SCSI' && isRemovable) ||
-              (busTypeUpper == 'UNKNOWN' && isRemovable);
-      
+
+      if (diskInfo.isEmpty && fallbackDisk == null) {
+        warnings.add('wtg_warn_disk_info_failed');
+      }
+
+      model = _usableString(diskInfo['Model']) ?? model;
+      friendlyName = _usableString(diskInfo['FriendlyName']) ?? friendlyName;
+
+      final detectedSize = _readInt(diskInfo['SizeBytes']);
+      if (detectedSize > 0) {
+        sizeBytes = detectedSize;
+        sizeFormatted = _formatSize(sizeBytes);
+      }
+
+      busType = _usableString(diskInfo['BusType']) ?? busType;
+      isRemovable = _readBool(diskInfo['IsRemovable']) ?? isRemovable;
+      isUsb = _looksLikeUsb(busType, isRemovable);
+
       _addDebug('Calculated Values:');
       _addDebug('  sizeFormatted: $sizeFormatted');
       _addDebug('  sizeBytes: $sizeBytes');
-      _addDebug('  sizeGB: ${(sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)}');
+      _addDebug(
+        '  sizeGB: ${(sizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)}',
+      );
       _addDebug('  busType: $busType');
       _addDebug('  isRemovable: $isRemovable');
       _addDebug('  isUsb (calculated): $isUsb');
-      
     } catch (e) {
       _addDebug('Error getting disk info: $e');
-      warnings.add('wtg_warn_disk_info_failed');
+      if (fallbackDisk == null) {
+        warnings.add('wtg_warn_disk_info_failed');
+      }
     }
 
     // Get USB version
-    usbVersion = _detectUsbVersion(busType);
+    usbVersion = _detectUsbVersion(
+      busType,
+      model: model,
+      friendlyName: friendlyName,
+    );
     _addDebug('USB Version: $usbVersion');
 
     // Check size requirements
     final sizeGB = sizeBytes / (1024 * 1024 * 1024);
     _addDebug('Size check: ${sizeGB.toStringAsFixed(2)} GB');
-    
+
     if (sizeGB < 32) {
       warnings.add('wtg_warn_size_small');
     }
@@ -184,7 +203,7 @@ class WtgCompatibilityService {
     // Run speed test
     _addDebug('');
     _addDebug('Start Speed Test...');
-    
+
     if (driveLetter.isNotEmpty) {
       // Normalize drive letter format
       String driveRoot;
@@ -197,15 +216,15 @@ class WtgCompatibilityService {
       } else {
         driveRoot = '$driveLetter\\';
       }
-      
+
       _addDebug('Drive Letter Raw: $driveLetter');
       _addDebug('Drive Root: $driveRoot');
-      
+
       // Check if drive exists
       final driveDir = Directory(driveRoot);
       final driveExists = driveDir.existsSync();
       _addDebug('Drive Exists: $driveExists');
-      
+
       if (!driveExists) {
         _addDebug('ERROR: Drive root not found');
         speedTestSuccess = false;
@@ -217,12 +236,12 @@ class WtgCompatibilityService {
           writeSpeedMBps = speedResult['write'] ?? 0;
           speedTestSuccess = speedResult['success'] == true;
           speedTestError = speedResult['error']?.toString();
-          
+
           _addDebug('');
           _addDebug('Speed Test Result:');
           _addDebug('  Success: $speedTestSuccess');
-          _addDebug('  Read Speed: ${readSpeedMBps} MB/s');
-          _addDebug('  Write Speed: ${writeSpeedMBps} MB/s');
+          _addDebug('  Read Speed: $readSpeedMBps MB/s');
+          _addDebug('  Write Speed: $writeSpeedMBps MB/s');
           if (speedTestError != null) {
             _addDebug('  Error: $speedTestError');
           }
@@ -236,7 +255,7 @@ class WtgCompatibilityService {
       _addDebug('Skipping speed test - empty drive letter');
       speedTestError = 'wtg_err_empty_drive_letter';
     }
-    
+
     _addDebug('Speed Test Completed.');
 
     // Calculate grade
@@ -363,15 +382,27 @@ class WtgCompatibilityService {
     }
   }
 
-  String _detectUsbVersion(String busType) {
-    if (busType.toUpperCase().contains('USB')) {
-      if (busType.contains('3.2')) {
+  bool _looksLikeUsb(String busType, bool isRemovable) {
+    final busTypeUpper = busType.toUpperCase();
+    return busTypeUpper.contains('USB') ||
+        (busTypeUpper == 'SCSI' && isRemovable) ||
+        (busTypeUpper == 'UNKNOWN' && isRemovable);
+  }
+
+  String _detectUsbVersion(
+    String busType, {
+    String? model,
+    String? friendlyName,
+  }) {
+    final probe = '$busType ${model ?? ''} ${friendlyName ?? ''}';
+    if (probe.toUpperCase().contains('USB')) {
+      if (probe.contains('3.2')) {
         return 'USB 3.2';
-      } else if (busType.contains('3.1')) {
+      } else if (probe.contains('3.1')) {
         return 'USB 3.1';
-      } else if (busType.contains('3.0')) {
+      } else if (probe.contains('3.0')) {
         return 'USB 3.0';
-      } else if (busType.contains('2.0')) {
+      } else if (probe.contains('2.0')) {
         return 'USB 2.0';
       }
       return 'USB 3.0'; // Default assumption for USB devices
@@ -379,11 +410,34 @@ class WtgCompatibilityService {
     return 'N/A';
   }
 
+  String? _usableString(Object? value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+    if (text.toLowerCase() == 'unknown') return null;
+    if (text.toLowerCase() == 'null') return null;
+    return text;
+  }
+
+  int _readInt(Object? value) {
+    if (value is int) return value;
+    if (value is double) return value.round();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool? _readBool(Object? value) {
+    if (value is bool) return value;
+    final text = value?.toString().toLowerCase();
+    if (text == 'true') return true;
+    if (text == 'false') return false;
+    return null;
+  }
+
   Future<Map<String, dynamic>> _getDiskInfo(int diskNumber) async {
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         '''
         \$disk = Get-Disk -Number $diskNumber -ErrorAction Stop
@@ -402,7 +456,7 @@ class WtgCompatibilityService {
       ]).timeout(const Duration(seconds: 10));
 
       _addDebug('PowerShell Get-Disk exit code: ${result.exitCode}');
-      
+
       if (result.exitCode == 0) {
         final output = result.stdout.toString().trim();
         if (output.isNotEmpty) {
@@ -421,78 +475,74 @@ class WtgCompatibilityService {
     final testFile = '${driveRoot}WinDeployStudio_Test.bin';
     final testSize = 512 * 1024 * 1024; // 512MB
     final chunkSize = 1024 * 1024; // 1MB chunks
-    
+
     _addDebug('Test File Path: $testFile');
     _addDebug('Test File Size: ${testSize ~/ (1024 * 1024)} MB');
-    
+
     try {
       final file = File(testFile);
-      
+
       // Delete existing test file if any
       if (await file.exists()) {
         _addDebug('Deleting existing test file...');
         await file.delete();
       }
-      
+
       // Prepare test data (1MB chunk)
       final testData = List<int>.filled(chunkSize, 0);
-      
+
       // Write speed test - sequential write 512MB
       _addDebug('');
       _addDebug('Write Test Start: ${DateTime.now().toIso8601String()}');
       final writeStopwatch = Stopwatch()..start();
-      
+
       final sink = file.openWrite();
       for (int i = 0; i < testSize ~/ chunkSize; i++) {
         sink.add(testData);
       }
       await sink.flush();
       await sink.close();
-      
+
       writeStopwatch.stop();
       final writeDuration = writeStopwatch.elapsedMilliseconds;
       _addDebug('Write Test End: ${DateTime.now().toIso8601String()}');
       _addDebug('Write Duration: ${writeDuration}ms');
-      
-      final writeSpeed = writeDuration > 0 
+
+      final writeSpeed = writeDuration > 0
           ? ((testSize / (1024 * 1024)) * 1000 / writeDuration).round()
           : 0;
-      _addDebug('Write Speed: ${writeSpeed} MB/s');
-      
+      _addDebug('Write Speed: $writeSpeed MB/s');
+
       // Read speed test - sequential read 512MB
       _addDebug('');
       _addDebug('Read Test Start: ${DateTime.now().toIso8601String()}');
       final readStopwatch = Stopwatch()..start();
-      
+
       await file.readAsBytes();
-      
+
       readStopwatch.stop();
       final readDuration = readStopwatch.elapsedMilliseconds;
       _addDebug('Read Test End: ${DateTime.now().toIso8601String()}');
       _addDebug('Read Duration: ${readDuration}ms');
-      
+
       final readSpeed = readDuration > 0
           ? ((testSize / (1024 * 1024)) * 1000 / readDuration).round()
           : 0;
-      _addDebug('Read Speed: ${readSpeed} MB/s');
-      
+      _addDebug('Read Speed: $readSpeed MB/s');
+
       // Cleanup
       _addDebug('');
       _addDebug('Cleaning up test file...');
       await file.delete();
-      
+
       _addDebug('Speed Test Completed Successfully.');
-      
-      return {
-        'success': true,
-        'read': readSpeed,
-        'write': writeSpeed,
-      };
+
+      return {'success': true, 'read': readSpeed, 'write': writeSpeed};
     } catch (e) {
       _addDebug('');
       _addDebug('Exception: $e');
       _addDebug('Speed Test Failed.');
-      
+
       // Try to cleanup on error
       try {
         final file = File(testFile);
@@ -500,13 +550,8 @@ class WtgCompatibilityService {
           await file.delete();
         }
       } catch (_) {}
-      
-      return {
-        'success': false,
-        'read': 0,
-        'write': 0,
-        'error': e.toString(),
-      };
+
+      return {'success': false, 'read': 0, 'write': 0, 'error': e.toString()};
     }
   }
 
@@ -528,36 +573,51 @@ class WtgCompatibilityService {
       if (content.isEmpty) return map;
       int i = 0;
       while (i < content.length) {
-        while (i < content.length && content[i] == ' ') { i++; }
+        while (i < content.length && content[i] == ' ') {
+          i++;
+        }
         if (i >= content.length || content[i] != '"') break;
         i++;
         final keyStart = i;
-        while (i < content.length && content[i] != '"') { i++; }
+        while (i < content.length && content[i] != '"') {
+          i++;
+        }
         final key = content.substring(keyStart, i);
         i++;
-        while (i < content.length && (content[i] == ':' || content[i] == ' ')) { i++; }
+        while (i < content.length && (content[i] == ':' || content[i] == ' ')) {
+          i++;
+        }
         if (i >= content.length) break;
         dynamic value;
         if (content[i] == '"') {
           i++;
           final valueStart = i;
-          while (i < content.length && content[i] != '"') { i++; }
+          while (i < content.length && content[i] != '"') {
+            i++;
+          }
           value = content.substring(valueStart, i);
           i++;
         } else if (content[i] == 't') {
-          value = true; i += 4;
+          value = true;
+          i += 4;
         } else if (content[i] == 'f') {
-          value = false; i += 5;
+          value = false;
+          i += 5;
         } else if (content[i] == 'n') {
-          value = null; i += 4;
+          value = null;
+          i += 4;
         } else {
           final numStart = i;
-          while (i < content.length && content[i] != ',' && content[i] != '}') { i++; }
+          while (i < content.length && content[i] != ',' && content[i] != '}') {
+            i++;
+          }
           final numStr = content.substring(numStart, i).trim();
           value = int.tryParse(numStr) ?? double.tryParse(numStr);
         }
         map[key] = value;
-        while (i < content.length && (content[i] == ',' || content[i] == ' ')) { i++; }
+        while (i < content.length && (content[i] == ',' || content[i] == ' ')) {
+          i++;
+        }
       }
     } catch (e) {
       _addDebug('JSON parse error: $e');

@@ -12,7 +12,7 @@
   🖼️ 镜像中心
     浏览精选的 Windows 镜像和下载链接
     
-  💿 启动盘制作工具  
+  💿 Windows 安装盘创建工具  
     从 ISO 文件创建 Windows 安装介质
     
   🚀 Windows To Go
@@ -33,4 +33,4 @@
 
 点击"下一步"继续安装。
 
-© 2026 Bob Steve. 保留所有权利。
+© 2026 Bob Steve. 基于 MIT License 发布。

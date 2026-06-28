@@ -1,4 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import '../../../core/localization/strings.dart';
 import '../models/update_models.dart';
 import '../services/update_service.dart';
 
@@ -39,7 +40,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     if (info == null) {
       state = state.copyWith(
         status: UpdateStatus.error,
-        error: 'Failed to check for updates',
+        error: trCurrent('update_check_failed'),
         lastCheckTime: lastCheck,
       );
       await Future.delayed(const Duration(seconds: 3));
@@ -87,18 +88,19 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
 
     _cancelToken = CancelToken();
 
-    final filePath = await _service.downloadUpdate(
-      state.info!,
-      (progress, speed, remaining, phase) {
-        state = state.copyWith(
-          downloadProgress: progress,
-          downloadSpeed: speed,
-          downloadRemaining: remaining,
-          downloadPhase: phase,
-        );
-      },
-      _cancelToken!,
-    );
+    final filePath = await _service.downloadUpdate(state.info!, (
+      progress,
+      speed,
+      remaining,
+      phase,
+    ) {
+      state = state.copyWith(
+        downloadProgress: progress,
+        downloadSpeed: speed,
+        downloadRemaining: remaining,
+        downloadPhase: phase,
+      );
+    }, _cancelToken!);
 
     if (filePath != null) {
       _downloadedFilePath = filePath;
@@ -112,7 +114,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       } else {
         state = state.copyWith(
           status: UpdateStatus.error,
-          error: 'Download failed after retries',
+          error: trCurrent('webview_download_failed'),
         );
       }
     }
@@ -127,15 +129,19 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     if (_downloadedFilePath == null) return false;
 
     state = state.copyWith(status: UpdateStatus.installing);
-    return await _service.installUpdate(_downloadedFilePath!);
+    final success = await _service.installUpdate(_downloadedFilePath!);
+    if (!success) {
+      state = state.copyWith(
+        status: UpdateStatus.downloaded,
+        error: 'Installer signature check failed or install could not start',
+      );
+    }
+    return success;
   }
 
   Future<void> ignoreVersion(String tagName) async {
     await _service.setIgnoredVersion(tagName);
-    state = state.copyWith(
-      ignoredVersion: tagName,
-      status: UpdateStatus.idle,
-    );
+    state = state.copyWith(ignoredVersion: tagName, status: UpdateStatus.idle);
   }
 
   Future<void> setAutoCheck(bool enabled) async {
@@ -160,6 +166,8 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
   String get releasePageUrl => _service.releasePageUrl;
 }
 
-final updateProvider = StateNotifierProvider<UpdateNotifier, UpdateState>((ref) {
+final updateProvider = StateNotifierProvider<UpdateNotifier, UpdateState>((
+  ref,
+) {
   return UpdateNotifier(UpdateService());
 });

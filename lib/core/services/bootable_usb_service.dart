@@ -9,6 +9,7 @@ import '../utils/file_utils.dart';
 import '../../features/logs/services/log_center_service.dart';
 
 enum BootMode { uefi, bios, both }
+
 enum CreateStep {
   preparing,
   cleaningDisk,
@@ -76,53 +77,67 @@ class BootableUsbService {
     ProgressCallback? onProgress,
   }) async {
     _log.clear();
-    _logLine('=== Create Bootable USB Start ===');
+    _logLine('=== Create Windows Installation Media Start ===');
     _logLine('Disk: $diskNumber, ISO: $isoPath, Mode: $bootMode');
 
     final logCenter = LogCenterService();
-    await logCenter.logUsb('启动盘制作开始 | 磁盘: $diskNumber | ISO: $isoPath | 模式: $bootMode');
+    await logCenter.logUsb(
+      'Windows 安装盘创建开始 | 磁盘: $diskNumber | ISO: $isoPath | 模式: $bootMode',
+    );
 
     final logger = ref.read(fileLoggerServiceProvider);
     await logger.log(
-      action: 'Create USB',
+      action: 'Create Install Media',
       target: 'Disk $diskNumber',
       result: 'Starting - ISO: $isoPath',
     );
 
     try {
       // Step 1: Prepare
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.preparing,
-        message: 'boot_preparing',
-        progress: 0.0,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.preparing,
+          message: 'boot_preparing',
+          progress: 0.0,
+        ),
+      );
 
-      // Always use MBR for removable USB
-      _logLine('Using MBR + FAT32 for removable USB');
+      _logLine('Using FAT32 boot media layout for $bootMode');
 
       // Step 2: Clean and partition disk
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.cleaningDisk,
-        message: 'boot_cleaning',
-        progress: 0.05,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.cleaningDisk,
+          message: 'boot_cleaning',
+          progress: 0.05,
+        ),
+      );
 
-      final partitionResult = await _partitionDisk(diskNumber: diskNumber);
+      final partitionResult = await _partitionDisk(
+        diskNumber: diskNumber,
+        bootMode: bootMode,
+      );
 
       if (!partitionResult.success) {
         final errorDetail = partitionResult.error ?? '';
         _logLine('Partition FAILED: $errorDetail');
-        final errorKey = errorDetail.contains('Access is denied') ||
+        final errorKey =
+            errorDetail.contains('Access is denied') ||
                 errorDetail.contains('denied') ||
                 errorDetail.contains('0x80070005')
             ? 'boot_access_denied'
             : 'boot_partition_failed';
         final logPath = await saveLogToFile();
-        _notify(onProgress, CreateProgress(
-          step: CreateStep.failed,
-          message: '$errorKey\n\nLog: $logPath',
-          error: errorDetail,
-        ));
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: '$errorKey\n\nLog: $logPath',
+            error: errorDetail,
+          ),
+        );
         return false;
       }
 
@@ -134,11 +149,14 @@ class BootableUsbService {
       _logLine('Partition OK, drive: $driveLetter');
 
       // Step 3: Format (already done by diskpart, just verify)
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.formatting,
-        message: 'boot_format_verifying',
-        progress: 0.15,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.formatting,
+          message: 'boot_format_verifying',
+          progress: 0.15,
+        ),
+      );
 
       final formatResult = await _formatPartition(
         driveLetter: driveLetter,
@@ -148,29 +166,38 @@ class BootableUsbService {
       if (!formatResult) {
         _logLine('Format verification FAILED');
         final logPath = await saveLogToFile();
-        _notify(onProgress, CreateProgress(
-          step: CreateStep.failed,
-          message: 'boot_format_failed\n\nLog: $logPath',
-        ));
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'boot_format_failed\n\nLog: $logPath',
+          ),
+        );
         return false;
       }
       _logLine('Format verified');
 
       // Step 4: Mount ISO
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.mountingIso,
-        message: 'boot_mounting',
-        progress: 0.20,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.mountingIso,
+          message: 'boot_mounting',
+          progress: 0.20,
+        ),
+      );
 
       final mountPoint = await _mountIso(isoPath);
       if (mountPoint == null) {
         _logLine('Mount ISO FAILED');
         final logPath = await saveLogToFile();
-        _notify(onProgress, CreateProgress(
-          step: CreateStep.failed,
-          message: 'boot_mount_failed\n$isoPath\n\nLog: $logPath',
-        ));
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'boot_mount_failed\n$isoPath\n\nLog: $logPath',
+          ),
+        );
         return false;
       }
       _logLine('Mounted at: $mountPoint');
@@ -201,24 +228,30 @@ class BootableUsbService {
       }
 
       // Step 6: Copy files with robocopy (fast)
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.copyingFiles,
-        message: 'boot_copying_fast',
-        progress: 0.25,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.copyingFiles,
+          message: 'boot_copying_fast',
+          progress: 0.25,
+        ),
+      );
 
       final copyResult = await _copyIsoContents(
         mountPoint: mountPoint,
         targetDrive: driveLetter,
         excludeWim: needSplit,
         onProgress: (progress) {
-          _notify(onProgress, CreateProgress(
-            step: CreateStep.copyingFiles,
-            message: progress < 1.0
-                ? 'boot_copying_fast'
-                : 'boot_copy_complete',
-            progress: 0.25 + progress * 0.45,
-          ));
+          _notify(
+            onProgress,
+            CreateProgress(
+              step: CreateStep.copyingFiles,
+              message: progress < 1.0
+                  ? 'boot_copying_fast'
+                  : 'boot_copy_complete',
+              progress: 0.25 + progress * 0.45,
+            ),
+          );
         },
       );
 
@@ -226,21 +259,27 @@ class BootableUsbService {
         _logLine('File copy FAILED');
         await _unmountIso(isoPath);
         final logPath = await saveLogToFile();
-        _notify(onProgress, CreateProgress(
-          step: CreateStep.failed,
-          message: 'boot_copy_failed\n\nLog: $logPath',
-        ));
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'boot_copy_failed\n\nLog: $logPath',
+          ),
+        );
         return false;
       }
       _logLine('File copy OK');
 
       // Step 7: Split WIM if needed
       if (needSplit && wimSource.isNotEmpty) {
-        _notify(onProgress, const CreateProgress(
-          step: CreateStep.splittingWim,
-          message: 'boot_splitting_wim',
-          progress: 0.70,
-        ));
+        _notify(
+          onProgress,
+          const CreateProgress(
+            step: CreateStep.splittingWim,
+            message: 'boot_splitting_wim',
+            progress: 0.70,
+          ),
+        );
 
         final splitResult = await _splitWim(
           sourcePath: wimSource,
@@ -251,25 +290,32 @@ class BootableUsbService {
           _logLine('WIM split FAILED');
           await _unmountIso(isoPath);
           final logPath = await saveLogToFile();
-          _notify(onProgress, CreateProgress(
-            step: CreateStep.failed,
-            message: 'boot_split_failed\n\nLog: $logPath',
-          ));
+          _notify(
+            onProgress,
+            CreateProgress(
+              step: CreateStep.failed,
+              message: 'boot_split_failed\n\nLog: $logPath',
+            ),
+          );
           return false;
         }
         _logLine('WIM split OK');
       }
 
       // Step 8: Write boot files
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.writingBootFiles,
-        message: 'boot_writing_boot',
-        progress: 0.80,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.writingBootFiles,
+          message: 'boot_writing_boot',
+          progress: 0.80,
+        ),
+      );
 
       final bootResult = await _writeBootFiles(
         windowsDrive: mountPoint.endsWith('\\') ? mountPoint : '$mountPoint\\',
         targetDrive: driveLetter,
+        bootMode: bootMode,
       );
 
       await _unmountIso(isoPath);
@@ -277,40 +323,55 @@ class BootableUsbService {
       if (!bootResult) {
         _logLine('Boot file write FAILED');
         final logPath = await saveLogToFile();
-        _notify(onProgress, CreateProgress(
-          step: CreateStep.failed,
-          message: 'boot_write_failed\n\nLog: $logPath',
-        ));
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'boot_write_failed\n\nLog: $logPath',
+          ),
+        );
         return false;
       }
       _logLine('Boot files OK');
 
       // Step 8.5: Set volume icon
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.writingBootFiles,
-        message: 'boot_setting_icon',
-        progress: 0.85,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.writingBootFiles,
+          message: 'boot_setting_icon',
+          progress: 0.85,
+        ),
+      );
       await _setVolumeIcon(driveLetter);
 
       // Step 9: Verify
-      _notify(onProgress, const CreateProgress(
-        step: CreateStep.verifying,
-        message: 'boot_verifying',
-        progress: 0.90,
-      ));
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.verifying,
+          message: 'boot_verifying',
+          progress: 0.90,
+        ),
+      );
 
-      final verifyResult = await _verifyBootableUsb(driveLetter: driveLetter);
+      final verifyResult = await _verifyBootableUsb(
+        driveLetter: driveLetter,
+        bootMode: bootMode,
+      );
       _logLine('Verify: ${verifyResult ? "OK" : "FAILED"}');
 
-      _notify(onProgress, CreateProgress(
-        step: verifyResult ? CreateStep.complete : CreateStep.failed,
-        message: verifyResult ? 'boot_complete' : 'boot_verify_failed',
-        progress: verifyResult ? 1.0 : 0.0,
-      ));
+      _notify(
+        onProgress,
+        CreateProgress(
+          step: verifyResult ? CreateStep.complete : CreateStep.failed,
+          message: verifyResult ? 'boot_complete' : 'boot_verify_failed',
+          progress: verifyResult ? 1.0 : 0.0,
+        ),
+      );
 
       await logger.log(
-        action: 'Create USB',
+        action: 'Create Install Media',
         target: 'Disk $diskNumber',
         result: verifyResult ? 'Success - Verified' : 'Failed - Verification',
         level: verifyResult ? LogLevel.success : LogLevel.error,
@@ -320,22 +381,25 @@ class BootableUsbService {
       _logLine('Log saved to: $logPath');
 
       if (verifyResult) {
-        await logCenter.logUsb('启动盘制作成功 | 磁盘: $diskNumber');
+        await logCenter.logUsb('Windows 安装盘创建成功 | 磁盘: $diskNumber');
       } else {
-        await logCenter.logError('启动盘验证失败 | 磁盘: $diskNumber');
+        await logCenter.logError('Windows 安装盘验证失败 | 磁盘: $diskNumber');
       }
 
       return verifyResult;
     } catch (e) {
       _logLine('EXCEPTION: $e');
       final logPath = await saveLogToFile();
-      await logCenter.logError('启动盘制作异常 | 磁盘: $diskNumber | 错误: $e');
-      _notify(onProgress, CreateProgress(
-        step: CreateStep.failed,
-        message: 'Error: $e\n\nLog: $logPath',
-      ));
+      await logCenter.logError('Windows 安装盘创建异常 | 磁盘: $diskNumber | 错误: $e');
+      _notify(
+        onProgress,
+        CreateProgress(
+          step: CreateStep.failed,
+          message: 'creator_error\n$e\n\nLog: $logPath',
+        ),
+      );
       await logger.log(
-        action: 'Create USB',
+        action: 'Create Install Media',
         target: 'Disk $diskNumber',
         result: 'Exception: $e',
         level: LogLevel.error,
@@ -348,15 +412,17 @@ class BootableUsbService {
 
   Future<_DiskPartResult> _partitionDisk({
     required int diskNumber,
+    required BootMode bootMode,
   }) async {
-    // Always use MBR + FAT32 for removable USB media
-      final script = '''
+    final activeLine = bootMode == BootMode.uefi ? '' : 'active';
+    final script =
+        '''
 select disk $diskNumber
 clean
 convert mbr
 create partition primary
-active
-format fs=fat32 label="INTEL" quick
+$activeLine
+format fs=fat32 label="WDS_BOOT" quick
 assign
 exit
 ''';
@@ -376,7 +442,7 @@ exit
       );
     }
 
-    final driveLetter = await _findNewDriveLetter();
+    final driveLetter = await _findDriveLetterForDisk(diskNumber);
     if (driveLetter == null) {
       _logLine('Could not find drive letter');
       return _DiskPartResult(
@@ -388,24 +454,17 @@ exit
     return _DiskPartResult(success: true, driveLetter: driveLetter);
   }
 
-  Future<String?> _findNewDriveLetter() async {
+  Future<String?> _findDriveLetterForDisk(int diskNumber) async {
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
-        r'Get-Volume | Where-Object { $_.DriveLetter -and $_.DriveLetter -ne "C" -and $_.DriveLetter -ne "X" -and $_.FileSystemLabel -eq "INTEL" } | Select-Object -First 1 -ExpandProperty DriveLetter',
-      ]);
-      if (result.exitCode == 0) {
-        final letter = result.stdout.toString().trim();
-        if (letter.isNotEmpty) return '$letter:';
-      }
-    } catch (_) {}
-
-    try {
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-Command',
-        r'Get-Volume | Where-Object { $_.DriveLetter -and $_.DriveLetter -ne "C" -and $_.DriveLetter -ne "X" -and $_.FileSystem -and $_.SizeRemaining -gt 0 } | Sort-Object -Property DriveLetter | Select-Object -Last 1 -ExpandProperty DriveLetter',
+        'Get-Partition -DiskNumber $diskNumber -ErrorAction Stop | '
+            'Where-Object { \$_.DriveLetter } | '
+            'Sort-Object PartitionNumber | '
+            'Select-Object -First 1 -ExpandProperty DriveLetter',
       ]);
       if (result.exitCode == 0) {
         final letter = result.stdout.toString().trim();
@@ -425,10 +484,14 @@ exit
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         'Get-Volume -DriveLetter ${driveLetter.replaceAll(":", "")} | Select-Object -ExpandProperty FileSystem',
       ]);
-      return result.exitCode == 0;
+      return result.exitCode == 0 &&
+          result.stdout.toString().trim().toUpperCase() ==
+              fileSystem.toUpperCase();
     } catch (_) {
       return false;
     }
@@ -443,18 +506,24 @@ exit
 
       // Clean up any stale mount
       await Process.run('powershell', [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
       ]).timeout(const Duration(seconds: 10));
 
       // Mount
       final mountResult = await Process.run('powershell', [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         "Mount-DiskImage -ImagePath '$escapedPath' -PassThru | Out-Null",
       ]).timeout(const Duration(seconds: 30));
-      _logLine('Mount exit: ${mountResult.exitCode}, stderr: ${mountResult.stderr}');
+      _logLine(
+        'Mount exit: ${mountResult.exitCode}, stderr: ${mountResult.stderr}',
+      );
 
       if (mountResult.exitCode != 0) return null;
 
@@ -462,11 +531,15 @@ exit
       for (int i = 0; i < 5; i++) {
         await Future.delayed(const Duration(milliseconds: 500));
         final letterResult = await Process.run('powershell', [
-          '-NoProfile', '-ExecutionPolicy', 'Bypass',
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
           '-Command',
           "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
         ]).timeout(const Duration(seconds: 10));
-        _logLine('Drive letter attempt $i: exit=${letterResult.exitCode}, out="${letterResult.stdout}"');
+        _logLine(
+          'Drive letter attempt $i: exit=${letterResult.exitCode}, out="${letterResult.stdout}"',
+        );
         if (letterResult.exitCode == 0) {
           final letter = letterResult.stdout.toString().trim();
           if (letter.isNotEmpty) {
@@ -485,7 +558,9 @@ exit
     try {
       final escapedPath = isoPath.replaceAll("'", "''");
       await Process.run('powershell', [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
         '-Command',
         "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue",
       ]).timeout(const Duration(seconds: 15));
@@ -505,21 +580,23 @@ exit
   }) async {
     try {
       final srcDir = mountPoint.endsWith('\\') ? mountPoint : '$mountPoint\\';
-      final dstDir = targetDrive.endsWith('\\') ? targetDrive : '$targetDrive\\';
+      final dstDir = targetDrive.endsWith('\\')
+          ? targetDrive
+          : '$targetDrive\\';
       _logLine('robocopy: $srcDir -> $dstDir');
 
       // robocopy args
       final args = <String>[
         srcDir,
         dstDir,
-        '/E',           // recursive including empty dirs
-        '/R:1',         // 1 retry
-        '/W:1',         // 1 second wait between retries
-        '/NP',          // no progress percentage (clean output)
-        '/NDL',         // don't log directory names
-        '/NJH',         // no job header
-        '/NJS',         // no job summary
-        '/MT:8',        // 8 threads
+        '/E', // recursive including empty dirs
+        '/R:1', // 1 retry
+        '/W:1', // 1 second wait between retries
+        '/NP', // no progress percentage (clean output)
+        '/NDL', // don't log directory names
+        '/NJH', // no job header
+        '/NJS', // no job summary
+        '/MT:8', // 8 threads
       ];
 
       if (excludeWim) {
@@ -537,8 +614,10 @@ exit
         onProgress(0.0);
       }
 
-      final result = await Process.run('robocopy', args)
-          .timeout(const Duration(minutes: 15));
+      final result = await Process.run(
+        'robocopy',
+        args,
+      ).timeout(const Duration(minutes: 15));
 
       // robocopy exit codes: 0-7 are success, 8+ are failures
       // 0 = no files copied (already up to date)
@@ -595,20 +674,26 @@ exit
   Future<bool> _writeBootFiles({
     required String windowsDrive,
     required String targetDrive,
+    required BootMode bootMode,
   }) async {
     try {
       _logLine('Writing boot files: target=$targetDrive');
 
       // Step 1: Write MBR boot code with bootsect
-      _logLine('Step 1: bootsect /nt60 $targetDrive /mbr');
-      final bootsectResult = await Process.run('bootsect', [
-        '/nt60', targetDrive,
-        '/mbr',
-      ]).timeout(const Duration(seconds: 30));
-      _logLine('bootsect exit: ${bootsectResult.exitCode}');
-      _logLine('bootsect stdout: ${bootsectResult.stdout}');
-      if (bootsectResult.exitCode != 0) {
-        _logLine('bootsect stderr: ${bootsectResult.stderr}');
+      if (bootMode != BootMode.uefi) {
+        _logLine('Step 1: bootsect /nt60 $targetDrive /mbr');
+        final bootsectResult = await Process.run('bootsect', [
+          '/nt60',
+          targetDrive,
+          '/mbr',
+        ]).timeout(const Duration(seconds: 30));
+        _logLine('bootsect exit: ${bootsectResult.exitCode}');
+        _logLine('bootsect stdout: ${bootsectResult.stdout}');
+        if (bootsectResult.exitCode != 0) {
+          _logLine('bootsect stderr: ${bootsectResult.stderr}');
+        }
+      } else {
+        _logLine('Step 1: skipped bootsect for UEFI-only mode');
       }
 
       // Step 2: Try bcdboot (fast if \Windows exists on ISO)
@@ -617,8 +702,10 @@ exit
         _logLine('Step 2: bcdboot (standard path)');
         final result = await Process.run('bcdboot', [
           windowsDir,
-          '/s', targetDrive,
-          '/f', 'ALL',
+          '/s',
+          targetDrive,
+          '/f',
+          'ALL',
         ]).timeout(const Duration(seconds: 60));
         _logLine('bcdboot exit: ${result.exitCode}');
         _logLine('bcdboot stdout: ${result.stdout}');
@@ -645,7 +732,8 @@ exit
       // Verify: bootsect + bootmgr from ISO = bootable for BIOS
       // UEFI boot needs \efi\boot\bootx64.efi which was copied from ISO
       final hasBootmgr = await File('$targetDrive\\bootmgr').exists();
-      var hasEfiBoot = await File('$targetDrive\\efi\\boot\\bootx64.efi').exists() ||
+      var hasEfiBoot =
+          await File('$targetDrive\\efi\\boot\\bootx64.efi').exists() ||
           await File('$targetDrive\\efi\\boot\\bootaa64.efi').exists();
       _logLine('Boot files: bootmgr=$hasBootmgr, efi=$hasEfiBoot');
 
@@ -665,7 +753,8 @@ exit
 
         // Try 1b: Copy bootmgfw.efi as bootaa64.efi for ARM64
         if (!hasEfiBoot) {
-          final bootmgfwPath2 = '$targetDrive\\efi\\microsoft\\boot\\bootmgfw.efi';
+          final bootmgfwPath2 =
+              '$targetDrive\\efi\\microsoft\\boot\\bootmgfw.efi';
           if (await File(bootmgfwPath2).exists()) {
             final efiBootDir = '$targetDrive\\efi\\boot';
             await Directory(efiBootDir).create(recursive: true);
@@ -681,11 +770,14 @@ exit
             _logLine('Trying bcdboot /f UEFI...');
             final uefiResult = await Process.run('bcdboot', [
               windowsDir2,
-              '/s', targetDrive,
-              '/f', 'UEFI',
+              '/s',
+              targetDrive,
+              '/f',
+              'UEFI',
             ]).timeout(const Duration(seconds: 60));
             _logLine('bcdboot UEFI exit: ${uefiResult.exitCode}');
-            hasEfiBoot = await File('$targetDrive\\efi\\boot\\bootx64.efi').exists() ||
+            hasEfiBoot =
+                await File('$targetDrive\\efi\\boot\\bootx64.efi').exists() ||
                 await File('$targetDrive\\efi\\boot\\bootaa64.efi').exists();
           }
         }
@@ -697,7 +789,11 @@ exit
       }
 
       _logLine('Final: bootmgr=$hasBootmgr, efi=$hasEfiBoot');
-      return hasBootmgr || hasEfiBoot;
+      return _bootFilesMatchMode(
+        bootMode: bootMode,
+        hasBootmgr: hasBootmgr,
+        hasEfiBoot: hasEfiBoot,
+      );
     } catch (e) {
       _logLine('Boot file exception: $e');
       return false;
@@ -709,14 +805,18 @@ exit
       final bcdPath = '$targetDrive\\boot\\BCD';
       // bcdedit /createstore creates an empty BCD store
       await Process.run('bcdedit', [
-        '/createstore', bcdPath,
+        '/createstore',
+        bcdPath,
       ]).timeout(const Duration(seconds: 10));
 
       // Create boot manager entry
       await Process.run('bcdedit', [
-        '/store', bcdPath,
-        '/create', '{bootmgr}',
-        '/d', 'Windows Boot Manager',
+        '/store',
+        bcdPath,
+        '/create',
+        '{bootmgr}',
+        '/d',
+        'Windows Boot Manager',
       ]).timeout(const Duration(seconds: 10));
 
       _logLine('BCD store created');
@@ -729,20 +829,22 @@ exit
 
   Future<bool> _verifyBootableUsb({
     required String driveLetter,
+    required BootMode bootMode,
   }) async {
     final errors = <String>[];
 
-    // Core boot files (required)
+    // Core boot files (required for BIOS/both)
     final hasBootmgr = await File('$driveLetter\\bootmgr').exists();
-    if (!hasBootmgr) {
+    if (bootMode != BootMode.uefi && !hasBootmgr) {
       errors.add('bootmgr missing');
     }
 
-    // EFI boot (at least one required for UEFI)
-    final hasEfiBoot = await File('$driveLetter\\EFI\\Boot\\bootx64.efi').exists() ||
+    // EFI boot (required for UEFI/both)
+    final hasEfiBoot =
+        await File('$driveLetter\\EFI\\Boot\\bootx64.efi').exists() ||
         await File('$driveLetter\\EFI\\Boot\\bootaa64.efi').exists();
-    if (!hasEfiBoot && !hasBootmgr) {
-      errors.add('No boot files (bootmgr or EFI boot)');
+    if (bootMode != BootMode.bios && !hasEfiBoot) {
+      errors.add('EFI boot file missing');
     }
 
     // Install image (required)
@@ -762,7 +864,7 @@ exit
       _logLine('Verify issues: ${errors.join(', ')}');
       final logger = ref.read(fileLoggerServiceProvider);
       await logger.log(
-        action: 'Verify USB',
+        action: 'Verify Install Media',
         target: driveLetter,
         result: 'Issues: ${errors.join(', ')}',
         level: LogLevel.warning,
@@ -770,6 +872,21 @@ exit
     }
 
     return errors.isEmpty;
+  }
+
+  bool _bootFilesMatchMode({
+    required BootMode bootMode,
+    required bool hasBootmgr,
+    required bool hasEfiBoot,
+  }) {
+    switch (bootMode) {
+      case BootMode.bios:
+        return hasBootmgr;
+      case BootMode.uefi:
+        return hasEfiBoot;
+      case BootMode.both:
+        return hasBootmgr && hasEfiBoot;
+    }
   }
 
   // --- Volume Icon ---
@@ -792,23 +909,30 @@ exit
       try {
         // Remove hidden/system/read-only attributes if file exists
         await Process.run('attrib', [
-          '-h', '-s', '-r', autorunFile.path,
+          '-h',
+          '-s',
+          '-r',
+          autorunFile.path,
         ]).timeout(const Duration(seconds: 5));
         await autorunFile.delete().catchError((_) => autorunFile);
       } catch (_) {}
 
-      await autorunFile.writeAsString('[autorun]\nicon=intel.ico\nlabel=INTEL\n');
+      await autorunFile.writeAsString(
+        '[autorun]\nicon=intel.ico\nlabel=INTEL\n',
+      );
       _logLine('autorun.inf created');
 
       // Set autorun.inf as hidden+system (suppresses some Windows warnings)
       await Process.run('attrib', [
-        '+h', '+s',
+        '+h',
+        '+s',
         autorunFile.path,
       ]).timeout(const Duration(seconds: 5));
 
       // Set icon as hidden
       await Process.run('attrib', [
-        '+h', iconDest.path,
+        '+h',
+        iconDest.path,
       ]).timeout(const Duration(seconds: 5));
 
       _logLine('Volume icon set OK');
@@ -826,9 +950,12 @@ exit
 
     try {
       final result = await Process.run('diskpart', ['/s', scriptFile.path])
-          .timeout(const Duration(seconds: 30), onTimeout: () {
-        return ProcessResult(0, -1, '', 'diskpart timed out after 30s');
-      });
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              return ProcessResult(0, -1, '', 'diskpart timed out after 30s');
+            },
+          );
       return result;
     } finally {
       await scriptFile.delete().catchError((_) => scriptFile);
@@ -845,9 +972,5 @@ class _DiskPartResult {
   final String? driveLetter;
   final String? error;
 
-  const _DiskPartResult({
-    required this.success,
-    this.driveLetter,
-    this.error,
-  });
+  const _DiskPartResult({required this.success, this.driveLetter, this.error});
 }

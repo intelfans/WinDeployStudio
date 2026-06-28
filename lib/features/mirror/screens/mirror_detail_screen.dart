@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/mirror_speed_test_service.dart';
 import '../models/mirror_models.dart';
+import '../providers/mirror_source_provider.dart';
 import '../../logs/services/log_center_service.dart';
 import '../../../shared/webview/webview_helper.dart';
 
@@ -23,7 +25,9 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _runSpeedTest();
+    if (!widget.item.isOfficialMicrosoft) {
+      _runSpeedTest();
+    }
   }
 
   Future<void> _runSpeedTest({bool force = false}) async {
@@ -63,23 +67,37 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
             _buildHeader(context, locale),
             const SizedBox(height: 24),
             isCompact
-                ? Column(children: [
-                    _buildInfoSection(context, locale),
-                    const SizedBox(height: 24),
-                    _buildSpeedTestCard(context),
-                    const SizedBox(height: 24),
-                    _buildDownloadSection(context, locale),
-                  ])
+                ? Column(
+                    children: [
+                      _buildInfoSection(context, locale),
+                      if (!widget.item.isOfficialMicrosoft) ...[
+                        const SizedBox(height: 24),
+                        _buildSpeedTestCard(context),
+                      ],
+                      const SizedBox(height: 24),
+                      _buildDownloadSection(context, locale),
+                    ],
+                  )
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 2, child: _buildInfoSection(context, locale)),
+                      Expanded(
+                        flex: 2,
+                        child: _buildInfoSection(context, locale),
+                      ),
                       const SizedBox(width: 24),
-                      Expanded(flex: 1, child: Column(children: [
-                        _buildSpeedTestCard(context),
-                        const SizedBox(height: 16),
-                        _buildDownloadSection(context, locale),
-                      ])),
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          children: [
+                            if (!widget.item.isOfficialMicrosoft) ...[
+                              _buildSpeedTestCard(context),
+                              const SizedBox(height: 16),
+                            ],
+                            _buildDownloadSection(context, locale),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
           ],
@@ -97,6 +115,11 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     final theme = Theme.of(context);
     final name = widget.item.getName(locale);
     final type = widget.item.getType(locale);
+    final trustBadge = widget.item.isOfficialMicrosoft
+        ? tr(context, 'mirror_badge_official')
+        : widget.item.isCommunityImage
+        ? tr(context, 'mirror_badge_community')
+        : null;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -107,26 +130,34 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
             color: _catColor(widget.item.category).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(_catIcon(widget.item.category),
-              size: 32, color: _catColor(widget.item.category)),
+          child: Icon(
+            _catIcon(widget.item.category),
+            size: 32,
+            color: _catColor(widget.item.category),
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(name,
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                name,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 4),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: [
                   if (type.isNotEmpty) _Tag(type),
+                  if (trustBadge != null) _Tag(trustBadge),
                   if (widget.item.version != null) _Tag(widget.item.version!),
                   if (widget.item.build != null) _Tag(widget.item.build!),
-                  if (widget.item.architecture != null) _Tag(widget.item.architecture!),
+                  if (widget.item.architecture != null)
+                    _Tag(widget.item.architecture!),
                   if (widget.item.size != null) _Tag(widget.item.size!),
                 ],
               ),
@@ -151,9 +182,12 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               children: [
                 Icon(Icons.speed, size: 20, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(tr(context, 'mirror_speed_test_title'),
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  tr(context, 'mirror_speed_test_title'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const Spacer(),
                 if (!_testing)
                   IconButton(
@@ -168,47 +202,58 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               Row(
                 children: [
                   const SizedBox(
-                    width: 16, height: 16,
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   const SizedBox(width: 12),
-                  Text(tr(context, 'mirror_speed_test_testing'),
-                      style: theme.textTheme.bodySmall),
+                  Text(
+                    tr(context, 'mirror_speed_test_testing'),
+                    style: theme.textTheme.bodySmall,
+                  ),
                 ],
               )
             else if (_testResult == null)
-              Text(tr(context, 'mirror_speed_test_failed'),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: colorScheme.error))
+              Text(
+                tr(context, 'mirror_speed_test_failed'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.error,
+                ),
+              )
             else ...[
               _MirrorStatusRow(
-                label: 'China Mirror',
+                label: tr(context, 'mirror_china_title'),
                 online: _testResult!.china.online,
                 latency: _testResult!.china.latency,
               ),
               const SizedBox(height: 8),
               _MirrorStatusRow(
-                label: 'Global Mirror',
+                label: tr(context, 'mirror_global_title'),
                 online: _testResult!.global.online,
                 latency: _testResult!.global.latency,
               ),
               if (_testResult!.bothOffline) ...[
                 const SizedBox(height: 12),
-                Text(tr(context, 'mirror_speed_test_all_offline'),
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: colorScheme.error)),
+                Text(
+                  tr(context, 'mirror_speed_test_all_offline'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                ),
               ] else ...[
                 const Divider(height: 20),
                 Row(
                   children: [
                     Icon(Icons.recommend, size: 16, color: Colors.green),
                     const SizedBox(width: 6),
-                    Text('${tr(context, 'mirror_speed_test_recommend')}: ',
-                        style: theme.textTheme.bodySmall),
+                    Text(
+                      '${tr(context, 'mirror_speed_test_recommend')}: ',
+                      style: theme.textTheme.bodySmall,
+                    ),
                     Text(
                       _testResult!.recommendedSource == 'china'
-                          ? 'China Mirror'
-                          : 'Global Mirror',
+                          ? tr(context, 'mirror_china_title')
+                          : tr(context, 'mirror_global_title'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.green,
@@ -241,35 +286,35 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         if (pros.isNotEmpty) ...[
           _SectionTitle(Icons.check_circle_outline, tr(context, 'detail_pros')),
           const SizedBox(height: 8),
-          ...pros.map((p) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('•  ',
-                        style: TextStyle(color: Colors.green.shade600)),
-                    Expanded(
-                        child: Text(p, style: theme.textTheme.bodyMedium)),
-                  ],
-                ),
-              )),
+          ...pros.map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('•  ', style: TextStyle(color: Colors.green.shade600)),
+                  Expanded(child: Text(p, style: theme.textTheme.bodyMedium)),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
         ],
         if (notes.isNotEmpty) ...[
           _SectionTitle(Icons.info_outline, tr(context, 'detail_notes')),
           const SizedBox(height: 8),
-          ...notes.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('•  ',
-                        style: TextStyle(color: Colors.orange.shade700)),
-                    Expanded(
-                        child: Text(n, style: theme.textTheme.bodyMedium)),
-                  ],
-                ),
-              )),
+          ...notes.map(
+            (n) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('•  ', style: TextStyle(color: Colors.orange.shade700)),
+                  Expanded(child: Text(n, style: theme.textTheme.bodyMedium)),
+                ],
+              ),
+            ),
+          ),
         ],
         if (widget.item.sha256 != null && widget.item.sha256!.isNotEmpty) ...[
           const SizedBox(height: 20),
@@ -279,24 +324,32 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
             onTap: () {
               Clipboard.setData(ClipboardData(text: widget.item.sha256!));
               ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(tr(context, 'detail_sha256_copied'))));
+                SnackBar(content: Text(tr(context, 'detail_sha256_copied'))),
+              );
             },
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Row(children: [
-                Expanded(
-                    child: Text(widget.item.sha256!,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontFamily: 'Consolas'),
-                        overflow: TextOverflow.ellipsis)),
-                const SizedBox(width: 8),
-                Icon(Icons.copy, size: 14, color: theme.colorScheme.primary),
-              ]),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.item.sha256!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'Consolas',
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.copy, size: 14, color: theme.colorScheme.primary),
+                ],
+              ),
             ),
           ),
         ],
@@ -306,16 +359,23 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
   Widget _buildDownloadSection(BuildContext context, Locale locale) {
     final theme = Theme.of(context);
-    final description = widget.item.getDescription(locale);
+    final description = widget.item.isOfficialMicrosoft
+        ? tr(context, 'mirror_desc_official')
+        : widget.item.isCommunityImage
+        ? tr(context, 'mirror_desc_community')
+        : '';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tr(context, 'detail_download'),
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600)),
+            Text(
+              tr(context, 'detail_download'),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 12),
             if (description.isNotEmpty) ...[
               Text(description, style: theme.textTheme.bodySmall),
@@ -339,9 +399,15 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: widget.item.downloadUrl));
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(tr(context, 'detail_link_copied'))));
+                  final url = widget.item.isOfficialMicrosoft
+                      ? widget.item.downloadUrl
+                      : ref
+                            .read(mirrorSourceProvider.notifier)
+                            .resolveUrl(widget.item);
+                  Clipboard.setData(ClipboardData(text: url));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(tr(context, 'detail_link_copied'))),
+                  );
                 },
                 icon: const Icon(Icons.copy, size: 16),
                 label: Text(tr(context, 'detail_copy_link')),
@@ -354,31 +420,132 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   }
 
   Future<void> _openDownload(BuildContext context, Locale locale) async {
-    final name = widget.item.getName(locale);
+    if (widget.item.isOfficialMicrosoft) {
+      await _openOfficialDownload(context);
+      return;
+    }
 
+    final name = widget.item.getName(locale);
+    final sourceNotifier = ref.read(mirrorSourceProvider.notifier);
+    var sourceState = ref.read(mirrorSourceProvider);
+
+    if (sourceState.geo == null) {
+      await sourceNotifier.detectGeo();
+      if (!context.mounted) {
+        return;
+      }
+      sourceState = ref.read(mirrorSourceProvider);
+    }
+
+    final hasChina =
+        widget.item.chinaUrl != null && widget.item.chinaUrl!.isNotEmpty;
+    final hasGlobal =
+        widget.item.globalUrl != null && widget.item.globalUrl!.isNotEmpty;
+
+    if (!hasChina && !hasGlobal) {
+      await _openResolvedDownload(
+        context: context,
+        name: name,
+        url: widget.item.downloadUrl,
+        mirrorLabel: tr(context, 'mirror_default_title'),
+      );
+      return;
+    }
+
+    final suggestedMirror = sourceState.isChina ? 'china' : 'global';
     final selectedMirror = await showDialog<String>(
       context: context,
       builder: (ctx) => _MirrorSelectionDialog(
         itemName: name,
         chinaUrl: widget.item.chinaUrl,
         globalUrl: widget.item.globalUrl,
+        suggestedMirror: suggestedMirror,
       ),
     );
 
-    if (selectedMirror == null || !context.mounted) return;
-
-    String url;
-    String mirrorLabel;
-
-    if (selectedMirror == 'china') {
-      url = widget.item.chinaUrl ?? widget.item.downloadUrl;
-      mirrorLabel = 'China Mirror';
-    } else {
-      url = widget.item.globalUrl ?? widget.item.downloadUrl;
-      mirrorLabel = 'Global Mirror';
+    if (selectedMirror == null || !context.mounted) {
+      return;
     }
 
+    final String url;
+    final String mirrorLabel;
+    final String mirrorLogName;
+    if (selectedMirror == 'china') {
+      url = widget.item.chinaUrl!;
+      mirrorLabel = tr(context, 'mirror_china_title');
+      mirrorLogName = '123';
+    } else if (selectedMirror == 'global') {
+      url = widget.item.globalUrl!;
+      mirrorLabel = tr(context, 'mirror_global_title');
+      mirrorLogName = 'GoFile';
+    } else {
+      return;
+    }
+
+    await _openResolvedDownload(
+      context: context,
+      name: name,
+      url: url,
+      mirrorLabel: mirrorLabel,
+      mirrorLogName: mirrorLogName,
+    );
+  }
+
+  Future<void> _openOfficialDownload(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(ctx, 'official_download_title')),
+        content: SingleChildScrollView(
+          child: Text(tr(ctx, 'official_download_message')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr(ctx, 'detail_cancel')),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.open_in_browser, size: 18),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            label: Text(tr(ctx, 'official_download_open')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    await LogCenterService().logDownload(
+      '[OfficialDownload]\n'
+      'Product=${widget.item.productLogName}\n'
+      'Source=Microsoft\n'
+      'Method=SystemBrowser',
+    );
+
+    final uri = Uri.parse(widget.item.downloadUrl);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr(context, 'official_download_open_failed'))),
+      );
+    }
+  }
+
+  Future<void> _openResolvedDownload({
+    required BuildContext context,
+    required String name,
+    required String url,
+    required String mirrorLabel,
+    String? mirrorLogName,
+  }) async {
     final logCenter = LogCenterService();
+    if (mirrorLogName != null) {
+      await logCenter.logDownload(
+        '[CommunityDownload]\n'
+        'Product=${widget.item.productLogName}\n'
+        'Mirror=$mirrorLogName',
+      );
+    }
     await logCenter.logDownload(
       '[MirrorSource] Selected=$mirrorLabel Mirror=$name URL=$url',
     );
@@ -390,15 +557,10 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
   IconData _catIcon(String category) {
     switch (category) {
-      case 'Official Original':
-      case 'Official LTSC':
+      case 'Official Microsoft':
         return Icons.verified;
-      case 'TinyOS':
-        return Icons.compress;
-      case 'X-Lite':
-        return Icons.speed;
-      case 'Custom':
-        return Icons.palette;
+      case 'Community Images':
+        return Icons.groups_outlined;
       case 'Tools':
         return Icons.build;
       default:
@@ -408,15 +570,10 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
   Color _catColor(String category) {
     switch (category) {
-      case 'Official Original':
-      case 'Official LTSC':
-        return Colors.blue;
-      case 'TinyOS':
-        return Colors.green;
-      case 'X-Lite':
-        return Colors.orange;
-      case 'Custom':
-        return Colors.purple;
+      case 'Official Microsoft':
+        return const Color(0xFF0071C5);
+      case 'Community Images':
+        return const Color(0xFF008272);
       case 'Tools':
         return Colors.teal;
       default:
@@ -433,14 +590,19 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(children: [
-      Icon(icon, size: 18, color: theme.colorScheme.primary),
-      const SizedBox(width: 8),
-      Text(title,
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
           style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.primary)),
-    ]);
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -453,10 +615,9 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(label, style: Theme.of(context).textTheme.labelSmall),
@@ -477,11 +638,12 @@ class _InfoRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: Theme.of(context).textTheme.bodySmall),
-          Text(value,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontWeight: FontWeight.w500)),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
@@ -502,30 +664,38 @@ class _FontPackWarning extends StatelessWidget {
         border: Border.all(color: colorScheme.tertiary),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(children: [
-        Icon(Icons.warning_amber, color: colorScheme.tertiary),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(tr(context, 'fontpack_warning'),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber, color: colorScheme.tertiary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr(context, 'fontpack_warning'),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onTertiaryContainer)),
-              const SizedBox(height: 4),
-              Text(tr(context, 'fontpack_recommend'),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: colorScheme.onTertiaryContainer)),
-            ],
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onTertiaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  tr(context, 'fontpack_recommend'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onTertiaryContainer,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        FilledButton.tonal(
-          onPressed: () => context.go('/mirror/font-pack'),
-          child: Text(tr(context, 'fontpack_download')),
-        ),
-      ]),
+          const SizedBox(width: 12),
+          FilledButton.tonal(
+            onPressed: () => context.go('/mirror/font-pack'),
+            child: Text(tr(context, 'fontpack_download')),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -570,11 +740,13 @@ class _MirrorSelectionDialog extends StatelessWidget {
   final String itemName;
   final String? chinaUrl;
   final String? globalUrl;
+  final String suggestedMirror;
 
   const _MirrorSelectionDialog({
     required this.itemName,
     this.chinaUrl,
     this.globalUrl,
+    required this.suggestedMirror,
   });
 
   @override
@@ -627,7 +799,9 @@ class _MirrorSelectionDialog extends StatelessWidget {
                 icon: Icons.flag_outlined,
                 title: tr(context, 'mirror_china_title'),
                 subtitle: tr(context, 'mirror_china_desc'),
-                tag: tr(context, 'mirror_china_tag'),
+                tag: suggestedMirror == 'china'
+                    ? tr(context, 'mirror_speed_test_recommend')
+                    : tr(context, 'mirror_china_tag'),
                 tagColor: Colors.blue,
                 onTap: () => Navigator.of(context).pop('china'),
               ),
@@ -637,19 +811,12 @@ class _MirrorSelectionDialog extends StatelessWidget {
                 icon: Icons.public_outlined,
                 title: tr(context, 'mirror_global_title'),
                 subtitle: tr(context, 'mirror_global_desc'),
-                tag: tr(context, 'mirror_global_tag'),
+                tag: suggestedMirror == 'global'
+                    ? tr(context, 'mirror_speed_test_recommend')
+                    : tr(context, 'mirror_global_tag'),
                 tagColor: Colors.green,
                 onTap: () => Navigator.of(context).pop('global'),
               ),
-            if (!hasChina && !hasGlobal) ...[
-              _MirrorOption(
-                icon: Icons.download_outlined,
-                title: tr(context, 'mirror_default_title'),
-                subtitle: tr(context, 'mirror_default_desc'),
-                tag: null,
-                onTap: () => Navigator.of(context).pop('default'),
-              ),
-            ],
           ],
         ),
       ),
@@ -725,8 +892,9 @@ class _MirrorOption extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: (tagColor ?? colorScheme.primary)
-                                .withValues(alpha: 0.1),
+                            color: (tagColor ?? colorScheme.primary).withValues(
+                              alpha: 0.1,
+                            ),
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
                               color: (tagColor ?? colorScheme.primary)

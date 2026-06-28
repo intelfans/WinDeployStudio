@@ -95,14 +95,12 @@ class _InAppWebviewState extends State<InAppWebview> {
       }
       document.addEventListener('click', function(e) {
         var url = isDownloadLink(e.target);
-        if (url && url !== '#' && !url.startsWith('javascript:')) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (url.indexOf('http') !== 0) {
-            url = window.location.origin + (url.charAt(0) === '/' ? url : '/' + url);
+          if (url && url !== '#' && !url.startsWith('javascript:')) {
+            e.preventDefault();
+            e.stopPropagation();
+            url = new URL(url, window.location.href).href;
+            window.__wds_pending_download = url;
           }
-          window.__wds_pending_download = url;
-        }
       }, true);
       return 'ok';
     })();
@@ -149,7 +147,9 @@ class _InAppWebviewState extends State<InAppWebview> {
     try {
       await _controller.initialize();
 
-      await _controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.sameWindow);
+      await _controller.setPopupWindowPolicy(
+        WebviewPopupWindowPolicy.sameWindow,
+      );
       await _controller.setUserAgent(_chromeUA);
 
       _controller.url.listen((url) {
@@ -183,7 +183,12 @@ class _InAppWebviewState extends State<InAppWebview> {
       _controller.onLoadError.listen((error) {
         if (!mounted || _isReloading) return;
         final errorName = error.name;
-        _log('NavigationCompleted', url: _currentUrl, success: false, error: errorName);
+        _log(
+          'NavigationCompleted',
+          url: _currentUrl,
+          success: false,
+          error: errorName,
+        );
         setState(() {
           _hasError = true;
           _errorCode = 'ERR_$errorName';
@@ -238,7 +243,9 @@ class _InAppWebviewState extends State<InAppWebview> {
   }
 
   void _startDownloadPolling() {
-    _downloadPoller = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+    _downloadPoller = Timer.periodic(const Duration(milliseconds: 500), (
+      _,
+    ) async {
       if (!mounted) return;
       try {
         if (!_navFixInjected) {
@@ -253,7 +260,9 @@ class _InAppWebviewState extends State<InAppWebview> {
           final result = await _controller.executeScript(
             '(function(){ var u = window.__wds_pending_download; window.__wds_pending_download = ""; return u || ""; })()',
           );
-          if (result is String && result.isNotEmpty && result.startsWith('http')) {
+          if (result is String &&
+              result.isNotEmpty &&
+              result.startsWith('http')) {
             _handleDownloadUrl(result);
           }
         }
@@ -283,13 +292,17 @@ class _InAppWebviewState extends State<InAppWebview> {
   }
 
   Future<void> _startDownload(String url, String defaultName) async {
-    final savePath = await FilePicker.platform.saveFile(
+    final savePath = await FilePicker.saveFile(
       dialogTitle: tr(context, 'webview_save_title'),
       fileName: defaultName,
       type: FileType.any,
     );
     if (savePath == null) return;
-    await _downloadManager.startDownload(url: url, fileName: p.basename(savePath), savePath: savePath);
+    await _downloadManager.startDownload(
+      url: url,
+      fileName: p.basename(savePath),
+      savePath: savePath,
+    );
   }
 
   void _reload() {
@@ -326,7 +339,7 @@ class _InAppWebviewState extends State<InAppWebview> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open browser: $e')),
+          SnackBar(content: Text('${tr(context, 'detail_open_failed')}: $e')),
         );
       }
     }
@@ -419,11 +432,14 @@ class _InAppWebviewState extends State<InAppWebview> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(tr(ctx, 'webview_diag_title')),
-          content: SelectableText(logMsg, style: const TextStyle(fontFamily: 'Consolas', fontSize: 12)),
+          content: SelectableText(
+            logMsg,
+            style: const TextStyle(fontFamily: 'Consolas', fontSize: 12),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('OK'),
+              child: Text(tr(ctx, 'close')),
             ),
           ],
         ),
@@ -432,23 +448,31 @@ class _InAppWebviewState extends State<InAppWebview> {
   }
 
   void _showDownloadPanel() {
-    final RenderBox? button = _downloadBtnKey.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? button =
+        _downloadBtnKey.currentContext?.findRenderObject() as RenderBox?;
     if (button == null) return;
     final offset = button.localToGlobal(Offset.zero);
     final size = button.size;
 
     showMenu(
       context: context,
-      position: RelativeRect.fromLTRB(offset.dx - 380 + size.width, offset.dy + size.height + 4, offset.dx, offset.dy + size.height + 4 + 420),
+      position: RelativeRect.fromLTRB(
+        offset.dx - 380 + size.width,
+        offset.dy + size.height + 4,
+        offset.dx,
+        offset.dy + size.height + 4 + 420,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       constraints: const BoxConstraints(maxWidth: 380, maxHeight: 420),
       items: [
         PopupMenuItem(
           enabled: false,
           padding: EdgeInsets.zero,
-          child: DownloadPanel(onDownloadCurrentPage: () {
-            Navigator.pop(context);
-          }),
+          child: DownloadPanel(
+            onDownloadCurrentPage: () {
+              Navigator.pop(context);
+            },
+          ),
         ),
       ],
     );
@@ -476,8 +500,12 @@ class _InAppWebviewState extends State<InAppWebview> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Center(
                 child: SizedBox(
-                  width: 18, height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
                 ),
               ),
             )
@@ -490,12 +518,17 @@ class _InAppWebviewState extends State<InAppWebview> {
             ListenableBuilder(
               listenable: _downloadManager,
               builder: (context, _) {
-                final activeCount = _downloadManager.items.where((i) => i.status == DownloadStatus.downloading).length;
+                final activeCount = _downloadManager.items
+                    .where((i) => i.status == DownloadStatus.downloading)
+                    .length;
                 return IconButton(
                   key: _downloadBtnKey,
                   icon: Badge(
                     isLabelVisible: activeCount > 0,
-                    label: Text('$activeCount', style: const TextStyle(fontSize: 10)),
+                    label: Text(
+                      '$activeCount',
+                      style: const TextStyle(fontSize: 10),
+                    ),
                     child: const Icon(Icons.download_rounded),
                   ),
                   onPressed: _showDownloadPanel,
@@ -528,7 +561,8 @@ class _InAppWebviewState extends State<InAppWebview> {
               isError: _hasError,
               errorCode: _hasError ? _errorCode : null,
               onRetry: _reload,
-              onOpenExternal: () => _openExternal(_hasError ? widget.url : _currentUrl),
+              onOpenExternal: () =>
+                  _openExternal(_hasError ? widget.url : _currentUrl),
               localizer: (key) => tr(context, key),
             ),
         ],

@@ -1,4 +1,4 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
+﻿╔══════════════════════════════════════════════════════════════════════════════╗
 ║                          WinDeploy Studio                                    ║
 ║                         Windows Deployment Tool                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -12,7 +12,7 @@ MAIN FEATURES:
   ◆ Image Library
     Browse curated Windows images with download links
     
-  ◆ Bootable USB Creator  
+  ◆ Windows Installation Media Creator  
     Create Windows installation media from ISO files
     
   ◆ Windows To Go
@@ -33,4 +33,4 @@ SYSTEM REQUIREMENTS:
 
 Click Next to continue installation.
 
-© 2026 Bob Steve. All rights reserved.
+© 2026 Bob Steve. Released under the MIT License.

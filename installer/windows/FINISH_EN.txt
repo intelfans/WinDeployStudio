@@ -1,29 +1,30 @@
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Installation Complete - Thank You!                        ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+﻿Installation Complete - Thank You!
 
-WinDeploy Studio has been successfully installed!
+WinDeploy Studio has been successfully installed.
 
-────────────────────────────────────────────────────────────────────────────────
+What's next:
 
-WHAT'S NEXT:
+- Launch WinDeploy Studio from the Start menu or desktop shortcut.
+- Explore the Image Library to browse Windows images.
+- Create your first Windows installation USB or Windows To Go drive.
+- Share your feedback to help us improve.
 
-  ✓ Launch WinDeploy Studio from the Start menu or desktop shortcut
-  
-  ✓ Explore the Image Library to browse Windows images
-  
-  ✓ Create your first bootable USB or Windows To Go drive
-  
-  ✓ Share your feedback to help us improve!
+License: MIT License
+GitHub Profile: https://github.com/intelfans
+GitHub Repository: https://github.com/intelfans/WinDeployStudio
 
-────────────────────────────────────────────────────────────────────────────────
+Special Thanks
 
-Thank you for choosing WinDeploy Studio!
+WinDeploy Studio would like to thank the following people and communities for their valuable feedback, testing, ideas, inspiration, and support.
 
-We value your feedback and are committed to making WinDeploy Studio better.
+- Star__P
+  Early feedback, testing, and project discussions
 
-────────────────────────────────────────────────────────────────────────────────
+- Timme
+  Detailed international user feedback, trust and usability recommendations, Microsoft source suggestions, and community review
 
-© 2026 Bob Steve. All rights reserved.
+- Microsoft Sysinternals Team
+  Inspiration from Microsoft's diagnostic and troubleshooting tools
 
-Website: https://xueyanzhang.top/contact/
+- Open Source Community
+  For documentation, bug reports, testing, translations, and suggestions

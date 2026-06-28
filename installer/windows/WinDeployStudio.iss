@@ -1,11 +1,13 @@
-#define MyAppName "WinDeploy Studio"
-#define MyAppVersion "1.0.2.0"
+﻿#define MyAppName "WinDeploy Studio"
+#define MyAppVersion "1.1.0"
+#define MyAppFileVersion "1.1.0.0"
 #define MyAppPublisher "Bob Steve"
 #define MyAppPublisherZH "Bob Steve"
 #define MyAppExeName "win_deploy_studio.exe"
 #define MyAppDescription "Windows Deployment Tool"
-#define MyAppContact "bob_0910@qq.com"
-#define MyAppURL "https://xueyanzhang.top/contact/"
+#define MyAppContact "https://github.com/intelfans"
+#define MyAppURL "https://github.com/intelfans"
+#define MyAppGitHub "https://github.com/intelfans/WinDeployStudio"
 
 [Setup]
 AppId={{B7E5FC28-27A9-4D3F-B777-2C5F8B3D6E7C}
@@ -15,11 +17,11 @@ AppPublisher={#MyAppPublisher}
 AppContact={#MyAppContact}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-AppCopyright=© 2026 {#MyAppPublisher}. All rights reserved.
+AppCopyright=© 2026 {#MyAppPublisher}. Released under the MIT License.
 DefaultDirName={autopf}\WinDeploy Studio
 DefaultGroupName=WinDeploy Studio
 OutputDir=..\..\dist\windows
-OutputBaseFilename=WinDeployStudio_Setup_1.0.2
+OutputBaseFilename=WinDeployStudio_Setup_1.1.0
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -28,34 +30,35 @@ UninstallDisplayName=WinDeploy Studio
 WizardStyle=modern
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
-LicenseFile=LICENSE_EN.txt
 WizardImageFile=wizardimage.bmp
 WizardSmallImageFile=wizardsmallimage.bmp
 SetupIconFile=icon.ico
-VersionInfoVersion=1.0.2.0
+VersionInfoVersion={#MyAppFileVersion}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppDescription}
-VersionInfoCopyright=© 2026 {#MyAppPublisher}
+VersionInfoCopyright=© 2026 {#MyAppPublisher}. MIT License.
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 
 [Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"; LicenseFile: "LICENSE_ZH.txt"; InfoBeforeFile: "WELCOME_ZH.txt"; InfoAfterFile: "FINISH_ZH.txt"
-Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"; LicenseFile: "LICENSE_ZH_TW.txt"; InfoBeforeFile: "WELCOME_ZH_TW.txt"; InfoAfterFile: "FINISH_ZH_TW.txt"
-Name: "english"; MessagesFile: "compiler:Default.isl"; LicenseFile: "LICENSE_EN.txt"; InfoBeforeFile: "WELCOME_EN.txt"; InfoAfterFile: "FINISH_EN.txt"
-Name: "french"; MessagesFile: "compiler:Languages\French.isl"; LicenseFile: "LICENSE_FR.txt"; InfoBeforeFile: "WELCOME_FR.txt"; InfoAfterFile: "FINISH_FR.txt"
-Name: "german"; MessagesFile: "compiler:Languages\German.isl"; LicenseFile: "LICENSE_DE.txt"; InfoBeforeFile: "WELCOME_DE.txt"; InfoAfterFile: "FINISH_DE.txt"
-Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"; LicenseFile: "LICENSE_ES.txt"; InfoBeforeFile: "WELCOME_ES.txt"; InfoAfterFile: "FINISH_ES.txt"
-Name: "portuguese"; MessagesFile: "compiler:Languages\Portuguese.isl"; LicenseFile: "LICENSE_PT.txt"; InfoBeforeFile: "WELCOME_PT.txt"; InfoAfterFile: "FINISH_PT.txt"
-Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"; LicenseFile: "LICENSE_RU.txt"; InfoBeforeFile: "WELCOME_RU.txt"; InfoAfterFile: "FINISH_RU.txt"
-Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"; LicenseFile: "LICENSE_AR.txt"; InfoBeforeFile: "WELCOME_AR.txt"; InfoAfterFile: "FINISH_AR.txt"
-Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"; LicenseFile: "LICENSE_KO.txt"; InfoBeforeFile: "WELCOME_KO.txt"; InfoAfterFile: "FINISH_KO.txt"
-Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"; LicenseFile: "LICENSE_JA.txt"; InfoBeforeFile: "WELCOME_JA.txt"; InfoAfterFile: "FINISH_JA.txt"
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"; InfoBeforeFile: "WELCOME_ZH.txt"; InfoAfterFile: "FINISH_ZH.txt"
+Name: "chinesetraditional"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"; InfoBeforeFile: "WELCOME_ZH_TW.txt"; InfoAfterFile: "FINISH_ZH_TW.txt"
+Name: "english"; MessagesFile: "compiler:Default.isl"; InfoBeforeFile: "WELCOME_EN.txt"; InfoAfterFile: "FINISH_EN.txt"
+Name: "french"; MessagesFile: "compiler:Languages\French.isl"; InfoBeforeFile: "WELCOME_FR.txt"; InfoAfterFile: "FINISH_FR.txt"
+Name: "german"; MessagesFile: "compiler:Languages\German.isl"; InfoBeforeFile: "WELCOME_DE.txt"; InfoAfterFile: "FINISH_DE.txt"
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"; InfoBeforeFile: "WELCOME_ES.txt"; InfoAfterFile: "FINISH_ES.txt"
+Name: "portuguese"; MessagesFile: "compiler:Languages\Portuguese.isl"; InfoBeforeFile: "WELCOME_PT.txt"; InfoAfterFile: "FINISH_PT.txt"
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"; InfoBeforeFile: "WELCOME_RU.txt"; InfoAfterFile: "FINISH_RU.txt"
+Name: "arabic"; MessagesFile: "compiler:Languages\Arabic.isl"; InfoBeforeFile: "WELCOME_AR.txt"; InfoAfterFile: "FINISH_AR.txt"
+Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"; InfoBeforeFile: "WELCOME_KO.txt"; InfoAfterFile: "FINISH_KO.txt"
+Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"; InfoBeforeFile: "WELCOME_JA.txt"; InfoAfterFile: "FINISH_JA.txt"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
+Source: "MIT_LICENSE.txt"; Flags: dontcopy
+Source: "MIT_LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
@@ -68,11 +71,19 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,WinDeploy Stu
 
 [CustomMessages]
 ; Custom messages for both languages
+english.OpenSourceNoticeTitle=Open Source Notice
+english.OpenSourceNoticeSubTitle=License and third-party acknowledgement
+english.OpenSourceNoticeText=WinDeploy Studio is distributed under the MIT License.%n%nThird-party software, trademarks, logos, and external resources remain the property of their respective owners.%n%nUse of this software is at your own risk.%n%nNo warranty is provided.
+english.ViewMITLicense=View MIT License
 english.CreateDesktopIcon=Create a &desktop shortcut
 english.AdditionalIcons=Additional icons:
 english.UninstallProgram=Uninstall %1
 english.LaunchProgram=Launch %1
 
+chinesesimplified.OpenSourceNoticeTitle=开源说明
+chinesesimplified.OpenSourceNoticeSubTitle=许可证与第三方致谢
+chinesesimplified.OpenSourceNoticeText=WinDeploy Studio 基于 MIT License 分发。%n%n第三方软件、商标、标志和外部资源仍归其各自所有者所有。%n%n使用本软件风险自负。%n%n本软件不提供任何担保。
+chinesesimplified.ViewMITLicense=查看 MIT License
 chinesesimplified.CreateDesktopIcon=创建桌面快捷方式(&D)
 chinesesimplified.AdditionalIcons=其他图标：
 chinesesimplified.UninstallProgram=卸载 %1
@@ -87,36 +98,60 @@ chinesesimplified.AutoStartProgram=安装完成后自动运行 %1(&R)
 chinesesimplified.AddonHostProgramNotFound=%1 无法找到您选择的文件夹。%n%n您是否仍要继续？
 
 ; Traditional Chinese
+chinesetraditional.OpenSourceNoticeTitle=開源說明
+chinesetraditional.OpenSourceNoticeSubTitle=授權與第三方致謝
+chinesetraditional.OpenSourceNoticeText=WinDeploy Studio 基於 MIT License 發行。%n%n第三方軟體、商標、標誌和外部資源仍歸其各自所有者所有。%n%n使用本軟體風險自負。%n%n本軟體不提供任何擔保。
+chinesetraditional.ViewMITLicense=檢視 MIT License
 chinesetraditional.CreateDesktopIcon=建立桌面捷徑(&D)
 chinesetraditional.AdditionalIcons=其他圖示：
 chinesetraditional.UninstallProgram=解除安裝 %1
 chinesetraditional.LaunchProgram=啟動 %1
 
 ; Russian
+russian.OpenSourceNoticeTitle=Уведомление об открытом коде
+russian.OpenSourceNoticeSubTitle=Лицензия и сторонние ресурсы
+russian.OpenSourceNoticeText=WinDeploy Studio распространяется по лицензии MIT.%n%nСтороннее ПО, товарные знаки, логотипы и внешние ресурсы остаются собственностью соответствующих владельцев.%n%nВы используете это ПО на свой риск.%n%nГарантии не предоставляются.
+russian.ViewMITLicense=Открыть лицензию MIT
 russian.CreateDesktopIcon=Создать &ярлык на рабочем столе
 russian.AdditionalIcons=Дополнительные значки:
 russian.UninstallProgram=Удалить %1
 russian.LaunchProgram=Запустить %1
 
 ; French
+french.OpenSourceNoticeTitle=Avis open source
+french.OpenSourceNoticeSubTitle=Licence et ressources tierces
+french.OpenSourceNoticeText=WinDeploy Studio est distribué sous licence MIT.%n%nLes logiciels tiers, marques, logos et ressources externes restent la propriété de leurs détenteurs respectifs.%n%nVous utilisez ce logiciel à vos propres risques.%n%nAucune garantie n'est fournie.
+french.ViewMITLicense=Voir la licence MIT
 french.CreateDesktopIcon=Créer un raccourci sur le &bureau
 french.AdditionalIcons=Icônes supplémentaires :
 french.UninstallProgram=Désinstaller %1
 french.LaunchProgram=Lancer %1
 
 ; German
+german.OpenSourceNoticeTitle=Open-Source-Hinweis
+german.OpenSourceNoticeSubTitle=Lizenz und Drittanbieterressourcen
+german.OpenSourceNoticeText=WinDeploy Studio wird unter der MIT-Lizenz verteilt.%n%nSoftware, Marken, Logos und externe Ressourcen Dritter bleiben Eigentum der jeweiligen Rechteinhaber.%n%nDie Nutzung dieser Software erfolgt auf eigenes Risiko.%n%nEs wird keine Gewährleistung übernommen.
+german.ViewMITLicense=MIT-Lizenz anzeigen
 german.CreateDesktopIcon=Verknüpfung auf dem &Desktop erstellen
 german.AdditionalIcons=Zusätzliche Symbole:
 german.UninstallProgram=%1 deinstallieren
 german.LaunchProgram=%1 starten
 
 ; Spanish
+spanish.OpenSourceNoticeTitle=Aviso de código abierto
+spanish.OpenSourceNoticeSubTitle=Licencia y recursos de terceros
+spanish.OpenSourceNoticeText=WinDeploy Studio se distribuye bajo la licencia MIT.%n%nEl software de terceros, las marcas, los logotipos y los recursos externos siguen siendo propiedad de sus respectivos propietarios.%n%nEl uso de este software es bajo su propio riesgo.%n%nNo se proporciona garantía.
+spanish.ViewMITLicense=Ver licencia MIT
 spanish.CreateDesktopIcon=Crear un acceso directo en el &escritorio
 spanish.AdditionalIcons=Iconos adicionales:
 spanish.UninstallProgram=Desinstalar %1
 spanish.LaunchProgram=Ejecutar %1
 
 ; Portuguese
+portuguese.OpenSourceNoticeTitle=Aviso de código aberto
+portuguese.OpenSourceNoticeSubTitle=Licença e recursos de terceiros
+portuguese.OpenSourceNoticeText=O WinDeploy Studio é distribuído sob a Licença MIT.%n%nSoftwares de terceiros, marcas, logotipos e recursos externos permanecem propriedade de seus respectivos proprietários.%n%nO uso deste software é por sua conta e risco.%n%nNenhuma garantia é fornecida.
+portuguese.ViewMITLicense=Ver Licença MIT
 portuguese.CreateDesktopIcon=Criar atalho na &área de trabalho
 portuguese.AdditionalIcons=Ícones adicionais:
 portuguese.UninstallProgram=Desinstalar %1
@@ -129,18 +164,30 @@ russian.UninstallProgram=Удалить %1
 russian.LaunchProgram=Запустить %1
 
 ; Arabic
+arabic.OpenSourceNoticeTitle=تنبيه مفتوح المصدر
+arabic.OpenSourceNoticeSubTitle=الترخيص وموارد الجهات الخارجية
+arabic.OpenSourceNoticeText=يُوزَّع WinDeploy Studio بموجب ترخيص MIT.%n%nتبقى البرامج والعلامات التجارية والشعارات والموارد الخارجية التابعة لجهات خارجية ملكًا لأصحابها المعنيين.%n%nاستخدام هذا البرنامج يكون على مسؤوليتك الخاصة.%n%nلا يتم تقديم أي ضمان.
+arabic.ViewMITLicense=عرض ترخيص MIT
 arabic.CreateDesktopIcon=إنشاء اختصار على سطح المكتب(&D)
 arabic.AdditionalIcons=أيقونات إضافية:
 arabic.UninstallProgram=إلغاء تثبيت %1
 arabic.LaunchProgram=تشغيل %1
 
 ; Korean
+korean.OpenSourceNoticeTitle=오픈 소스 안내
+korean.OpenSourceNoticeSubTitle=라이선스 및 타사 리소스
+korean.OpenSourceNoticeText=WinDeploy Studio는 MIT License에 따라 배포됩니다.%n%n타사 소프트웨어, 상표, 로고 및 외부 리소스는 각 소유자의 자산입니다.%n%n이 소프트웨어의 사용은 사용자 책임입니다.%n%n어떠한 보증도 제공되지 않습니다.
+korean.ViewMITLicense=MIT License 보기
 korean.CreateDesktopIcon=바탕 화면에 바로 가기 만들기(&D)
 korean.AdditionalIcons=추가 아이콘:
 korean.UninstallProgram=%1 제거
 korean.LaunchProgram=%1 실행
 
 ; Japanese
+japanese.OpenSourceNoticeTitle=オープンソースに関するお知らせ
+japanese.OpenSourceNoticeSubTitle=ライセンスと第三者リソース
+japanese.OpenSourceNoticeText=WinDeploy Studio は MIT License の下で配布されています。%n%n第三者のソフトウェア、商標、ロゴ、外部リソースは、それぞれの所有者に帰属します。%n%n本ソフトウェアの使用は自己責任です。%n%nいかなる保証も提供されません。
+japanese.ViewMITLicense=MIT License を表示
 japanese.CreateDesktopIcon=デスクトップにショートカットを作成(&D)
 japanese.AdditionalIcons=追加のアイコン：
 japanese.UninstallProgram=%1 をアンインストール
@@ -149,12 +196,12 @@ japanese.LaunchProgram=%1 を起動
 [Messages]
 ; ── English messages ──
 english.WelcomeLabel1=Welcome to the WinDeploy Studio Setup Wizard
-english.WelcomeLabel2=This will install WinDeploy Studio %1 on your computer.%n%nWinDeploy Studio is a modern Windows deployment tool for creating bootable USB drives and Windows To Go workspaces.%n%nIt is recommended that you close all other applications before continuing.
+english.WelcomeLabel2=This will install WinDeploy Studio %1 on your computer.%n%nWinDeploy Studio is a modern Windows deployment tool for creating Windows installation media and Windows To Go workspaces.%n%nIt is recommended that you close all other applications before continuing.
 english.FinishedLabel=Setup has successfully installed WinDeploy Studio on your computer. The application may be launched by selecting the installed icons.
 
 ; ── 简体中文消息 ──
 chinesesimplified.WelcomeLabel1=欢迎使用 WinDeploy Studio 安装向导
-chinesesimplified.WelcomeLabel2=安装程序将在您的计算机上安装 WinDeploy Studio %1。%n%nWinDeploy Studio 是一款现代化的 Windows 部署工具，用于创建启动盘和 Windows To Go 工作空间。%n%n建议您在继续之前关闭所有其他应用程序。
+chinesesimplified.WelcomeLabel2=安装程序将在您的计算机上安装 WinDeploy Studio %1。%n%nWinDeploy Studio 是一款现代化的 Windows 部署工具，用于创建 Windows 安装盘和 Windows To Go 工作空间。%n%n建议您在继续之前关闭所有其他应用程序。
 chinesesimplified.FinishedLabel=安装程序已成功将 WinDeploy Studio 安装到您的计算机上。您可以通过选择已安装的图标来启动应用程序。
 chinesesimplified.SetupAppTitle=WinDeploy Studio 安装程序
 chinesesimplified.SetupWindowTitle=WinDeploy Studio 安装程序
@@ -242,45 +289,100 @@ chinesesimplified.PrivilegesRequiredOverrideTitle=选择安装范围
 
 ; ── Русские сообщения ──
 russian.WelcomeLabel1=Добро пожаловать в мастер установки WinDeploy Studio
-russian.WelcomeLabel2=Эта программа установит WinDeploy Studio %1 на ваш компьютер.%n%nWinDeploy Studio — современный инструмент развёртывания Windows для создания загрузочных USB-накопителей и рабочих пространств Windows To Go.%n%nРекомендуется закрыть все остальные приложения перед продолжением.
+russian.WelcomeLabel2=Эта программа установит WinDeploy Studio %1 на ваш компьютер.%n%nWinDeploy Studio — современный инструмент развёртывания Windows для создания установочных носителей Windows и рабочих пространств Windows To Go.%n%nРекомендуется закрыть все остальные приложения перед продолжением.
 russian.FinishedLabel=Установка WinDeploy Studio на ваш компьютер успешно завершена. Приложение можно запустить, выбрав установленные значки.
 
 ; ── Messages français ──
 french.WelcomeLabel1=Bienvenue dans l'assistant d'installation de WinDeploy Studio
-french.WelcomeLabel2=Cette procédure va installer WinDeploy Studio %1 sur votre ordinateur.%n%nWinDeploy Studio est un outil moderne de déploiement Windows pour créer des clés USB amorçables et des espaces de travail Windows To Go.%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
+french.WelcomeLabel2=Cette procédure va installer WinDeploy Studio %1 sur votre ordinateur.%n%nWinDeploy Studio est un outil moderne de déploiement Windows pour créer des supports d'installation Windows et des espaces de travail Windows To Go.%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
 french.FinishedLabel=L'installation de WinDeploy Studio sur votre ordinateur est terminée avec succès. L'application peut être lancée en sélectionnant les icônes installées.
 
 ; ── Mensagens em português ──
 portuguese.WelcomeLabel1=Bem-vindo ao assistente de instalação do WinDeploy Studio
-portuguese.WelcomeLabel2=Este procedimento instalará o WinDeploy Studio %1 no seu computador.%n%nO WinDeploy Studio é uma ferramenta moderna de implantação do Windows para criar memórias USB inicializáveis e espaços de trabalho Windows To Go.%n%nRecomenda-se fechar todos os outros aplicativos antes de continuar.
+portuguese.WelcomeLabel2=Este procedimento instalará o WinDeploy Studio %1 no seu computador.%n%nO WinDeploy Studio é uma ferramenta moderna de implantação do Windows para criar mídia de instalação do Windows e espaços de trabalho Windows To Go.%n%nRecomenda-se fechar todos os outros aplicativos antes de continuar.
 portuguese.FinishedLabel=A instalação do WinDeploy Studio no seu computador foi concluída com sucesso. O aplicativo pode ser iniciado selecionando os ícones instalados.
 
 ; ── 日本語メッセージ ──
 japanese.WelcomeLabel1=WinDeploy Studio セットアップウィザードへようこそ
-japanese.WelcomeLabel2=このプログラムは WinDeploy Studio %1 をお使いのコンピューターにインストールします。%n%nWinDeploy Studio は、起動可能USBドライブと Windows To Go ワークスペースを作成するための最新の Windows デプロイメントツールです。%n%n続行する前に、他のすべてのアプリケーションを閉じることをお勧めします。
+japanese.WelcomeLabel2=このプログラムは WinDeploy Studio %1 をお使いのコンピューターにインストールします。%n%nWinDeploy Studio は、Windows インストールメディアと Windows To Go ワークスペースを作成するための最新の Windows デプロイメントツールです。%n%n続行する前に、他のすべてのアプリケーションを閉じることをお勧めします。
 japanese.FinishedLabel=WinDeploy Studio お使いのコンピューターへのインストールが正常に完了しました。インストールされたアイコンを選択してアプリケーションを起動できます。
 
 ; ── 繁體中文訊息 ──
 chinesetraditional.WelcomeLabel1=歡迎使用 WinDeploy Studio 安裝精靈
-chinesetraditional.WelcomeLabel2=安裝程式將在您的電腦上安裝 WinDeploy Studio %1。%n%nWinDeploy Studio 是一款現代化的 Windows 部署工具，用於建立開機碟和 Windows To Go 工作空間。%n%n建議您在繼續之前關閉所有其他應用程式。
+chinesetraditional.WelcomeLabel2=安裝程式將在您的電腦上安裝 WinDeploy Studio %1。%n%nWinDeploy Studio 是一款現代化的 Windows 部署工具，用於建立 Windows 安裝盤和 Windows To Go 工作空間。%n%n建議您在繼續之前關閉所有其他應用程式。
 chinesetraditional.FinishedLabel=安裝程式已成功將 WinDeploy Studio 安裝到您的電腦上。您可以透過選擇已安裝的圖示來啟動應用程式。
 
 ; ── Mensajes en español ──
 spanish.WelcomeLabel1=Bienvenido al asistente de instalación de WinDeploy Studio
-spanish.WelcomeLabel2=Este procedimiento instalará WinDeploy Studio %1 en su equipo.%n%nWinDeploy Studio es una herramienta moderna de despliegue de Windows para crear memorias USB booteables y espacios de trabajo Windows To Go.%n%nSe recomienda cerrar todas las demás aplicaciones antes de continuar.
+spanish.WelcomeLabel2=Este procedimiento instalará WinDeploy Studio %1 en su equipo.%n%nWinDeploy Studio es una herramienta moderna de despliegue de Windows para crear medios de instalación de Windows y espacios de trabajo Windows To Go.%n%nSe recomienda cerrar todas las demás aplicaciones antes de continuar.
 spanish.FinishedLabel=La instalación de WinDeploy Studio en su equipo se ha completado correctamente. Puede iniciar la aplicación seleccionando los iconos instalados.
 
 ; ── رسائل عربية ──
 arabic.WelcomeLabel1=مرحبًا بك في معالج تثبيت WinDeploy Studio
-arabic.WelcomeLabel2=سيقوم هذا المثبت بتثبيت WinDeploy Studio %1 على جهازك.%n%nWinDeploy Studio هو أداة حديثة لنشر Windows لإنشاء أقراص USB قابلة للتشغيل وبيئات عمل Windows To Go.%n%nيُوصى بإغلاق جميع التطبيقات الأخرى قبل المتابعة.
+arabic.WelcomeLabel2=سيقوم هذا المثبت بتثبيت WinDeploy Studio %1 على جهازك.%n%nWinDeploy Studio هو أداة حديثة لنشر Windows لإنشاء وسائط تثبيت Windows وبيئات عمل Windows To Go.%n%nيُوصى بإغلاق جميع التطبيقات الأخرى قبل المتابعة.
 arabic.FinishedLabel=تم تثبيت WinDeploy Studio على جهازك بنجاح. يمكنك تشغيل التطبيق من خلال اختيار الأيقونات المثبتة.
 
 ; ── 한국어 메시지 ──
 korean.WelcomeLabel1=WinDeploy Studio 설치 마법사에 오신 것을 환영합니다
-korean.WelcomeLabel2=이 프로그램은 WinDeploy Studio %1을(를) 컴퓨터에 설치합니다.%n%nWinDeploy Studio는 부팅 가능 USB 드라이브와 Windows To Go 작업 공간을 만들기 위한 최신 Windows 배포 도구입니다.%n%n계속하기 전에 다른 모든 애플리케이션을 닫는 것이 좋습니다.
+korean.WelcomeLabel2=이 프로그램은 WinDeploy Studio %1을(를) 컴퓨터에 설치합니다.%n%nWinDeploy Studio는 Windows 설치 미디어와 Windows To Go 작업 공간을 만들기 위한 최신 Windows 배포 도구입니다.%n%n계속하기 전에 다른 모든 애플리케이션을 닫는 것이 좋습니다.
 korean.FinishedLabel=WinDeploy Studio가 컴퓨터에 성공적으로 설치되었습니다. 설치된 아이콘을 선택하여 애플리케이션을 시작할 수 있습니다.
 
 ; ── Deutsche Meldungen ──
 german.WelcomeLabel1=Willkommen beim WinDeploy Studio-Installationsassistenten
-german.WelcomeLabel2=Dies wird WinDeploy Studio %1 auf Ihrem Computer installieren.%n%nWinDeploy Studio ist ein modernes Windows-Bereitstellungstool zum Erstellen bootfähiger USB-Laufwerke und Windows To Go-Arbeitsbereiche.%n%nEs wird empfohlen, alle anderen Anwendungen zu schließen, bevor Sie fortfahren.
+german.WelcomeLabel2=Dies wird WinDeploy Studio %1 auf Ihrem Computer installieren.%n%nWinDeploy Studio ist ein modernes Windows-Bereitstellungstool zum Erstellen von Windows-Installationsmedien und Windows To Go-Arbeitsbereichen.%n%nEs wird empfohlen, alle anderen Anwendungen zu schließen, bevor Sie fortfahren.
 german.FinishedLabel=Die Installation von WinDeploy Studio auf Ihrem Computer wurde erfolgreich abgeschlossen. Die Anwendung kann über die installierten Symbole gestartet werden.
+
+[Code]
+var
+  OpenSourceNoticePage: TWizardPage;
+  OpenSourceNoticeMemo: TMemo;
+  ViewMITLicenseButton: TNewButton;
+
+function MessageText(const Key: string): string;
+var
+  Text: string;
+begin
+  Text := CustomMessage(Key);
+  StringChangeEx(Text, '%n', #13#10, True);
+  Result := Text;
+end;
+
+procedure ViewMITLicenseButtonClick(Sender: TObject);
+var
+  ResultCode: Integer;
+  LicensePath: string;
+begin
+  ExtractTemporaryFile('MIT_LICENSE.txt');
+  LicensePath := ExpandConstant('{tmp}\MIT_LICENSE.txt');
+  ShellExec('', LicensePath, '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+end;
+
+procedure InitializeWizard;
+begin
+  OpenSourceNoticePage :=
+    CreateCustomPage(
+      wpWelcome,
+      CustomMessage('OpenSourceNoticeTitle'),
+      CustomMessage('OpenSourceNoticeSubTitle')
+    );
+
+  OpenSourceNoticeMemo := TMemo.Create(OpenSourceNoticePage);
+  OpenSourceNoticeMemo.Parent := OpenSourceNoticePage.Surface;
+  OpenSourceNoticeMemo.Left := 0;
+  OpenSourceNoticeMemo.Top := 0;
+  OpenSourceNoticeMemo.Width := OpenSourceNoticePage.SurfaceWidth;
+  OpenSourceNoticeMemo.Height := OpenSourceNoticePage.SurfaceHeight - ScaleY(40);
+  OpenSourceNoticeMemo.ReadOnly := True;
+  OpenSourceNoticeMemo.ScrollBars := ssVertical;
+  OpenSourceNoticeMemo.WordWrap := True;
+  OpenSourceNoticeMemo.Text := MessageText('OpenSourceNoticeText');
+
+  ViewMITLicenseButton := TNewButton.Create(OpenSourceNoticePage);
+  ViewMITLicenseButton.Parent := OpenSourceNoticePage.Surface;
+  ViewMITLicenseButton.Left := 0;
+  ViewMITLicenseButton.Top := OpenSourceNoticeMemo.Top + OpenSourceNoticeMemo.Height + ScaleY(8);
+  ViewMITLicenseButton.Width := ScaleX(140);
+  ViewMITLicenseButton.Height := ScaleY(24);
+  ViewMITLicenseButton.Caption := CustomMessage('ViewMITLicense');
+  ViewMITLicenseButton.OnClick := @ViewMITLicenseButtonClick;
+end;

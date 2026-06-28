@@ -4,14 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/config/ai_config.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/localization/strings.dart';
 import '../../app/theme.dart';
-import '../mirror/providers/mirror_source_provider.dart';
 import '../logs/services/log_center_service.dart';
 import '../update/models/update_models.dart';
 import '../update/providers/update_provider.dart';
 import '../update/screens/update_dialog.dart';
+import '../../shared/widgets/special_thanks_section.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -29,12 +30,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Timer? _intelLogoResetTimer;
   int _easterEggTapCount = 0;
   int _intelLogoTapCount = 0;
+  String? _aiProxyUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAiProxyUrl();
+  }
 
   @override
   void dispose() {
     _easterEggResetTimer?.cancel();
     _intelLogoResetTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadAiProxyUrl() async {
+    final url = await AiConfig.getProxyUrl();
+    if (mounted) setState(() => _aiProxyUrl = url);
   }
 
   void _handleEasterEggTap() {
@@ -107,9 +120,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tr(context, 'settings_title'),
-                style: theme.textTheme.headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              tr(context, 'settings_title'),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 24),
             _SettingsSection(
               title: tr(context, 'settings_appearance'),
@@ -123,14 +139,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     underline: const SizedBox.shrink(),
                     items: [
                       DropdownMenuItem(
-                          value: ThemeMode.system,
-                          child: Text(tr(context, 'settings_theme_system'))),
+                        value: ThemeMode.system,
+                        child: Text(tr(context, 'settings_theme_system')),
+                      ),
                       DropdownMenuItem(
-                          value: ThemeMode.light,
-                          child: Text(tr(context, 'settings_theme_light'))),
+                        value: ThemeMode.light,
+                        child: Text(tr(context, 'settings_theme_light')),
+                      ),
                       DropdownMenuItem(
-                          value: ThemeMode.dark,
-                          child: Text(tr(context, 'settings_theme_dark'))),
+                        value: ThemeMode.dark,
+                        child: Text(tr(context, 'settings_theme_dark')),
+                      ),
                     ],
                     onChanged: (mode) {
                       if (mode != null) {
@@ -148,22 +167,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     value: ref.watch(localeProvider),
                     underline: const SizedBox.shrink(),
                     items: const [
-                      DropdownMenuItem(value: Locale('zh'), child: Text('简体中文')),
-                      DropdownMenuItem(value: Locale('zh', 'TW'), child: Text('繁體中文')),
-                      DropdownMenuItem(value: Locale('en'), child: Text('English')),
-                      DropdownMenuItem(value: Locale('fr'), child: Text('Français')),
-                      DropdownMenuItem(value: Locale('de'), child: Text('Deutsch')),
-                      DropdownMenuItem(value: Locale('es'), child: Text('Español')),
-                      DropdownMenuItem(value: Locale('pt'), child: Text('Português')),
-                      DropdownMenuItem(value: Locale('ru'), child: Text('Русский')),
-                      DropdownMenuItem(value: Locale('ar'), child: Text('العربية')),
+                      DropdownMenuItem(
+                        value: Locale('zh'),
+                        child: Text('简体中文'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('zh', 'TW'),
+                        child: Text('繁體中文'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('en'),
+                        child: Text('English'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('fr'),
+                        child: Text('Français'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('de'),
+                        child: Text('Deutsch'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('es'),
+                        child: Text('Español'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('pt'),
+                        child: Text('Português'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('ru'),
+                        child: Text('Русский'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('ar'),
+                        child: Text('العربية'),
+                      ),
                       DropdownMenuItem(value: Locale('ko'), child: Text('한국어')),
                       DropdownMenuItem(value: Locale('ja'), child: Text('日本語')),
                     ],
                     onChanged: (locale) {
                       if (locale != null) {
                         ref.read(localeProvider.notifier).setLocale(locale);
-                        LogCenterService().logSystem('语言已切换为: ${locale.languageCode}');
+                        LogCenterService().logSystem(
+                          '语言已切换为: ${locale.languageCode}',
+                        );
                       }
                     },
                   ),
@@ -177,11 +225,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     underline: const SizedBox.shrink(),
                     items: const [
                       DropdownMenuItem(
-                          value: 'HarmonyOSSans', child: Text('HarmonyOS Sans')),
+                        value: 'HarmonyOSSans',
+                        child: Text('HarmonyOS Sans'),
+                      ),
                       DropdownMenuItem(
-                          value: 'Microsoft YaHei UI', child: Text('Microsoft YaHei UI')),
-                      DropdownMenuItem(
-                          value: 'MiSans', child: Text('MiSans')),
+                        value: 'Microsoft YaHei UI',
+                        child: Text('Microsoft YaHei UI'),
+                      ),
+                      DropdownMenuItem(value: 'MiSans', child: Text('MiSans')),
                     ],
                     onChanged: (font) {
                       if (font != null) {
@@ -205,8 +256,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       for (final colorValue in AppTheme.presetColors)
                         _ColorSwatch(
                           color: Color(colorValue),
-                          selected: ref.watch(seedColorProvider).toARGB32() == colorValue,
-                          onTap: () => ref.read(seedColorProvider.notifier).setColor(Color(colorValue)),
+                          selected:
+                              ref.watch(seedColorProvider).toARGB32() ==
+                              colorValue,
+                          onTap: () => ref
+                              .read(seedColorProvider.notifier)
+                              .setColor(Color(colorValue)),
                         ),
                     ],
                   ),
@@ -215,34 +270,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 16),
             _SettingsSection(
-              title: tr(context, 'settings_mirror_source'),
+              title: tr(context, 'ai_settings_section'),
               children: [
-                ListTile(
-                  leading: const Icon(Icons.cloud_outlined),
-                  title: Text(tr(context, 'settings_mirror_source')),
-                  subtitle: Text(tr(context, 'settings_mirror_source_desc')),
-                  trailing: DropdownButton<MirrorSourceStrategy>(
-                    value: ref.watch(mirrorSourceProvider).strategy,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(
-                        value: MirrorSourceStrategy.auto,
-                        child: Text(tr(context, 'mirror_strategy_auto')),
-                      ),
-                      DropdownMenuItem(
-                        value: MirrorSourceStrategy.china,
-                        child: Text(tr(context, 'mirror_strategy_china')),
-                      ),
-                      DropdownMenuItem(
-                        value: MirrorSourceStrategy.global,
-                        child: Text(tr(context, 'mirror_strategy_global')),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        ref.read(mirrorSourceProvider.notifier).setStrategy(v);
-                      }
-                    },
+                _SettingsTile(
+                  icon: Icons.smart_toy_outlined,
+                  title: tr(context, 'ai_proxy_url'),
+                  subtitle: _aiProxyUrl ?? tr(context, 'ai_proxy_url_loading'),
+                  trailing: FilledButton.tonal(
+                    onPressed: _showAiProxyDialog,
+                    child: Text(tr(context, 'settings_edit')),
                   ),
                 ),
               ],
@@ -254,7 +290,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.update_outlined,
                   title: tr(context, 'update_current_version'),
-                  subtitle: '${AppConstants.appVersion} (${AppConstants.appBuild})',
+                  subtitle: AppConstants.appVersion,
                   trailing: const SizedBox.shrink(),
                 ),
                 _SettingsTile(
@@ -299,10 +335,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.search_outlined,
                   title: tr(context, 'update_check_now'),
-                  subtitle: ref.watch(updateProvider.notifier).lastCheckFormatted ?? tr(context, 'update_never'),
+                  subtitle:
+                      ref.watch(updateProvider.notifier).lastCheckFormatted ??
+                      tr(context, 'update_never'),
                   trailing: FilledButton.tonal(
                     onPressed: () {
-                      ref.read(updateProvider.notifier).checkForUpdate(forceRefresh: true);
+                      ref
+                          .read(updateProvider.notifier)
+                          .checkForUpdate(forceRefresh: true);
                     },
                     child: Text(tr(context, 'update_check_now')),
                   ),
@@ -314,7 +354,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   trailing: IconButton(
                     icon: const Icon(Icons.open_in_new, size: 18),
                     onPressed: () {
-                      final url = ref.read(updateProvider.notifier).releasePageUrl;
+                      final url = ref
+                          .read(updateProvider.notifier)
+                          .releasePageUrl;
                       _launchUrl(url);
                     },
                   ),
@@ -328,14 +370,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.info_outline,
                   title: tr(context, 'settings_version'),
-                  subtitle: '${AppConstants.appVersion} (${AppConstants.appBuild})',
+                  subtitle: AppConstants.appVersion,
                   trailing: const SizedBox.shrink(),
                 ),
                 _SettingsTile(
                   icon: Icons.description_outlined,
                   title: tr(context, 'settings_license'),
-                  subtitle: tr(context, 'settings_license_value'),
+                  subtitle: AppConstants.licenseName,
                   trailing: const SizedBox.shrink(),
+                ),
+                _SettingsTile(
+                  icon: Icons.code_outlined,
+                  title: tr(context, 'about_github_repository'),
+                  subtitle: AppConstants.githubRepository,
+                  trailing: IconButton(
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    onPressed: () => _launchUrl(AppConstants.githubRepository),
+                  ),
                 ),
               ],
             ),
@@ -350,7 +401,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildAboutCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -427,6 +478,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            const SpecialThanksSection(),
           ],
         ),
       ),
@@ -466,6 +519,91 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _showAiProxyDialog() async {
+    final controller = TextEditingController(
+      text: _aiProxyUrl ?? AiConfig.defaultProxyUrl,
+    );
+    var errorText = '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> save() async {
+              final normalized = AiConfig.normalizeProxyUrl(controller.text);
+              if (normalized.isNotEmpty &&
+                  !AiConfig.isValidProxyUrl(normalized)) {
+                setDialogState(() {
+                  errorText = tr(context, 'ai_proxy_url_invalid');
+                });
+                return;
+              }
+              try {
+                await AiConfig.setProxyUrl(normalized);
+                await _loadAiProxyUrl();
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              } catch (_) {
+                setDialogState(() {
+                  errorText = tr(context, 'ai_proxy_url_invalid');
+                });
+              }
+            }
+
+            Future<void> reset() async {
+              await AiConfig.resetProxyUrl();
+              await _loadAiProxyUrl();
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            }
+
+            return AlertDialog(
+              title: Text(tr(context, 'ai_proxy_url')),
+              content: SizedBox(
+                width: 520,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr(context, 'ai_proxy_url_desc')),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'ai_proxy_url'),
+                        hintText: AiConfig.defaultProxyUrl,
+                        errorText: errorText.isEmpty ? null : errorText,
+                        border: const OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.url,
+                      onSubmitted: (_) => save(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: reset,
+                  child: Text(tr(context, 'settings_reset_default')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(tr(context, 'detail_cancel')),
+                ),
+                FilledButton(
+                  onPressed: save,
+                  child: Text(tr(context, 'settings_save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+  }
+
   Future<void> _launchUrl(String url) async {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
@@ -474,7 +612,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open URL: $e')),
+          SnackBar(content: Text('${tr(context, 'detail_open_failed')}: $e')),
         );
       }
     }
@@ -491,11 +629,13 @@ class _SettingsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                )),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: 8),
         Card(
           child: Column(
@@ -549,8 +689,9 @@ class _ColorSwatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final brightness = ThemeData.estimateBrightnessForColor(color);
-    final iconColor =
-        brightness == Brightness.dark ? Colors.white : Colors.black;
+    final iconColor = brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -623,9 +764,7 @@ class _EasterEggDialog extends StatelessWidget {
                             child: Text(
                               tr(context, 'easter_egg_missing'),
                               textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
+                              style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(color: Colors.white),
                             ),
                           );
@@ -679,7 +818,7 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
       _getMemoryInfoAsync(),
       _getWindowsVersionAsync(),
     ]);
-    
+
     if (mounted) {
       setState(() {
         _cpuInfo = results[0];
@@ -695,7 +834,7 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loadingText = tr(context, 'intel_loading');
-    
+
     return AlertDialog(
       title: Row(
         children: [
@@ -717,12 +856,32 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
               ),
             ),
             const SizedBox(height: 20),
-            _buildInfoRow(context, tr(context, 'intel_cpu'), _cpuInfo.isEmpty ? loadingText : _cpuInfo),
-            _buildInfoRow(context, tr(context, 'intel_gpu'), _gpuInfo.isEmpty ? loadingText : _gpuInfo),
-            _buildInfoRow(context, tr(context, 'intel_memory'), _memoryInfo.isEmpty ? loadingText : _memoryInfo),
-            _buildInfoRow(context, 'Windows', _windowsVersion.isEmpty ? loadingText : _windowsVersion),
+            _buildInfoRow(
+              context,
+              tr(context, 'intel_cpu'),
+              _cpuInfo.isEmpty ? loadingText : _cpuInfo,
+            ),
+            _buildInfoRow(
+              context,
+              tr(context, 'intel_gpu'),
+              _gpuInfo.isEmpty ? loadingText : _gpuInfo,
+            ),
+            _buildInfoRow(
+              context,
+              tr(context, 'intel_memory'),
+              _memoryInfo.isEmpty ? loadingText : _memoryInfo,
+            ),
+            _buildInfoRow(
+              context,
+              'Windows',
+              _windowsVersion.isEmpty ? loadingText : _windowsVersion,
+            ),
             _buildInfoRow(context, 'Flutter', '3.44.0'),
-            _buildInfoRow(context, tr(context, 'intel_build_time'), DateTime.now().toString().split('.')[0]),
+            _buildInfoRow(
+              context,
+              tr(context, 'intel_build_time'),
+              DateTime.now().toString().split('.')[0],
+            ),
             const SizedBox(height: 16),
             Text(
               'Intel® is a trademark of Intel Corporation.',
@@ -758,16 +917,13 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
             width: 100,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
           ),
         ],
       ),
@@ -776,11 +932,11 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
 
   Future<String> _getCPUInfoAsync() async {
     try {
-      final result = await Process.run(
-        'powershell', 
-        ['-NoProfile', '-Command', '(Get-CimInstance Win32_Processor).Name'],
-        runInShell: true
-      );
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        '(Get-CimInstance Win32_Processor).Name',
+      ], runInShell: true);
       if (result.exitCode == 0) {
         final output = result.stdout.toString().trim();
         if (output.isNotEmpty && !output.contains('Error')) {
@@ -788,7 +944,7 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
         }
       }
     } catch (_) {}
-    
+
     final identifier = Platform.environment['PROCESSOR_IDENTIFIER'] ?? '';
     if (identifier.isNotEmpty) {
       if (identifier.contains('Intel')) {
@@ -803,20 +959,21 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
 
   Future<String> _getGPUInfoAsync() async {
     try {
-      final result = await Process.run(
-        'powershell',
-        ['-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).Name'],
-        runInShell: true
-      );
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        '(Get-CimInstance Win32_VideoController).Name',
+      ], runInShell: true);
       if (result.exitCode == 0) {
         final output = result.stdout.toString().trim();
         if (output.isNotEmpty && !output.contains('Error')) {
-          final gpus = output.split('\n')
+          final gpus = output
+              .split('\n')
               .map((g) => g.trim())
               .where((g) => g.isNotEmpty)
               .where((g) => !_isVirtualGPU(g))
               .toList();
-          
+
           if (gpus.isNotEmpty) {
             return gpus.join('\n');
           }
@@ -828,11 +985,11 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
 
   Future<String> _getMemoryInfoAsync() async {
     try {
-      final result = await Process.run(
-        'powershell',
-        ['-NoProfile', '-Command', '[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB, 1)'],
-        runInShell: true
-      );
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        '[math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB, 1)',
+      ], runInShell: true);
       if (result.exitCode == 0) {
         final output = result.stdout.toString().trim();
         if (output.isNotEmpty && !output.contains('Error')) {
@@ -845,11 +1002,11 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
 
   Future<String> _getWindowsVersionAsync() async {
     try {
-      final result = await Process.run(
-        'powershell',
-        ['-NoProfile', '-Command', '(Get-CimInstance Win32_OperatingSystem).Caption'],
-        runInShell: true
-      );
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        '(Get-CimInstance Win32_OperatingSystem).Caption',
+      ], runInShell: true);
       if (result.exitCode == 0) {
         final output = result.stdout.toString().trim();
         if (output.isNotEmpty && !output.contains('Error')) {
@@ -857,7 +1014,7 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
         }
       }
     } catch (_) {}
-    
+
     final version = Platform.operatingSystemVersion;
     if (version.contains('10.0.2')) {
       return 'Windows 11';
@@ -870,10 +1027,10 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
   static bool _isVirtualGPU(String gpuName) {
     final lower = gpuName.toLowerCase();
     return lower.contains('vmware') ||
-           lower.contains('mumu') ||
-           lower.contains('virtual') ||
-           lower.contains('remote') ||
-           lower.contains('basic display') ||
-           lower.contains('microsoft basic');
+        lower.contains('mumu') ||
+        lower.contains('virtual') ||
+        lower.contains('remote') ||
+        lower.contains('basic display') ||
+        lower.contains('microsoft basic');
   }
 }

@@ -1,29 +1,30 @@
-﻿┌─────────────────────────────────────────────────────────────┐
-│                 Instalación completada - ¡Gracias!                 │
-└─────────────────────────────────────────────────────────────┘
+﻿Instalación completada - ¡Gracias!
 
-¡WinDeploy Studio se ha instalado correctamente!
-
-═══════════════════════════════════════════════════════════════
+WinDeploy Studio se ha instalado correctamente.
 
 Próximos pasos:
 
-  • Inicie WinDeploy Studio desde el menú Inicio o el acceso directo del escritorio
-  
-  • Explore la biblioteca de imágenes para imágenes de Windows
-  
-  • Cree su primer USB de arranque o Windows To Go
-  
-  • ¡Comparta sus comentarios para ayudarnos a mejorar!
+- Inicie WinDeploy Studio desde el menú Inicio o el acceso directo del escritorio.
+- Explore la biblioteca de imágenes para imágenes de Windows.
+- Cree su primer USB de instalación de Windows o Windows To Go.
+- Comparta sus comentarios para ayudarnos a mejorar.
 
-═══════════════════════════════════════════════════════════════
+Licencia: MIT License
+Perfil de GitHub: https://github.com/intelfans
+Repositorio de GitHub: https://github.com/intelfans/WinDeployStudio
 
-¡Gracias por elegir WinDeploy Studio!
+Agradecimientos especiales
 
-Valoramos sus comentarios y nos esforzamos por mejorar WinDeploy Studio.
+WinDeploy Studio agradece a las siguientes personas y comunidades por sus comentarios, pruebas, ideas, inspiración y apoyo.
 
-═══════════════════════════════════════════════════════════════
+- Star__P
+  Comentarios iniciales, pruebas y conversaciones del proyecto
 
-© 2026 Bob Steve. Todos los derechos reservados.
+- Timme
+  Comentarios internacionales detallados, recomendaciones sobre confianza y usabilidad, sugerencias de fuentes de Microsoft y revisión comunitaria
 
-Sitio web: https://xueyanzhang.top/contact/
+- Microsoft Sysinternals Team
+  Inspiración de las herramientas de diagnóstico y solución de problemas de Microsoft
+
+- Open Source Community
+  Por documentación, informes de errores, pruebas, traducciones y sugerencias
