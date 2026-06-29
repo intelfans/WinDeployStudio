@@ -305,7 +305,7 @@ const _en = <String, String>{
   'settings_built_with': 'Built with:',
   'settings_copyright': '©2026 Bob Steve. Released under the MIT License.',
   'about_github_repository': 'GitHub Repository',
-  'special_thanks_title': '特別感謝',
+  'special_thanks_title': 'Special Thanks',
   'special_thanks_intro':
       'WinDeploy Studio would like to thank the following people and communities for their valuable feedback, testing, ideas, inspiration, and support.',
   'thanks_astra_desc': 'Early feedback, testing, and project discussions',
@@ -387,12 +387,16 @@ const _en = <String, String>{
   'wtg_debug_copied': 'Debug info copied to clipboard',
   'wtg_copy_debug': 'Copy Debug Info',
   'wtg_speed_test_failed': 'Speed Test Failed',
+  'wtg_speed_test_skipped': 'Speed test unavailable',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'This disk has no drive letter, so the speed test was skipped. WinDeploy Studio can still erase and partition it during creation.',
   'wtg_grade_a': 'Excellent - Best for Windows To Go',
   'wtg_grade_b': 'Good - Suitable for Windows To Go',
   'wtg_grade_c': 'Fair - May experience slowdowns',
   'wtg_grade_d': 'Poor - Not recommended for Windows To Go',
   'wtg_grade_f': 'Failed - Not suitable for Windows To Go',
   'wtg_grade_unknown': 'Unknown - Speed test required',
+  'wtg_grade_unmeasured': 'Unmeasured - speed test skipped',
   'wtg_warn_disk_info_failed': 'Unable to retrieve disk information',
   'wtg_warn_size_small':
       'Disk size is less than 32GB - not recommended for Windows To Go',
@@ -692,13 +696,33 @@ const _en = <String, String>{
 
   // Mirror categories
   'mirror_category_official': 'Official',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Custom',
   'mirror_category_tools': 'Tools',
-  'mirror_category_official_microsoft': 'Official Microsoft',
-  'mirror_category_community': 'Community Images',
+  'mirror_category_official_microsoft': 'Official Microsoft Images',
+  'mirror_category_community': 'Community Editions',
+  'mirror_category_ltsc': 'Enterprise & LTSC Builds',
+  'mirror_badge_ltsc': 'Enterprise / LTSC Image',
+  'mirror_desc_ltsc': 'Third-party Enterprise and LTSC deployment resource',
+  'mirror_arch_notice':
+      'All Image Center downloads listed here are x64 (64-bit) images. x86 and ARM builds are not provided.',
+  'mirror_skill_beginner_tip':
+      'Beginner: official Microsoft source and safest download flow.',
+  'mirror_skill_advanced_tip':
+      'Advanced: community-maintained images using mirror-based downloads.',
+  'mirror_skill_expert_tip':
+      'Expert: Enterprise and LTSC images for deployment scenarios.',
+  'mirror_ltsc_warning_title': 'Expert-Level Content',
+  'mirror_ltsc_warning_message':
+      'This section contains Enterprise and LTSC Windows images intended for advanced users, IT technicians, and deployment scenarios.\n\nThese images may affect:\n- System configuration\n- Update behavior\n- Licensing environment\n\nProceed only if you understand Windows deployment concepts.',
+  'mirror_ltsc_disclaimer_title': 'Image Source Disclaimer',
+  'mirror_ltsc_disclaimer_body':
+      'These Windows images are provided as third-party deployment resources.\n\nThey are not modified by WinDeploy Studio.\n\nAll Microsoft-related trademarks, names, and assets belong to their respective owners.\n\nWinDeploy Studio does not provide official Microsoft ISO distribution.\n\nUsers are responsible for ensuring compliance with software licensing agreements.',
+  'mirror_ltsc_language_notice':
+      'LTSC language note: 123 Cloud provides the Simplified Chinese build; GoFile provides the English build.',
+  'mirror_ltsc_iot_language_notice':
+      'IoT LTSC language note: only English builds are provided. Both 123 Cloud and GoFile links are English builds.',
   'mirror_badge_official': 'Official Microsoft Source',
   'mirror_badge_community': 'Community Image',
   'mirror_desc_official': 'Download directly from Microsoft',
@@ -1045,12 +1069,16 @@ const _zh = <String, String>{
   'wtg_debug_copied': '调试信息已复制到剪贴板',
   'wtg_copy_debug': '复制调试信息',
   'wtg_speed_test_failed': '速度测试失败',
+  'wtg_speed_test_skipped': '速度测试不可用',
+  'wtg_speed_test_skipped_no_drive_letter':
+      '该磁盘当前没有盘符，因此已跳过速度测试。创建时 WinDeploy Studio 仍可擦除并重新分区。',
   'wtg_grade_a': '优秀 - 最适合 Windows To Go',
   'wtg_grade_b': '良好 - 适合 Windows To Go',
   'wtg_grade_c': '一般 - 可能会出现卡顿',
   'wtg_grade_d': '较差 - 不推荐用于 Windows To Go',
   'wtg_grade_f': '不合格 - 不适合 Windows To Go',
   'wtg_grade_unknown': '未知 - 需要进行速度测试',
+  'wtg_grade_unmeasured': '未测量 - 已跳过速度测试',
   'wtg_warn_disk_info_failed': '无法获取磁盘信息',
   'wtg_warn_size_small': '磁盘容量小于 32GB - 不推荐用于 Windows To Go',
   'wtg_warn_not_usb': '此设备似乎不是 USB 存储设备',
@@ -1326,13 +1354,28 @@ const _zh = <String, String>{
   'creator_starting': '正在启动...',
   'creator_error_prefix': '错误：',
   'mirror_category_official': '官方',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': '自定义',
   'mirror_category_tools': '工具',
-  'mirror_category_official_microsoft': 'Microsoft 官方',
-  'mirror_category_community': '社区镜像',
+  'mirror_category_official_microsoft': 'Microsoft 官方镜像',
+  'mirror_category_community': '社区版本',
+  'mirror_category_ltsc': '企业版与 LTSC 版本',
+  'mirror_badge_ltsc': '企业版 / LTSC 镜像',
+  'mirror_desc_ltsc': '第三方企业版与 LTSC 部署资源',
+  'mirror_arch_notice': '镜像中心列出的所有下载均为 x64（64 位）镜像，不提供 x86 或 ARM 版本。',
+  'mirror_skill_beginner_tip': '入门：Microsoft 官方来源，下载流程最稳妥。',
+  'mirror_skill_advanced_tip': '高级：社区维护镜像，使用镜像源下载。',
+  'mirror_skill_expert_tip': '专家：面向部署场景的企业版和 LTSC 镜像。',
+  'mirror_ltsc_warning_title': '专家级内容',
+  'mirror_ltsc_warning_message':
+      '此区域包含面向高级用户、IT 技术人员和部署场景的 Enterprise 与 LTSC Windows 镜像。\n\n这些镜像可能影响：\n- 系统配置\n- 更新行为\n- 授权环境\n\n仅在你理解 Windows 部署概念后继续。',
+  'mirror_ltsc_disclaimer_title': '镜像来源免责声明',
+  'mirror_ltsc_disclaimer_body':
+      '这些 Windows 镜像作为第三方部署资源提供。\n\n它们并非由 WinDeploy Studio 修改。\n\n所有 Microsoft 相关商标、名称和资产均归其各自所有者所有。\n\nWinDeploy Studio 不提供 Microsoft 官方 ISO 分发。\n\n用户需自行确保遵守软件许可协议。',
+  'mirror_ltsc_language_notice': 'LTSC 语言提示：123 云盘提供简体中文版本，GoFile 提供英文版本。',
+  'mirror_ltsc_iot_language_notice':
+      'IoT LTSC 语言提示：仅提供英文版；123 云盘和 GoFile 链接均为英文版。',
   'mirror_badge_official': 'Microsoft 官方来源',
   'mirror_badge_community': '社区镜像',
   'mirror_desc_official': '直接从 Microsoft 下载',
@@ -1549,7 +1592,8 @@ const _ru = <String, String>{
   'creator_creating': 'Создание...',
   'creator_parsing': 'Разбор файла ISO...',
   'creator_complete_title': 'Установочный носитель Windows создан!',
-  'creator_complete_desc': 'Ваш USB-носитель для установки Windows готов к использованию',
+  'creator_complete_desc':
+      'Ваш USB-носитель для установки Windows готов к использованию',
   'creator_another': 'Создать ещё',
   'creator_parse_error': 'Ошибка разбора файла ISO',
   'creator_error': 'Ошибка',
@@ -1674,12 +1718,16 @@ const _ru = <String, String>{
   'wtg_debug_copied': 'Отладочная информация скопирована в буфер обмена',
   'wtg_copy_debug': 'Копировать отладочную информацию',
   'wtg_speed_test_failed': 'Тест скорости не удался',
+  'wtg_speed_test_skipped': 'Тест скорости недоступен',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'У этого диска нет буквы, поэтому тест скорости был пропущен. WinDeploy Studio все равно сможет стереть и разметить его при создании.',
   'wtg_grade_a': 'Отлично - Лучший выбор для Windows To Go',
   'wtg_grade_b': 'Хорошо - Подходит для Windows To Go',
   'wtg_grade_c': 'Удовлетворительно - Возможны замедления',
   'wtg_grade_d': 'Плохо - Не рекомендуется для Windows To Go',
   'wtg_grade_f': 'Не подходит - Не пригоден для Windows To Go',
   'wtg_grade_unknown': 'Неизвестно - Требуется тест скорости',
+  'wtg_grade_unmeasured': 'Не измерено - тест скорости пропущен',
   'wtg_warn_disk_info_failed': 'Не удалось получить информацию о диске',
   'wtg_warn_size_small':
       'Размер диска менее 32 ГБ - не рекомендуется для Windows To Go',
@@ -1979,13 +2027,33 @@ const _ru = <String, String>{
   'creator_starting': 'Запуск...',
   'creator_error_prefix': 'Ошибка:',
   'mirror_category_official': 'Официальные',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Пользовательские',
   'mirror_category_tools': 'Инструменты',
   'mirror_category_official_microsoft': 'Официальные образы Microsoft',
-  'mirror_category_community': 'Образы сообщества',
+  'mirror_category_community': 'Редакции сообщества',
+  'mirror_category_ltsc': 'Сборки Enterprise и LTSC',
+  'mirror_badge_ltsc': 'Образ Enterprise / LTSC',
+  'mirror_desc_ltsc': 'Сторонний ресурс для развертывания Enterprise и LTSC',
+  'mirror_arch_notice':
+      'Все загрузки в центре образов являются образами x64 (64-бит). Сборки x86 и ARM не предоставляются.',
+  'mirror_skill_beginner_tip':
+      'Начальный уровень: официальный источник Microsoft и самый безопасный способ загрузки.',
+  'mirror_skill_advanced_tip':
+      'Продвинутый уровень: образы, поддерживаемые сообществом, с загрузкой через зеркала.',
+  'mirror_skill_expert_tip':
+      'Экспертный уровень: образы Enterprise и LTSC для сценариев развертывания.',
+  'mirror_ltsc_warning_title': 'Контент экспертного уровня',
+  'mirror_ltsc_warning_message':
+      'В этом разделе находятся образы Windows Enterprise и LTSC для опытных пользователей, IT-специалистов и сценариев развертывания.\n\nЭти образы могут повлиять на:\n- конфигурацию системы\n- поведение обновлений\n- среду лицензирования\n\nПродолжайте только если понимаете принципы развертывания Windows.',
+  'mirror_ltsc_disclaimer_title': 'Отказ от ответственности за источник образа',
+  'mirror_ltsc_disclaimer_body':
+      'Эти образы Windows предоставляются как сторонние ресурсы для развертывания.\n\nОни не изменяются WinDeploy Studio.\n\nВсе товарные знаки, названия и материалы Microsoft принадлежат их владельцам.\n\nWinDeploy Studio не распространяет официальные ISO-образы Microsoft.\n\nПользователи сами отвечают за соблюдение лицензионных соглашений.',
+  'mirror_ltsc_language_notice':
+      'Языки LTSC: 123 Cloud предоставляет сборку на упрощенном китайском, GoFile предоставляет английскую сборку.',
+  'mirror_ltsc_iot_language_notice':
+      'Языки IoT LTSC: доступны только английские сборки; ссылки 123 Cloud и GoFile ведут на английские сборки.',
   'mirror_badge_official': 'Официальный источник Microsoft',
   'mirror_badge_community': 'Образ сообщества',
   'mirror_desc_official': 'Скачивание напрямую с сайта Microsoft',
@@ -2116,13 +2184,15 @@ const _fr = <String, String>{
   'nav_logs': 'Journaux',
   'nav_settings': 'Paramètres',
   'home_title': 'Boîte à outils de déploiement Windows',
-  'home_subtitle': 'Créateur de support d\'installation Windows & Windows To Go',
+  'home_subtitle':
+      'Créateur de support d\'installation Windows & Windows To Go',
   'home_quick_start': 'Démarrage rapide',
   'home_image_library': 'Bibliothèque d\'images',
   'home_image_library_desc':
       'Parcourir les images Windows et obtenir les liens de téléchargement',
   'home_bootable_usb': 'Créateur de support d\'installation Windows',
-  'home_bootable_usb_desc': 'Créer une clé USB d\'installation Windows depuis un ISO',
+  'home_bootable_usb_desc':
+      'Créer une clé USB d\'installation Windows depuis un ISO',
   'home_font_pack': 'Télécharger le pack de polices',
   'home_font_pack_desc': 'Polices CJK pour les ISO Windows allégés',
   'home_wtg': 'Windows To Go',
@@ -2214,7 +2284,8 @@ const _fr = <String, String>{
   'creator_creating': 'Création en cours...',
   'creator_parsing': 'Analyse du fichier ISO...',
   'creator_complete_title': 'Support d\'installation Windows créé !',
-  'creator_complete_desc': 'Votre clé USB d\'installation Windows est prête à être utilisée',
+  'creator_complete_desc':
+      'Votre clé USB d\'installation Windows est prête à être utilisée',
   'creator_another': 'En créer un autre',
   'creator_parse_error': 'Échec de l\'analyse du fichier ISO',
   'creator_error': 'Erreur',
@@ -2344,12 +2415,16 @@ const _fr = <String, String>{
   'wtg_debug_copied': 'Informations de débogage copiées dans le presse-papiers',
   'wtg_copy_debug': 'Copier les infos de débogage',
   'wtg_speed_test_failed': 'Échec du test de vitesse',
+  'wtg_speed_test_skipped': 'Test de vitesse indisponible',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'Ce disque n’a pas de lettre de lecteur. Le test de vitesse a donc été ignoré. WinDeploy Studio pourra tout de même l’effacer et le partitionner pendant la création.',
   'wtg_grade_a': 'Excellent - Idéal pour Windows To Go',
   'wtg_grade_b': 'Bon - Adapté pour Windows To Go',
   'wtg_grade_c': 'Moyen - Ralentissements possibles',
   'wtg_grade_d': 'Mauvais - Non recommandé pour Windows To Go',
   'wtg_grade_f': 'Échec - Non adapté pour Windows To Go',
   'wtg_grade_unknown': 'Inconnu - Test de vitesse requis',
+  'wtg_grade_unmeasured': 'Non mesuré - test de vitesse ignoré',
   'wtg_warn_disk_info_failed':
       'Impossible de récupérer les informations du disque',
   'wtg_warn_size_small':
@@ -2640,13 +2715,34 @@ const _fr = <String, String>{
   'creator_starting': 'Démarrage...',
   'creator_error_prefix': 'Erreur :',
   'mirror_category_official': 'Officiel',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Personnalisé',
   'mirror_category_tools': 'Outils',
   'mirror_category_official_microsoft': 'Images officielles Microsoft',
-  'mirror_category_community': 'Images communautaires',
+  'mirror_category_community': 'Éditions communautaires',
+  'mirror_category_ltsc': 'Versions Enterprise et LTSC',
+  'mirror_badge_ltsc': 'Image Enterprise / LTSC',
+  'mirror_desc_ltsc':
+      'Ressource de déploiement Enterprise et LTSC fournie par un tiers',
+  'mirror_arch_notice':
+      'Tous les téléchargements du centre d’images sont des images x64 (64 bits). Les versions x86 et ARM ne sont pas fournies.',
+  'mirror_skill_beginner_tip':
+      'Débutant : source officielle Microsoft et parcours de téléchargement le plus sûr.',
+  'mirror_skill_advanced_tip':
+      'Avancé : images maintenues par la communauté avec téléchargement via miroirs.',
+  'mirror_skill_expert_tip':
+      'Expert : images Enterprise et LTSC destinées aux scénarios de déploiement.',
+  'mirror_ltsc_warning_title': 'Contenu de niveau expert',
+  'mirror_ltsc_warning_message':
+      'Cette section contient des images Windows Enterprise et LTSC destinées aux utilisateurs avancés, aux techniciens IT et aux scénarios de déploiement.\n\nCes images peuvent affecter :\n- la configuration du système\n- le comportement des mises à jour\n- l’environnement de licence\n\nContinuez uniquement si vous comprenez les concepts de déploiement Windows.',
+  'mirror_ltsc_disclaimer_title': 'Avertissement sur la source de l’image',
+  'mirror_ltsc_disclaimer_body':
+      'Ces images Windows sont fournies comme ressources de déploiement tierces.\n\nElles ne sont pas modifiées par WinDeploy Studio.\n\nToutes les marques, noms et ressources liés à Microsoft appartiennent à leurs propriétaires respectifs.\n\nWinDeploy Studio ne distribue pas d’ISO Microsoft officielles.\n\nLes utilisateurs sont responsables du respect des accords de licence logicielle.',
+  'mirror_ltsc_language_notice':
+      'Langues LTSC : 123 Cloud fournit la version en chinois simplifié ; GoFile fournit la version anglaise.',
+  'mirror_ltsc_iot_language_notice':
+      'Langues IoT LTSC : seules les versions anglaises sont fournies ; les liens 123 Cloud et GoFile pointent tous deux vers des versions anglaises.',
   'mirror_badge_official': 'Source officielle Microsoft',
   'mirror_badge_community': 'Image communautaire',
   'mirror_desc_official': 'Téléchargement direct depuis Microsoft',
@@ -2917,7 +3013,7 @@ const _ja = <String, String>{
   'settings_built_with': '使用ツール：',
   'settings_copyright': '©2026 Bob Steve. MIT License の下で配布されています。',
   'about_github_repository': 'GitHub リポジトリ',
-  'special_thanks_title': '특별 감사',
+  'special_thanks_title': '特別な感謝',
   'special_thanks_intro':
       'WinDeploy Studio は、貴重なフィードバック、テスト、アイデア、インスピレーション、サポートを寄せてくださった皆さまとコミュニティに感謝します。',
   'thanks_astra_desc': '初期フィードバック、テスト、プロジェクトに関する議論',
@@ -2993,12 +3089,16 @@ const _ja = <String, String>{
   'wtg_debug_copied': 'デバッグ情報がクリップボードにコピーされました',
   'wtg_copy_debug': 'デバッグ情報をコピー',
   'wtg_speed_test_failed': '速度テストに失敗しました',
+  'wtg_speed_test_skipped': '速度テストは利用できません',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'このディスクにはドライブ文字がないため、速度テストをスキップしました。作成時には WinDeploy Studio が消去して再パーティション化できます。',
   'wtg_grade_a': '優秀 - Windows To Goに最適',
   'wtg_grade_b': '良好 - Windows To Goに適しています',
   'wtg_grade_c': '普通 - 速度低下が発生する可能性があります',
   'wtg_grade_d': '悪い - Windows To Goには推奨されません',
   'wtg_grade_f': '失敗 - Windows To Goには適していません',
   'wtg_grade_unknown': '不明 - 速度テストが必要です',
+  'wtg_grade_unmeasured': '未測定 - 速度テストをスキップしました',
   'wtg_warn_disk_info_failed': 'ディスク情報を取得できません',
   'wtg_warn_size_small': 'ディスクサイズが32GB未満です - Windows To Goには推奨されません',
   'wtg_warn_not_usb': 'これはUSBドライブではないようです',
@@ -3283,13 +3383,30 @@ const _ja = <String, String>{
   'creator_starting': '開始中...',
   'creator_error_prefix': 'エラー：',
   'mirror_category_official': '公式',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'カスタム',
   'mirror_category_tools': 'ツール',
   'mirror_category_official_microsoft': 'Microsoft 公式イメージ',
-  'mirror_category_community': 'コミュニティイメージ',
+  'mirror_category_community': 'コミュニティ版',
+  'mirror_category_ltsc': 'Enterprise / LTSC ビルド',
+  'mirror_badge_ltsc': 'Enterprise / LTSC イメージ',
+  'mirror_desc_ltsc': 'サードパーティの Enterprise / LTSC 展開リソース',
+  'mirror_arch_notice':
+      'イメージセンターに掲載されているダウンロードはすべて x64（64 ビット）イメージです。x86 と ARM ビルドは提供されません。',
+  'mirror_skill_beginner_tip': '初心者向け：Microsoft 公式ソースで、最も安全なダウンロード手順です。',
+  'mirror_skill_advanced_tip': '上級者向け：コミュニティ管理イメージをミラー経由でダウンロードします。',
+  'mirror_skill_expert_tip': 'エキスパート向け：展開シナリオ用の Enterprise および LTSC イメージです。',
+  'mirror_ltsc_warning_title': 'エキスパート向けコンテンツ',
+  'mirror_ltsc_warning_message':
+      'このセクションには、上級ユーザー、IT 技術者、展開用途向けの Enterprise および LTSC Windows イメージが含まれます。\n\nこれらのイメージは次に影響する可能性があります。\n- システム構成\n- 更新の動作\n- ライセンス環境\n\nWindows 展開の概念を理解している場合のみ続行してください。',
+  'mirror_ltsc_disclaimer_title': 'イメージ提供元に関する免責事項',
+  'mirror_ltsc_disclaimer_body':
+      'これらの Windows イメージは、サードパーティの展開リソースとして提供されています。\n\nWinDeploy Studio によって改変されたものではありません。\n\nMicrosoft に関連する商標、名称、資産はすべて各所有者に帰属します。\n\nWinDeploy Studio は Microsoft 公式 ISO を配布しません。\n\nソフトウェアライセンス契約の遵守はユーザー自身の責任です。',
+  'mirror_ltsc_language_notice':
+      'LTSC 言語メモ：123 Cloud は簡体字中国語版、GoFile は英語版を提供します。',
+  'mirror_ltsc_iot_language_notice':
+      'IoT LTSC 言語メモ：英語版のみ提供されます。123 Cloud と GoFile のリンクはいずれも英語版です。',
   'mirror_badge_official': 'Microsoft 公式ソース',
   'mirror_badge_community': 'コミュニティイメージ',
   'mirror_desc_official': 'Microsoft から直接ダウンロード',
@@ -3623,12 +3740,16 @@ const _zhTW = <String, String>{
   'wtg_debug_copied': '偵錯資訊已複製到剪貼簿',
   'wtg_copy_debug': '複製偵錯資訊',
   'wtg_speed_test_failed': '速度測試失敗',
+  'wtg_speed_test_skipped': '速度測試不可用',
+  'wtg_speed_test_skipped_no_drive_letter':
+      '此磁碟目前沒有磁碟機代號，因此已略過速度測試。建立時 WinDeploy Studio 仍可清除並重新分割。',
   'wtg_grade_a': '優秀 - 最適合 Windows To Go',
   'wtg_grade_b': '良好 - 適合 Windows To Go',
   'wtg_grade_c': '普通 - 可能會出現卡頓',
   'wtg_grade_d': '較差 - 不建議用於 Windows To Go',
   'wtg_grade_f': '不合格 - 不適合 Windows To Go',
   'wtg_grade_unknown': '未知 - 需要進行速度測試',
+  'wtg_grade_unmeasured': '未測量 - 已略過速度測試',
   'wtg_warn_disk_info_failed': '無法取得磁碟資訊',
   'wtg_warn_size_small': '磁碟容量小於 32GB - 不建議用於 Windows To Go',
   'wtg_warn_not_usb': '此裝置似乎不是 USB 儲存裝置',
@@ -3905,13 +4026,28 @@ const _zhTW = <String, String>{
   'creator_starting': '正在啟動...',
   'creator_error_prefix': '錯誤：',
   'mirror_category_official': '官方',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': '自訂',
   'mirror_category_tools': '工具',
-  'mirror_category_official_microsoft': 'Microsoft 官方',
-  'mirror_category_community': '社群映像',
+  'mirror_category_official_microsoft': 'Microsoft 官方映像',
+  'mirror_category_community': '社群版本',
+  'mirror_category_ltsc': '企業版與 LTSC 版本',
+  'mirror_badge_ltsc': '企業版 / LTSC 映像',
+  'mirror_desc_ltsc': '第三方企業版與 LTSC 部署資源',
+  'mirror_arch_notice': '映像中心列出的所有下載均為 x64（64 位元）映像，不提供 x86 或 ARM 版本。',
+  'mirror_skill_beginner_tip': '入門：Microsoft 官方來源，下載流程最穩妥。',
+  'mirror_skill_advanced_tip': '進階：社群維護映像，使用鏡像來源下載。',
+  'mirror_skill_expert_tip': '專家：面向部署場景的企業版和 LTSC 映像。',
+  'mirror_ltsc_warning_title': '專家級內容',
+  'mirror_ltsc_warning_message':
+      '此區域包含面向進階使用者、IT 技術人員和部署場景的 Enterprise 與 LTSC Windows 映像。\n\n這些映像可能影響：\n- 系統設定\n- 更新行為\n- 授權環境\n\n僅在你理解 Windows 部署概念後繼續。',
+  'mirror_ltsc_disclaimer_title': '映像來源免責聲明',
+  'mirror_ltsc_disclaimer_body':
+      '這些 Windows 映像作為第三方部署資源提供。\n\n它們並非由 WinDeploy Studio 修改。\n\n所有 Microsoft 相關商標、名稱和資產均歸其各自所有者所有。\n\nWinDeploy Studio 不提供 Microsoft 官方 ISO 分發。\n\n使用者需自行確保遵守軟體授權協議。',
+  'mirror_ltsc_language_notice': 'LTSC 語言提示：123 雲盤提供簡體中文版本，GoFile 提供英文版本。',
+  'mirror_ltsc_iot_language_notice':
+      'IoT LTSC 語言提示：僅提供英文版；123 雲盤和 GoFile 連結均為英文版。',
   'mirror_badge_official': 'Microsoft 官方來源',
   'mirror_badge_community': '社群映像',
   'mirror_desc_official': '直接從 Microsoft 下載',
@@ -4032,13 +4168,15 @@ const _es = <String, String>{
   'nav_logs': 'Registros',
   'nav_settings': 'Ajustes',
   'home_title': 'Herramienta de despliegue Windows',
-  'home_subtitle': 'Creador de medios de instalación de Windows y Windows To Go',
+  'home_subtitle':
+      'Creador de medios de instalación de Windows y Windows To Go',
   'home_quick_start': 'Inicio rápido',
   'home_image_library': 'Biblioteca de imágenes',
   'home_image_library_desc':
       'Explorar imágenes de Windows y obtener enlaces de descarga',
   'home_bootable_usb': 'Creador de medio de instalación de Windows',
-  'home_bootable_usb_desc': 'Crear un USB de instalación de Windows desde un ISO',
+  'home_bootable_usb_desc':
+      'Crear un USB de instalación de Windows desde un ISO',
   'home_font_pack': 'Descargar paquete de fuentes',
   'home_font_pack_desc': 'Fuentes CJK para ISOs ligeros de Windows',
   'home_wtg': 'Windows To Go',
@@ -4129,7 +4267,8 @@ const _es = <String, String>{
   'creator_creating': 'Creando...',
   'creator_parsing': 'Analizando archivo ISO...',
   'creator_complete_title': '¡Medio de instalación de Windows creado!',
-  'creator_complete_desc': 'Su USB de instalación de Windows está listo para usar',
+  'creator_complete_desc':
+      'Su USB de instalación de Windows está listo para usar',
   'creator_another': 'Crear otro',
   'creator_parse_error': 'Error al analizar el archivo ISO',
   'creator_error': 'Error',
@@ -4258,12 +4397,16 @@ const _es = <String, String>{
   'wtg_debug_copied': 'Información de depuración copiada al portapapeles',
   'wtg_copy_debug': 'Copiar información de depuración',
   'wtg_speed_test_failed': 'Prueba de velocidad fallida',
+  'wtg_speed_test_skipped': 'Prueba de velocidad no disponible',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'Este disco no tiene letra de unidad, por lo que se omitió la prueba de velocidad. WinDeploy Studio aún puede borrarlo y particionarlo durante la creación.',
   'wtg_grade_a': 'Excelente - Ideal para Windows To Go',
   'wtg_grade_b': 'Bueno - Apto para Windows To Go',
   'wtg_grade_c': 'Regular - Puede experimentar lentitud',
   'wtg_grade_d': 'Deficiente - No recomendado para Windows To Go',
   'wtg_grade_f': 'Fallido - No apto para Windows To Go',
   'wtg_grade_unknown': 'Desconocido - Se requiere prueba de velocidad',
+  'wtg_grade_unmeasured': 'Sin medir - prueba de velocidad omitida',
   'wtg_warn_disk_info_failed': 'No se pudo obtener la información del disco',
   'wtg_warn_size_small':
       'El disco es menor de 32 GB, no recomendado para Windows To Go',
@@ -4549,13 +4692,33 @@ const _es = <String, String>{
   'creator_starting': 'Iniciando...',
   'creator_error_prefix': 'Error:',
   'mirror_category_official': 'Oficial',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Personalizado',
   'mirror_category_tools': 'Herramientas',
   'mirror_category_official_microsoft': 'Imágenes oficiales de Microsoft',
-  'mirror_category_community': 'Imágenes de la comunidad',
+  'mirror_category_community': 'Ediciones comunitarias',
+  'mirror_category_ltsc': 'Compilaciones Enterprise y LTSC',
+  'mirror_badge_ltsc': 'Imagen Enterprise / LTSC',
+  'mirror_desc_ltsc': 'Recurso de despliegue Enterprise y LTSC de terceros',
+  'mirror_arch_notice':
+      'Todas las descargas del Centro de imágenes son imágenes x64 (64 bits). No se proporcionan compilaciones x86 ni ARM.',
+  'mirror_skill_beginner_tip':
+      'Principiante: fuente oficial de Microsoft y flujo de descarga más seguro.',
+  'mirror_skill_advanced_tip':
+      'Avanzado: imágenes mantenidas por la comunidad con descargas mediante espejos.',
+  'mirror_skill_expert_tip':
+      'Experto: imágenes Enterprise y LTSC para escenarios de despliegue.',
+  'mirror_ltsc_warning_title': 'Contenido de nivel experto',
+  'mirror_ltsc_warning_message':
+      'Esta sección contiene imágenes de Windows Enterprise y LTSC destinadas a usuarios avanzados, técnicos de TI y escenarios de despliegue.\n\nEstas imágenes pueden afectar:\n- la configuración del sistema\n- el comportamiento de las actualizaciones\n- el entorno de licenciamiento\n\nContinúa solo si entiendes los conceptos de despliegue de Windows.',
+  'mirror_ltsc_disclaimer_title': 'Aviso sobre el origen de la imagen',
+  'mirror_ltsc_disclaimer_body':
+      'Estas imágenes de Windows se proporcionan como recursos de despliegue de terceros.\n\nWinDeploy Studio no las modifica.\n\nTodas las marcas comerciales, nombres y recursos relacionados con Microsoft pertenecen a sus respectivos propietarios.\n\nWinDeploy Studio no distribuye ISO oficiales de Microsoft.\n\nLos usuarios son responsables de cumplir los acuerdos de licencia de software.',
+  'mirror_ltsc_language_notice':
+      'Nota de idioma LTSC: 123 Cloud proporciona la compilación en chino simplificado; GoFile proporciona la compilación en inglés.',
+  'mirror_ltsc_iot_language_notice':
+      'Nota de idioma IoT LTSC: solo se proporcionan compilaciones en inglés. Los enlaces de 123 Cloud y GoFile son compilaciones en inglés.',
   'mirror_badge_official': 'Fuente oficial de Microsoft',
   'mirror_badge_community': 'Imagen de la comunidad',
   'mirror_desc_official': 'Descarga directamente desde Microsoft',
@@ -4901,12 +5064,16 @@ const _ar = <String, String>{
   'wtg_debug_copied': 'تم نسخ معلومات التصحيح إلى الحافظة',
   'wtg_copy_debug': 'نسخ معلومات التصحيح',
   'wtg_speed_test_failed': 'فشل اختبار السرعة',
+  'wtg_speed_test_skipped': 'اختبار السرعة غير متاح',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'لا يحتوي هذا القرص على حرف محرك أقراص، لذلك تم تخطي اختبار السرعة. لا يزال بإمكان WinDeploy Studio مسحه وتقسيمه أثناء الإنشاء.',
   'wtg_grade_a': 'ممتاز - الأفضل لـ Windows To Go',
   'wtg_grade_b': 'جيد - مناسب لـ Windows To Go',
   'wtg_grade_c': 'مقبول - قد يحدث بطء',
   'wtg_grade_d': 'ضعيف - غير موصى به لـ Windows To Go',
   'wtg_grade_f': 'فاشل - غير مناسب لـ Windows To Go',
   'wtg_grade_unknown': 'غير معروف - يتطلب اختبار سرعة',
+  'wtg_grade_unmeasured': 'غير مقاس - تم تخطي اختبار السرعة',
   'wtg_warn_disk_info_failed': 'تعذر الحصول على معلومات القرص',
   'wtg_warn_size_small':
       'حجم القرص أقل من 32 جيجابايت، غير موصى به لـ Windows To Go',
@@ -5194,13 +5361,33 @@ const _ar = <String, String>{
   'creator_starting': 'جاري البدء...',
   'creator_error_prefix': 'خطأ:',
   'mirror_category_official': 'رسمي',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'مخصص',
   'mirror_category_tools': 'أدوات',
   'mirror_category_official_microsoft': 'صور Microsoft الرسمية',
-  'mirror_category_community': 'صور المجتمع',
+  'mirror_category_community': 'إصدارات المجتمع',
+  'mirror_category_ltsc': 'إصدارات Enterprise و LTSC',
+  'mirror_badge_ltsc': 'صورة Enterprise / LTSC',
+  'mirror_desc_ltsc': 'مورد نشر Enterprise و LTSC من جهة خارجية',
+  'mirror_arch_notice':
+      'كل التنزيلات المعروضة في مركز الصور هي صور x64 (64 بت). لا تتوفر إصدارات x86 أو ARM.',
+  'mirror_skill_beginner_tip':
+      'مبتدئ: مصدر Microsoft الرسمي ومسار التنزيل الأكثر أمانًا.',
+  'mirror_skill_advanced_tip':
+      'متقدم: صور يديرها المجتمع وتستخدم التنزيل عبر المرايا.',
+  'mirror_skill_expert_tip':
+      'خبير: صور Enterprise و LTSC مخصصة لسيناريوهات النشر.',
+  'mirror_ltsc_warning_title': 'محتوى مخصص للخبراء',
+  'mirror_ltsc_warning_message':
+      'يحتوي هذا القسم على صور Windows Enterprise و LTSC موجهة للمستخدمين المتقدمين وفنيي تقنية المعلومات وسيناريوهات النشر.\n\nقد تؤثر هذه الصور في:\n- تكوين النظام\n- سلوك التحديثات\n- بيئة الترخيص\n\nتابع فقط إذا كنت تفهم مفاهيم نشر Windows.',
+  'mirror_ltsc_disclaimer_title': 'إخلاء مسؤولية مصدر الصورة',
+  'mirror_ltsc_disclaimer_body':
+      'تُقدَّم صور Windows هذه كموارد نشر من جهات خارجية.\n\nلم يتم تعديلها بواسطة WinDeploy Studio.\n\nكل العلامات التجارية والأسماء والأصول المرتبطة بـ Microsoft مملوكة لأصحابها.\n\nلا يوزع WinDeploy Studio ملفات ISO الرسمية من Microsoft.\n\nيتحمل المستخدمون مسؤولية الالتزام باتفاقيات ترخيص البرامج.',
+  'mirror_ltsc_language_notice':
+      'ملاحظة لغة LTSC: يوفر 123 Cloud إصدار الصينية المبسطة، ويوفر GoFile الإصدار الإنجليزي.',
+  'mirror_ltsc_iot_language_notice':
+      'ملاحظة لغة IoT LTSC: تتوفر الإصدارات الإنجليزية فقط؛ روابط 123 Cloud و GoFile كلاهما لإصدارات إنجليزية.',
   'mirror_badge_official': 'مصدر Microsoft الرسمي',
   'mirror_badge_community': 'صورة مجتمع',
   'mirror_desc_official': 'تنزيل مباشر من Microsoft',
@@ -5329,7 +5516,8 @@ const _pt = <String, String>{
   'home_image_library_desc':
       'Explorar imagens do Windows e obter links de download',
   'home_bootable_usb': 'Criador de mídia de instalação do Windows',
-  'home_bootable_usb_desc': 'Criar um USB de instalação do Windows a partir de um ISO',
+  'home_bootable_usb_desc':
+      'Criar um USB de instalação do Windows a partir de um ISO',
   'home_font_pack': 'Baixar pacote de fontes',
   'home_font_pack_desc': 'Fontes CJK para ISOs leves do Windows',
   'home_wtg': 'Windows To Go',
@@ -5391,7 +5579,8 @@ const _pt = <String, String>{
   'iso_step_info': 'Lendo informações da imagem...',
   'iso_step_cleanup': 'Limpando...',
   'creator_title': 'Criador de mídia de instalação do Windows',
-  'creator_subtitle': 'Criar um USB de instalação do Windows a partir de um ISO',
+  'creator_subtitle':
+      'Criar um USB de instalação do Windows a partir de um ISO',
   'creator_step_iso': 'Selecionar ISO',
   'creator_step_usb': 'Selecionar USB',
   'creator_step_confirm': 'Confirmar',
@@ -5420,7 +5609,8 @@ const _pt = <String, String>{
   'creator_creating': 'Criando...',
   'creator_parsing': 'Analisando arquivo ISO...',
   'creator_complete_title': 'Mídia de instalação do Windows criada!',
-  'creator_complete_desc': 'Seu USB de instalação do Windows está pronto para uso',
+  'creator_complete_desc':
+      'Seu USB de instalação do Windows está pronto para uso',
   'creator_another': 'Criar outro',
   'creator_parse_error': 'Erro ao analisar o arquivo ISO',
   'creator_error': 'Erro',
@@ -5549,12 +5739,16 @@ const _pt = <String, String>{
       'Informações de depuração copiadas para a área de transferência',
   'wtg_copy_debug': 'Copiar informações de depuração',
   'wtg_speed_test_failed': 'Teste de velocidade falhou',
+  'wtg_speed_test_skipped': 'Teste de velocidade indisponível',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'Este disco não tem letra de unidade, então o teste de velocidade foi ignorado. O WinDeploy Studio ainda poderá apagá-lo e particioná-lo durante a criação.',
   'wtg_grade_a': 'Excelente - Ideal para Windows To Go',
   'wtg_grade_b': 'Bom - Adequado para Windows To Go',
   'wtg_grade_c': 'Razoável - Pode apresentar lentidão',
   'wtg_grade_d': 'Fraco - Não recomendado para Windows To Go',
   'wtg_grade_f': 'Falhou - Inadequado para Windows To Go',
   'wtg_grade_unknown': 'Desconhecido - Teste de velocidade necessário',
+  'wtg_grade_unmeasured': 'Não medido - teste de velocidade ignorado',
   'wtg_warn_disk_info_failed': 'Não foi possível obter informações do disco',
   'wtg_warn_size_small':
       'O disco tem menos de 32 GB, não recomendado para Windows To Go',
@@ -5841,13 +6035,33 @@ const _pt = <String, String>{
   'creator_starting': 'Iniciando...',
   'creator_error_prefix': 'Erro:',
   'mirror_category_official': 'Oficial',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Personalizado',
   'mirror_category_tools': 'Ferramentas',
   'mirror_category_official_microsoft': 'Imagens oficiais da Microsoft',
-  'mirror_category_community': 'Imagens da comunidade',
+  'mirror_category_community': 'Edições da comunidade',
+  'mirror_category_ltsc': 'Builds Enterprise e LTSC',
+  'mirror_badge_ltsc': 'Imagem Enterprise / LTSC',
+  'mirror_desc_ltsc': 'Recurso de implantação Enterprise e LTSC de terceiros',
+  'mirror_arch_notice':
+      'Todos os downloads do Centro de imagens são imagens x64 (64 bits). Builds x86 e ARM não são fornecidas.',
+  'mirror_skill_beginner_tip':
+      'Iniciante: fonte oficial da Microsoft e fluxo de download mais seguro.',
+  'mirror_skill_advanced_tip':
+      'Avançado: imagens mantidas pela comunidade usando downloads por espelhos.',
+  'mirror_skill_expert_tip':
+      'Especialista: imagens Enterprise e LTSC para cenários de implantação.',
+  'mirror_ltsc_warning_title': 'Conteúdo de nível especialista',
+  'mirror_ltsc_warning_message':
+      'Esta seção contém imagens do Windows Enterprise e LTSC destinadas a usuários avançados, técnicos de TI e cenários de implantação.\n\nEssas imagens podem afetar:\n- a configuração do sistema\n- o comportamento das atualizações\n- o ambiente de licenciamento\n\nProssiga apenas se você entende os conceitos de implantação do Windows.',
+  'mirror_ltsc_disclaimer_title': 'Aviso sobre a origem da imagem',
+  'mirror_ltsc_disclaimer_body':
+      'Estas imagens do Windows são fornecidas como recursos de implantação de terceiros.\n\nElas não são modificadas pelo WinDeploy Studio.\n\nTodas as marcas, nomes e ativos relacionados à Microsoft pertencem aos seus respectivos proprietários.\n\nO WinDeploy Studio não distribui ISOs oficiais da Microsoft.\n\nOs usuários são responsáveis por cumprir os contratos de licença de software.',
+  'mirror_ltsc_language_notice':
+      'Nota de idioma LTSC: o 123 Cloud fornece a build em chinês simplificado; o GoFile fornece a build em inglês.',
+  'mirror_ltsc_iot_language_notice':
+      'Nota de idioma IoT LTSC: somente builds em inglês são fornecidas. Os links do 123 Cloud e do GoFile são builds em inglês.',
   'mirror_badge_official': 'Fonte oficial da Microsoft',
   'mirror_badge_community': 'Imagem da comunidade',
   'mirror_desc_official': 'Baixe diretamente da Microsoft',
@@ -5982,7 +6196,8 @@ const _de = <String, String>{
   'home_image_library_desc':
       'Windows-Abbilder durchsuchen und Download-Links erhalten',
   'home_bootable_usb': 'Windows-Installationsmedium erstellen',
-  'home_bootable_usb_desc': 'Einen Windows-Installations-USB aus einer ISO erstellen',
+  'home_bootable_usb_desc':
+      'Einen Windows-Installations-USB aus einer ISO erstellen',
   'home_font_pack': 'Schriftpaket herunterladen',
   'home_font_pack_desc': 'CJK-Schriften für schlanke Windows-ISOs',
   'home_wtg': 'Windows To Go',
@@ -6203,12 +6418,16 @@ const _de = <String, String>{
   'wtg_debug_copied': 'Debug-Informationen in die Zwischenablage kopiert',
   'wtg_copy_debug': 'Debug-Informationen kopieren',
   'wtg_speed_test_failed': 'Geschwindigkeitstest fehlgeschlagen',
+  'wtg_speed_test_skipped': 'Geschwindigkeitstest nicht verfügbar',
+  'wtg_speed_test_skipped_no_drive_letter':
+      'Dieser Datenträger hat keinen Laufwerksbuchstaben. Der Geschwindigkeitstest wurde daher übersprungen. WinDeploy Studio kann ihn beim Erstellen trotzdem löschen und neu partitionieren.',
   'wtg_grade_a': 'Ausgezeichnet – Ideal für Windows To Go',
   'wtg_grade_b': 'Gut – Geeignet für Windows To Go',
   'wtg_grade_c': 'Befriedigend – Mögliche Verlangsamungen',
   'wtg_grade_d': 'Mangelhaft – Nicht empfohlen für Windows To Go',
   'wtg_grade_f': 'Nicht bestanden – Ungeeignet für Windows To Go',
   'wtg_grade_unknown': 'Unbekannt – Geschwindigkeitstest erforderlich',
+  'wtg_grade_unmeasured': 'Nicht gemessen – Geschwindigkeitstest übersprungen',
   'wtg_warn_disk_info_failed':
       'Datenträgerinformationen konnten nicht abgerufen werden',
   'wtg_warn_size_small':
@@ -6500,13 +6719,34 @@ const _de = <String, String>{
   'creator_starting': 'Startet...',
   'creator_error_prefix': 'Fehler:',
   'mirror_category_official': 'Offiziell',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': 'Benutzerdefiniert',
   'mirror_category_tools': 'Werkzeuge',
   'mirror_category_official_microsoft': 'Offizielle Microsoft-Abbilder',
-  'mirror_category_community': 'Community-Abbilder',
+  'mirror_category_community': 'Community-Editionen',
+  'mirror_category_ltsc': 'Enterprise- und LTSC-Builds',
+  'mirror_badge_ltsc': 'Enterprise-/LTSC-Abbild',
+  'mirror_desc_ltsc':
+      'Drittanbieter-Ressource für Enterprise- und LTSC-Bereitstellung',
+  'mirror_arch_notice':
+      'Alle im Abbildzentrum aufgeführten Downloads sind x64-Abbilder (64-Bit). x86- und ARM-Builds werden nicht bereitgestellt.',
+  'mirror_skill_beginner_tip':
+      'Einsteiger: offizielle Microsoft-Quelle und sicherster Download-Ablauf.',
+  'mirror_skill_advanced_tip':
+      'Fortgeschritten: von der Community gepflegte Abbilder mit spiegelbasierten Downloads.',
+  'mirror_skill_expert_tip':
+      'Experte: Enterprise- und LTSC-Abbilder für Bereitstellungsszenarien.',
+  'mirror_ltsc_warning_title': 'Inhalt für Experten',
+  'mirror_ltsc_warning_message':
+      'Dieser Bereich enthält Windows Enterprise- und LTSC-Abbilder für erfahrene Benutzer, IT-Techniker und Bereitstellungsszenarien.\n\nDiese Abbilder können Folgendes beeinflussen:\n- Systemkonfiguration\n- Updateverhalten\n- Lizenzierungsumgebung\n\nFahren Sie nur fort, wenn Sie Windows-Bereitstellungskonzepte verstehen.',
+  'mirror_ltsc_disclaimer_title': 'Hinweis zur Abbildquelle',
+  'mirror_ltsc_disclaimer_body':
+      'Diese Windows-Abbilder werden als Drittanbieter-Ressourcen für Bereitstellungen bereitgestellt.\n\nSie werden von WinDeploy Studio nicht verändert.\n\nAlle Microsoft-bezogenen Marken, Namen und Inhalte gehören ihren jeweiligen Eigentümern.\n\nWinDeploy Studio verteilt keine offiziellen Microsoft-ISOs.\n\nBenutzer sind selbst für die Einhaltung der Softwarelizenzverträge verantwortlich.',
+  'mirror_ltsc_language_notice':
+      'LTSC-Sprachhinweis: 123 Cloud stellt die vereinfachte chinesische Build bereit; GoFile stellt die englische Build bereit.',
+  'mirror_ltsc_iot_language_notice':
+      'IoT-LTSC-Sprachhinweis: Es werden nur englische Builds bereitgestellt. Die Links von 123 Cloud und GoFile führen beide zu englischen Builds.',
   'mirror_badge_official': 'Offizielle Microsoft-Quelle',
   'mirror_badge_community': 'Community-Abbild',
   'mirror_desc_official': 'Direkt von Microsoft herunterladen',
@@ -6778,7 +7018,7 @@ const _ko = <String, String>{
   'settings_built_with': '빌드 도구:',
   'settings_copyright': '©2026 Bob Steve. MIT License에 따라 배포됩니다.',
   'about_github_repository': 'GitHub 저장소',
-  'special_thanks_title': 'Special Thanks',
+  'special_thanks_title': '특별 감사',
   'special_thanks_intro':
       'WinDeploy Studio는 소중한 피드백, 테스트, 아이디어, 영감과 지원을 보내 준 다음 분들과 커뮤니티에 감사드립니다.',
   'thanks_astra_desc': '초기 피드백, 테스트 및 프로젝트 논의',
@@ -6854,12 +7094,16 @@ const _ko = <String, String>{
   'wtg_debug_copied': '디버그 정보가 클립보드에 복사되었습니다',
   'wtg_copy_debug': '디버그 정보 복사',
   'wtg_speed_test_failed': '속도 테스트 실패',
+  'wtg_speed_test_skipped': '속도 테스트를 사용할 수 없음',
+  'wtg_speed_test_skipped_no_drive_letter':
+      '이 디스크에는 드라이브 문자가 없어 속도 테스트를 건너뛰었습니다. 생성 과정에서 WinDeploy Studio가 디스크를 지우고 다시 파티션할 수 있습니다.',
   'wtg_grade_a': '우수 - Windows To Go에 최적',
   'wtg_grade_b': '양호 - Windows To Go에 적합',
   'wtg_grade_c': '보통 - 속도 저하 가능성',
   'wtg_grade_d': '미흡 - Windows To Go에 권장하지 않음',
   'wtg_grade_f': '불합격 - Windows To Go에 부적합',
   'wtg_grade_unknown': '알 수 없음 - 속도 테스트 필요',
+  'wtg_grade_unmeasured': '측정 안 됨 - 속도 테스트 건너뜀',
   'wtg_warn_disk_info_failed': '디스크 정보를 가져올 수 없습니다',
   'wtg_warn_size_small': '디스크 용량이 32GB 미만 - Windows To Go에 권장하지 않음',
   'wtg_warn_not_usb': '이 장치는 USB 드라이브가 아닌 것 같습니다',
@@ -7141,13 +7385,30 @@ const _ko = <String, String>{
   'creator_starting': '시작 중...',
   'creator_error_prefix': '오류:',
   'mirror_category_official': '공식',
-  'mirror_category_ltsc': 'LTSC',
   'mirror_category_tinyos': 'TinyOS',
   'mirror_category_xlite': 'X-Lite',
   'mirror_category_custom': '사용자 정의',
   'mirror_category_tools': '도구',
   'mirror_category_official_microsoft': 'Microsoft 공식 이미지',
-  'mirror_category_community': '커뮤니티 이미지',
+  'mirror_category_community': '커뮤니티 에디션',
+  'mirror_category_ltsc': 'Enterprise 및 LTSC 빌드',
+  'mirror_badge_ltsc': 'Enterprise / LTSC 이미지',
+  'mirror_desc_ltsc': '타사 Enterprise 및 LTSC 배포 리소스',
+  'mirror_arch_notice':
+      '이미지 센터에 표시된 모든 다운로드는 x64(64비트) 이미지입니다. x86 및 ARM 빌드는 제공되지 않습니다.',
+  'mirror_skill_beginner_tip': '초급: Microsoft 공식 출처이며 가장 안전한 다운로드 흐름입니다.',
+  'mirror_skill_advanced_tip': '고급: 커뮤니티가 관리하는 이미지를 미러 기반 다운로드로 제공합니다.',
+  'mirror_skill_expert_tip': '전문가: 배포 시나리오용 Enterprise 및 LTSC 이미지입니다.',
+  'mirror_ltsc_warning_title': '전문가용 콘텐츠',
+  'mirror_ltsc_warning_message':
+      '이 섹션에는 고급 사용자, IT 기술자, 배포 시나리오를 위한 Windows Enterprise 및 LTSC 이미지가 포함되어 있습니다.\n\n이 이미지는 다음에 영향을 줄 수 있습니다.\n- 시스템 구성\n- 업데이트 동작\n- 라이선스 환경\n\nWindows 배포 개념을 이해하는 경우에만 계속하세요.',
+  'mirror_ltsc_disclaimer_title': '이미지 출처 고지',
+  'mirror_ltsc_disclaimer_body':
+      '이 Windows 이미지는 타사 배포 리소스로 제공됩니다.\n\nWinDeploy Studio에서 수정하지 않았습니다.\n\nMicrosoft 관련 상표, 이름, 자산은 각각의 소유자에게 있습니다.\n\nWinDeploy Studio는 Microsoft 공식 ISO를 배포하지 않습니다.\n\n사용자는 소프트웨어 라이선스 계약 준수에 대한 책임이 있습니다.',
+  'mirror_ltsc_language_notice':
+      'LTSC 언어 안내: 123 Cloud는 중국어 간체 빌드를, GoFile은 영어 빌드를 제공합니다.',
+  'mirror_ltsc_iot_language_notice':
+      'IoT LTSC 언어 안내: 영어 빌드만 제공됩니다. 123 Cloud와 GoFile 링크 모두 영어 빌드입니다.',
   'mirror_badge_official': 'Microsoft 공식 출처',
   'mirror_badge_community': '커뮤니티 이미지',
   'mirror_desc_official': 'Microsoft에서 직접 다운로드',

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/strings.dart';
 import '../providers/mirror_provider.dart';
 import '../models/mirror_models.dart';
+import '../widgets/ltsc_warning_dialog.dart';
 
 class MirrorScreen extends ConsumerStatefulWidget {
   const MirrorScreen({super.key});
@@ -155,7 +156,14 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
                     icon: _getCategoryIcon(cat.icon),
                     count: cat.items.length,
                     isSelected: _selectedCategory == cat.id,
-                    onTap: () => setState(() => _selectedCategory = cat.id),
+                    skillLevel: cat.items.first.skillLevel,
+                    onTap: () async {
+                      if (cat.id == 'Enterprise & LTSC Builds') {
+                        final allowed = await showLtscExpertWarning(context);
+                        if (!allowed || !context.mounted) return;
+                      }
+                      setState(() => _selectedCategory = cat.id);
+                    },
                   ),
                 ),
                 if (localIsos.isNotEmpty)
@@ -198,6 +206,8 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
 
     return ListView(
       children: [
+        const _ArchitectureNotice(),
+        const SizedBox(height: 12),
         ...items.map((item) => _MirrorItemCard(item: item, locale: locale)),
         if (_selectedCategory == null && localIsos.isNotEmpty) ...[
           Padding(
@@ -231,6 +241,8 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
         return Icons.verified;
       case 'community':
         return Icons.groups_outlined;
+      case 'ltsc':
+        return Icons.admin_panel_settings_outlined;
       default:
         return Icons.folder;
     }
@@ -243,12 +255,14 @@ class _CategoryTile extends StatelessWidget {
   final int count;
   final bool isSelected;
   final VoidCallback onTap;
+  final MirrorSkillLevel? skillLevel;
   const _CategoryTile({
     required this.label,
     required this.icon,
     required this.count,
     required this.isSelected,
     required this.onTap,
+    this.skillLevel,
   });
 
   @override
@@ -257,11 +271,28 @@ class _CategoryTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, size: 20),
       title: Text(label, style: theme.textTheme.bodyMedium),
-      trailing: Text(
-        '$count',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '$count',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (skillLevel != null)
+            Tooltip(
+              message: tr(context, skillLevel!.tooltipKey),
+              child: Text(
+                tr(context, skillLevel!.labelKey),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: _skillColor(skillLevel!, theme.colorScheme),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
       ),
       selected: isSelected,
       selectedTileColor: theme.colorScheme.primaryContainer.withValues(
@@ -270,6 +301,14 @@ class _CategoryTile extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       onTap: onTap,
     );
+  }
+
+  Color _skillColor(MirrorSkillLevel level, ColorScheme colorScheme) {
+    return switch (level) {
+      MirrorSkillLevel.beginner => colorScheme.primary,
+      MirrorSkillLevel.advanced => colorScheme.tertiary,
+      MirrorSkillLevel.expert => colorScheme.error,
+    };
   }
 }
 
@@ -287,17 +326,27 @@ class _MirrorItemCard extends StatelessWidget {
         ? tr(context, 'mirror_badge_official')
         : item.isCommunityImage
         ? tr(context, 'mirror_badge_community')
+        : item.isEnterpriseLtsc
+        ? tr(context, 'mirror_badge_ltsc')
         : '';
     final trustText = item.isOfficialMicrosoft
         ? tr(context, 'mirror_desc_official')
         : item.isCommunityImage
         ? tr(context, 'mirror_desc_community')
+        : item.isEnterpriseLtsc
+        ? tr(context, 'mirror_desc_ltsc')
         : '';
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.go('/mirror/${item.id}', extra: item),
+        onTap: () async {
+          if (item.isEnterpriseLtsc) {
+            final allowed = await showLtscExpertWarning(context);
+            if (!allowed || !context.mounted) return;
+          }
+          context.go('/mirror/${item.id}', extra: item);
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -336,6 +385,14 @@ class _MirrorItemCard extends StatelessWidget {
                             badgeLabel,
                             _catColor(item.category),
                           ),
+                        Tooltip(
+                          message: tr(context, item.skillLevel.tooltipKey),
+                          child: _buildTag(
+                            context,
+                            tr(context, item.skillLevel.labelKey),
+                            _skillColor(item.skillLevel, theme.colorScheme),
+                          ),
+                        ),
                         if (item.version != null)
                           _buildTag(
                             context,
@@ -414,9 +471,13 @@ class _MirrorItemCard extends StatelessWidget {
   IconData _catIcon(String category) {
     switch (category) {
       case 'Official Microsoft':
+      case 'Official Microsoft Images':
         return Icons.verified;
       case 'Community Images':
+      case 'Community Editions':
         return Icons.groups_outlined;
+      case 'Enterprise & LTSC Builds':
+        return Icons.admin_panel_settings_outlined;
       default:
         return Icons.folder;
     }
@@ -425,12 +486,57 @@ class _MirrorItemCard extends StatelessWidget {
   Color _catColor(String category) {
     switch (category) {
       case 'Official Microsoft':
+      case 'Official Microsoft Images':
         return const Color(0xFF0071C5);
       case 'Community Images':
+      case 'Community Editions':
         return const Color(0xFF008272);
+      case 'Enterprise & LTSC Builds':
+        return const Color(0xFFC43E1C);
       default:
         return Colors.grey;
     }
+  }
+
+  Color _skillColor(MirrorSkillLevel level, ColorScheme colorScheme) {
+    return switch (level) {
+      MirrorSkillLevel.beginner => colorScheme.primary,
+      MirrorSkillLevel.advanced => colorScheme.tertiary,
+      MirrorSkillLevel.expert => colorScheme.error,
+    };
+  }
+}
+
+class _ArchitectureNotice extends StatelessWidget {
+  const _ArchitectureNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.memory_outlined, color: colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              tr(context, 'mirror_arch_notice'),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

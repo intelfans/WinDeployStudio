@@ -1,6 +1,6 @@
 ﻿#define MyAppName "WinDeploy Studio"
-#define MyAppVersion "1.1.0"
-#define MyAppFileVersion "1.1.0.0"
+#define MyAppVersion "1.1.1"
+#define MyAppFileVersion "1.1.1.0"
 #define MyAppPublisher "Bob Steve"
 #define MyAppPublisherZH "Bob Steve"
 #define MyAppExeName "win_deploy_studio.exe"
@@ -21,7 +21,7 @@ AppCopyright=© 2026 {#MyAppPublisher}. Released under the MIT License.
 DefaultDirName={autopf}\WinDeploy Studio
 DefaultGroupName=WinDeploy Studio
 OutputDir=..\..\dist\windows
-OutputBaseFilename=WinDeployStudio_Setup_1.1.0
+OutputBaseFilename=WinDeployStudio_Setup_1.1.1
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible

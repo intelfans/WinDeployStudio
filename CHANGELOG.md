@@ -2,6 +2,25 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## v1.1.1
+
+### Improvements
+
+- Refined Image Center LTSC descriptions across all 11 supported languages.
+- Updated Windows 10 Enterprise LTSC wording to avoid implying the image is "based on itself".
+- Clarified LTSC entries as long-term servicing channel deployment resources.
+- Updated the Windows 10 Enterprise LTSC 123 Cloud mirror link.
+- Updated app, Windows metadata, installer, scripts, README, and release notes to version 1.1.1.
+
+### Fixes
+
+- Fixed awkward/self-referential LTSC wording in every localized Windows 10 Enterprise LTSC detail page.
+- Fixed stale v1.1.0 references in installer output naming and documentation.
+
+### Notes
+
+This is a small polish and consistency release focused on Image Center wording, LTSC mirror accuracy, and release metadata alignment.
+
 ## v1.1.0
 
 ### New Features

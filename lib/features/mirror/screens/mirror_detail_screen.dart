@@ -7,6 +7,7 @@ import '../../../core/localization/strings.dart';
 import '../../../core/services/mirror_speed_test_service.dart';
 import '../models/mirror_models.dart';
 import '../providers/mirror_source_provider.dart';
+import '../widgets/ltsc_warning_dialog.dart';
 import '../../logs/services/log_center_service.dart';
 import '../../../shared/webview/webview_helper.dart';
 
@@ -69,6 +70,10 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
             isCompact
                 ? Column(
                     children: [
+                      if (widget.item.isEnterpriseLtsc) ...[
+                        _buildLtscDisclaimer(context),
+                        const SizedBox(height: 24),
+                      ],
                       _buildInfoSection(context, locale),
                       if (!widget.item.isOfficialMicrosoft) ...[
                         const SizedBox(height: 24),
@@ -92,6 +97,10 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
                           children: [
                             if (!widget.item.isOfficialMicrosoft) ...[
                               _buildSpeedTestCard(context),
+                              const SizedBox(height: 16),
+                            ],
+                            if (widget.item.isEnterpriseLtsc) ...[
+                              _buildLtscDisclaimer(context),
                               const SizedBox(height: 16),
                             ],
                             _buildDownloadSection(context, locale),
@@ -119,6 +128,8 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         ? tr(context, 'mirror_badge_official')
         : widget.item.isCommunityImage
         ? tr(context, 'mirror_badge_community')
+        : widget.item.isEnterpriseLtsc
+        ? tr(context, 'mirror_badge_ltsc')
         : null;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,6 +165,10 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
                 children: [
                   if (type.isNotEmpty) _Tag(type),
                   if (trustBadge != null) _Tag(trustBadge),
+                  Tooltip(
+                    message: tr(context, widget.item.skillLevel.tooltipKey),
+                    child: _Tag(tr(context, widget.item.skillLevel.labelKey)),
+                  ),
                   if (widget.item.version != null) _Tag(widget.item.version!),
                   if (widget.item.build != null) _Tag(widget.item.build!),
                   if (widget.item.architecture != null)
@@ -165,6 +180,50 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLtscDisclaimer(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Card(
+      color: colorScheme.errorContainer.withValues(alpha: 0.28),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionTitle(
+              Icons.policy_outlined,
+              tr(context, 'mirror_ltsc_disclaimer_title'),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              tr(context, 'mirror_ltsc_disclaimer_body'),
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.55,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                widget.item.isIotLtsc
+                    ? tr(context, 'mirror_ltsc_iot_language_notice')
+                    : tr(context, 'mirror_ltsc_language_notice'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -363,6 +422,8 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         ? tr(context, 'mirror_desc_official')
         : widget.item.isCommunityImage
         ? tr(context, 'mirror_desc_community')
+        : widget.item.isEnterpriseLtsc
+        ? tr(context, 'mirror_desc_ltsc')
         : '';
     return Card(
       child: Padding(
@@ -425,6 +486,11 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       return;
     }
 
+    if (widget.item.isEnterpriseLtsc) {
+      final allowed = await showLtscExpertWarning(context);
+      if (!allowed || !context.mounted) return;
+    }
+
     final name = widget.item.getName(locale);
     final sourceNotifier = ref.read(mirrorSourceProvider.notifier);
     var sourceState = ref.read(mirrorSourceProvider);
@@ -482,6 +548,13 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       return;
     }
 
+    final confirmed = await _confirmMirrorDownload(
+      context: context,
+      name: name,
+      mirrorLabel: mirrorLabel,
+    );
+    if (!confirmed || !context.mounted) return;
+
     await _openResolvedDownload(
       context: context,
       name: name,
@@ -489,6 +562,47 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       mirrorLabel: mirrorLabel,
       mirrorLogName: mirrorLogName,
     );
+  }
+
+  Future<bool> _confirmMirrorDownload({
+    required BuildContext context,
+    required String name,
+    required String mirrorLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(ctx, 'mirror_download_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _InfoRow(tr(ctx, 'mirror_download_mirror'), name),
+            _InfoRow(tr(ctx, 'mirror_download_source'), mirrorLabel),
+            if (widget.item.isEnterpriseLtsc) ...[
+              const SizedBox(height: 12),
+              Text(
+                widget.item.isIotLtsc
+                    ? tr(ctx, 'mirror_ltsc_iot_language_notice')
+                    : tr(ctx, 'mirror_ltsc_language_notice'),
+                style: Theme.of(ctx).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr(ctx, 'detail_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(tr(ctx, 'detail_download_btn')),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
   }
 
   Future<void> _openOfficialDownload(BuildContext context) async {
@@ -539,28 +653,41 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     String? mirrorLogName,
   }) async {
     final logCenter = LogCenterService();
-    if (mirrorLogName != null) {
-      await logCenter.logDownload(
-        '[CommunityDownload]\n'
-        'Product=${widget.item.productLogName}\n'
-        'Mirror=$mirrorLogName',
-      );
-    }
     await logCenter.logDownload(
-      '[MirrorSource] Selected=$mirrorLabel Mirror=$name URL=$url',
+      '[Download]\n'
+      'Category=${widget.item.categoryLogName}\n'
+      'Image=$name\n'
+      'Mirror=${mirrorLogName ?? mirrorLabel}\n'
+      'Status=Started',
+    );
+
+    await logCenter.logDownload(
+      '[MirrorSource] Category=${widget.item.categoryLogName} '
+      'Selected=$mirrorLabel Image=$name URL=$url',
     );
 
     if (context.mounted) {
       await WebviewHelper.openUrl(context, url, title: name);
+      await logCenter.logDownload(
+        '[Download]\n'
+        'Category=${widget.item.categoryLogName}\n'
+        'Image=$name\n'
+        'Mirror=${mirrorLogName ?? mirrorLabel}\n'
+        'Status=Success',
+      );
     }
   }
 
   IconData _catIcon(String category) {
     switch (category) {
       case 'Official Microsoft':
+      case 'Official Microsoft Images':
         return Icons.verified;
       case 'Community Images':
+      case 'Community Editions':
         return Icons.groups_outlined;
+      case 'Enterprise & LTSC Builds':
+        return Icons.admin_panel_settings_outlined;
       case 'Tools':
         return Icons.build;
       default:
@@ -571,9 +698,13 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   Color _catColor(String category) {
     switch (category) {
       case 'Official Microsoft':
+      case 'Official Microsoft Images':
         return const Color(0xFF0071C5);
       case 'Community Images':
+      case 'Community Editions':
         return const Color(0xFF008272);
+      case 'Enterprise & LTSC Builds':
+        return const Color(0xFFC43E1C);
       case 'Tools':
         return Colors.teal;
       default:

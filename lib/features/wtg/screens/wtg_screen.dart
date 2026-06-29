@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -219,24 +218,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         if (letter.isNotEmpty) {
           driveLetter = letter.length == 1 ? '$letter:' : letter;
         }
-      }
-
-      // If no drive letter from disk info, try to get it via PowerShell
-      if (driveLetter.isEmpty) {
-        try {
-          final result = await Process.run('powershell', [
-            '-NoProfile',
-            '-Command',
-            'Get-Partition -DiskNumber ${disk.diskNumber}'
-                r' | Where-Object { $_.DriveLetter } | Select-Object -First 1 -ExpandProperty DriveLetter',
-          ]).timeout(const Duration(seconds: 5));
-          if (result.exitCode == 0) {
-            final letter = result.stdout.toString().trim();
-            if (letter.isNotEmpty) {
-              driveLetter = letter.length == 1 ? '$letter:' : letter;
-            }
-          }
-        } catch (_) {}
       }
 
       final compatibilityService = ref.read(wtgCompatibilityServiceProvider);
@@ -992,6 +973,39 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 tr(context, 'wtg_write_speed'),
                 '${result.writeSpeedMBps} MB/s',
               ),
+            ] else if (result.speedTestSkipped) ...[
+              const Divider(),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      tr(context, 'wtg_speed_test_skipped'),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (result.speedTestError != null) ...[
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: 24),
+                  child: Text(
+                    tr(context, result.speedTestError!),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
             ] else ...[
               const Divider(),
               Row(

@@ -7,6 +7,7 @@ import '../features/mirror/screens/mirror_screen.dart';
 import '../features/mirror/screens/mirror_detail_screen.dart';
 import '../features/mirror/models/mirror_models.dart';
 import '../features/mirror/providers/mirror_provider.dart';
+import '../features/mirror/widgets/ltsc_warning_dialog.dart';
 import '../features/creator/screens/creator_screen.dart';
 import '../features/wtg/screens/wtg_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -77,6 +78,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           final blocked =
               item?.isStarValleyX == true && !item!.isVisibleInLocale(locale);
           if (item != null && !blocked) {
+            if (item.isEnterpriseLtsc) {
+              Future.microtask(() async {
+                if (!context.mounted) return;
+                final allowed = await showLtscExpertWarning(context);
+                if (!allowed && context.mounted) context.go('/mirror');
+              });
+            }
             return MirrorDetailScreen(item: item);
           }
 
@@ -119,6 +127,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               foundItem?.isStarValleyX == true &&
               !foundItem!.isVisibleInLocale(locale);
           if (foundItem != null && !foundBlocked) {
+            if (foundItem.isEnterpriseLtsc) {
+              Future.microtask(() async {
+                if (!context.mounted) return;
+                final allowed = await showLtscExpertWarning(context);
+                if (!allowed && context.mounted) context.go('/mirror');
+              });
+            }
             return MirrorDetailScreen(item: foundItem);
           }
 

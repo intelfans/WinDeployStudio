@@ -21,6 +21,7 @@ class WtgCompatibilityResult {
   final bool isRemovable;
   final bool isUsb;
   final bool speedTestSuccess;
+  final bool speedTestSkipped;
   final String? speedTestError;
   final List<String> warnings;
   final List<String> recommendations;
@@ -41,6 +42,7 @@ class WtgCompatibilityResult {
     required this.isRemovable,
     required this.isUsb,
     required this.speedTestSuccess,
+    this.speedTestSkipped = false,
     this.speedTestError,
     required this.warnings,
     required this.recommendations,
@@ -77,6 +79,9 @@ class WtgCompatibilityResult {
       case WtgCompatibilityGrade.f:
         return 'wtg_grade_f';
       case WtgCompatibilityGrade.unknown:
+        if (speedTestSkipped) {
+          return 'wtg_grade_unmeasured';
+        }
         return 'wtg_grade_unknown';
     }
   }
@@ -125,6 +130,7 @@ class WtgCompatibilityService {
     int readSpeedMBps = 0;
     int writeSpeedMBps = 0;
     bool speedTestSuccess = false;
+    bool speedTestSkipped = false;
     String? speedTestError;
     final warnings = <String>[];
     final recommendations = <String>[];
@@ -252,8 +258,9 @@ class WtgCompatibilityService {
         }
       }
     } else {
-      _addDebug('Skipping speed test - empty drive letter');
-      speedTestError = 'wtg_err_empty_drive_letter';
+      _addDebug('Skipping speed test - target disk has no drive letter');
+      speedTestSkipped = true;
+      speedTestError = 'wtg_speed_test_skipped_no_drive_letter';
     }
 
     _addDebug('Speed Test Completed.');
@@ -274,7 +281,7 @@ class WtgCompatibilityService {
       if (readSpeedMBps < 80 || writeSpeedMBps < 80) {
         warnings.add('wtg_warn_performance_low');
       }
-    } else {
+    } else if (!speedTestSkipped) {
       warnings.add('wtg_warn_speed_test_failed');
       recommendations.add('wtg_rec_retry_speed_test');
     }
@@ -294,6 +301,7 @@ class WtgCompatibilityService {
       isRemovable: isRemovable,
       isUsb: isUsb,
       speedTestSuccess: speedTestSuccess,
+      speedTestSkipped: speedTestSkipped,
       speedTestError: speedTestError,
       warnings: warnings,
       recommendations: recommendations,

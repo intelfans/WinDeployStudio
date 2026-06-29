@@ -18,6 +18,30 @@ enum WtgStep {
   failed,
 }
 
+enum WtgBootLayout { gptUefi, mbrHybrid }
+
+class _WtgDriveLetters {
+  final String efiLetter;
+  final String windowsLetter;
+
+  const _WtgDriveLetters({
+    required this.efiLetter,
+    required this.windowsLetter,
+  });
+}
+
+class _WtgPartitionLayout {
+  final WtgBootLayout bootLayout;
+  final String efiDrive;
+  final String windowsDrive;
+
+  const _WtgPartitionLayout({
+    required this.bootLayout,
+    required this.efiDrive,
+    required this.windowsDrive,
+  });
+}
+
 class WtgProgress {
   final WtgStep step;
   final double progress;
@@ -166,6 +190,30 @@ class WtgService {
   }
 
   String get logText => _log.join('\n');
+
+  String _driveRoot(String drive) {
+    final value = drive.trim();
+    if (value.endsWith('\\')) return value;
+    if (value.endsWith(':')) return '$value\\';
+    if (value.length == 1) return '$value:\\';
+    return value;
+  }
+
+  String _driveSpec(String drive) {
+    final value = drive.trim().replaceAll('\\', '');
+    if (value.endsWith(':')) return value;
+    if (value.length == 1) return '$value:';
+    return value;
+  }
+
+  String _drivePath(String drive, String relativePath) {
+    final cleanRelative = relativePath.replaceFirst(RegExp(r'^\\+'), '');
+    return '${_driveRoot(drive)}$cleanRelative';
+  }
+
+  String _driveFromLetter(String letter) {
+    return '${letter.toUpperCase()}:\\';
+  }
 
   void _killCurrentProcess() {
     if (_currentProcess == null) return;
@@ -513,8 +561,8 @@ class WtgService {
         ),
       );
 
-      final partitionResult = await _partitionDisk(diskNumber: diskNumber);
-      if (!partitionResult) {
+      final partitionLayout = await _partitionDisk(diskNumber: diskNumber);
+      if (partitionLayout == null) {
         _logLine('Partition FAILED');
         final logPath = await saveLogToFile();
         _notify(
@@ -527,6 +575,11 @@ class WtgService {
         return false;
       }
       _logLine('Partition OK');
+      final bootLayout = partitionLayout.bootLayout;
+      final efiDrive = partitionLayout.efiDrive;
+      final windowsDrive = partitionLayout.windowsDrive;
+      _logLine('Prepared EFI partition: $efiDrive');
+      _logLine('Prepared Windows partition: $windowsDrive');
 
       if (_cancelled) return false;
 
@@ -595,10 +648,12 @@ class WtgService {
         return false;
       }
 
-      // Get Windows drive letter (the larger partition)
-      final windowsDrive = await _getWindowsPartitionDrive(diskNumber);
-      if (windowsDrive == null) {
-        _logLine('Could not find Windows partition drive');
+      final windowsDriveReady = await _waitForPartitionRoot(
+        drive: windowsDrive,
+        expectedLabel: 'WDS_WTG',
+      );
+      if (!windowsDriveReady) {
+        _logLine('Windows partition is not accessible: $windowsDrive');
         await _unmountIso(isoPath);
         final logPath = await saveLogToFile();
         _notify(
@@ -638,6 +693,27 @@ class WtgService {
         return false;
       }
 
+      final configResult = await _configureWtgImage(windowsDrive: windowsDrive);
+      if (!configResult) {
+        _logLine('WTG offline configuration FAILED');
+        await _unmountIso(isoPath);
+        final logPath = await saveLogToFile();
+        _notify(
+          onProgress,
+          WtgProgress(
+            step: WtgStep.failed,
+            message: 'wtg_svc_boot_failed\n\nLog: $logPath',
+          ),
+        );
+        return false;
+      }
+      _logLine('WTG offline configuration OK');
+
+      if (_cancelled) {
+        await _unmountIso(isoPath);
+        return false;
+      }
+
       // Step 5: Write boot files
       _notify(
         onProgress,
@@ -648,21 +724,29 @@ class WtgService {
         ),
       );
 
-      // For GPT, get EFI partition; for MBR, use Windows partition
-      String efiDrive;
-      final efiPartition = await _getEfiPartitionDrive(diskNumber);
-      if (efiPartition != null) {
-        efiDrive = efiPartition;
-        _logLine('Using separate EFI partition: $efiDrive');
-      } else {
-        // MBR mode - use Windows partition for boot files
-        efiDrive = windowsDrive;
-        _logLine('Using Windows partition for boot files (MBR mode)');
+      final efiDriveReady = await _waitForPartitionRoot(
+        drive: efiDrive,
+        expectedLabel: 'WDS_EFI',
+      );
+      if (!efiDriveReady) {
+        _logLine('EFI partition is not accessible: $efiDrive');
+        await _unmountIso(isoPath);
+        final logPath = await saveLogToFile();
+        _notify(
+          onProgress,
+          WtgProgress(
+            step: WtgStep.failed,
+            message: 'wtg_svc_boot_failed\n\nLog: $logPath',
+          ),
+        );
+        return false;
       }
+      _logLine('Using independent EFI partition: $efiDrive');
 
       final bootResult = await _writeBootFiles(
         windowsDrive: windowsDrive,
         efiDrive: efiDrive,
+        bootLayout: bootLayout,
       );
 
       await _unmountIso(isoPath);
@@ -696,6 +780,7 @@ class WtgService {
       final verifyResult = await _verifyWtg(
         windowsDrive: windowsDrive,
         efiDrive: efiDrive,
+        bootLayout: bootLayout,
       );
       _logLine('Verify: ${verifyResult ? "OK" : "FAILED"}');
 
@@ -764,30 +849,50 @@ class WtgService {
     }
   }
 
-  Future<bool> _partitionDisk({required int diskNumber}) async {
-    // First try GPT + EFI partition (for fixed disks)
-    _logLine('Attempting GPT partition scheme...');
-    final gptResult = await _partitionDiskGpt(diskNumber);
+  Future<_WtgPartitionLayout?> _partitionDisk({required int diskNumber}) async {
+    final letters = await _reserveWtgDriveLetters();
+    if (letters == null) {
+      _logLine('Unable to reserve drive letters for WTG partitions');
+      return null;
+    }
+
+    _logLine('Creating GPT/UEFI WTG partition scheme...');
+    final gptResult = await _partitionDiskGpt(diskNumber, letters);
 
     if (gptResult) {
-      _logLine('GPT partition scheme succeeded');
-      return true;
+      _logLine('GPT/UEFI partition scheme succeeded');
+      return _WtgPartitionLayout(
+        bootLayout: WtgBootLayout.gptUefi,
+        efiDrive: _driveFromLetter(letters.efiLetter),
+        windowsDrive: _driveFromLetter(letters.windowsLetter),
+      );
     }
 
-    // If GPT fails (e.g., removable media), try MBR
-    _logLine('GPT failed, falling back to MBR partition scheme...');
-    final mbrResult = await _partitionDiskMbr(diskNumber);
+    _logLine('GPT/UEFI failed, trying MBR hybrid two-partition layout...');
+    final retryLetters = await _reserveWtgDriveLetters();
+    if (retryLetters == null) {
+      _logLine('Unable to reserve drive letters for MBR fallback');
+      return null;
+    }
 
+    final mbrResult = await _partitionDiskMbrHybrid(diskNumber, retryLetters);
     if (mbrResult) {
-      _logLine('MBR partition scheme succeeded');
-      return true;
+      _logLine('MBR hybrid partition scheme succeeded');
+      return _WtgPartitionLayout(
+        bootLayout: WtgBootLayout.mbrHybrid,
+        efiDrive: _driveFromLetter(retryLetters.efiLetter),
+        windowsDrive: _driveFromLetter(retryLetters.windowsLetter),
+      );
     }
 
-    _logLine('Both GPT and MBR partition schemes failed');
-    return false;
+    _logLine('All WTG partition schemes failed');
+    return null;
   }
 
-  Future<bool> _partitionDiskGpt(int diskNumber) async {
+  Future<bool> _partitionDiskGpt(
+    int diskNumber,
+    _WtgDriveLetters letters,
+  ) async {
     final script =
         '''
 select disk $diskNumber
@@ -801,8 +906,10 @@ exit
     final cleanResult = await _runDiskpart(script);
     _logLine('Clean exit: ${cleanResult.exitCode}');
 
-    if (cleanResult.exitCode != 0) {
+    if (!_diskpartSucceeded(cleanResult)) {
       _logLine('Clean failed');
+      _logLine('Clean stderr: ${cleanResult.stderr}');
+      _logLine('Clean stdout: ${cleanResult.stdout}');
       return false;
     }
 
@@ -815,12 +922,13 @@ exit
         '''
 select disk $diskNumber
 convert gpt
-create partition efi size=260
+create partition efi size=300
 format fs=fat32 label="WDS_EFI" quick
-assign
+assign letter=${letters.efiLetter}
+create partition msr size=16
 create partition primary
 format fs=ntfs label="WDS_WTG" quick
-assign
+assign letter=${letters.windowsLetter}
 exit
 ''';
     _logLine('GPT DiskPart - Step 2: Create partitions');
@@ -829,7 +937,8 @@ exit
     final result = await _runDiskpart(script2);
     _logLine('GPT DiskPart exit: ${result.exitCode}');
 
-    if (result.exitCode != 0) {
+    if (!_diskpartSucceeded(result)) {
+      _logLine('GPT DiskPart stderr: ${result.stderr}');
       _logLine('GPT DiskPart stdout: ${result.stdout}');
       return false;
     }
@@ -837,52 +946,149 @@ exit
     return true;
   }
 
-  Future<bool> _partitionDiskMbr(int diskNumber) async {
-    // Step 1: Clean the disk
+  Future<bool> _partitionDiskMbrHybrid(
+    int diskNumber,
+    _WtgDriveLetters letters,
+  ) async {
     final cleanScript =
         '''
 select disk $diskNumber
 clean
 exit
 ''';
-    _logLine('MBR DiskPart - Step 1: Clean disk');
+    _logLine('MBR Hybrid DiskPart - Step 1: Clean disk');
 
     final cleanResult = await _runDiskpart(cleanScript);
     _logLine('Clean exit: ${cleanResult.exitCode}');
 
-    if (cleanResult.exitCode != 0) {
+    if (!_diskpartSucceeded(cleanResult)) {
       _logLine('Clean failed');
+      _logLine('Clean stderr: ${cleanResult.stderr}');
+      _logLine('Clean stdout: ${cleanResult.stdout}');
       return false;
     }
 
-    // Wait for system to recognize the cleaned disk
     _logLine('Waiting 3 seconds for disk recognition...');
     await Future.delayed(const Duration(seconds: 3));
 
-    // Step 2: Convert to MBR and create partition
     final script =
         '''
 select disk $diskNumber
 convert mbr
-create partition primary
+create partition primary size=350
+format fs=fat32 label="WDS_EFI" quick
 active
+assign letter=${letters.efiLetter}
+create partition primary
 format fs=ntfs label="WDS_WTG" quick
-assign
+assign letter=${letters.windowsLetter}
 exit
 ''';
-    _logLine('MBR DiskPart - Step 2: Create partition');
+    _logLine(
+      'MBR Hybrid DiskPart - Step 2: Create system and Windows partitions',
+    );
     _logLine('DiskPart script:\n$script');
 
     final result = await _runDiskpart(script);
-    _logLine('MBR DiskPart exit: ${result.exitCode}');
+    _logLine('MBR Hybrid DiskPart exit: ${result.exitCode}');
 
-    if (result.exitCode != 0) {
-      _logLine('MBR DiskPart stderr: ${result.stderr}');
-      _logLine('MBR DiskPart stdout: ${result.stdout}');
+    if (!_diskpartSucceeded(result)) {
+      _logLine('MBR Hybrid DiskPart stderr: ${result.stderr}');
+      _logLine('MBR Hybrid DiskPart stdout: ${result.stdout}');
       return false;
     }
 
     return true;
+  }
+
+  bool _diskpartSucceeded(ProcessResult result) {
+    if (result.exitCode != 0) return false;
+
+    final combined = '${result.stdout}\n${result.stderr}'.toLowerCase();
+    const errors = [
+      'diskpart has encountered an error',
+      'virtual disk service error',
+      'the parameter is incorrect',
+      'access is denied',
+      'diskpart 遇到错误',
+      '虚拟磁盘服务错误',
+      '参数错误',
+      '拒绝访问',
+    ];
+
+    return !errors.any(combined.contains);
+  }
+
+  Future<_WtgDriveLetters?> _reserveWtgDriveLetters() async {
+    const preferredEfi = 'S';
+    const preferredWindows = 'W';
+
+    String? pick(List<String> preferred, Set<String> blocked) {
+      for (final letter in preferred) {
+        final value = letter.toUpperCase();
+        final root = Directory(_driveFromLetter(value));
+        if (!root.existsSync() && !blocked.contains(value)) {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    final efi = pick([
+      preferredEfi,
+      'R',
+      'T',
+      'U',
+      'V',
+      'X',
+      'Y',
+      'Z',
+    ], const {});
+    if (efi == null) return null;
+
+    final windows = pick(
+      [preferredWindows, 'V', 'U', 'T', 'R', 'X', 'Y', 'Z'],
+      {efi},
+    );
+    if (windows == null) return null;
+
+    _logLine('Reserved WTG drive letters: EFI=$efi Windows=$windows');
+    return _WtgDriveLetters(efiLetter: efi, windowsLetter: windows);
+  }
+
+  Future<bool> _waitForPartitionRoot({
+    required String drive,
+    required String expectedLabel,
+  }) async {
+    final root = _driveRoot(drive);
+    _logLine('Waiting for $expectedLabel partition at $root');
+
+    for (var attempt = 1; attempt <= 30; attempt++) {
+      if (_cancelled) return false;
+
+      final directory = Directory(root);
+      if (await directory.exists()) {
+        final probe = File(_drivePath(root, '.wds_probe'));
+        try {
+          await probe.writeAsString('ok');
+          await probe.delete().catchError((_) => probe);
+          _logLine(
+            '$expectedLabel partition ready at $root (attempt $attempt)',
+          );
+          return true;
+        } catch (e) {
+          _logLine(
+            '$expectedLabel partition exists but is not writable yet '
+            '(attempt $attempt): $e',
+          );
+        }
+      }
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    _logLine('$expectedLabel partition did not become ready at $root');
+    return false;
   }
 
   Future<ProcessResult> _runDiskpart(String script) async {
@@ -902,73 +1108,6 @@ exit
     } finally {
       await scriptFile.delete().catchError((_) => scriptFile);
     }
-  }
-
-  Future<String?> _getWindowsPartitionDrive(int diskNumber) async {
-    try {
-      _logLine('Getting Windows partition drive for disk $diskNumber');
-
-      // Try multiple approaches to find the drive letter
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        '''
-        \$parts = Get-Partition -DiskNumber $diskNumber -ErrorAction Stop | Where-Object { \$_.DriveLetter }
-        \$volumes = foreach (\$part in \$parts) {
-          \$volume = Get-Volume -DriveLetter \$part.DriveLetter -ErrorAction SilentlyContinue
-          [PSCustomObject]@{
-            DriveLetter = \$part.DriveLetter
-            Size = \$part.Size
-            Type = \$part.Type.ToString()
-            GptType = if (\$part.GptType) { \$part.GptType.ToString() } else { '' }
-            Label = if (\$volume) { \$volume.FileSystemLabel } else { '' }
-            FileSystem = if (\$volume) { \$volume.FileSystem } else { '' }
-          }
-        }
-        \$volumes |
-          Where-Object {
-            \$_.Label -eq 'WDS_WTG' -or
-            \$_.Label -eq 'Windows' -or
-            (\$_.FileSystem -eq 'NTFS' -and \$_.Type -ne 'EFI' -and \$_.GptType -ne '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}')
-          } |
-          Sort-Object Size -Descending |
-          Select-Object -First 1 -ExpandProperty DriveLetter
-        ''',
-      ]).timeout(const Duration(seconds: 10));
-
-      _logLine('Get-Partition exit: ${result.exitCode}');
-      _logLine('Get-Partition stdout: "${result.stdout}"');
-      _logLine('Get-Partition stderr: "${result.stderr}"');
-
-      if (result.exitCode == 0) {
-        final letter = result.stdout.toString().trim();
-        if (letter.isNotEmpty && letter.length == 1) {
-          _logLine('Found Windows partition drive: $letter:');
-          return '$letter:';
-        }
-      }
-    } catch (e) {
-      _logLine('Get partition drive error: $e');
-    }
-    return null;
-  }
-
-  Future<String?> _getEfiPartitionDrive(int diskNumber) async {
-    try {
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-Command',
-        'Get-Partition -DiskNumber $diskNumber | Where-Object { \$_.Type -eq "EFI" -or \$_.GptType -eq "{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}" } | Select-Object -First 1 -ExpandProperty DriveLetter',
-      ]).timeout(const Duration(seconds: 5));
-
-      if (result.exitCode == 0) {
-        final letter = result.stdout.toString().trim();
-        if (letter.isNotEmpty) return '$letter:';
-      }
-    } catch (_) {}
-    return null;
   }
 
   Future<String?> _mountIso(String isoPath) async {
@@ -1106,6 +1245,187 @@ exit
     }
   }
 
+  Future<bool> _configureWtgImage({required String windowsDrive}) async {
+    const hiveName = 'WDS_WTG_SYSTEM';
+    final systemHive = _drivePath(
+      windowsDrive,
+      'Windows\\System32\\config\\SYSTEM',
+    );
+
+    try {
+      _logLine('Configuring offline WTG image: $windowsDrive');
+      if (!await File(systemHive).exists()) {
+        _logLine('SYSTEM hive not found: $systemHive');
+        return false;
+      }
+
+      final sanPolicyResult = await _applySanPolicyUnattend(windowsDrive);
+      if (!sanPolicyResult) {
+        return false;
+      }
+
+      final winReResult = await _writeWinReUnattend(windowsDrive);
+      if (!winReResult) {
+        return false;
+      }
+
+      await _unloadRegistryHive(hiveName);
+
+      final loadResult = await Process.run('reg', [
+        'load',
+        'HKLM\\$hiveName',
+        systemHive,
+      ]).timeout(const Duration(seconds: 30));
+      _logLine('reg load exit: ${loadResult.exitCode}');
+      _logLine('reg load stdout: ${loadResult.stdout}');
+      if (loadResult.exitCode != 0) {
+        _logLine('reg load stderr: ${loadResult.stderr}');
+        return false;
+      }
+
+      final commands = <List<String>>[
+        [
+          'add',
+          'HKLM\\$hiveName\\ControlSet001\\Control',
+          '/v',
+          'PortableOperatingSystem',
+          '/t',
+          'REG_DWORD',
+          '/d',
+          '1',
+          '/f',
+        ],
+        [
+          'add',
+          'HKLM\\$hiveName\\ControlSet001\\Services\\partmgr\\Parameters',
+          '/v',
+          'SanPolicy',
+          '/t',
+          'REG_DWORD',
+          '/d',
+          '4',
+          '/f',
+        ],
+      ];
+
+      for (final args in commands) {
+        final result = await Process.run(
+          'reg',
+          args,
+        ).timeout(const Duration(seconds: 30));
+        _logLine('reg ${args.join(' ')} exit: ${result.exitCode}');
+        if (result.exitCode != 0) {
+          _logLine('reg stderr: ${result.stderr}');
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      _logLine('WTG offline configuration error: $e');
+      return false;
+    } finally {
+      await _unloadRegistryHive(hiveName);
+    }
+  }
+
+  Future<bool> _applySanPolicyUnattend(String windowsDrive) async {
+    final imageRoot = _driveRoot(windowsDrive);
+    final policyPath = _drivePath(windowsDrive, 'san_policy.xml');
+    const policyXml = '''
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="offlineServicing">
+    <component name="Microsoft-Windows-PartitionManager" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <SanPolicy>4</SanPolicy>
+    </component>
+    <component name="Microsoft-Windows-PartitionManager" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <SanPolicy>4</SanPolicy>
+    </component>
+    <component name="Microsoft-Windows-PartitionManager" processorArchitecture="arm64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <SanPolicy>4</SanPolicy>
+    </component>
+  </settings>
+</unattend>
+''';
+
+    try {
+      await File(policyPath).writeAsString(policyXml);
+      _logLine('Applying SAN policy unattend: $policyPath');
+      final result = await Process.run('dism', [
+        '/Image:$imageRoot',
+        '/Apply-Unattend:$policyPath',
+      ]).timeout(const Duration(minutes: 5));
+
+      _logLine('DISM SAN policy exit: ${result.exitCode}');
+      _logLine('DISM SAN policy stdout: ${result.stdout}');
+      if (result.exitCode != 0) {
+        _logLine('DISM SAN policy stderr: ${result.stderr}');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _logLine('SAN policy unattend error: $e');
+      return false;
+    } finally {
+      try {
+        await File(policyPath).delete();
+      } catch (_) {}
+    }
+  }
+
+  Future<bool> _writeWinReUnattend(String windowsDrive) async {
+    final sysprepDir = Directory(
+      _drivePath(windowsDrive, 'Windows\\System32\\Sysprep'),
+    );
+    final unattendPath = p.join(sysprepDir.path, 'unattend.xml');
+    const unattendXml = '''
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <UninstallWindowsRE>true</UninstallWindowsRE>
+    </component>
+    <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <UninstallWindowsRE>true</UninstallWindowsRE>
+    </component>
+    <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="arm64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <UninstallWindowsRE>true</UninstallWindowsRE>
+    </component>
+  </settings>
+</unattend>
+''';
+
+    try {
+      if (!await sysprepDir.exists()) {
+        await sysprepDir.create(recursive: true);
+      }
+      await File(unattendPath).writeAsString(unattendXml);
+      _logLine('Wrote WTG WinRE unattend: $unattendPath');
+      return true;
+    } catch (e) {
+      _logLine('Write WinRE unattend error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _unloadRegistryHive(String hiveName) async {
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        final result = await Process.run('reg', [
+          'unload',
+          'HKLM\\$hiveName',
+        ]).timeout(const Duration(seconds: 15));
+        _logLine('reg unload HKLM\\$hiveName exit: ${result.exitCode}');
+        if (result.exitCode == 0) return;
+      } catch (e) {
+        _logLine('reg unload warning: $e');
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
   Future<bool> _applyImage({
     required String sourcePath,
     required int imageIndex,
@@ -1116,7 +1436,8 @@ exit
       _logLine('=== Apply Image ===');
       _logLine('Source: $sourcePath');
       _logLine('Index: $imageIndex');
-      _logLine('Target: $targetDrive');
+      final targetRoot = _driveRoot(targetDrive);
+      _logLine('Target: $targetRoot');
 
       // Get total image size from source file
       final sourceFile = File(sourcePath);
@@ -1133,7 +1454,7 @@ exit
         '/Apply-Image',
         '/ImageFile:$sourcePath',
         '/Index:$imageIndex',
-        '/ApplyDir:$targetDrive',
+        '/ApplyDir:$targetRoot',
       ]);
 
       // Save process reference for cancellation
@@ -1264,6 +1585,7 @@ exit
   Future<bool> _writeBootFiles({
     required String windowsDrive,
     required String efiDrive,
+    required WtgBootLayout bootLayout,
   }) async {
     try {
       _logLine('Writing boot files: windows=$windowsDrive efi=$efiDrive');
@@ -1276,14 +1598,25 @@ exit
         return false;
       }
 
-      // Run bcdboot
-      _logLine('Running bcdboot $windowsDrive\\Windows /s $efiDrive /f ALL');
-      final result = await Process.run('bcdboot', [
-        '$windowsDrive\\Windows',
+      // Run bcdboot against the independent FAT32 system partition. Never use
+      // the Windows NTFS partition as the boot target.
+      final windowsPath = _drivePath(windowsDrive, 'Windows');
+      final efiRoot = _driveRoot(efiDrive);
+      final targetBcdboot = _drivePath(
+        windowsDrive,
+        'Windows\\System32\\bcdboot.exe',
+      );
+      final bcdbootExe = await File(targetBcdboot).exists()
+          ? targetBcdboot
+          : 'bcdboot';
+      final firmware = bootLayout == WtgBootLayout.gptUefi ? 'UEFI' : 'ALL';
+      _logLine('Running $bcdbootExe $windowsPath /s $efiRoot /f $firmware');
+      final result = await Process.run(bcdbootExe, [
+        windowsPath,
         '/s',
-        efiDrive,
+        efiRoot,
         '/f',
-        'ALL',
+        firmware,
       ]).timeout(const Duration(seconds: 120));
 
       _logLine('bcdboot exit: ${result.exitCode}');
@@ -1296,12 +1629,87 @@ exit
       }
 
       _logLine('bcdboot completed successfully');
-      return true;
+      final fallbackOk = await _ensureFallbackUefiBootFile(efiDrive: efiDrive);
+      if (!fallbackOk) return false;
+
+      return _hardenBcdStore(windowsDrive: windowsDrive, efiDrive: efiDrive);
     } on TimeoutException {
       _logLine('bcdboot timed out after 120 seconds');
       return false;
     } catch (e) {
       _logLine('Boot file error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _hardenBcdStore({
+    required String windowsDrive,
+    required String efiDrive,
+  }) async {
+    final bcdPath = _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\BCD');
+    if (!await File(bcdPath).exists()) {
+      _logLine('BCD store not found for hardening: $bcdPath');
+      return false;
+    }
+
+    final osDevice = 'partition=${_driveSpec(windowsDrive)}';
+    final commands = <List<String>>[
+      ['/store', bcdPath, '/set', '{default}', 'device', osDevice],
+      ['/store', bcdPath, '/set', '{default}', 'osdevice', osDevice],
+      ['/store', bcdPath, '/set', '{default}', 'detecthal', 'yes'],
+    ];
+
+    for (final args in commands) {
+      try {
+        final result = await Process.run(
+          'bcdedit',
+          args,
+        ).timeout(const Duration(seconds: 30));
+        _logLine('bcdedit ${args.join(' ')} exit: ${result.exitCode}');
+        if (result.exitCode != 0) {
+          _logLine('bcdedit stderr: ${result.stderr}');
+          return false;
+        }
+      } catch (e) {
+        _logLine('bcdedit error: $e');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<bool> _ensureFallbackUefiBootFile({required String efiDrive}) async {
+    try {
+      final bootDir = Directory(_drivePath(efiDrive, 'EFI\\Boot'));
+      if (!await bootDir.exists()) {
+        await bootDir.create(recursive: true);
+      }
+
+      final fallback = File(_drivePath(efiDrive, 'EFI\\Boot\\bootx64.efi'));
+      if (await fallback.exists()) {
+        _logLine('UEFI fallback boot file exists: ${fallback.path}');
+        return true;
+      }
+
+      final candidates = <String>[
+        _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\bootmgfw.efi'),
+        _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\bootx64.efi'),
+      ];
+
+      for (final candidate in candidates) {
+        final source = File(candidate);
+        if (await source.exists()) {
+          await source.copy(fallback.path);
+          _logLine('Copied UEFI fallback boot file from $candidate');
+          return true;
+        }
+      }
+
+      _logLine('Unable to create UEFI fallback boot file');
+      return false;
+    } catch (e) {
+      _logLine('UEFI fallback boot file error: $e');
       return false;
     }
   }
@@ -1319,51 +1727,47 @@ exit
   Future<bool> _verifyWtg({
     required String windowsDrive,
     required String efiDrive,
+    required WtgBootLayout bootLayout,
   }) async {
     final errors = <String>[];
-    final isMbrMode = windowsDrive == efiDrive;
 
-    _logLine('Verification mode: ${isMbrMode ? "MBR" : "GPT"}');
+    _logLine('Verification mode: ${bootLayout.name}');
 
     // Check Windows partition
-    if (!await Directory('${windowsDrive}Windows').exists()) {
+    if (!await Directory(_drivePath(windowsDrive, 'Windows')).exists()) {
       errors.add('Windows directory missing');
     }
 
-    // Check BIOS boot files only when Windows partition is also the boot partition.
-    final hasBootmgr = await File('${windowsDrive}bootmgr').exists();
-    if (isMbrMode && !hasBootmgr) {
-      errors.add('bootmgr missing');
+    if (_driveRoot(windowsDrive).toUpperCase() ==
+        _driveRoot(efiDrive).toUpperCase()) {
+      errors.add('EFI partition must be separate from Windows partition');
     }
 
-    if (isMbrMode) {
-      // MBR mode: check boot folder on Windows partition
-      final hasBootDir =
-          await Directory('${windowsDrive}Boot').exists() ||
-          await Directory('${windowsDrive}boot').exists();
-      if (!hasBootDir) {
-        _logLine('Note: Boot directory not found (may be created by bcdboot)');
-      }
-    } else {
-      // GPT mode: check EFI partition
-      if (!await Directory('${efiDrive}EFI').exists()) {
-        errors.add('EFI directory missing');
-      }
+    // GPT mode: check independent EFI partition
+    if (!await Directory(_drivePath(efiDrive, 'EFI')).exists()) {
+      errors.add('EFI directory missing');
+    }
 
-      // Check BCD
-      final hasBcd = await File(
-        '${efiDrive}EFI\\Microsoft\\Boot\\BCD',
-      ).exists();
-      if (!hasBcd) {
-        errors.add('BCD missing');
-      }
+    // Check BCD
+    final hasBcd = await File(
+      _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\BCD'),
+    ).exists();
+    if (!hasBcd) {
+      errors.add('BCD missing');
+    }
 
-      final hasFallbackEfi =
-          await File('${efiDrive}EFI\\Boot\\bootx64.efi').exists() ||
-          await File('${efiDrive}EFI\\Boot\\bootaa64.efi').exists();
-      if (!hasFallbackEfi) {
-        errors.add('UEFI fallback boot file missing');
+    if (bootLayout == WtgBootLayout.mbrHybrid) {
+      final hasBootmgr = await File(_drivePath(efiDrive, 'bootmgr')).exists();
+      if (!hasBootmgr) {
+        errors.add('BIOS bootmgr missing on system partition');
       }
+    }
+
+    final hasFallbackEfi =
+        await File(_drivePath(efiDrive, 'EFI\\Boot\\bootx64.efi')).exists() ||
+        await File(_drivePath(efiDrive, 'EFI\\Boot\\bootaa64.efi')).exists();
+    if (!hasFallbackEfi) {
+      errors.add('UEFI fallback boot file missing');
     }
 
     if (errors.isNotEmpty) {

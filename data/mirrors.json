@@ -16,7 +16,7 @@
         "ko": "공식 Windows 10",
         "ja": "公式 Windows 10"
       },
-      "category": "Official Microsoft",
+      "category": "Official Microsoft Images",
       "type": {
         "zh": "微软官方镜像",
         "zh_TW": "微軟官方映像",
@@ -32,7 +32,7 @@
       },
       "version": "Windows 10",
       "build": "22H2",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "日常使用、办公学习和较旧电脑",
         "zh_TW": "日常使用、辦公學習和較舊電腦",
@@ -191,7 +191,7 @@
         "ko": "공식 Windows 11",
         "ja": "公式 Windows 11"
       },
-      "category": "Official Microsoft",
+      "category": "Official Microsoft Images",
       "type": {
         "zh": "微软官方镜像",
         "zh_TW": "微軟官方映像",
@@ -207,7 +207,7 @@
       },
       "version": "Windows 11",
       "build": "25H2",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "新电脑、游戏玩家和开发者",
         "zh_TW": "新電腦、遊戲玩家和開發者",
@@ -355,7 +355,7 @@
         "ko": "Tiny10",
         "ja": "Tiny10"
       },
-      "category": "Community Images",
+      "category": "Community Editions",
       "type": {
         "zh": "精简系统",
         "zh_TW": "精簡系統",
@@ -371,7 +371,7 @@
       },
       "version": "Windows 10",
       "build": "22H2",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "低配置电脑、虚拟机和测试环境",
         "zh_TW": "低配置電腦、虛擬機和測試環境",
@@ -533,7 +533,7 @@
         "ko": "Tiny11",
         "ja": "Tiny11"
       },
-      "category": "Community Images",
+      "category": "Community Editions",
       "type": {
         "zh": "精简系统",
         "zh_TW": "精簡系統",
@@ -549,7 +549,7 @@
       },
       "version": "Windows 11",
       "build": "25H2",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "低配置电脑、虚拟机和测试环境",
         "zh_TW": "低配置電腦、虛擬機和測試環境",
@@ -700,7 +700,7 @@
         "ko": "X-Lite Windows 10",
         "ja": "X-Lite Windows 10"
       },
-      "category": "Community Images",
+      "category": "Community Editions",
       "type": {
         "zh": "深度优化系统",
         "zh_TW": "深度最佳化系統",
@@ -715,7 +715,7 @@
         "ja": "高度に最適化されたシステム"
       },
       "version": "Windows 10",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "游戏玩家和性能爱好者",
         "zh_TW": "遊戲玩家和效能愛好者",
@@ -877,7 +877,7 @@
         "ko": "X-Lite Windows 11",
         "ja": "X-Lite Windows 11"
       },
-      "category": "Community Images",
+      "category": "Community Editions",
       "type": {
         "zh": "深度优化系统",
         "zh_TW": "深度最佳化系統",
@@ -892,7 +892,7 @@
         "ja": "高度に最適化されたシステム"
       },
       "version": "Windows 11",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "游戏玩家和性能爱好者",
         "zh_TW": "遊戲玩家和效能愛好者",
@@ -1043,7 +1043,7 @@
         "ko": "StarValleyX",
         "ja": "StarValleyX"
       },
-      "category": "Community Images",
+      "category": "Community Editions",
       "type": {
         "zh": "视觉增强版 Windows 10",
         "zh_TW": "視覺增強版 Windows 10",
@@ -1058,7 +1058,7 @@
         "ja": "ビジュアル強化版 Windows 10"
       },
       "version": "Windows 10",
-      "architecture": "x64",
+      "architecture": "x64 (64-bit)",
       "audience": {
         "zh": "桌面美化爱好者",
         "zh_TW": "桌面美化愛好者",
@@ -1193,6 +1193,766 @@
       "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
       "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
       "globalUrl": "https://gofile.io/d/Cxz53k"
+    },
+    {
+      "id": "ltsc-win10-enterprise",
+      "name": {
+        "zh": "Windows 10 Enterprise LTSC",
+        "zh_TW": "Windows 10 Enterprise LTSC",
+        "en": "Windows 10 Enterprise LTSC",
+        "fr": "Windows 10 Enterprise LTSC",
+        "de": "Windows 10 Enterprise LTSC",
+        "es": "Windows 10 Enterprise LTSC",
+        "pt": "Windows 10 Enterprise LTSC",
+        "ru": "Windows 10 Enterprise LTSC",
+        "ar": "Windows 10 Enterprise LTSC",
+        "ko": "Windows 10 Enterprise LTSC",
+        "ja": "Windows 10 Enterprise LTSC"
+      },
+      "type": {
+        "zh": "企业长期服务版",
+        "zh_TW": "企业长期服务版",
+        "en": "Enterprise Long-Term Servicing Channel",
+        "fr": "Enterprise Long-Term Servicing Channel",
+        "de": "Enterprise Long-Term Servicing Channel",
+        "es": "Enterprise Long-Term Servicing Channel",
+        "pt": "Enterprise Long-Term Servicing Channel",
+        "ru": "Enterprise Long-Term Servicing Channel",
+        "ar": "Enterprise Long-Term Servicing Channel",
+        "ko": "Enterprise Long-Term Servicing Channel",
+        "ja": "Enterprise Long-Term Servicing Channel"
+      },
+      "version": "Windows 10",
+      "build": "Enterprise LTSC",
+      "size": "x64 ISO",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-WkS0h",
+      "globalUrl": "https://gofile.io/d/GuBVGQ",
+      "audience": {
+        "zh": "适合 IT 技术人员、实验室环境、离线部署、长期维护设备和需要稳定更新节奏的高级用户。",
+        "zh_TW": "適合 IT 技術人員、實驗室環境、離線部署、長期維護設備，以及需要穩定更新節奏的進階使用者。",
+        "en": "For IT technicians, lab systems, offline deployment, long-maintenance devices, and advanced users who want a stable servicing cadence.",
+        "fr": "Pour les techniciens IT, les systèmes de laboratoire, les déploiements hors ligne, les appareils maintenus longtemps et les utilisateurs avancés qui veulent un rythme de maintenance stable.",
+        "de": "Für IT-Techniker, Laborsysteme, Offline-Bereitstellungen, langfristig gewartete Geräte und fortgeschrittene Benutzer, die einen stabilen Wartungsrhythmus wünschen.",
+        "es": "Para técnicos de TI, sistemas de laboratorio, despliegues sin conexión, dispositivos de mantenimiento prolongado y usuarios avanzados que desean un ritmo de servicio estable.",
+        "pt": "Para técnicos de TI, sistemas de laboratório, implantação offline, dispositivos de manutenção prolongada e usuários avançados que desejam um ritmo de manutenção estável.",
+        "ru": "Для IT-специалистов, лабораторных систем, автономного развертывания, устройств с долгим обслуживанием и опытных пользователей, которым нужен стабильный цикл обслуживания.",
+        "ar": "مناسب لفنيي تقنية المعلومات وأنظمة المختبرات والنشر دون اتصال والأجهزة طويلة الصيانة والمستخدمين المتقدمين الذين يريدون وتيرة صيانة مستقرة.",
+        "ko": "IT 기술자, 실험실 시스템, 오프라인 배포, 장기 유지 관리 장치, 안정적인 서비스 주기를 원하는 고급 사용자에게 적합합니다.",
+        "ja": "IT 技術者、ラボ環境、オフライン展開、長期保守デバイス、安定したサービス周期を求める上級ユーザー向けです。"
+      },
+      "pros": {
+        "zh": [
+          "采用 LTSC 长期服务通道，面向长期服务场景，功能更新频率低，主要接收安全和质量更新。",
+          "相比普通消费版，默认体验更安静，预装应用和消费者功能更少，适合纯净桌面、游戏机、工作站和专用设备。",
+          "兼容性成熟，对旧硬件、旧驱动、专业软件和离线部署流程更友好。",
+          "适合需要长期稳定环境的用户，但仍应使用合法授权并理解企业版授权要求。"
+        ],
+        "zh_TW": [
+          "採用 LTSC 長期服務通道，面向長期服務場景，功能更新頻率低，主要接收安全與品質更新。",
+          "相比一般消費版，預設體驗更安靜，預裝應用與消費者功能更少，適合純淨桌面、遊戲機、工作站和專用設備。",
+          "相容性成熟，對舊硬體、舊驅動、專業軟體與離線部署流程更友善。",
+          "適合需要長期穩定環境的使用者，但仍應使用合法授權並理解企業版授權要求。"
+        ],
+        "en": [
+          "Uses the LTSC long-term servicing channel. Feature updates are infrequent; security and quality updates are the focus.",
+          "Quieter than consumer editions, with fewer bundled apps and consumer experiences. Good for clean desktops, gaming rigs, workstations, and dedicated devices.",
+          "Mature compatibility for older hardware, legacy drivers, professional software, and offline deployment workflows.",
+          "Useful when stability matters more than new features, provided licensing requirements are understood."
+        ],
+        "fr": [
+          "Utilise le canal de maintenance à long terme LTSC. Les mises à jour de fonctionnalités sont rares ; la sécurité et la qualité sont prioritaires.",
+          "Plus discret que les éditions grand public, avec moins d’applications intégrées et d’expériences consommateur. Adapté aux bureaux propres, PC de jeu, stations de travail et appareils dédiés.",
+          "Compatibilité mûre avec le matériel ancien, les pilotes hérités, les logiciels professionnels et les déploiements hors ligne.",
+          "Utile lorsque la stabilité compte plus que les nouveautés, à condition de comprendre les exigences de licence."
+        ],
+        "de": [
+          "Verwendet den LTSC-Kanal für langfristige Wartung. Funktionsupdates sind selten; Sicherheits- und Qualitätsupdates stehen im Mittelpunkt.",
+          "Ruhiger als Consumer-Editionen, mit weniger vorinstallierten Apps und Verbraucherfunktionen. Gut für saubere Desktops, Gaming-PCs, Workstations und dedizierte Geräte.",
+          "Ausgereifte Kompatibilität mit älterer Hardware, Legacy-Treibern, professioneller Software und Offline-Bereitstellungen.",
+          "Sinnvoll, wenn Stabilität wichtiger ist als neue Funktionen, sofern die Lizenzanforderungen verstanden werden."
+        ],
+        "es": [
+          "Usa el canal de servicio a largo plazo LTSC. Las actualizaciones de funciones son poco frecuentes; se priorizan seguridad y calidad.",
+          "Más silencioso que las ediciones de consumo, con menos aplicaciones integradas y experiencias de consumidor. Adecuado para escritorios limpios, equipos de juego, estaciones de trabajo y dispositivos dedicados.",
+          "Compatibilidad madura con hardware antiguo, controladores heredados, software profesional y despliegues sin conexión.",
+          "Útil cuando la estabilidad importa más que las novedades, siempre que se comprendan los requisitos de licencia."
+        ],
+        "pt": [
+          "Usa o canal de manutenção de longo prazo LTSC. Atualizações de recursos são pouco frequentes; segurança e qualidade são o foco.",
+          "Mais discreto que as edições de consumo, com menos aplicativos incluídos e experiências de consumidor. Bom para desktops limpos, PCs de jogos, estações de trabalho e dispositivos dedicados.",
+          "Compatibilidade madura com hardware antigo, drivers legados, software profissional e fluxos de implantação offline.",
+          "Útil quando a estabilidade importa mais que novos recursos, desde que os requisitos de licença sejam compreendidos."
+        ],
+        "ru": [
+          "Использует канал долгосрочного обслуживания LTSC. Функциональные обновления редки; основной упор на безопасность и качество.",
+          "Спокойнее потребительских редакций: меньше встроенных приложений и пользовательских функций. Подходит для чистых рабочих столов, игровых ПК, рабочих станций и специализированных устройств.",
+          "Зрелая совместимость со старым оборудованием, устаревшими драйверами, профессиональным ПО и автономными сценариями развертывания.",
+          "Полезен, когда стабильность важнее новых функций, если понятны лицензионные требования."
+        ],
+        "ar": [
+          "يستخدم قناة خدمة LTSC طويلة الأمد. تحديثات الميزات قليلة، والتركيز على تحديثات الأمان والجودة.",
+          "أهدأ من إصدارات المستهلك، مع تطبيقات وتجارب مدمجة أقل. مناسب لسطح مكتب نظيف وأجهزة الألعاب ومحطات العمل والأجهزة المخصصة.",
+          "توافق ناضج مع الأجهزة القديمة وبرامج التشغيل القديمة والبرامج الاحترافية وعمليات النشر دون اتصال.",
+          "مفيد عندما تكون الاستقرار أهم من الميزات الجديدة، بشرط فهم متطلبات الترخيص."
+        ],
+        "ko": [
+          "LTSC 장기 서비스 채널을 사용합니다. 기능 업데이트는 드물고 보안 및 품질 업데이트에 집중합니다.",
+          "일반 소비자 에디션보다 조용하며 번들 앱과 소비자 경험이 적습니다. 깔끔한 데스크톱, 게임 PC, 워크스테이션, 전용 장치에 적합합니다.",
+          "구형 하드웨어, 레거시 드라이버, 전문 소프트웨어, 오프라인 배포 흐름과의 호환성이 성숙합니다.",
+          "새 기능보다 안정성이 더 중요할 때 유용하지만 라이선스 요구 사항을 이해해야 합니다."
+        ],
+        "ja": [
+          "LTSC の長期サービスチャネルを採用しています。機能更新は少なく、セキュリティと品質更新が中心です。",
+          "一般向けエディションより静かで、同梱アプリやコンシューマー機能が少なめです。クリーンなデスクトップ、ゲーム機、ワークステーション、専用デバイスに適しています。",
+          "古いハードウェア、レガシードライバー、専門ソフト、オフライン展開との互換性が成熟しています。",
+          "新機能より安定性を重視する場合に有用ですが、ライセンス要件を理解している必要があります。"
+        ]
+      },
+      "notes": {
+        "zh": [
+          "仅提供简体中文版本（123 云盘）和英文版（GoFile）。",
+          "不适合想要最新 Windows 功能、Microsoft Store 体验或频繁功能更新的用户。",
+          "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
+        ],
+        "zh_TW": [
+          "僅提供簡體中文版本（123 雲盤）和英文版（GoFile）。",
+          "不適合想要最新 Windows 功能、Microsoft Store 體驗或頻繁功能更新的使用者。",
+          "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
+        ],
+        "en": [
+          "Simplified Chinese is provided via 123 Cloud; English is provided via GoFile.",
+          "Not ideal if you want the newest Windows features, Microsoft Store-centric workflows, or frequent feature updates.",
+          "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
+        ],
+        "fr": [
+          "Le chinois simplifié est fourni via 123 Cloud ; l’anglais est fourni via GoFile.",
+          "Peu adapté si vous voulez les dernières fonctionnalités Windows, les usages centrés sur Microsoft Store ou des mises à jour fonctionnelles fréquentes.",
+          "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
+        ],
+        "de": [
+          "Vereinfachtes Chinesisch wird über 123 Cloud bereitgestellt; Englisch über GoFile.",
+          "Nicht ideal, wenn Sie die neuesten Windows-Funktionen, Microsoft-Store-zentrierte Abläufe oder häufige Funktionsupdates wünschen.",
+          "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
+        ],
+        "es": [
+          "El chino simplificado se proporciona mediante 123 Cloud; el inglés mediante GoFile.",
+          "No es ideal si quieres las funciones más recientes de Windows, flujos centrados en Microsoft Store o actualizaciones de funciones frecuentes.",
+          "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
+        ],
+        "pt": [
+          "O chinês simplificado é fornecido pelo 123 Cloud; o inglês é fornecido pelo GoFile.",
+          "Não é ideal se você deseja os recursos mais recentes do Windows, fluxos centrados na Microsoft Store ou atualizações frequentes de recursos.",
+          "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
+        ],
+        "ru": [
+          "Упрощенный китайский доступен через 123 Cloud; английский через GoFile.",
+          "Не лучший вариант, если нужны новейшие функции Windows, сценарии вокруг Microsoft Store или частые функциональные обновления.",
+          "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
+        ],
+        "ar": [
+          "تتوفر الصينية المبسطة عبر 123 Cloud، والإنجليزية عبر GoFile.",
+          "ليس مثاليًا إذا كنت تريد أحدث ميزات Windows أو سير عمل يركز على Microsoft Store أو تحديثات ميزات متكررة.",
+          "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
+        ],
+        "ko": [
+          "중국어 간체는 123 Cloud로 제공되며 영어는 GoFile로 제공됩니다.",
+          "최신 Windows 기능, Microsoft Store 중심 흐름, 잦은 기능 업데이트를 원하는 경우에는 적합하지 않습니다.",
+          "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
+        ],
+        "ja": [
+          "簡体字中国語版は 123 Cloud、英語版は GoFile で提供されます。",
+          "最新の Windows 機能、Microsoft Store 中心の利用、頻繁な機能更新を求める場合には向きません。",
+          "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
+        ]
+      },
+      "category": "Enterprise & LTSC Builds",
+      "architecture": "x64 (64-bit)",
+      "description": {
+        "zh": "面向部署、长期维护和高级使用场景的 LTSC 镜像资源。",
+        "zh_TW": "面向部署、長期維護和進階使用場景的 LTSC 映像資源。",
+        "en": "LTSC image resource for deployment, long-term maintenance, and advanced usage scenarios.",
+        "fr": "Ressource d’image LTSC pour le déploiement, la maintenance à long terme et les usages avancés.",
+        "de": "LTSC-Abbildressource für Bereitstellung, langfristige Wartung und fortgeschrittene Nutzungsszenarien.",
+        "es": "Recurso de imagen LTSC para despliegue, mantenimiento a largo plazo y escenarios de uso avanzado.",
+        "pt": "Recurso de imagem LTSC para implantação, manutenção de longo prazo e cenários de uso avançado.",
+        "ru": "Ресурс образа LTSC для развертывания, долгосрочного обслуживания и продвинутых сценариев.",
+        "ar": "مورد صورة LTSC للنشر والصيانة طويلة الأمد وسيناريوهات الاستخدام المتقدمة.",
+        "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
+        "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
+      },
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-WkS0h",
+      "sha256": "",
+      "needsFontPack": false
+    },
+    {
+      "id": "ltsc-win11-enterprise",
+      "name": {
+        "zh": "Windows 11 Enterprise LTSC",
+        "zh_TW": "Windows 11 Enterprise LTSC",
+        "en": "Windows 11 Enterprise LTSC",
+        "fr": "Windows 11 Enterprise LTSC",
+        "de": "Windows 11 Enterprise LTSC",
+        "es": "Windows 11 Enterprise LTSC",
+        "pt": "Windows 11 Enterprise LTSC",
+        "ru": "Windows 11 Enterprise LTSC",
+        "ar": "Windows 11 Enterprise LTSC",
+        "ko": "Windows 11 Enterprise LTSC",
+        "ja": "Windows 11 Enterprise LTSC"
+      },
+      "type": {
+        "zh": "企业长期服务版",
+        "zh_TW": "企业长期服务版",
+        "en": "Enterprise Long-Term Servicing Channel",
+        "fr": "Enterprise Long-Term Servicing Channel",
+        "de": "Enterprise Long-Term Servicing Channel",
+        "es": "Enterprise Long-Term Servicing Channel",
+        "pt": "Enterprise Long-Term Servicing Channel",
+        "ru": "Enterprise Long-Term Servicing Channel",
+        "ar": "Enterprise Long-Term Servicing Channel",
+        "ko": "Enterprise Long-Term Servicing Channel",
+        "ja": "Enterprise Long-Term Servicing Channel"
+      },
+      "version": "Windows 11",
+      "build": "Enterprise LTSC",
+      "size": "x64 ISO",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-3g4Kh",
+      "globalUrl": "https://gofile.io/d/Kh3ivv",
+      "audience": {
+        "zh": "适合想使用 Windows 11 平台，同时又希望减少功能变动、长期保持部署环境稳定的高级用户和技术人员。",
+        "zh_TW": "適合想使用 Windows 11 平台，同時又希望減少功能變動、長期保持部署環境穩定的進階使用者和技術人員。",
+        "en": "For advanced users and technicians who want Windows 11 while keeping deployments stable with fewer feature changes.",
+        "fr": "Pour les utilisateurs avancés et les techniciens qui veulent Windows 11 tout en conservant des déploiements stables avec moins de changements fonctionnels.",
+        "de": "Für fortgeschrittene Benutzer und Techniker, die Windows 11 nutzen möchten und gleichzeitig stabile Bereitstellungen mit weniger Funktionsänderungen brauchen.",
+        "es": "Para usuarios avanzados y técnicos que desean Windows 11 manteniendo despliegues estables con menos cambios de funciones.",
+        "pt": "Para usuários avançados e técnicos que desejam usar o Windows 11 mantendo implantações estáveis com menos mudanças de recursos.",
+        "ru": "Для опытных пользователей и специалистов, которым нужна платформа Windows 11 при стабильных развертываниях с меньшим числом функциональных изменений.",
+        "ar": "للمستخدمين المتقدمين والفنيين الذين يريدون Windows 11 مع الحفاظ على استقرار عمليات النشر وتقليل تغييرات الميزات.",
+        "ko": "Windows 11을 사용하면서 기능 변경을 줄이고 배포 환경을 오래 안정적으로 유지하려는 고급 사용자와 기술자에게 적합합니다.",
+        "ja": "Windows 11 を使いながら機能変更を抑え、展開環境を長期的に安定させたい上級ユーザーと技術者向けです。"
+      },
+      "pros": {
+        "zh": [
+          "保留 Windows 11 的新平台基础，同时采用 LTSC 更新节奏，减少功能版本频繁变化带来的维护成本。",
+          "适合新硬件、Windows 11 驱动栈、现代游戏平台和需要较新内核能力的工作站。",
+          "相比普通 Windows 11，消费者预装和体验打扰更少，更适合追求干净系统的极客用户。",
+          "适合实验室、游戏环境、专用工作站和长期部署测试。"
+        ],
+        "zh_TW": [
+          "保留 Windows 11 的新平台基礎，同時採用 LTSC 更新節奏，減少功能版本頻繁變化帶來的維護成本。",
+          "適合新硬體、Windows 11 驅動堆疊、現代遊戲平台，以及需要較新核心能力的工作站。",
+          "相比一般 Windows 11，消費者預裝與體驗打擾更少，更適合追求乾淨系統的極客使用者。",
+          "適合實驗室、遊戲環境、專用工作站和長期部署測試。"
+        ],
+        "en": [
+          "Keeps the Windows 11 platform while using the LTSC servicing cadence, reducing maintenance churn from frequent feature releases.",
+          "Good for newer hardware, the Windows 11 driver stack, modern gaming platforms, and workstations that benefit from newer kernel capabilities.",
+          "Less consumer-focused noise than normal Windows 11 editions, making it attractive for clean enthusiast builds.",
+          "Suitable for labs, gaming setups, dedicated workstations, and long-term deployment testing."
+        ],
+        "fr": [
+          "Conserve la plateforme Windows 11 tout en adoptant le rythme de maintenance LTSC, ce qui réduit la charge liée aux changements fréquents de fonctionnalités.",
+          "Adapté au matériel récent, à la pile de pilotes Windows 11, aux plateformes de jeu modernes et aux stations de travail qui profitent d’un noyau plus récent.",
+          "Moins de bruit orienté consommateur que les éditions Windows 11 classiques, ce qui convient aux configurations propres d’utilisateurs exigeants.",
+          "Adapté aux laboratoires, environnements de jeu, stations de travail dédiées et tests de déploiement à long terme."
+        ],
+        "de": [
+          "Behält die Windows-11-Plattform bei und nutzt den LTSC-Wartungsrhythmus, wodurch Aufwand durch häufige Funktionsversionen sinkt.",
+          "Gut für neuere Hardware, den Windows-11-Treiberstack, moderne Gaming-Plattformen und Workstations, die von neueren Kernel-Fähigkeiten profitieren.",
+          "Weniger verbraucherorientierte Ablenkung als normale Windows-11-Editionen, attraktiv für saubere Enthusiasten-Installationen.",
+          "Geeignet für Labore, Gaming-Setups, dedizierte Workstations und langfristige Bereitstellungstests."
+        ],
+        "es": [
+          "Mantiene la plataforma Windows 11 con el ritmo de servicio LTSC, reduciendo el mantenimiento causado por versiones de funciones frecuentes.",
+          "Adecuado para hardware nuevo, la pila de controladores de Windows 11, plataformas modernas de juego y estaciones de trabajo que aprovechan capacidades de núcleo más recientes.",
+          "Menos ruido orientado al consumidor que las ediciones normales de Windows 11, atractivo para instalaciones limpias de entusiastas.",
+          "Apto para laboratorios, entornos de juego, estaciones de trabajo dedicadas y pruebas de despliegue a largo plazo."
+        ],
+        "pt": [
+          "Mantém a plataforma Windows 11 usando o ritmo de manutenção LTSC, reduzindo o esforço causado por lançamentos frequentes de recursos.",
+          "Bom para hardware mais novo, pilha de drivers do Windows 11, plataformas modernas de jogos e estações de trabalho que se beneficiam de recursos de kernel mais recentes.",
+          "Menos ruído voltado ao consumidor que edições normais do Windows 11, atraente para instalações limpas de entusiastas.",
+          "Adequado para laboratórios, ambientes de jogos, estações de trabalho dedicadas e testes de implantação de longo prazo."
+        ],
+        "ru": [
+          "Сохраняет платформу Windows 11 и использует цикл обслуживания LTSC, снижая нагрузку от частых функциональных выпусков.",
+          "Подходит для нового оборудования, стека драйверов Windows 11, современных игровых платформ и рабочих станций, которым полезны новые возможности ядра.",
+          "Меньше потребительского шума, чем в обычных редакциях Windows 11, что привлекательно для чистых энтузиастских сборок.",
+          "Подходит для лабораторий, игровых систем, выделенных рабочих станций и долгосрочного тестирования развертываний."
+        ],
+        "ar": [
+          "يحافظ على منصة Windows 11 مع استخدام وتيرة صيانة LTSC، مما يقلل عبء الصيانة الناتج عن إصدارات الميزات المتكررة.",
+          "مناسب للأجهزة الأحدث وحزمة تعريفات Windows 11 ومنصات الألعاب الحديثة ومحطات العمل التي تستفيد من إمكانات نواة أحدث.",
+          "ضوضاء موجهة للمستهلك أقل من إصدارات Windows 11 العادية، ما يجعله جذابًا للتركيبات النظيفة لعشاق التقنية.",
+          "مناسب للمختبرات وبيئات الألعاب ومحطات العمل المخصصة واختبارات النشر طويلة الأمد."
+        ],
+        "ko": [
+          "Windows 11 플랫폼을 유지하면서 LTSC 서비스 주기를 사용해 잦은 기능 릴리스로 인한 유지 관리 부담을 줄입니다.",
+          "최신 하드웨어, Windows 11 드라이버 스택, 현대적인 게임 플랫폼, 새로운 커널 기능이 필요한 워크스테이션에 적합합니다.",
+          "일반 Windows 11 에디션보다 소비자 중심 요소가 적어 깔끔한 매니아 빌드에 매력적입니다.",
+          "실험실, 게임 환경, 전용 워크스테이션, 장기 배포 테스트에 적합합니다."
+        ],
+        "ja": [
+          "Windows 11 プラットフォームを保ちながら LTSC のサービス周期を使い、頻繁な機能リリースによる保守負荷を減らします。",
+          "新しいハードウェア、Windows 11 ドライバースタック、現代的なゲーム環境、新しいカーネル機能を活かすワークステーションに適しています。",
+          "通常の Windows 11 よりコンシューマー向けの要素が少なく、クリーンな構成を好むユーザーに向いています。",
+          "ラボ、ゲーム環境、専用ワークステーション、長期展開テストに適しています。"
+        ]
+      },
+      "notes": {
+        "zh": [
+          "仅提供简体中文版本（123 云盘）和英文版（GoFile）。",
+          "Windows 11 LTSC 仍可能有硬件和 TPM/安全启动相关要求，部署前请自行验证。",
+          "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
+        ],
+        "zh_TW": [
+          "僅提供簡體中文版本（123 雲盤）和英文版（GoFile）。",
+          "Windows 11 LTSC 仍可能有硬體、TPM 與安全啟動相關要求，部署前請自行驗證。",
+          "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
+        ],
+        "en": [
+          "Simplified Chinese is provided via 123 Cloud; English is provided via GoFile.",
+          "Windows 11 LTSC may still involve hardware, TPM, and Secure Boot considerations. Verify before deployment.",
+          "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
+        ],
+        "fr": [
+          "Le chinois simplifié est fourni via 123 Cloud ; l’anglais est fourni via GoFile.",
+          "Windows 11 LTSC peut encore impliquer des contraintes matérielles, TPM et Secure Boot. Vérifiez avant le déploiement.",
+          "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
+        ],
+        "de": [
+          "Vereinfachtes Chinesisch wird über 123 Cloud bereitgestellt; Englisch über GoFile.",
+          "Windows 11 LTSC kann weiterhin Hardware-, TPM- und Secure-Boot-Aspekte betreffen. Vor der Bereitstellung prüfen.",
+          "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
+        ],
+        "es": [
+          "El chino simplificado se proporciona mediante 123 Cloud; el inglés mediante GoFile.",
+          "Windows 11 LTSC aún puede implicar consideraciones de hardware, TPM y arranque seguro. Verifícalo antes del despliegue.",
+          "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
+        ],
+        "pt": [
+          "O chinês simplificado é fornecido pelo 123 Cloud; o inglês é fornecido pelo GoFile.",
+          "O Windows 11 LTSC ainda pode envolver requisitos de hardware, TPM e Inicialização Segura. Verifique antes da implantação.",
+          "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
+        ],
+        "ru": [
+          "Упрощенный китайский доступен через 123 Cloud; английский через GoFile.",
+          "Windows 11 LTSC все еще может требовать внимания к оборудованию, TPM и Secure Boot. Проверьте перед развертыванием.",
+          "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
+        ],
+        "ar": [
+          "تتوفر الصينية المبسطة عبر 123 Cloud، والإنجليزية عبر GoFile.",
+          "قد يتطلب Windows 11 LTSC مراعاة العتاد وTPM والإقلاع الآمن. تحقق قبل النشر.",
+          "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
+        ],
+        "ko": [
+          "중국어 간체는 123 Cloud로 제공되며 영어는 GoFile로 제공됩니다.",
+          "Windows 11 LTSC는 하드웨어, TPM, 보안 부팅 관련 사항을 여전히 고려해야 할 수 있습니다. 배포 전에 확인하세요.",
+          "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
+        ],
+        "ja": [
+          "簡体字中国語版は 123 Cloud、英語版は GoFile で提供されます。",
+          "Windows 11 LTSC でもハードウェア、TPM、セキュアブートに関する確認が必要な場合があります。展開前に検証してください。",
+          "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
+        ]
+      },
+      "category": "Enterprise & LTSC Builds",
+      "architecture": "x64 (64-bit)",
+      "description": {
+        "zh": "面向部署、长期维护和高级使用场景的 LTSC 镜像资源。",
+        "zh_TW": "面向部署、長期維護和進階使用場景的 LTSC 映像資源。",
+        "en": "LTSC image resource for deployment, long-term maintenance, and advanced usage scenarios.",
+        "fr": "Ressource d’image LTSC pour le déploiement, la maintenance à long terme et les usages avancés.",
+        "de": "LTSC-Abbildressource für Bereitstellung, langfristige Wartung und fortgeschrittene Nutzungsszenarien.",
+        "es": "Recurso de imagen LTSC para despliegue, mantenimiento a largo plazo y escenarios de uso avanzado.",
+        "pt": "Recurso de imagem LTSC para implantação, manutenção de longo prazo e cenários de uso avançado.",
+        "ru": "Ресурс образа LTSC для развертывания, долгосрочного обслуживания и продвинутых сценариев.",
+        "ar": "مورد صورة LTSC للنشر والصيانة طويلة الأمد وسيناريوهات الاستخدام المتقدمة.",
+        "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
+        "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
+      },
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-3g4Kh",
+      "sha256": "",
+      "needsFontPack": false
+    },
+    {
+      "id": "ltsc-win10-iot",
+      "name": {
+        "zh": "Windows 10 IoT Enterprise LTSC",
+        "zh_TW": "Windows 10 IoT Enterprise LTSC",
+        "en": "Windows 10 IoT Enterprise LTSC",
+        "fr": "Windows 10 IoT Enterprise LTSC",
+        "de": "Windows 10 IoT Enterprise LTSC",
+        "es": "Windows 10 IoT Enterprise LTSC",
+        "pt": "Windows 10 IoT Enterprise LTSC",
+        "ru": "Windows 10 IoT Enterprise LTSC",
+        "ar": "Windows 10 IoT Enterprise LTSC",
+        "ko": "Windows 10 IoT Enterprise LTSC",
+        "ja": "Windows 10 IoT Enterprise LTSC"
+      },
+      "type": {
+        "zh": "IoT 企业长期服务版",
+        "zh_TW": "IoT 企业长期服务版",
+        "en": "IoT Enterprise Long-Term Servicing Channel",
+        "fr": "IoT Enterprise Long-Term Servicing Channel",
+        "de": "IoT Enterprise Long-Term Servicing Channel",
+        "es": "IoT Enterprise Long-Term Servicing Channel",
+        "pt": "IoT Enterprise Long-Term Servicing Channel",
+        "ru": "IoT Enterprise Long-Term Servicing Channel",
+        "ar": "IoT Enterprise Long-Term Servicing Channel",
+        "ko": "IoT Enterprise Long-Term Servicing Channel",
+        "ja": "IoT Enterprise Long-Term Servicing Channel"
+      },
+      "version": "Windows 10",
+      "build": "IoT Enterprise LTSC",
+      "size": "x64 ISO",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh",
+      "globalUrl": "https://gofile.io/d/Cshncs",
+      "audience": {
+        "zh": "适合嵌入式设备、专用终端、离线设备、长期运行环境，以及想要更长生命周期的极客用户。",
+        "zh_TW": "適合嵌入式設備、專用終端、離線設備、長期運作環境，以及想要更長生命週期的極客使用者。",
+        "en": "For embedded devices, dedicated terminals, offline systems, long-running environments, and enthusiasts who want a longer lifecycle.",
+        "fr": "Pour les appareils intégrés, les terminaux dédiés, les systèmes hors ligne, les environnements longue durée et les passionnés qui veulent un cycle de vie plus long.",
+        "de": "Für Embedded-Geräte, dedizierte Terminals, Offline-Systeme, dauerhaft laufende Umgebungen und Enthusiasten, die einen längeren Lebenszyklus wünschen.",
+        "es": "Para dispositivos integrados, terminales dedicados, sistemas sin conexión, entornos de ejecución prolongada y entusiastas que desean un ciclo de vida más largo.",
+        "pt": "Para dispositivos embarcados, terminais dedicados, sistemas offline, ambientes de longa execução e entusiastas que desejam um ciclo de vida maior.",
+        "ru": "Для встраиваемых устройств, выделенных терминалов, автономных систем, долго работающих сред и энтузиастов, которым нужен более длинный жизненный цикл.",
+        "ar": "مناسب للأجهزة المضمنة والطرفيات المخصصة والأنظمة غير المتصلة والبيئات طويلة التشغيل والمتحمسين الذين يريدون دورة حياة أطول.",
+        "ko": "임베디드 장치, 전용 단말, 오프라인 시스템, 장시간 운영 환경, 더 긴 수명 주기를 원하는 고급 사용자에게 적합합니다.",
+        "ja": "組み込みデバイス、専用端末、オフラインシステム、長期稼働環境、より長いライフサイクルを求めるユーザー向けです。"
+      },
+      "pros": {
+        "zh": [
+          "IoT LTSC 通常比普通 Enterprise LTSC 拥有更长支持周期，更适合长期固定用途设备。",
+          "面向专用设备和嵌入式场景，适合 NAS 控制台、街机/游戏前端、采集机、展示终端和实验设备。",
+          "功能更新节奏稳定，减少长期维护中因功能变动造成的兼容性风险。",
+          "适合追求稳定、低打扰和长期可维护性的高级用户。"
+        ],
+        "zh_TW": [
+          "IoT LTSC 通常比一般 Enterprise LTSC 擁有更長支援週期，更適合長期固定用途設備。",
+          "面向專用設備和嵌入式場景，適合 NAS 控制台、街機/遊戲前端、擷取機、展示終端和實驗設備。",
+          "功能更新節奏穩定，減少長期維護中因功能變動造成的相容性風險。",
+          "適合追求穩定、低打擾和長期可維護性的進階使用者。"
+        ],
+        "en": [
+          "IoT LTSC generally offers a longer support lifecycle than standard Enterprise LTSC, making it better for fixed-purpose systems.",
+          "Designed for dedicated and embedded-style deployments such as NAS consoles, arcade or gaming frontends, capture stations, kiosks, and lab devices.",
+          "Stable servicing reduces compatibility risk from feature churn over long maintenance periods.",
+          "Good for advanced users who value stability, low noise, and long-term maintainability."
+        ],
+        "fr": [
+          "IoT LTSC offre généralement un cycle de support plus long que l’Enterprise LTSC standard, ce qui convient mieux aux systèmes à usage fixe.",
+          "Conçu pour des déploiements dédiés ou de style embarqué : consoles NAS, frontends arcade ou jeu, stations de capture, bornes et appareils de laboratoire.",
+          "Une maintenance stable réduit le risque de compatibilité lié aux changements de fonctionnalités sur de longues périodes.",
+          "Adapté aux utilisateurs avancés qui privilégient la stabilité, la discrétion et la maintenabilité à long terme."
+        ],
+        "de": [
+          "IoT LTSC bietet in der Regel einen längeren Support-Lebenszyklus als Standard-Enterprise-LTSC und eignet sich daher besser für Systeme mit festem Zweck.",
+          "Für dedizierte und eingebettete Bereitstellungen wie NAS-Konsolen, Arcade- oder Gaming-Frontends, Capture-Stationen, Kiosksysteme und Laborgeräte gedacht.",
+          "Stabile Wartung reduziert Kompatibilitätsrisiken durch Funktionsänderungen über lange Wartungszeiträume.",
+          "Gut für fortgeschrittene Benutzer, die Stabilität, geringe Ablenkung und langfristige Wartbarkeit schätzen."
+        ],
+        "es": [
+          "IoT LTSC suele ofrecer un ciclo de soporte más largo que Enterprise LTSC estándar, por lo que encaja mejor en sistemas de propósito fijo.",
+          "Diseñado para despliegues dedicados y de estilo embebido, como consolas NAS, frontends arcade o de juego, estaciones de captura, quioscos y equipos de laboratorio.",
+          "El servicio estable reduce el riesgo de compatibilidad por cambios de funciones durante periodos largos de mantenimiento.",
+          "Adecuado para usuarios avanzados que valoran estabilidad, bajo ruido y mantenibilidad a largo plazo."
+        ],
+        "pt": [
+          "O IoT LTSC geralmente oferece um ciclo de suporte mais longo que o Enterprise LTSC padrão, sendo melhor para sistemas de finalidade fixa.",
+          "Projetado para implantações dedicadas e de estilo embarcado, como consoles NAS, frontends de arcade ou jogos, estações de captura, quiosques e dispositivos de laboratório.",
+          "A manutenção estável reduz riscos de compatibilidade causados por mudanças de recursos durante longos períodos.",
+          "Bom para usuários avançados que valorizam estabilidade, pouco ruído e manutenção de longo prazo."
+        ],
+        "ru": [
+          "IoT LTSC обычно имеет более длинный цикл поддержки, чем стандартный Enterprise LTSC, поэтому лучше подходит для систем фиксированного назначения.",
+          "Предназначен для выделенных и встраиваемых развертываний: NAS-консолей, аркадных или игровых фронтендов, станций захвата, киосков и лабораторных устройств.",
+          "Стабильное обслуживание снижает риск совместимости из-за изменения функций на длинных сроках поддержки.",
+          "Подходит опытным пользователям, которым важны стабильность, минимум отвлечений и долгосрочная сопровождаемость."
+        ],
+        "ar": [
+          "يوفر IoT LTSC عادةً دورة دعم أطول من Enterprise LTSC القياسي، لذلك يناسب الأنظمة ذات الغرض الثابت.",
+          "مصمم لعمليات نشر مخصصة أو مدمجة مثل وحدات تحكم NAS وواجهات الألعاب أو الأركيد ومحطات الالتقاط والأكشاك وأجهزة المختبر.",
+          "وتيرة الصيانة المستقرة تقلل مخاطر التوافق الناتجة عن تغيرات الميزات على مدى فترات صيانة طويلة.",
+          "مناسب للمستخدمين المتقدمين الذين يقدرون الاستقرار وقلة الإزعاج وقابلية الصيانة طويلة الأمد."
+        ],
+        "ko": [
+          "IoT LTSC는 일반 Enterprise LTSC보다 더 긴 지원 수명 주기를 제공하는 경우가 많아 고정 목적 시스템에 더 적합합니다.",
+          "NAS 콘솔, 아케이드 또는 게임 프런트엔드, 캡처 스테이션, 키오스크, 실험실 장비 같은 전용 및 임베디드 스타일 배포를 위해 설계되었습니다.",
+          "안정적인 서비스 주기는 장기 유지 관리 기간 동안 기능 변화로 인한 호환성 위험을 줄입니다.",
+          "안정성, 낮은 방해 요소, 장기 유지 관리성을 중시하는 고급 사용자에게 좋습니다."
+        ],
+        "ja": [
+          "IoT LTSC は通常、標準の Enterprise LTSC より長いサポートライフサイクルを持ち、固定用途システムに向いています。",
+          "NAS コンソール、アーケード/ゲームフロントエンド、キャプチャステーション、キオスク、ラボ機器などの専用・組み込み風展開向けです。",
+          "安定したサービス周期により、長期保守中の機能変更による互換性リスクを抑えます。",
+          "安定性、低いノイズ、長期保守性を重視する上級ユーザーに適しています。"
+        ]
+      },
+      "notes": {
+        "zh": [
+          "IoT 版仅提供英文版；123 云盘和 GoFile 均为英文版。",
+          "IoT 授权和用途更偏专用设备，请自行确认授权合规性。",
+          "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
+        ],
+        "zh_TW": [
+          "IoT 版僅提供英文版；123 雲盤和 GoFile 均為英文版。",
+          "IoT 授權和用途更偏專用設備，請自行確認授權合規性。",
+          "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
+        ],
+        "en": [
+          "IoT editions are English-only here; both 123 Cloud and GoFile provide the English build.",
+          "IoT licensing and usage are oriented toward dedicated devices. Confirm license compliance yourself.",
+          "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
+        ],
+        "fr": [
+          "Les éditions IoT sont uniquement en anglais ici ; 123 Cloud et GoFile fournissent tous deux la version anglaise.",
+          "La licence et l’usage IoT sont orientés vers les appareils dédiés. Vérifiez vous-même la conformité de licence.",
+          "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
+        ],
+        "de": [
+          "IoT-Editionen sind hier nur auf Englisch verfügbar; 123 Cloud und GoFile stellen beide die englische Build bereit.",
+          "IoT-Lizenzierung und -Nutzung sind auf dedizierte Geräte ausgerichtet. Prüfen Sie die Lizenzkonformität selbst.",
+          "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
+        ],
+        "es": [
+          "Las ediciones IoT aquí solo están en inglés; tanto 123 Cloud como GoFile proporcionan la compilación en inglés.",
+          "La licencia y el uso de IoT están orientados a dispositivos dedicados. Confirma tú mismo el cumplimiento de licencia.",
+          "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
+        ],
+        "pt": [
+          "As edições IoT aqui são somente em inglês; tanto o 123 Cloud quanto o GoFile fornecem a build em inglês.",
+          "O licenciamento e o uso IoT são voltados a dispositivos dedicados. Confirme você mesmo a conformidade da licença.",
+          "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
+        ],
+        "ru": [
+          "Редакции IoT здесь доступны только на английском; и 123 Cloud, и GoFile предоставляют английскую сборку.",
+          "Лицензирование и использование IoT ориентированы на специализированные устройства. Самостоятельно проверьте лицензионное соответствие.",
+          "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
+        ],
+        "ar": [
+          "إصدارات IoT هنا باللغة الإنجليزية فقط؛ يوفر كل من 123 Cloud وGoFile الإصدار الإنجليزي.",
+          "ترخيص واستخدام IoT موجهان للأجهزة المخصصة. تحقق بنفسك من الامتثال للترخيص.",
+          "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
+        ],
+        "ko": [
+          "여기서 IoT 에디션은 영어만 제공됩니다. 123 Cloud와 GoFile 모두 영어 빌드입니다.",
+          "IoT 라이선스와 사용 목적은 전용 장치에 맞춰져 있습니다. 라이선스 준수 여부를 직접 확인하세요.",
+          "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
+        ],
+        "ja": [
+          "ここでの IoT エディションは英語版のみです。123 Cloud と GoFile のどちらも英語版を提供します。",
+          "IoT のライセンスと用途は専用デバイス向けです。ライセンス遵守はご自身で確認してください。",
+          "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
+        ]
+      },
+      "category": "Enterprise & LTSC Builds",
+      "architecture": "x64 (64-bit)",
+      "description": {
+        "zh": "面向部署、长期维护和高级使用场景的 LTSC 镜像资源。",
+        "zh_TW": "面向部署、長期維護和進階使用場景的 LTSC 映像資源。",
+        "en": "LTSC image resource for deployment, long-term maintenance, and advanced usage scenarios.",
+        "fr": "Ressource d’image LTSC pour le déploiement, la maintenance à long terme et les usages avancés.",
+        "de": "LTSC-Abbildressource für Bereitstellung, langfristige Wartung und fortgeschrittene Nutzungsszenarien.",
+        "es": "Recurso de imagen LTSC para despliegue, mantenimiento a largo plazo y escenarios de uso avanzado.",
+        "pt": "Recurso de imagem LTSC para implantação, manutenção de longo prazo e cenários de uso avançado.",
+        "ru": "Ресурс образа LTSC для развертывания, долгосрочного обслуживания и продвинутых сценариев.",
+        "ar": "مورد صورة LTSC للنشر والصيانة طويلة الأمد وسيناريوهات الاستخدام المتقدمة.",
+        "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
+        "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
+      },
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh",
+      "sha256": "",
+      "needsFontPack": false
+    },
+    {
+      "id": "ltsc-win11-iot",
+      "name": {
+        "zh": "Windows 11 IoT Enterprise LTSC",
+        "zh_TW": "Windows 11 IoT Enterprise LTSC",
+        "en": "Windows 11 IoT Enterprise LTSC",
+        "fr": "Windows 11 IoT Enterprise LTSC",
+        "de": "Windows 11 IoT Enterprise LTSC",
+        "es": "Windows 11 IoT Enterprise LTSC",
+        "pt": "Windows 11 IoT Enterprise LTSC",
+        "ru": "Windows 11 IoT Enterprise LTSC",
+        "ar": "Windows 11 IoT Enterprise LTSC",
+        "ko": "Windows 11 IoT Enterprise LTSC",
+        "ja": "Windows 11 IoT Enterprise LTSC"
+      },
+      "type": {
+        "zh": "IoT 企业长期服务版",
+        "zh_TW": "IoT 企业长期服务版",
+        "en": "IoT Enterprise Long-Term Servicing Channel",
+        "fr": "IoT Enterprise Long-Term Servicing Channel",
+        "de": "IoT Enterprise Long-Term Servicing Channel",
+        "es": "IoT Enterprise Long-Term Servicing Channel",
+        "pt": "IoT Enterprise Long-Term Servicing Channel",
+        "ru": "IoT Enterprise Long-Term Servicing Channel",
+        "ar": "IoT Enterprise Long-Term Servicing Channel",
+        "ko": "IoT Enterprise Long-Term Servicing Channel",
+        "ja": "IoT Enterprise Long-Term Servicing Channel"
+      },
+      "version": "Windows 11",
+      "build": "IoT Enterprise LTSC",
+      "size": "x64 ISO",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h",
+      "globalUrl": "https://gofile.io/d/Oag1zR",
+      "audience": {
+        "zh": "适合新硬件上的长期专用系统、游戏/展示终端、实验室设备，以及需要 Windows 11 平台和更长生命周期的高级用户。",
+        "zh_TW": "適合新硬體上的長期專用系統、遊戲/展示終端、實驗室設備，以及需要 Windows 11 平台和更長生命週期的進階使用者。",
+        "en": "For long-term dedicated systems on newer hardware, gaming or display terminals, lab devices, and advanced users who want Windows 11 with a longer lifecycle.",
+        "fr": "Pour les systèmes dédiés à long terme sur matériel récent, les terminaux de jeu ou d’affichage, les appareils de laboratoire et les utilisateurs avancés qui veulent Windows 11 avec un cycle de vie plus long.",
+        "de": "Für langfristig dedizierte Systeme auf neuerer Hardware, Gaming- oder Anzeigeterminals, Laborgeräte und fortgeschrittene Benutzer, die Windows 11 mit längerem Lebenszyklus wünschen.",
+        "es": "Para sistemas dedicados a largo plazo en hardware nuevo, terminales de juego o visualización, equipos de laboratorio y usuarios avanzados que quieren Windows 11 con un ciclo de vida más largo.",
+        "pt": "Para sistemas dedicados de longo prazo em hardware mais novo, terminais de jogos ou exibição, dispositivos de laboratório e usuários avançados que desejam Windows 11 com ciclo de vida maior.",
+        "ru": "Для долгосрочных выделенных систем на новом оборудовании, игровых или демонстрационных терминалов, лабораторных устройств и опытных пользователей, которым нужен Windows 11 с более длинным жизненным циклом.",
+        "ar": "مناسب للأنظمة المخصصة طويلة الأمد على الأجهزة الحديثة ومحطات الألعاب أو العرض وأجهزة المختبر والمستخدمين المتقدمين الذين يريدون Windows 11 بدورة حياة أطول.",
+        "ko": "최신 하드웨어의 장기 전용 시스템, 게임 또는 전시 단말, 실험실 장비, 더 긴 수명 주기의 Windows 11을 원하는 고급 사용자에게 적합합니다.",
+        "ja": "新しいハードウェア上の長期専用システム、ゲーム/表示端末、ラボ機器、より長いライフサイクルの Windows 11 を求める上級ユーザー向けです。"
+      },
+      "pros": {
+        "zh": [
+          "结合 Windows 11 平台和 IoT LTSC 长期服务特性，适合新硬件上的长期稳定部署。",
+          "相比普通 Windows 11，更新节奏更克制，预装体验更少，更适合纯粹游戏、专用工作站和展示设备。",
+          "IoT 分支通常提供更长生命周期，适合希望多年保持同一系统基础的用户。",
+          "适合懂得驱动、授权、启动方式和部署流程的高级用户。"
+        ],
+        "zh_TW": [
+          "結合 Windows 11 平台和 IoT LTSC 長期服務特性，適合新硬體上的長期穩定部署。",
+          "相比一般 Windows 11，更新節奏更克制，預裝體驗更少，更適合純粹遊戲、專用工作站和展示設備。",
+          "IoT 分支通常提供更長生命週期，適合希望多年保持同一系統基礎的使用者。",
+          "適合懂得驅動、授權、啟動方式和部署流程的進階使用者。"
+        ],
+        "en": [
+          "Combines the Windows 11 platform with IoT LTSC long-term servicing, useful for stable deployments on newer hardware.",
+          "More restrained servicing and fewer bundled experiences than normal Windows 11, making it appealing for pure gaming, dedicated workstations, and display devices.",
+          "The IoT branch generally offers a longer lifecycle, useful when you want to keep the same OS base for years.",
+          "Best for advanced users who understand drivers, licensing, boot modes, and deployment workflows."
+        ],
+        "fr": [
+          "Associe la plateforme Windows 11 à la maintenance longue durée IoT LTSC, utile pour les déploiements stables sur matériel récent.",
+          "Maintenance plus maîtrisée et moins d’expériences intégrées que Windows 11 classique, intéressant pour le jeu pur, les stations dédiées et les appareils d’affichage.",
+          "La branche IoT offre généralement un cycle de vie plus long, utile pour garder la même base système pendant des années.",
+          "Convient surtout aux utilisateurs avancés qui comprennent pilotes, licences, modes de démarrage et flux de déploiement."
+        ],
+        "de": [
+          "Kombiniert die Windows-11-Plattform mit der langfristigen Wartung von IoT LTSC, nützlich für stabile Bereitstellungen auf neuerer Hardware.",
+          "Zurückhaltendere Wartung und weniger gebündelte Erlebnisse als normales Windows 11, attraktiv für reines Gaming, dedizierte Workstations und Anzeigegeräte.",
+          "Der IoT-Zweig bietet in der Regel einen längeren Lebenszyklus, nützlich wenn dieselbe Betriebssystembasis über Jahre beibehalten werden soll.",
+          "Am besten für fortgeschrittene Benutzer, die Treiber, Lizenzierung, Startmodi und Bereitstellungsabläufe verstehen."
+        ],
+        "es": [
+          "Combina la plataforma Windows 11 con el servicio a largo plazo de IoT LTSC, útil para despliegues estables en hardware nuevo.",
+          "Servicio más contenido y menos experiencias integradas que Windows 11 normal, atractivo para juego puro, estaciones dedicadas y dispositivos de visualización.",
+          "La rama IoT suele ofrecer un ciclo de vida más largo, útil si quieres mantener la misma base del sistema durante años.",
+          "Mejor para usuarios avanzados que entienden controladores, licencias, modos de arranque y flujos de despliegue."
+        ],
+        "pt": [
+          "Combina a plataforma Windows 11 com a manutenção de longo prazo do IoT LTSC, útil para implantações estáveis em hardware mais novo.",
+          "Manutenção mais contida e menos experiências incluídas que o Windows 11 normal, atraente para jogos puros, estações dedicadas e dispositivos de exibição.",
+          "O ramo IoT geralmente oferece ciclo de vida mais longo, útil quando se deseja manter a mesma base do sistema por anos.",
+          "Melhor para usuários avançados que entendem drivers, licenciamento, modos de inicialização e fluxos de implantação."
+        ],
+        "ru": [
+          "Сочетает платформу Windows 11 с долгосрочным обслуживанием IoT LTSC, полезно для стабильных развертываний на новом оборудовании.",
+          "Более сдержанное обслуживание и меньше встроенных потребительских компонентов, чем в обычной Windows 11; привлекательно для чистых игровых, выделенных рабочих и демонстрационных систем.",
+          "Ветка IoT обычно имеет более длинный жизненный цикл, полезный если нужно годами сохранять одну базу ОС.",
+          "Лучше всего для опытных пользователей, понимающих драйверы, лицензирование, режимы загрузки и процессы развертывания."
+        ],
+        "ar": [
+          "يجمع بين منصة Windows 11 وخدمة IoT LTSC طويلة الأمد، وهو مفيد للنشر المستقر على الأجهزة الأحدث.",
+          "صيانة أكثر تحفظًا وتجارب مدمجة أقل من Windows 11 العادي، ما يجعله جذابًا للألعاب النقية ومحطات العمل المخصصة وأجهزة العرض.",
+          "يوفر فرع IoT عادةً دورة حياة أطول، وهو مفيد عند الرغبة في الحفاظ على قاعدة النظام نفسها لسنوات.",
+          "الأفضل للمستخدمين المتقدمين الذين يفهمون التعريفات والترخيص وأنماط الإقلاع وسير عمل النشر."
+        ],
+        "ko": [
+          "Windows 11 플랫폼과 IoT LTSC 장기 서비스를 결합해 최신 하드웨어에서 안정적인 장기 배포에 유용합니다.",
+          "일반 Windows 11보다 서비스 주기가 더 절제되어 있고 번들 경험이 적어 순수 게임, 전용 워크스테이션, 전시 장치에 매력적입니다.",
+          "IoT 분기는 일반적으로 더 긴 수명 주기를 제공하므로 같은 OS 기반을 몇 년간 유지하려는 경우 유용합니다.",
+          "드라이버, 라이선스, 부팅 모드, 배포 흐름을 이해하는 고급 사용자에게 가장 적합합니다."
+        ],
+        "ja": [
+          "Windows 11 プラットフォームと IoT LTSC の長期サービスを組み合わせ、新しいハードウェアでの安定した長期展開に役立ちます。",
+          "通常の Windows 11 よりサービスが抑制され、同梱体験も少ないため、純粋なゲーム環境、専用ワークステーション、表示デバイスに向いています。",
+          "IoT 系統は通常より長いライフサイクルを持ち、同じ OS ベースを何年も維持したい場合に有用です。",
+          "ドライバー、ライセンス、ブートモード、展開手順を理解する上級ユーザーに最適です。"
+        ]
+      },
+      "notes": {
+        "zh": [
+          "IoT 版仅提供英文版；123 云盘和 GoFile 均为英文版。",
+          "Windows 11 IoT LTSC 仍需关注硬件、驱动、TPM 和安全启动兼容性。",
+          "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
+        ],
+        "zh_TW": [
+          "IoT 版僅提供英文版；123 雲盤和 GoFile 均為英文版。",
+          "Windows 11 IoT LTSC 仍需注意硬體、驅動、TPM 和安全啟動相容性。",
+          "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
+        ],
+        "en": [
+          "IoT editions are English-only here; both 123 Cloud and GoFile provide the English build.",
+          "Windows 11 IoT LTSC still requires attention to hardware, drivers, TPM, and Secure Boot compatibility.",
+          "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
+        ],
+        "fr": [
+          "Les éditions IoT sont uniquement en anglais ici ; 123 Cloud et GoFile fournissent tous deux la version anglaise.",
+          "Windows 11 IoT LTSC exige encore de vérifier la compatibilité matérielle, les pilotes, le TPM et Secure Boot.",
+          "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
+        ],
+        "de": [
+          "IoT-Editionen sind hier nur auf Englisch verfügbar; 123 Cloud und GoFile stellen beide die englische Build bereit.",
+          "Windows 11 IoT LTSC erfordert weiterhin Aufmerksamkeit bei Hardware, Treibern, TPM und Secure-Boot-Kompatibilität.",
+          "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
+        ],
+        "es": [
+          "Las ediciones IoT aquí solo están en inglés; tanto 123 Cloud como GoFile proporcionan la compilación en inglés.",
+          "Windows 11 IoT LTSC aún requiere atención a la compatibilidad de hardware, controladores, TPM y arranque seguro.",
+          "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
+        ],
+        "pt": [
+          "As edições IoT aqui são somente em inglês; tanto o 123 Cloud quanto o GoFile fornecem a build em inglês.",
+          "O Windows 11 IoT LTSC ainda exige atenção à compatibilidade de hardware, drivers, TPM e Inicialização Segura.",
+          "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
+        ],
+        "ru": [
+          "Редакции IoT здесь доступны только на английском; и 123 Cloud, и GoFile предоставляют английскую сборку.",
+          "Windows 11 IoT LTSC все еще требует внимания к совместимости оборудования, драйверов, TPM и Secure Boot.",
+          "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
+        ],
+        "ar": [
+          "إصدارات IoT هنا باللغة الإنجليزية فقط؛ يوفر كل من 123 Cloud وGoFile الإصدار الإنجليزي.",
+          "لا يزال Windows 11 IoT LTSC يتطلب الانتباه إلى توافق العتاد والتعريفات وTPM والإقلاع الآمن.",
+          "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
+        ],
+        "ko": [
+          "여기서 IoT 에디션은 영어만 제공됩니다. 123 Cloud와 GoFile 모두 영어 빌드입니다.",
+          "Windows 11 IoT LTSC는 하드웨어, 드라이버, TPM, 보안 부팅 호환성에 여전히 주의해야 합니다.",
+          "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
+        ],
+        "ja": [
+          "ここでの IoT エディションは英語版のみです。123 Cloud と GoFile のどちらも英語版を提供します。",
+          "Windows 11 IoT LTSC でもハードウェア、ドライバー、TPM、セキュアブート互換性に注意が必要です。",
+          "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
+        ]
+      },
+      "category": "Enterprise & LTSC Builds",
+      "architecture": "x64 (64-bit)",
+      "description": {
+        "zh": "面向部署、长期维护和高级使用场景的 LTSC 镜像资源。",
+        "zh_TW": "面向部署、長期維護和進階使用場景的 LTSC 映像資源。",
+        "en": "LTSC image resource for deployment, long-term maintenance, and advanced usage scenarios.",
+        "fr": "Ressource d’image LTSC pour le déploiement, la maintenance à long terme et les usages avancés.",
+        "de": "LTSC-Abbildressource für Bereitstellung, langfristige Wartung und fortgeschrittene Nutzungsszenarien.",
+        "es": "Recurso de imagen LTSC para despliegue, mantenimiento a largo plazo y escenarios de uso avanzado.",
+        "pt": "Recurso de imagem LTSC para implantação, manutenção de longo prazo e cenários de uso avançado.",
+        "ru": "Ресурс образа LTSC для развертывания, долгосрочного обслуживания и продвинутых сценариев.",
+        "ar": "مورد صورة LTSC للنشر والصيانة طويلة الأمد وسيناريوهات الاستخدام المتقدمة.",
+        "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
+        "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
+      },
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h",
+      "sha256": "",
+      "needsFontPack": false
     },
     {
       "id": "font-pack",

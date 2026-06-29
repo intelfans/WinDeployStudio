@@ -2,6 +2,26 @@ import 'dart:ui';
 
 import '../../../core/localization/strings.dart';
 
+enum MirrorSkillLevel { beginner, advanced, expert }
+
+extension MirrorSkillLevelLabel on MirrorSkillLevel {
+  String get labelKey {
+    return switch (this) {
+      MirrorSkillLevel.beginner => 'tool_safety_beginner',
+      MirrorSkillLevel.advanced => 'tool_safety_advanced',
+      MirrorSkillLevel.expert => 'tool_safety_expert',
+    };
+  }
+
+  String get tooltipKey {
+    return switch (this) {
+      MirrorSkillLevel.beginner => 'mirror_skill_beginner_tip',
+      MirrorSkillLevel.advanced => 'mirror_skill_advanced_tip',
+      MirrorSkillLevel.expert => 'mirror_skill_expert_tip',
+    };
+  }
+}
+
 class MirrorItem {
   final String id;
   final Map<String, String> _name;
@@ -76,10 +96,31 @@ class MirrorItem {
   List<String> getPros(Locale locale) => _localizeList(_pros, locale);
   List<String> getNotes(Locale locale) => _localizeList(_notes, locale);
 
-  bool get isOfficialMicrosoft => category == 'Official Microsoft';
-  bool get isCommunityImage => category == 'Community Images';
-  bool get isImageCenterItem => isOfficialMicrosoft || isCommunityImage;
+  bool get isOfficialMicrosoftImage =>
+      category == 'Official Microsoft Images' ||
+      category == 'Official Microsoft';
+  bool get isOfficialMicrosoft => isOfficialMicrosoftImage;
+  bool get isCommunityEdition =>
+      category == 'Community Editions' || category == 'Community Images';
+  bool get isCommunityImage => isCommunityEdition;
+  bool get isEnterpriseLtsc => category == 'Enterprise & LTSC Builds';
+  bool get isImageCenterItem =>
+      isOfficialMicrosoftImage || isCommunityEdition || isEnterpriseLtsc;
   bool get isStarValleyX => id == 'starvalleyx';
+  bool get isIotLtsc => id.contains('iot');
+
+  MirrorSkillLevel get skillLevel {
+    if (isOfficialMicrosoftImage) return MirrorSkillLevel.beginner;
+    if (isEnterpriseLtsc) return MirrorSkillLevel.expert;
+    return MirrorSkillLevel.advanced;
+  }
+
+  String get categoryLogName {
+    if (isOfficialMicrosoftImage) return 'Official Microsoft Images';
+    if (isEnterpriseLtsc) return 'LTSC';
+    if (isCommunityEdition) return 'Community';
+    return category;
+  }
 
   String get productLogName {
     return switch (id) {
@@ -90,6 +131,10 @@ class MirrorItem {
       'xlite11' => 'WindowsXLite11',
       'xlite10' => 'WindowsXLite10',
       'starvalleyx' => 'StarValleyX',
+      'ltsc-win10-enterprise' => 'Windows10 Enterprise LTSC',
+      'ltsc-win11-enterprise' => 'Windows11 Enterprise LTSC',
+      'ltsc-win10-iot' => 'Windows10 IoT LTSC',
+      'ltsc-win11-iot' => 'Windows11 IoT LTSC',
       _ => id,
     };
   }
@@ -205,36 +250,74 @@ class MirrorListData {
       if (!item.isVisibleInLocale(locale)) continue;
       map.putIfAbsent(item.category, () => []).add(item);
     }
-    return map.entries
-        .map(
-          (e) => MirrorCategory(
-            id: e.key,
-            name: _categoryName(e.key, locale),
-            icon: _categoryIcon(e.key),
-            items: e.value,
-          ),
-        )
-        .toList();
+
+    const order = [
+      'Official Microsoft Images',
+      'Official Microsoft',
+      'Community Editions',
+      'Community Images',
+      'Enterprise & LTSC Builds',
+    ];
+
+    final categories = <MirrorCategory>[];
+    final seen = <String>{};
+    for (final id in order) {
+      final list = map[id];
+      if (list == null || seen.contains(id)) continue;
+      seen.add(id);
+      categories.add(
+        MirrorCategory(
+          id: id,
+          name: _categoryName(id, locale),
+          icon: _categoryIcon(id),
+          items: list,
+        ),
+      );
+    }
+
+    for (final entry in map.entries) {
+      if (seen.contains(entry.key)) continue;
+      categories.add(
+        MirrorCategory(
+          id: entry.key,
+          name: _categoryName(entry.key, locale),
+          icon: _categoryIcon(entry.key),
+          items: entry.value,
+        ),
+      );
+    }
+
+    return categories;
   }
 
   static String _categoryName(String category, Locale locale) {
     final code = localeCodeFromLocale(locale);
     return switch (category) {
+      'Official Microsoft Images' => trByCode(
+        code,
+        'mirror_category_official_microsoft',
+      ),
       'Official Microsoft' => trByCode(
         code,
         'mirror_category_official_microsoft',
       ),
+      'Community Editions' => trByCode(code, 'mirror_category_community'),
       'Community Images' => trByCode(code, 'mirror_category_community'),
+      'Enterprise & LTSC Builds' => trByCode(code, 'mirror_category_ltsc'),
       _ => category,
     };
   }
 
   static String _categoryIcon(String category) {
     switch (category) {
+      case 'Official Microsoft Images':
       case 'Official Microsoft':
         return 'official';
+      case 'Community Editions':
       case 'Community Images':
         return 'community';
+      case 'Enterprise & LTSC Builds':
+        return 'ltsc';
       default:
         return 'other';
     }
