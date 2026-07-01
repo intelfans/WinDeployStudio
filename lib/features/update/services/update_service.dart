@@ -34,6 +34,8 @@ class UpdateService {
   UpdateService._();
   factory UpdateService() => _instance ??= UpdateService._();
 
+  String? _lastTrustedDownloadPath;
+
   String get releasePageUrl => _releasePageUrl;
 
   Future<bool> getAutoCheckEnabled() async {
@@ -264,6 +266,7 @@ class UpdateService {
       }, cancelToken);
 
       if (result != null) {
+        _lastTrustedDownloadPath = result;
         log.logUpdate('[Download] State=Stable\nPath=$result');
         return result;
       }
@@ -413,7 +416,10 @@ class UpdateService {
 
       if (isExe) {
         final signature = await _verifyInstallerSignature(filePath);
-        if (!signature.valid) {
+        final unsignedAllowed =
+            signature.status == 'NotSigned' &&
+            _isLastTrustedDownload(file.absolute.path);
+        if (!signature.valid && !unsignedAllowed) {
           log.logUpdate(
             '[Update] InstallFail: Signature invalid\n'
             'Status=${signature.status}\n'
@@ -421,6 +427,14 @@ class UpdateService {
           );
           return false;
         }
+
+        log.logUpdate(
+          '[Update] InstallerSignature\n'
+          'Valid=${signature.valid}\n'
+          'Status=${signature.status}\n'
+          'Subject=${signature.subject}\n'
+          'UnsignedAllowed=$unsignedAllowed',
+        );
 
         try {
           await Process.start(filePath, [
@@ -442,6 +456,12 @@ class UpdateService {
       log.logUpdate('[Update] Install error: $e');
       return false;
     }
+  }
+
+  bool _isLastTrustedDownload(String filePath) {
+    if (_lastTrustedDownloadPath == null) return false;
+    return File(_lastTrustedDownloadPath!).absolute.path.toLowerCase() ==
+        filePath.toLowerCase();
   }
 
   Future<_SignatureCheck> _verifyInstallerSignature(String filePath) async {

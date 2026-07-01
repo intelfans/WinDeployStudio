@@ -1022,12 +1022,12 @@ exit
   Future<_WtgDriveLetters?> _reserveWtgDriveLetters() async {
     const preferredEfi = 'S';
     const preferredWindows = 'W';
+    final usedLetters = await _getUsedDriveLetters();
 
     String? pick(List<String> preferred, Set<String> blocked) {
       for (final letter in preferred) {
         final value = letter.toUpperCase();
-        final root = Directory(_driveFromLetter(value));
-        if (!root.existsSync() && !blocked.contains(value)) {
+        if (!usedLetters.contains(value) && !blocked.contains(value)) {
           return value;
         }
       }
@@ -1054,6 +1054,51 @@ exit
 
     _logLine('Reserved WTG drive letters: EFI=$efi Windows=$windows');
     return _WtgDriveLetters(efiLetter: efi, windowsLetter: windows);
+  }
+
+  Future<Set<String>> _getUsedDriveLetters() async {
+    try {
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        r'''
+$letters = @()
+try {
+  $letters += Get-Volume -ErrorAction SilentlyContinue |
+    Where-Object { $_.DriveLetter } |
+    ForEach-Object { $_.DriveLetter.ToString() }
+} catch {}
+try {
+  $letters += Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^[A-Za-z]$' } |
+    ForEach-Object { $_.Name }
+} catch {}
+$letters |
+  Where-Object { $_ } |
+  ForEach-Object { $_.ToString().TrimEnd(':').ToUpperInvariant() } |
+  Sort-Object -Unique
+''',
+      ]).timeout(const Duration(seconds: 10));
+
+      if (result.exitCode == 0) {
+        final letters = result.stdout
+            .toString()
+            .split(RegExp(r'\s+'))
+            .map((item) => item.trim().replaceAll(':', '').toUpperCase())
+            .where((item) => item.length == 1)
+            .toSet();
+        _logLine('Used drive letters: ${letters.toList()..sort()}');
+        return letters;
+      }
+
+      _logLine('Drive letter scan failed: ${result.stderr}');
+    } catch (e) {
+      _logLine('Drive letter scan error: $e');
+    }
+
+    return <String>{};
   }
 
   Future<bool> _waitForPartitionRoot({

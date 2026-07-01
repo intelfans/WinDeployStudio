@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/strings.dart';
 import '../providers/mirror_provider.dart';
 import '../models/mirror_models.dart';
-import '../widgets/ltsc_warning_dialog.dart';
 
 class MirrorScreen extends ConsumerStatefulWidget {
   const MirrorScreen({super.key});
@@ -157,13 +156,7 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
                     count: cat.items.length,
                     isSelected: _selectedCategory == cat.id,
                     skillLevel: cat.items.first.skillLevel,
-                    onTap: () async {
-                      if (cat.id == 'Enterprise & LTSC Builds') {
-                        final allowed = await showLtscExpertWarning(context);
-                        if (!allowed || !context.mounted) return;
-                      }
-                      setState(() => _selectedCategory = cat.id);
-                    },
+                    onTap: () => setState(() => _selectedCategory = cat.id),
                   ),
                 ),
                 if (localIsos.isNotEmpty)
@@ -340,13 +333,7 @@ class _MirrorItemCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () async {
-          if (item.isEnterpriseLtsc) {
-            final allowed = await showLtscExpertWarning(context);
-            if (!allowed || !context.mounted) return;
-          }
-          context.go('/mirror/${item.id}', extra: item);
-        },
+        onTap: () => context.go('/mirror/${item.id}', extra: item),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(

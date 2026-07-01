@@ -4,7 +4,7 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'WinDeploy Studio';
-  static const String appVersion = '1.1.1';
+  static const String appVersion = '1.1.2';
   static const String licenseName = 'MIT License';
   static const String githubRepository =
       'https://github.com/intelfans/WinDeployStudio';

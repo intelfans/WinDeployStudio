@@ -1,7 +1,7 @@
 name: win_deploy_studio
 description: "Modern Windows deployment tool - Windows installation media & Windows To Go creator"
 publish_to: 'none'
-version: 1.1.1
+version: 1.1.2
 
 environment:
   sdk: ^3.12.0

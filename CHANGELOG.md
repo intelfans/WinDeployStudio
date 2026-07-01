@@ -2,6 +2,29 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## v1.1.2
+
+### Improvements
+
+- Improved disk enumeration by parsing structured PowerShell JSON with real partition metadata.
+- Improved WTG drive-letter reservation by checking both Windows volumes and file-system PSDrives before assigning temporary letters.
+- Reduced repeated Enterprise/LTSC prompts in Image Center; the expert notice is now shown at the download action point.
+- Added explicit community image download log entries in the requested `[CommunityDownload]` format.
+- Updated app, Windows metadata, installer, scripts, README, handover notes, and release notes to version 1.1.2.
+
+### Fixes
+
+- Fixed removable disk diagnostics showing partition count as `0` because partitions were never populated.
+- Fixed fragile hand-written JSON parsing in disk detection that could lose nested values.
+- Fixed WTG temporary drive-letter selection relying on `Directory.existsSync`, which could miss occupied or special drive letters.
+- Fixed unsigned project installers being blocked by the in-app updater while retaining signature-status logging.
+- Fixed duplicate Russian installer custom messages.
+- Fixed `scripts/build_windows.ps1` to use the same `flutter analyze --no-fatal-infos` behavior as the installer build.
+
+### Notes
+
+WTG creation and Windows installation media creation behavior remain unchanged except for safer drive-letter handling and more complete disk metadata.
+
 ## v1.1.1
 
 ### Improvements

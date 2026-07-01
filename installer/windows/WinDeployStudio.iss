@@ -1,6 +1,6 @@
 ﻿#define MyAppName "WinDeploy Studio"
-#define MyAppVersion "1.1.1"
-#define MyAppFileVersion "1.1.1.0"
+#define MyAppVersion "1.1.2"
+#define MyAppFileVersion "1.1.2.0"
 #define MyAppPublisher "Bob Steve"
 #define MyAppPublisherZH "Bob Steve"
 #define MyAppExeName "win_deploy_studio.exe"
@@ -21,7 +21,7 @@ AppCopyright=© 2026 {#MyAppPublisher}. Released under the MIT License.
 DefaultDirName={autopf}\WinDeploy Studio
 DefaultGroupName=WinDeploy Studio
 OutputDir=..\..\dist\windows
-OutputBaseFilename=WinDeployStudio_Setup_1.1.1
+OutputBaseFilename=WinDeployStudio_Setup_1.1.2
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -156,12 +156,6 @@ portuguese.CreateDesktopIcon=Criar atalho na &área de trabalho
 portuguese.AdditionalIcons=Ícones adicionais:
 portuguese.UninstallProgram=Desinstalar %1
 portuguese.LaunchProgram=Executar %1
-
-; Russian
-russian.CreateDesktopIcon=Создать &ярлык на рабочем столе
-russian.AdditionalIcons=Дополнительные значки:
-russian.UninstallProgram=Удалить %1
-russian.LaunchProgram=Запустить %1
 
 ; Arabic
 arabic.OpenSourceNoticeTitle=تنبيه مفتوح المصدر

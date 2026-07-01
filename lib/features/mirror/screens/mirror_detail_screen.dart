@@ -654,6 +654,12 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   }) async {
     final logCenter = LogCenterService();
     await logCenter.logDownload(
+      '[CommunityDownload]\n'
+      'Product=${widget.item.productLogName}\n'
+      'Mirror=${mirrorLogName ?? mirrorLabel}',
+    );
+
+    await logCenter.logDownload(
       '[Download]\n'
       'Category=${widget.item.categoryLogName}\n'
       'Image=$name\n'

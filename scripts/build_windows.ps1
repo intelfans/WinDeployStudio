@@ -25,7 +25,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "  Done!" -ForegroundColor Green
 
 Write-Host "[2/3] Running analysis..." -ForegroundColor Yellow
-flutter analyze
+flutter analyze --no-fatal-infos
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  Analysis failed!" -ForegroundColor Red
     exit 1

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -196,8 +197,17 @@ class DiskSafetyService {
   static const String _getAllDisksScript = r'''
   Get-Disk | ForEach-Object {
     $disk = $_
-    $partitions = Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue
-    $letters = $partitions | Where-Object { $_.DriveLetter } | ForEach-Object { $_.DriveLetter.ToString() }
+    $partitions = @(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue)
+    $letters = @($partitions | Where-Object { $_.DriveLetter } | ForEach-Object { $_.DriveLetter.ToString().ToUpperInvariant() })
+    $partitionData = @($partitions | ForEach-Object {
+      [PSCustomObject]@{
+        Type        = if ($_.Type) { $_.Type.ToString() } else { '' }
+        SizeBytes   = if ($_.Size) { [int64]$_.Size } else { 0 }
+        DriveLetter = if ($_.DriveLetter) { $_.DriveLetter.ToString().ToUpperInvariant() } else { '' }
+        IsSystem    = [bool]$_.IsSystem
+        IsActive    = [bool]$_.IsActive
+      }
+    })
     $serial = ''
     try {
       $phys = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq $disk.Number.ToString() }
@@ -215,34 +225,39 @@ class DiskSafetyService {
       IsBoot        = $disk.IsBoot
       IsOffline     = $disk.IsOffline
       IsRemovable   = $disk.IsRemovable
-      DriveLetters  = ($letters -join ',')
+      DriveLetters  = $letters
+      Partitions    = $partitionData
     }
-  } | ConvertTo-Json -Compress
+  } | ConvertTo-Json -Depth 5 -Compress
   ''';
 
   List<DiskInfo> _parseDisks(String json) {
     try {
-      if (json.startsWith('[')) {
-        final items = _parseJsonArray(json);
-        return items
-            .map((e) => _parseDiskInfo(e as Map<String, dynamic>))
-            .toList();
-      } else if (json.startsWith('{')) {
-        return [_parseDiskInfo(_parseJsonObject(json))];
+      final decoded = jsonDecode(json);
+      final items = decoded is List ? decoded : [decoded];
+      final disks = <DiskInfo>[];
+      for (final item in items) {
+        if (item is Map) {
+          disks.add(_parseDiskInfo(Map<String, dynamic>.from(item)));
+        }
       }
+      return disks;
     } catch (_) {}
     return [];
   }
 
   DiskInfo _parseDiskInfo(Map<String, dynamic> data) {
-    final sizeBytes = data['SizeBytes'] as int? ?? 0;
-    final lettersStr = data['DriveLetters']?.toString() ?? '';
-    final letters = lettersStr.isEmpty
-        ? <String>[]
-        : lettersStr.split(',').map((e) => e.trim()).toList();
+    final sizeBytes = _readInt(data['SizeBytes']);
+    final partitions = _parsePartitions(data['Partitions']);
+    final letters = _parseDriveLetters(data['DriveLetters']);
+    final derivedLetters = partitions
+        .map((p) => p.driveLetter)
+        .whereType<String>()
+        .where((letter) => letter.isNotEmpty)
+        .toList();
 
     return DiskInfo(
-      diskNumber: data['DiskNumber'] as int? ?? 0,
+      diskNumber: _readInt(data['DiskNumber']),
       model: data['Model']?.toString() ?? 'Unknown Disk',
       friendlyName: data['FriendlyName']?.toString() ?? 'Unknown Disk',
       sizeBytes: sizeBytes,
@@ -250,12 +265,62 @@ class DiskSafetyService {
       serialNumber: data['SerialNumber']?.toString() ?? 'N/A',
       busType: data['BusType']?.toString() ?? 'Unknown',
       partitionStyle: data['PartitionStyle']?.toString() ?? 'Unknown',
-      isSystem: data['IsSystem'] as bool? ?? false,
-      isBoot: data['IsBoot'] as bool? ?? false,
-      isOffline: data['IsOffline'] as bool? ?? false,
-      isRemovable: data['IsRemovable'] as bool? ?? false,
-      driveLetters: letters,
+      isSystem: _readBool(data['IsSystem']),
+      isBoot: _readBool(data['IsBoot']),
+      isOffline: _readBool(data['IsOffline']),
+      isRemovable: _readBool(data['IsRemovable']),
+      driveLetters: letters.isEmpty ? derivedLetters : letters,
+      partitions: partitions,
     );
+  }
+
+  List<String> _parseDriveLetters(dynamic value) {
+    final raw = value is List
+        ? value.map((e) => e.toString())
+        : (value?.toString() ?? '').split(',');
+    final seen = <String>{};
+    final letters = <String>[];
+    for (final item in raw) {
+      final letter = item.trim().replaceAll(':', '').toUpperCase();
+      if (letter.length == 1 && seen.add(letter)) {
+        letters.add(letter);
+      }
+    }
+    return letters;
+  }
+
+  List<DiskPartition> _parsePartitions(dynamic value) {
+    final items = value is List ? value : (value is Map ? [value] : const []);
+    final partitions = <DiskPartition>[];
+    for (final item in items) {
+      if (item is! Map) continue;
+      final data = Map<String, dynamic>.from(item);
+      final driveLetter = data['DriveLetter']?.toString().trim();
+      partitions.add(
+        DiskPartition(
+          type: data['Type']?.toString() ?? '',
+          sizeBytes: _readInt(data['SizeBytes']),
+          driveLetter: driveLetter == null || driveLetter.isEmpty
+              ? null
+              : driveLetter.replaceAll(':', '').toUpperCase(),
+          isSystem: _readBool(data['IsSystem']),
+          isActive: _readBool(data['IsActive']),
+        ),
+      );
+    }
+    return partitions;
+  }
+
+  int _readInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool _readBool(dynamic value) {
+    if (value is bool) return value;
+    final text = value?.toString().toLowerCase();
+    return text == 'true' || text == '1';
   }
 
   String _formatSize(int bytes) {
@@ -265,79 +330,5 @@ class DiskSafetyService {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(0)} GB';
-  }
-
-  List<dynamic> _parseJsonArray(String json) {
-    final content = json.substring(1, json.length - 1).trim();
-    if (content.isEmpty) return [];
-    final items = <dynamic>[];
-    int depth = 0;
-    int start = 0;
-    for (int i = 0; i < content.length; i++) {
-      if (content[i] == '{') depth++;
-      if (content[i] == '}') depth--;
-      if (content[i] == ',' && depth == 0) {
-        items.add(_parseJsonObject(content.substring(start, i).trim()));
-        start = i + 1;
-      }
-    }
-    items.add(_parseJsonObject(content.substring(start).trim()));
-    return items;
-  }
-
-  Map<String, dynamic> _parseJsonObject(String json) {
-    final map = <String, dynamic>{};
-    final content = json.substring(1, json.length - 1).trim();
-    if (content.isEmpty) return map;
-    int i = 0;
-    while (i < content.length) {
-      while (i < content.length && content[i] == ' ') {
-        i++;
-      }
-      if (i >= content.length || content[i] != '"') break;
-      i++;
-      final keyStart = i;
-      while (i < content.length && content[i] != '"') {
-        i++;
-      }
-      final key = content.substring(keyStart, i);
-      i++;
-      while (i < content.length && (content[i] == ':' || content[i] == ' ')) {
-        i++;
-      }
-      if (i >= content.length) break;
-      dynamic value;
-      if (content[i] == '"') {
-        i++;
-        final valueStart = i;
-        while (i < content.length && content[i] != '"') {
-          i++;
-        }
-        value = content.substring(valueStart, i);
-        i++;
-      } else if (content[i] == 't') {
-        value = true;
-        i += 4;
-      } else if (content[i] == 'f') {
-        value = false;
-        i += 5;
-      } else if (content[i] == 'n') {
-        value = null;
-        i += 4;
-      } else {
-        final numStart = i;
-        while (i < content.length && content[i] != ',' && content[i] != '}') {
-          i++;
-        }
-        value =
-            int.tryParse(content.substring(numStart, i).trim()) ??
-            double.tryParse(content.substring(numStart, i).trim());
-      }
-      map[key] = value;
-      while (i < content.length && (content[i] == ',' || content[i] == ' ')) {
-        i++;
-      }
-    }
-    return map;
   }
 }
