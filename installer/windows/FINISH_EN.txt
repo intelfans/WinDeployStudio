@@ -13,6 +13,9 @@ License: MIT License
 GitHub Profile: https://github.com/intelfans
 GitHub Repository: https://github.com/intelfans/WinDeployStudio
 
+Third-party tool notice:
+Linux To Go includes the bundled mke2fs.exe utility from e2fsprogs/AOSP to create ext4 persistence images. It is invoked as a separate command-line tool. See tools\e2fsprogs\README.md in the installation directory for details.
+
 Special Thanks
 
 WinDeploy Studio would like to thank the following people and communities for their valuable feedback, testing, ideas, inspiration, and support.

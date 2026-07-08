@@ -13,6 +13,9 @@ WinDeploy Studio 已成功安裝。
 GitHub 主頁：https://github.com/intelfans
 GitHub 儲存庫：https://github.com/intelfans/WinDeployStudio
 
+第三方工具說明：
+Linux To Go 隨程式內建來自 e2fsprogs/AOSP 的 mke2fs.exe 工具，用於建立 ext4 持久化映像。該工具以獨立命令列程式呼叫。詳情請查看安裝目錄中的 tools\e2fsprogs\README.md。
+
 特別感謝
 
 WinDeploy Studio 感謝以下個人和社群在回饋、測試、想法、靈感和支持方面提供的寶貴幫助。

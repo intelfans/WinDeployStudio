@@ -2,6 +2,12 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## v1.2.0
+
+### Maintenance
+
+- Updated app, Windows metadata, installer, scripts, README, and handover notes to version 1.2.0.
+
 ## v1.1.2
 
 ### Improvements

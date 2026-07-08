@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,8 @@ import '../utils/file_utils.dart';
 import '../../features/logs/services/log_center_service.dart';
 
 enum BootMode { uefi, bios, both }
+
+enum LinuxUsbKind { installMedia, toGo }
 
 enum CreateStep {
   preparing,
@@ -407,6 +410,1032 @@ class BootableUsbService {
       return false;
     }
   }
+
+  Future<bool> createLinuxIsoUsb({
+    required int diskNumber,
+    required String isoPath,
+    required LinuxUsbKind kind,
+    ProgressCallback? onProgress,
+  }) async {
+    _log.clear();
+    final modeName = kind == LinuxUsbKind.toGo
+        ? 'Linux To Go'
+        : 'Linux Installation Media';
+    _logLine('=== Create $modeName Start ===');
+    _logLine('Disk: $diskNumber, ISO: $isoPath');
+
+    final logCenter = LogCenterService();
+    await logCenter.logUsb('$modeName 创建开始 | 磁盘: $diskNumber | ISO: $isoPath');
+
+    final logger = ref.read(fileLoggerServiceProvider);
+    await logger.log(
+      action: 'Create $modeName',
+      target: 'Disk $diskNumber',
+      result: 'Starting - ISO: $isoPath',
+    );
+
+    try {
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.preparing,
+          message: 'linux_preparing',
+          progress: 0.0,
+        ),
+      );
+
+      if (!await File(isoPath).exists()) {
+        _logLine('ISO not found: $isoPath');
+        final logPath = await saveLogToFile();
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'linux_iso_not_found\n$isoPath\n\nLog: $logPath',
+          ),
+        );
+        return false;
+      }
+
+      if (kind == LinuxUsbKind.toGo) {
+        final result = await _createPersistentLinuxToGo(
+          diskNumber: diskNumber,
+          isoPath: isoPath,
+          onProgress: onProgress,
+        );
+
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: result.success ? CreateStep.complete : CreateStep.failed,
+            message: result.success
+                ? 'linux_complete'
+                : 'linux_write_failed\n${result.error ?? "Unknown error"}',
+            progress: result.success ? 1.0 : 0.0,
+            error: result.error,
+          ),
+        );
+
+        await logger.log(
+          action: 'Create $modeName',
+          target: 'Disk $diskNumber',
+          result: result.success
+              ? 'Success - Persistent Linux To Go'
+              : 'Failed: ${result.error ?? "Unknown error"}',
+          level: result.success ? LogLevel.success : LogLevel.error,
+        );
+
+        if (result.success) {
+          await logCenter.logUsb('$modeName 创建成功 | 磁盘: $diskNumber');
+        } else {
+          await logCenter.logError(
+            '$modeName 创建失败 | 磁盘: $diskNumber | 错误: ${result.error ?? "Unknown"}',
+          );
+        }
+
+        final logPath = await saveLogToFile();
+        _logLine('Log saved to: $logPath');
+        return result.success;
+      }
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.cleaningDisk,
+          message: 'linux_locking_disk',
+          progress: 0.05,
+        ),
+      );
+
+      final result = await _writeIsoHybridRaw(
+        diskNumber: diskNumber,
+        isoPath: isoPath,
+        onProgress: (rawProgress) {
+          _notify(
+            onProgress,
+            CreateProgress(
+              step: CreateStep.copyingFiles,
+              message: 'linux_writing_image',
+              progress: 0.08 + rawProgress * 0.87,
+            ),
+          );
+        },
+      );
+
+      if (!result.success) {
+        final errorDetail = result.error ?? 'Unknown error';
+        final errorKey =
+            errorDetail.contains('Access is denied') ||
+                errorDetail.contains('拒绝访问') ||
+                errorDetail.contains('UnauthorizedAccess')
+            ? 'linux_access_denied'
+            : 'linux_write_failed';
+        _logLine('Linux raw write FAILED: $errorDetail');
+        final logPath = await saveLogToFile();
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: '$errorKey\n$errorDetail\n\nLog: $logPath',
+            error: errorDetail,
+          ),
+        );
+        await logger.log(
+          action: 'Create $modeName',
+          target: 'Disk $diskNumber',
+          result: 'Failed: $errorDetail',
+          level: LogLevel.error,
+        );
+        await logCenter.logError(
+          '$modeName 创建失败 | 磁盘: $diskNumber | 错误: $errorDetail',
+        );
+        return false;
+      }
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.verifying,
+          message: 'linux_finalizing',
+          progress: 0.96,
+        ),
+      );
+
+      final verifyResult = await _verifyLinuxRawWrite(
+        diskNumber: diskNumber,
+        isoPath: isoPath,
+      );
+      _logLine('Linux verify: ${verifyResult ? "OK" : "FAILED"}');
+
+      _notify(
+        onProgress,
+        CreateProgress(
+          step: verifyResult ? CreateStep.complete : CreateStep.failed,
+          message: verifyResult ? 'linux_complete' : 'linux_verify_failed',
+          progress: verifyResult ? 1.0 : 0.0,
+        ),
+      );
+
+      await logger.log(
+        action: 'Create $modeName',
+        target: 'Disk $diskNumber',
+        result: verifyResult ? 'Success - Raw ISOHybrid write' : 'Failed',
+        level: verifyResult ? LogLevel.success : LogLevel.error,
+      );
+
+      if (verifyResult) {
+        await logCenter.logUsb('$modeName 创建成功 | 磁盘: $diskNumber');
+      } else {
+        await logCenter.logError('$modeName 验证失败 | 磁盘: $diskNumber');
+      }
+
+      final logPath = await saveLogToFile();
+      _logLine('Log saved to: $logPath');
+      return verifyResult;
+    } catch (e) {
+      _logLine('Linux creation EXCEPTION: $e');
+      final logPath = await saveLogToFile();
+      await logCenter.logError('$modeName 创建异常 | 磁盘: $diskNumber | 错误: $e');
+      _notify(
+        onProgress,
+        CreateProgress(
+          step: CreateStep.failed,
+          message: 'creator_error\n$e\n\nLog: $logPath',
+        ),
+      );
+      await logger.log(
+        action: 'Create $modeName',
+        target: 'Disk $diskNumber',
+        result: 'Exception: $e',
+        level: LogLevel.error,
+      );
+      return false;
+    }
+  }
+
+  Future<_LinuxRawWriteResult> _createPersistentLinuxToGo({
+    required int diskNumber,
+    required String isoPath,
+    ProgressCallback? onProgress,
+  }) async {
+    const int mib = 1024 * 1024;
+
+    try {
+      final isoBytes = await File(isoPath).length();
+      final diskBytes = await _getDiskSizeBytes(diskNumber);
+      if (diskBytes == null) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error: 'Unable to read target disk size.',
+        );
+      }
+
+      final diskSizeMb = diskBytes ~/ mib;
+      final isoSizeMb = (isoBytes + mib - 1) ~/ mib;
+      final partitionSizeMb = _minInt(diskSizeMb - 16, 32760);
+      final persistenceSizeMb = _minInt(
+        4095,
+        partitionSizeMb - isoSizeMb - 512,
+      );
+
+      if (partitionSizeMb <= isoSizeMb + 512 || persistenceSizeMb < 512) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error:
+              'The target disk is too small for Linux To Go persistence. Need ISO size plus at least 512 MB free space.',
+        );
+      }
+
+      _logLine(
+        'Linux To Go layout: disk=${diskSizeMb}MB, boot=${partitionSizeMb}MB, persistence=${persistenceSizeMb}MB',
+      );
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.cleaningDisk,
+          message: 'linux_locking_disk',
+          progress: 0.05,
+        ),
+      );
+
+      final partitionResult = await _partitionLinuxToGoDisk(
+        diskNumber: diskNumber,
+        partitionSizeMb: partitionSizeMb,
+      );
+      if (!partitionResult.success || partitionResult.driveLetter == null) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error: partitionResult.error ?? 'Failed to partition target disk.',
+        );
+      }
+
+      final targetDrive = partitionResult.driveLetter!;
+      _logLine('Linux To Go boot partition: $targetDrive');
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.formatting,
+          message: 'boot_format_verifying',
+          progress: 0.12,
+        ),
+      );
+
+      final formatOk = await _formatPartition(
+        driveLetter: targetDrive,
+        fileSystem: 'FAT32',
+      );
+      if (!formatOk) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error: 'Linux To Go boot partition was not formatted as FAT32.',
+        );
+      }
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.mountingIso,
+          message: 'boot_mounting',
+          progress: 0.18,
+        ),
+      );
+
+      final mountPoint = await _mountIso(isoPath);
+      if (mountPoint == null) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error: 'Failed to mount Linux ISO: $isoPath',
+        );
+      }
+
+      try {
+        _notify(
+          onProgress,
+          const CreateProgress(
+            step: CreateStep.copyingFiles,
+            message: 'step_copying',
+            progress: 0.24,
+          ),
+        );
+
+        final copyOk = await _copyIsoContents(
+          mountPoint: mountPoint,
+          targetDrive: targetDrive,
+          excludeWim: false,
+          onProgress: (progress) {
+            _notify(
+              onProgress,
+              CreateProgress(
+                step: CreateStep.copyingFiles,
+                message: 'step_copying',
+                progress: 0.24 + progress * 0.44,
+              ),
+            );
+          },
+        );
+
+        if (!copyOk) {
+          return const _LinuxRawWriteResult(
+            success: false,
+            error: 'Failed to copy Linux ISO files to the target disk.',
+          );
+        }
+      } finally {
+        await _unmountIso(isoPath);
+      }
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.writingBootFiles,
+          message: 'linux_finalizing',
+          progress: 0.72,
+        ),
+      );
+
+      final bootPatched = await _patchLinuxPersistenceBootConfigs(targetDrive);
+      if (!bootPatched) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error:
+              'Failed to enable Linux persistence in GRUB boot configuration.',
+        );
+      }
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.copyingFiles,
+          message: 'linux_finalizing',
+          progress: 0.78,
+        ),
+      );
+
+      final persistenceResult = await _createPersistenceImage(
+        targetDrive: targetDrive,
+        sizeMb: persistenceSizeMb,
+      );
+      if (!persistenceResult.success) {
+        return persistenceResult;
+      }
+
+      _notify(
+        onProgress,
+        const CreateProgress(
+          step: CreateStep.verifying,
+          message: 'linux_finalizing',
+          progress: 0.96,
+        ),
+      );
+
+      final verified = await _verifyLinuxToGoLayout(targetDrive);
+      if (!verified) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error: 'Linux To Go persistence layout verification failed.',
+        );
+      }
+
+      _logLine('Linux To Go verify: OK');
+      return const _LinuxRawWriteResult(success: true);
+    } catch (e) {
+      _logLine('Linux To Go creation error: $e');
+      return _LinuxRawWriteResult(success: false, error: e.toString());
+    }
+  }
+
+  Future<int?> _getDiskSizeBytes(int diskNumber) async {
+    try {
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        '(Get-Disk -Number $diskNumber -ErrorAction Stop).Size',
+      ]).timeout(const Duration(seconds: 10));
+
+      if (result.exitCode != 0) {
+        _logLine('Get-Disk size failed: ${result.stderr}');
+        return null;
+      }
+
+      return int.tryParse(result.stdout.toString().trim());
+    } catch (e) {
+      _logLine('Get-Disk size error: $e');
+      return null;
+    }
+  }
+
+  int _minInt(int a, int b) => a < b ? a : b;
+
+  Future<_DiskPartResult> _partitionLinuxToGoDisk({
+    required int diskNumber,
+    required int partitionSizeMb,
+  }) async {
+    final script =
+        '''
+select disk $diskNumber
+clean
+convert mbr
+create partition primary size=$partitionSizeMb
+active
+format fs=fat32 label="WDS_LTG" quick
+assign
+exit
+''';
+    _logLine('Linux To Go DiskPart script:\n$script');
+
+    final result = await _runDiskpart(script);
+    _logLine('Linux To Go DiskPart exit: ${result.exitCode}');
+
+    if (result.exitCode != 0) {
+      final stderr = result.stderr.toString();
+      final stdout = result.stdout.toString();
+      _logLine('Linux To Go DiskPart stderr: $stderr');
+      _logLine('Linux To Go DiskPart stdout: $stdout');
+      return _DiskPartResult(
+        success: false,
+        error: stderr.isNotEmpty ? stderr : stdout,
+      );
+    }
+
+    final driveLetter = await _findDriveLetterForDisk(diskNumber);
+    if (driveLetter == null) {
+      return const _DiskPartResult(
+        success: false,
+        error: 'Could not find Linux To Go boot partition drive letter.',
+      );
+    }
+
+    return _DiskPartResult(success: true, driveLetter: driveLetter);
+  }
+
+  Future<bool> _patchLinuxPersistenceBootConfigs(String targetDrive) async {
+    final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
+    final configFiles = <File>[
+      File(p.join(root, 'boot', 'grub', 'grub.cfg')),
+      File(p.join(root, 'boot', 'grub', 'loopback.cfg')),
+    ];
+
+    var foundBootConfig = false;
+    var foundCasperEntry = false;
+
+    for (final file in configFiles) {
+      if (!await file.exists()) continue;
+      foundBootConfig = true;
+
+      await Process.run('attrib', ['-R', file.path]).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => ProcessResult(0, -1, '', 'attrib timeout'),
+      );
+
+      final original = await file.readAsString();
+      final newline = original.contains('\r\n') ? '\r\n' : '\n';
+      final lines = original.replaceAll('\r\n', '\n').split('\n');
+      var changed = false;
+
+      final updatedLines = lines
+          .map((line) {
+            final isLinuxLine = RegExp(
+              r'^\s*linux(efi)?\s+',
+              caseSensitive: false,
+            ).hasMatch(line);
+            if (!isLinuxLine || !line.contains('/casper/vmlinuz')) {
+              return line;
+            }
+
+            foundCasperEntry = true;
+            if (RegExp(r'(^|\s)persistent(\s|$)').hasMatch(line)) {
+              return line;
+            }
+
+            changed = true;
+            final markerIndex = line.indexOf(' ---');
+            if (markerIndex >= 0) {
+              return '${line.substring(0, markerIndex)} persistent${line.substring(markerIndex)}';
+            }
+            return '$line persistent';
+          })
+          .join('\n');
+
+      if (changed) {
+        await file.writeAsString(updatedLines.replaceAll('\n', newline));
+        _logLine('Patched persistence boot config: ${file.path}');
+      } else {
+        _logLine('Persistence boot config already patched: ${file.path}');
+      }
+    }
+
+    return foundBootConfig && foundCasperEntry;
+  }
+
+  Future<_LinuxRawWriteResult> _createPersistenceImage({
+    required String targetDrive,
+    required int sizeMb,
+  }) async {
+    final mke2fs = await _findMke2fs();
+    if (mke2fs == null) {
+      return const _LinuxRawWriteResult(
+        success: false,
+        error:
+            'Bundled mke2fs.exe was not found. Linux To Go persistence requires mke2fs to create an ext4 writable image.',
+      );
+    }
+
+    final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
+    final image = File(p.join(root, 'writable'));
+    _logLine('Creating Linux persistence image: ${image.path}, ${sizeMb}MB');
+
+    if (await image.exists()) {
+      await image.delete();
+    }
+
+    final raf = await image.open(mode: FileMode.write);
+    try {
+      await raf.truncate(sizeMb * 1024 * 1024);
+    } finally {
+      await raf.close();
+    }
+
+    final result = await Process.run(mke2fs, [
+      '-t',
+      'ext4',
+      '-F',
+      '-L',
+      'writable',
+      image.path,
+    ]).timeout(const Duration(minutes: 5));
+
+    _logLine('mke2fs exit: ${result.exitCode}');
+    if (result.stdout.toString().trim().isNotEmpty) {
+      _logLine('mke2fs stdout: ${result.stdout}');
+    }
+    if (result.stderr.toString().trim().isNotEmpty) {
+      _logLine('mke2fs stderr: ${result.stderr}');
+    }
+
+    if (result.exitCode != 0) {
+      return _LinuxRawWriteResult(
+        success: false,
+        error: result.stderr.toString().trim().isNotEmpty
+            ? result.stderr.toString().trim()
+            : 'mke2fs failed with exit code ${result.exitCode}.',
+      );
+    }
+
+    return const _LinuxRawWriteResult(success: true);
+  }
+
+  Future<String?> _findMke2fs() async {
+    final candidates = <String>[];
+
+    final executableDir = File(Platform.resolvedExecutable).parent.path;
+    final currentDir = Directory.current.path;
+    candidates.addAll([
+      p.join(executableDir, 'tools', 'e2fsprogs', 'mke2fs.exe'),
+      p.join(executableDir, 'tools', 'mke2fs.exe'),
+      p.join(executableDir, 'data', 'tools', 'e2fsprogs', 'mke2fs.exe'),
+      p.join(executableDir, 'data', 'tools', 'mke2fs.exe'),
+      p.join(currentDir, 'tools', 'e2fsprogs', 'mke2fs.exe'),
+      p.join(currentDir, 'tools', 'mke2fs.exe'),
+    ]);
+
+    for (final name in const ['mke2fs.exe', 'mke2fs']) {
+      try {
+        final result = await Process.run('where.exe', [
+          name,
+        ]).timeout(const Duration(seconds: 5));
+        if (result.exitCode == 0) {
+          candidates.addAll(
+            result.stdout
+                .toString()
+                .split(RegExp(r'\r?\n'))
+                .map((line) => line.trim())
+                .where((line) => line.isNotEmpty),
+          );
+        }
+      } catch (_) {}
+    }
+
+    for (final candidate in candidates) {
+      if (candidate.isEmpty) continue;
+      if (await File(candidate).exists()) {
+        _logLine('Using mke2fs: $candidate');
+        return candidate;
+      }
+    }
+
+    _logLine('mke2fs not found');
+    return null;
+  }
+
+  Future<bool> _verifyLinuxToGoLayout(String targetDrive) async {
+    try {
+      final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
+      final bootx64 = File(p.join(root, 'EFI', 'BOOT', 'BOOTx64.EFI'));
+      final grub = File(p.join(root, 'boot', 'grub', 'grub.cfg'));
+      final writable = File(p.join(root, 'writable'));
+
+      if (!await bootx64.exists()) {
+        _logLine('Linux To Go verify failed: BOOTx64.EFI missing');
+        return false;
+      }
+      if (!await grub.exists()) {
+        _logLine('Linux To Go verify failed: grub.cfg missing');
+        return false;
+      }
+
+      final grubText = await grub.readAsString();
+      if (!RegExp(r'(^|\s)persistent(\s|$)').hasMatch(grubText)) {
+        _logLine('Linux To Go verify failed: persistent boot arg missing');
+        return false;
+      }
+
+      if (!await writable.exists() ||
+          await writable.length() < 16 * 1024 * 1024) {
+        _logLine('Linux To Go verify failed: writable image missing');
+        return false;
+      }
+
+      final raf = await writable.open();
+      try {
+        await raf.setPosition(1080);
+        final magic = await raf.read(2);
+        if (magic.length != 2 || magic[0] != 0x53 || magic[1] != 0xEF) {
+          _logLine('Linux To Go verify failed: ext4 magic missing');
+          return false;
+        }
+      } finally {
+        await raf.close();
+      }
+
+      return true;
+    } catch (e) {
+      _logLine('Linux To Go verify error: $e');
+      return false;
+    }
+  }
+
+  Future<_LinuxRawWriteResult> _writeIsoHybridRaw({
+    required int diskNumber,
+    required String isoPath,
+    required void Function(double progress) onProgress,
+  }) async {
+    final tempDir = await FileUtils.getTempDirectory();
+    final scriptFile = File(p.join(tempDir, 'wds_linux_raw_write.ps1'));
+    await scriptFile.writeAsString(_linuxRawWriteScript);
+
+    final process = await Process.start('powershell', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      scriptFile.path,
+      '-DiskNumber',
+      '$diskNumber',
+      '-IsoPath',
+      isoPath,
+    ]);
+
+    final stdoutLines = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .transform(const LineSplitter());
+    final stderrText = StringBuffer();
+
+    final stderrFuture = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .listen((chunk) {
+          stderrText.write(chunk);
+          if (chunk.trim().isNotEmpty) {
+            _logLine('Linux raw stderr: ${chunk.trim()}');
+          }
+        })
+        .asFuture<void>();
+
+    await for (final line in stdoutLines) {
+      final cleanLine = line.trim();
+      if (cleanLine.isEmpty) continue;
+      _logLine('Linux raw stdout: $cleanLine');
+      if (cleanLine.startsWith('WDS_PROGRESS:')) {
+        final parts = cleanLine.split(':');
+        if (parts.length >= 2) {
+          final percent = int.tryParse(parts[1]) ?? 0;
+          onProgress((percent.clamp(0, 100)) / 100.0);
+        }
+      }
+    }
+
+    final exitCode = await process.exitCode;
+    await stderrFuture.catchError((_) {});
+    await scriptFile.delete().catchError((_) => scriptFile);
+
+    if (exitCode != 0) {
+      return _LinuxRawWriteResult(
+        success: false,
+        error: stderrText.toString().trim().isNotEmpty
+            ? stderrText.toString().trim()
+            : 'PowerShell exited with code $exitCode',
+      );
+    }
+
+    return const _LinuxRawWriteResult(success: true);
+  }
+
+  Future<bool> _verifyLinuxRawWrite({
+    required int diskNumber,
+    required String isoPath,
+  }) async {
+    final tempDir = await FileUtils.getTempDirectory();
+    final scriptFile = File(p.join(tempDir, 'wds_linux_verify_raw_write.ps1'));
+
+    try {
+      await scriptFile.writeAsString(_linuxRawVerifyScript);
+
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptFile.path,
+        '-DiskNumber',
+        '$diskNumber',
+        '-IsoPath',
+        isoPath,
+      ]).timeout(const Duration(seconds: 15));
+      if (result.exitCode != 0) {
+        _logLine('Verify command failed: ${result.stderr}');
+        return false;
+      }
+      return result.stdout.toString().contains('OK');
+    } catch (e) {
+      _logLine('Verify command exception: $e');
+      return false;
+    } finally {
+      await scriptFile.delete().catchError((_) => scriptFile);
+    }
+  }
+
+  static const String _linuxRawWriteScript = r'''
+param(
+  [Parameter(Mandatory = $true)][int]$DiskNumber,
+  [Parameter(Mandatory = $true)][string]$IsoPath
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Emit-Progress([int]$Percent, [int64]$Written, [int64]$Total) {
+  Write-Output ("WDS_PROGRESS:{0}:{1}:{2}" -f $Percent, $Written, $Total)
+}
+
+if (-not (Test-Path -LiteralPath $IsoPath -PathType Leaf)) {
+  throw "ISO file not found: $IsoPath"
+}
+
+$disk = Get-Disk -Number $DiskNumber -ErrorAction Stop
+if ($disk.IsSystem -or $disk.IsBoot) {
+  throw "Refusing to write to a system or boot disk."
+}
+
+if ($disk.IsOffline) {
+  Set-Disk -Number $DiskNumber -IsOffline $false -ErrorAction SilentlyContinue
+}
+if ($disk.IsReadOnly) {
+  Set-Disk -Number $DiskNumber -IsReadOnly $false -ErrorAction SilentlyContinue
+}
+
+$driveLetters = @(
+  Get-Partition -DiskNumber $DiskNumber -ErrorAction SilentlyContinue |
+    Where-Object { $_.DriveLetter } |
+    Select-Object -ExpandProperty DriveLetter
+)
+
+foreach ($letter in $driveLetters) {
+  if ($null -ne $letter -and "$letter".Length -gt 0) {
+    $drive = ("{0}:" -f $letter)
+    & "$env:SystemRoot\System32\mountvol.exe" $drive /D 2>$null | Out-Null
+  }
+}
+
+Clear-Disk -Number $DiskNumber -RemoveData -RemoveOEM -Confirm:$false -ErrorAction Stop
+Start-Sleep -Milliseconds 700
+
+$source = [System.IO.File]::Open(
+  $IsoPath,
+  [System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::Read,
+  [System.IO.FileShare]::Read
+)
+
+$targetPath = "\\.\PhysicalDrive$DiskNumber"
+$target = [System.IO.File]::Open(
+  $targetPath,
+  [System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::ReadWrite,
+  [System.IO.FileShare]::ReadWrite
+)
+
+try {
+  $buffer = New-Object byte[] 4194304
+  $total = $source.Length
+  $written = [int64]0
+  $lastPercent = -1
+  Emit-Progress 0 0 $total
+
+  while (($read = $source.Read($buffer, 0, $buffer.Length)) -gt 0) {
+    $target.Write($buffer, 0, $read)
+    $written += $read
+    $percent = [int][Math]::Floor(($written * 100.0) / $total)
+    if ($percent -ne $lastPercent) {
+      Emit-Progress $percent $written $total
+      $lastPercent = $percent
+    }
+  }
+
+  $target.Flush($true)
+  Emit-Progress 100 $written $total
+} finally {
+  $target.Dispose()
+  $source.Dispose()
+}
+
+Update-Disk -Number $DiskNumber -ErrorAction SilentlyContinue | Out-Null
+Write-Output "WDS_DONE"
+''';
+
+  static const String _linuxRawVerifyScript = r'''
+param(
+  [Parameter(Mandatory = $true)][int]$DiskNumber,
+  [Parameter(Mandatory = $true)][string]$IsoPath
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Read-Bytes([System.IO.Stream]$Stream, [int64]$Offset, [int]$Length) {
+  $buffer = New-Object byte[] $Length
+  $Stream.Seek($Offset, [System.IO.SeekOrigin]::Begin) | Out-Null
+  $read = $Stream.Read($buffer, 0, $Length)
+  if ($read -ne $Length) {
+    throw "Short read at offset $Offset."
+  }
+  return $buffer
+}
+
+function Get-HexRange([byte[]]$Bytes, [int]$Offset, [int]$Length) {
+  $builder = New-Object System.Text.StringBuilder
+  for ($i = 0; $i -lt $Length; $i++) {
+    [void]$builder.AppendFormat("{0:X2}", $Bytes[$Offset + $i])
+  }
+  return $builder.ToString()
+}
+
+function Test-ZeroEntry([byte[]]$Entry) {
+  foreach ($byte in $Entry) {
+    if ($byte -ne 0) {
+      return $false
+    }
+  }
+  return $true
+}
+
+function Read-GptLayout([System.IO.Stream]$Stream) {
+  $header = Read-Bytes $Stream 512 92
+  $magic = [System.Text.Encoding]::ASCII.GetString($header, 0, 8)
+  if ($magic -ne 'EFI PART') {
+    return @()
+  }
+
+  $entryLba = [BitConverter]::ToUInt64($header, 72)
+  $entryCount = [BitConverter]::ToUInt32($header, 80)
+  $entrySize = [BitConverter]::ToUInt32($header, 84)
+
+  if ($entrySize -lt 56 -or $entrySize -gt 4096 -or $entryCount -gt 1024) {
+    throw "Invalid GPT entry table."
+  }
+
+  $entries = @()
+  for ($index = 0; $index -lt $entryCount; $index++) {
+    $entryOffset = ([int64]$entryLba * 512) + ([int64]$index * $entrySize)
+    $entry = Read-Bytes $Stream $entryOffset $entrySize
+    if (Test-ZeroEntry $entry) {
+      continue
+    }
+
+    $entries += [PSCustomObject]@{
+      TypeHex = Get-HexRange $entry 0 16
+      FirstLba = [BitConverter]::ToUInt64($entry, 32)
+      LastLba = [BitConverter]::ToUInt64($entry, 40)
+    }
+  }
+
+  return $entries
+}
+
+function Compare-Block(
+  [System.IO.Stream]$Source,
+  [System.IO.Stream]$Target,
+  [int64]$Offset,
+  [int]$Length
+) {
+  $sourceBytes = Read-Bytes $Source $Offset $Length
+  $targetBytes = Read-Bytes $Target $Offset $Length
+  for ($i = 0; $i -lt $Length; $i++) {
+    if ($sourceBytes[$i] -ne $targetBytes[$i]) {
+      throw "Verification mismatch at offset $($Offset + $i)."
+    }
+  }
+}
+
+if (-not (Test-Path -LiteralPath $IsoPath -PathType Leaf)) {
+  throw "ISO file not found: $IsoPath"
+}
+
+$isoItem = Get-Item -LiteralPath $IsoPath -ErrorAction Stop
+$isoLength = [int64]$isoItem.Length
+if ($isoLength -le 0) {
+  throw "ISO file is empty."
+}
+
+$targetDisk = Get-Disk -Number $DiskNumber -ErrorAction Stop
+if ([int64]$targetDisk.Size -lt $isoLength) {
+  throw "Target disk is smaller than the ISO image."
+}
+
+$source = [System.IO.File]::Open(
+  $IsoPath,
+  [System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::Read,
+  [System.IO.FileShare]::Read
+)
+
+$targetPath = "\\.\PhysicalDrive$DiskNumber"
+$target = [System.IO.File]::Open(
+  $targetPath,
+  [System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::Read,
+  [System.IO.FileShare]::ReadWrite
+)
+
+try {
+  $diskMbr = Read-Bytes $target 0 512
+  if ($diskMbr[510] -ne 0x55 -or $diskMbr[511] -ne 0xAA) {
+    throw "Target disk has no valid boot signature."
+  }
+
+  $isoLayout = @(Read-GptLayout $source)
+  $diskLayout = @(Read-GptLayout $target)
+  if ($isoLayout.Count -gt 0) {
+    if ($diskLayout.Count -lt $isoLayout.Count) {
+      throw "Target GPT partition count does not match the ISO image."
+    }
+
+    for ($i = 0; $i -lt $isoLayout.Count; $i++) {
+      if (
+        $isoLayout[$i].TypeHex -ne $diskLayout[$i].TypeHex -or
+        $isoLayout[$i].FirstLba -ne $diskLayout[$i].FirstLba -or
+        $isoLayout[$i].LastLba -ne $diskLayout[$i].LastLba
+      ) {
+        throw "Target GPT partition layout does not match the ISO image."
+      }
+    }
+  }
+
+  $sourcePvd = Read-Bytes $source 32768 6
+  $sourcePvdMagic = [System.Text.Encoding]::ASCII.GetString($sourcePvd, 1, 5)
+  if ($sourcePvdMagic -eq 'CD001') {
+    $targetPvd = Read-Bytes $target 32768 6
+    $targetPvdMagic = [System.Text.Encoding]::ASCII.GetString($targetPvd, 1, 5)
+    if ($targetPvdMagic -ne 'CD001') {
+      throw "Target disk is missing the ISO9660 signature."
+    }
+  }
+
+  $blockLength = 4096
+  $sampleOffsets = New-Object System.Collections.Generic.List[Int64]
+  $sampleOffsets.Add([int64]1048576) | Out-Null
+  $sampleOffsets.Add([int64][Math]::Floor($isoLength * 0.25)) | Out-Null
+  $sampleOffsets.Add([int64][Math]::Floor($isoLength * 0.50)) | Out-Null
+  $sampleOffsets.Add([int64][Math]::Floor($isoLength * 0.75)) | Out-Null
+
+  $checked = New-Object System.Collections.Generic.HashSet[Int64]
+  foreach ($offset in $sampleOffsets) {
+    $alignedOffset = [int64]([Math]::Floor($offset / 4096) * 4096)
+    if (
+      $alignedOffset -ge 1048576 -and
+      ($alignedOffset + $blockLength) -lt ($isoLength - 16777216) -and
+      $checked.Add($alignedOffset)
+    ) {
+      Compare-Block $source $target $alignedOffset $blockLength
+    }
+  }
+
+  Write-Output "OK"
+} finally {
+  $target.Dispose()
+  $source.Dispose()
+}
+''';
 
   // --- Disk Partitioning ---
 
@@ -973,4 +2002,11 @@ class _DiskPartResult {
   final String? error;
 
   const _DiskPartResult({required this.success, this.driveLetter, this.error});
+}
+
+class _LinuxRawWriteResult {
+  final bool success;
+  final String? error;
+
+  const _LinuxRawWriteResult({required this.success, this.error});
 }

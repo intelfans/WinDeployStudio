@@ -13,6 +13,9 @@ WinDeploy Studio가 성공적으로 설치되었습니다.
 GitHub 프로필: https://github.com/intelfans
 GitHub 저장소: https://github.com/intelfans/WinDeployStudio
 
+타사 도구 안내:
+Linux To Go에는 ext4 지속성 이미지를 만들기 위한 e2fsprogs/AOSP 기반 mke2fs.exe 유틸리티가 포함되어 있습니다. 이 도구는 별도의 명령줄 도구로 실행됩니다. 자세한 내용은 설치 폴더의 tools\e2fsprogs\README.md를 확인하세요.
+
 특별 감사
 
 WinDeploy Studio는 소중한 피드백, 테스트, 아이디어, 영감과 지원을 보내 준 다음 분들과 커뮤니티에 감사드립니다.

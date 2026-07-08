@@ -5,7 +5,7 @@ Modern Windows deployment toolkit for Windows installation media, Windows To Go,
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Flutter](https://img.shields.io/badge/Flutter-Windows-02569B?logo=flutter)
-![Version](https://img.shields.io/badge/Version-1.1.2-orange)
+![Version](https://img.shields.io/badge/Version-1.2.0-orange)
 
 ## Overview
 
@@ -246,6 +246,12 @@ Activation-related utilities are presented as third-party resources for educatio
 
 Windows, Microsoft, Sysinternals, Intel, and other product names, trademarks, logos, and external resources remain the property of their respective owners. WinDeploy Studio is not affiliated with Microsoft Corporation or Intel Corporation.
 
+## Third-Party Tools
+
+Linux To Go uses the bundled `mke2fs.exe` command-line utility to create the ext4 `writable` persistence image. The bundled binary is from e2fsprogs / Android Open Source Project references, reports `mke2fs 1.47.2 (1-Jan-2025)` and `android-platform-15.0.0_r5-314-ga1f793f6b`, and has SHA-256 `BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A`.
+
+`mke2fs.exe` is invoked as a separate executable and is not linked into the MIT-licensed WinDeploy Studio application binary. See [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) for details.
+
 ## Special Thanks
 
 WinDeploy Studio would like to thank the following people and communities for their valuable feedback, testing, ideas, inspiration, and support.
@@ -484,6 +490,12 @@ WinDeploy Studio 基于 MIT License 分发。
 本项目不提供 Windows 授权、产品密钥、激活服务或绕过授权机制。用户需自行确保遵守 Microsoft 及其他软件厂商的许可协议。
 
 第三方软件、商标、Logo 和外部资源归其各自所有者所有。WinDeploy Studio 与 Microsoft Corporation 或 Intel Corporation 无官方隶属关系。
+
+## 第三方工具说明
+
+Linux To Go 使用随程序内置的 `mke2fs.exe` 命令行工具创建 ext4 `writable` 持久化镜像。该二进制文件来源参考 e2fsprogs / Android Open Source Project，版本信息为 `mke2fs 1.47.2 (1-Jan-2025)` 和 `android-platform-15.0.0_r5-314-ga1f793f6b`，SHA-256 为 `BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A`。
+
+WinDeploy Studio 以独立进程调用 `mke2fs.exe`，并未将其链接进基于 MIT License 授权的主程序二进制文件。详见 [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md)。
 
 ## 特别鸣谢
 

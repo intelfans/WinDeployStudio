@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../constants/app_constants.dart';
 import 'file_logger_service.dart';
 import '../../features/logs/services/log_center_service.dart';
 
@@ -177,12 +178,12 @@ class WtgService {
   void _writeLogToFileSync(String line) {
     try {
       final dir = Directory(
-        'C:\\Users\\${Platform.environment['USERNAME']}\\AppData\\Roaming\\WinDeployStudio\\logs',
+        p.join(AppConstants.appDataPath, 'WinDeployStudio', 'logs'),
       );
       if (!dir.existsSync()) {
         dir.createSync(recursive: true);
       }
-      final logFile = File('${dir.path}\\wtg_detail.log');
+      final logFile = File(p.join(dir.path, 'wtg_detail.log'));
       logFile.writeAsStringSync('$line\n', mode: FileMode.append);
     } catch (e) {
       debugPrint('Log write error: $e');

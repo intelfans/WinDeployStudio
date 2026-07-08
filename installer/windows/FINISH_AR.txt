@@ -13,6 +13,9 @@
 ملف GitHub الشخصي: https://github.com/intelfans
 مستودع GitHub: https://github.com/intelfans/WinDeployStudio
 
+ملاحظة حول أداة خارجية:
+يتضمن Linux To Go أداة mke2fs.exe المرفقة من e2fsprogs/AOSP لإنشاء صور استمرارية ext4. يتم تشغيلها كأداة سطر أوامر منفصلة. راجع tools\e2fsprogs\README.md في مجلد التثبيت للتفاصيل.
+
 شكر خاص
 
 يشكر WinDeploy Studio الأشخاص والمجتمعات التالية على الملاحظات والاختبارات والأفكار والإلهام والدعم القيّم.
