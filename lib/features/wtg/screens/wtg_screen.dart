@@ -1,15 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import '../../../core/localization/strings.dart';
+import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/wtg_service.dart';
 import '../../../core/services/wtg_compatibility_service.dart';
 import '../../logs/services/log_center_service.dart';
+
+enum _WtgPlatform { windows, linux }
 
 class WtgScreen extends ConsumerStatefulWidget {
   const WtgScreen({super.key});
@@ -20,6 +25,7 @@ class WtgScreen extends ConsumerStatefulWidget {
 
 class _WtgScreenState extends ConsumerState<WtgScreen> {
   int _currentStep = 0;
+  _WtgPlatform _platform = _WtgPlatform.windows;
 
   IsoMetadata? _selectedIso;
   DiskInfo? _selectedDisk;
@@ -51,7 +57,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   Stopwatch? _progressStopwatch;
   Timer? _progressTimer;
 
-  // Lightweight waiting game state. UI-only; it never touches WTG creation.
+  // Lightweight waiting game state. UI-only; it never touches image creation.
   final Random _idleGameRandom = Random();
   int _idleGameTarget = 4;
   int _idleGameScore = 0;
@@ -60,6 +66,27 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   void initState() {
     super.initState();
     _detectDisks();
+  }
+
+  bool get _isLinuxMode => _platform == _WtgPlatform.linux;
+
+  void _setPlatform(_WtgPlatform platform) {
+    if (_platform == platform) return;
+    setState(() {
+      _platform = platform;
+      _currentStep = 0;
+      _selectedIso = null;
+      _selectedDisk = null;
+      _wimImages = [];
+      _selectedImageIndex = null;
+      _compatibilityResult = null;
+      _wtgProgress = null;
+      _isParsing = false;
+      _isLoadingWim = false;
+      _debugLogs = [];
+      _confirmController.clear();
+      _isConfirmValid = false;
+    });
   }
 
   @override
@@ -92,7 +119,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['iso'],
-        dialogTitle: tr(context, 'wtg_select_iso'),
+        dialogTitle: tr(
+          context,
+          _isLinuxMode ? 'wtg_linux_select_iso' : 'wtg_select_iso',
+        ),
       );
 
       if (result == null || result.files.single.path == null) return;
@@ -100,6 +130,26 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       debugPrint('ISO selected: $path');
 
       if (!mounted) return;
+
+      if (_isLinuxMode) {
+        final file = File(path);
+        final metadata = IsoMetadata(
+          filePath: path,
+          fileName: p.basename(path),
+          fileSize: await file.length(),
+          windowsVersion: 'Linux ISOHybrid',
+        );
+        setState(() {
+          _selectedIso = metadata;
+          _selectedImageIndex = 1;
+          _currentStep = 3;
+        });
+        final logCenter = LogCenterService();
+        await logCenter.logToGo(
+          'Linux To Go ISO 已选择 | 文件: ${metadata.fileName} | 大小: ${metadata.displaySize}',
+        );
+        return;
+      }
 
       // Show inline progress
       setState(() {
@@ -158,8 +208,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
       if (metadata != null) {
         final logCenter = LogCenterService();
-        await logCenter.logWTG(
-          'WTG ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"}',
+        await logCenter.logToGo(
+          'Windows To Go ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"}',
         );
         // Load WIM images
         await _loadWimImages(path);
@@ -242,9 +292,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   Future<void> _startWtgCreation() async {
-    if (_selectedIso == null ||
-        _selectedDisk == null ||
-        _selectedImageIndex == null) {
+    if (_selectedIso == null || _selectedDisk == null) {
+      return;
+    }
+    if (!_isLinuxMode && _selectedImageIndex == null) {
       return;
     }
 
@@ -264,27 +315,42 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _currentStep = 5; // Move to progress step
       _wtgProgress = WtgProgress(
         step: WtgStep.preparing,
-        message: tr(context, 'wtg_starting'),
+        message: tr(context, _isLinuxMode ? 'linux_preparing' : 'wtg_starting'),
         progress: 0.0,
       );
     });
 
-    final wtgService = ref.read(wtgServiceProvider);
-    final driveLetter = _selectedDisk!.driveLetters.isNotEmpty
-        ? _selectedDisk!.driveLetters.first
-        : '';
+    final bool result;
+    if (_isLinuxMode) {
+      final service = ref.read(bootableUsbServiceProvider);
+      result = await service.createLinuxIsoUsb(
+        isoPath: _selectedIso!.filePath,
+        diskNumber: _selectedDisk!.diskNumber,
+        kind: LinuxUsbKind.toGo,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() => _wtgProgress = _mapLinuxProgress(progress));
+          }
+        },
+      );
+    } else {
+      final wtgService = ref.read(wtgServiceProvider);
+      final driveLetter = _selectedDisk!.driveLetters.isNotEmpty
+          ? _selectedDisk!.driveLetters.first
+          : '';
 
-    final result = await wtgService.createWtg(
-      isoPath: _selectedIso!.filePath,
-      imageIndex: _selectedImageIndex!,
-      diskNumber: _selectedDisk!.diskNumber,
-      driveLetter: driveLetter,
-      onProgress: (progress) {
-        if (mounted) {
-          setState(() => _wtgProgress = progress);
-        }
-      },
-    );
+      result = await wtgService.createWtg(
+        isoPath: _selectedIso!.filePath,
+        imageIndex: _selectedImageIndex!,
+        diskNumber: _selectedDisk!.diskNumber,
+        driveLetter: driveLetter,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() => _wtgProgress = progress);
+          }
+        },
+      );
+    }
 
     if (mounted) {
       _progressTimer?.cancel();
@@ -293,6 +359,29 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         _currentStep = result ? 9 : 10; // Complete or Failed
       });
     }
+  }
+
+  WtgProgress _mapLinuxProgress(CreateProgress progress) {
+    final step = switch (progress.step) {
+      CreateStep.preparing => WtgStep.preparing,
+      CreateStep.cleaningDisk => WtgStep.partitioningDisk,
+      CreateStep.creatingPartitions => WtgStep.partitioningDisk,
+      CreateStep.formatting => WtgStep.partitioningDisk,
+      CreateStep.mountingIso => WtgStep.mountingIso,
+      CreateStep.copyingFiles => WtgStep.applyingImage,
+      CreateStep.splittingWim => WtgStep.applyingImage,
+      CreateStep.writingBootFiles => WtgStep.writingBootFiles,
+      CreateStep.verifying => WtgStep.verifying,
+      CreateStep.complete => WtgStep.complete,
+      CreateStep.failed => WtgStep.failed,
+    };
+    return WtgProgress(
+      step: step,
+      progress: progress.progress,
+      message: progress.message,
+      error: progress.error,
+      elapsedTime: _progressStopwatch?.elapsed,
+    );
   }
 
   String _resolveLocalizedMessage(BuildContext context, String key) {
@@ -322,22 +411,46 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              tr(context, 'wtg_title'),
+              tr(context, _isLinuxMode ? 'wtg_linux_title' : 'wtg_title'),
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              tr(context, 'wtg_subtitle'),
+              tr(context, _isLinuxMode ? 'wtg_linux_subtitle' : 'wtg_subtitle'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 16),
+            _buildPlatformSelector(),
             const SizedBox(height: 24),
             Expanded(child: _buildCurrentStep()),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlatformSelector() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SegmentedButton<_WtgPlatform>(
+        segments: [
+          ButtonSegment(
+            value: _WtgPlatform.windows,
+            icon: const Icon(Icons.window),
+            label: Text(tr(context, 'wtg_platform_windows')),
+          ),
+          ButtonSegment(
+            value: _WtgPlatform.linux,
+            icon: const Icon(Icons.terminal),
+            label: Text(tr(context, 'wtg_platform_linux')),
+          ),
+        ],
+        selected: {_platform},
+        onSelectionChanged: (selection) => _setPlatform(selection.first),
       ),
     );
   }
@@ -370,14 +483,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr(context, 'wtg_step1_title'),
+          tr(
+            context,
+            _isLinuxMode ? 'wtg_linux_step1_title' : 'wtg_step1_title',
+          ),
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
-          tr(context, 'wtg_step1_desc'),
+          tr(context, _isLinuxMode ? 'wtg_linux_step1_desc' : 'wtg_step1_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -438,9 +554,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           Row(
             children: [
               FilledButton.icon(
-                onPressed: () => setState(() => _currentStep = 1),
+                onPressed: () =>
+                    setState(() => _currentStep = _isLinuxMode ? 3 : 1),
                 icon: const Icon(Icons.arrow_forward),
-                label: Text(tr(context, 'wtg_next_parse')),
+                label: Text(
+                  tr(
+                    context,
+                    _isLinuxMode ? 'wtg_next_select_disk' : 'wtg_next_parse',
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               OutlinedButton.icon(
@@ -479,7 +601,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      tr(context, 'creator_select_iso_desc'),
+                      tr(
+                        context,
+                        _isLinuxMode
+                            ? 'wtg_linux_select_iso_desc'
+                            : 'creator_select_iso_desc',
+                      ),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -756,14 +883,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr(context, 'wtg_step4_title'),
+          tr(
+            context,
+            _isLinuxMode ? 'wtg_linux_step4_title' : 'wtg_step4_title',
+          ),
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
-          tr(context, 'wtg_step4_desc'),
+          tr(context, _isLinuxMode ? 'wtg_linux_step4_desc' : 'wtg_step4_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -852,15 +982,18 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                           setState(() {
                             _selectedDisk = disk;
                             _compatibilityResult = null;
+                            _isCheckingCompatibility = false;
                           });
-                          _checkCompatibility(disk);
+                          if (!_isLinuxMode) {
+                            _checkCompatibility(disk);
+                          }
                         },
                       ),
                     );
                   }),
 
                   // Compatibility checking indicator
-                  if (_isCheckingCompatibility) ...[
+                  if (!_isLinuxMode && _isCheckingCompatibility) ...[
                     const SizedBox(height: 16),
                     Center(
                       child: Column(
@@ -874,7 +1007,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                   ],
 
                   // Compatibility result card
-                  if (_compatibilityResult != null) ...[
+                  if (!_isLinuxMode && _compatibilityResult != null) ...[
                     const SizedBox(height: 16),
                     _buildCompatibilityCard(),
                   ],
@@ -892,7 +1025,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       ),
                       const SizedBox(width: 12),
                       OutlinedButton.icon(
-                        onPressed: () => setState(() => _currentStep = 2),
+                        onPressed: () =>
+                            setState(() => _currentStep = _isLinuxMode ? 0 : 2),
                         icon: const Icon(Icons.arrow_back),
                         label: Text(tr(context, 'creator_back')),
                       ),
@@ -1180,14 +1314,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr(context, 'wtg_step5_title'),
+          tr(
+            context,
+            _isLinuxMode ? 'wtg_linux_confirm_title' : 'wtg_step5_title',
+          ),
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
-          tr(context, 'wtg_step5_desc'),
+          tr(
+            context,
+            _isLinuxMode ? 'wtg_linux_confirm_desc' : 'wtg_step5_desc',
+          ),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -1223,7 +1363,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                           tr(context, 'creator_size'),
                           _selectedIso?.displaySize ?? '',
                         ),
-                        if (_selectedImageIndex != null) ...[
+                        if (!_isLinuxMode && _selectedImageIndex != null) ...[
                           const Divider(),
                           Text(
                             tr(context, 'wtg_selected_image'),
@@ -1265,6 +1405,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                                   ],
                                 ),
                               ),
+                        ] else if (_isLinuxMode) ...[
+                          const Divider(),
+                          _InfoRow(
+                            tr(context, 'wtg_linux_workspace_type'),
+                            tr(context, 'wtg_linux_live_workspace'),
+                          ),
+                          _InfoRow(
+                            tr(context, 'wtg_linux_persistence'),
+                            tr(context, 'wtg_linux_persistence_note'),
+                          ),
                         ],
                       ],
                     ),
@@ -1319,7 +1469,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          tr(context, 'creator_warning'),
+                          tr(
+                            context,
+                            _isLinuxMode
+                                ? 'creator_linux_warning'
+                                : 'creator_warning',
+                          ),
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(
                                 color: Theme.of(context).colorScheme.error,
@@ -1402,13 +1557,19 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         stepText = tr(context, 'wtg_step_preparing');
         break;
       case WtgStep.partitioningDisk:
-        stepText = tr(context, 'wtg_step_partitioning');
+        stepText = tr(
+          context,
+          _isLinuxMode ? 'linux_locking_disk' : 'wtg_step_partitioning',
+        );
         break;
       case WtgStep.mountingIso:
         stepText = tr(context, 'wtg_step_mounting');
         break;
       case WtgStep.applyingImage:
-        stepText = tr(context, 'wtg_step_applying');
+        stepText = tr(
+          context,
+          _isLinuxMode ? 'linux_step_writing_image' : 'wtg_step_applying',
+        );
         break;
       case WtgStep.writingBootFiles:
         stepText = tr(context, 'wtg_step_boot');
@@ -1428,14 +1589,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr(context, 'wtg_step6_title'),
+          tr(
+            context,
+            _isLinuxMode ? 'wtg_linux_step6_title' : 'wtg_step6_title',
+          ),
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
-          tr(context, 'wtg_step6_desc'),
+          tr(context, _isLinuxMode ? 'wtg_linux_step6_desc' : 'wtg_step6_desc'),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -1582,14 +1746,24 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr(context, 'wtg_step_complete_title'),
+          tr(
+            context,
+            _isLinuxMode
+                ? 'wtg_linux_step_complete_title'
+                : 'wtg_step_complete_title',
+          ),
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
-          tr(context, 'wtg_step_complete_desc'),
+          tr(
+            context,
+            _isLinuxMode
+                ? 'wtg_linux_step_complete_desc'
+                : 'wtg_step_complete_desc',
+          ),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
@@ -1606,14 +1780,24 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     Icon(Icons.check_circle, size: 64, color: Colors.green),
                     const SizedBox(height: 24),
                     Text(
-                      tr(context, 'wtg_creation_complete'),
+                      tr(
+                        context,
+                        _isLinuxMode
+                            ? 'wtg_linux_creation_complete'
+                            : 'wtg_creation_complete',
+                      ),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      tr(context, 'wtg_creation_complete_desc'),
+                      tr(
+                        context,
+                        _isLinuxMode
+                            ? 'wtg_linux_creation_complete_desc'
+                            : 'wtg_creation_complete_desc',
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -1656,14 +1840,24 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr(context, 'wtg_step_failed_title'),
+          tr(
+            context,
+            _isLinuxMode
+                ? 'wtg_linux_step_failed_title'
+                : 'wtg_step_failed_title',
+          ),
           style: Theme.of(
             context,
           ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Text(
-          tr(context, 'wtg_step_failed_desc'),
+          tr(
+            context,
+            _isLinuxMode
+                ? 'wtg_linux_step_failed_desc'
+                : 'wtg_step_failed_desc',
+          ),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),

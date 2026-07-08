@@ -6,13 +6,9 @@ import '../models/log_category.dart';
 class LogCenterService {
   static LogCenterService? _instance;
   late final String _logsBasePath;
-  
+
   LogCenterService._() {
-    _logsBasePath = p.join(
-      AppConstants.appDataPath,
-      'WinDeployStudio',
-      'logs',
-    );
+    _logsBasePath = p.join(AppConstants.appDataPath, 'WinDeployStudio', 'logs');
     _ensureDirectories();
   }
 
@@ -34,17 +30,19 @@ class LogCenterService {
 
   Future<void> log(LogCategory category, String message) async {
     final now = DateTime.now();
-    final fileName = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}.log';
+    final fileName =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}.log';
     final filePath = p.join(_logsBasePath, category.folderName, fileName);
-    
+
     final file = File(filePath);
     final timestamp = now.toIso8601String();
     await file.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
   }
 
   Future<void> logUsb(String message) => log(LogCategory.usb, message);
-  Future<void> logWTG(String message) => log(LogCategory.wtg, message);
-  Future<void> logDownload(String message) => log(LogCategory.downloads, message);
+  Future<void> logToGo(String message) => log(LogCategory.wtg, message);
+  Future<void> logDownload(String message) =>
+      log(LogCategory.downloads, message);
   Future<void> logIso(String message) => log(LogCategory.iso, message);
   Future<void> logSystem(String message) => log(LogCategory.system, message);
   Future<void> logError(String message) => log(LogCategory.errors, message);
@@ -59,7 +57,9 @@ class LogCenterService {
     for (final category in LogCategory.values) {
       final dir = Directory(p.join(_logsBasePath, category.folderName));
       if (dir.existsSync()) {
-        final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.log'));
+        final files = dir.listSync().whereType<File>().where(
+          (f) => f.path.endsWith('.log'),
+        );
         int count = 0;
         for (final file in files) {
           count++;
@@ -86,12 +86,15 @@ class LogCenterService {
     final dir = Directory(p.join(_logsBasePath, category.folderName));
     if (!dir.existsSync()) return [];
 
-    final files = dir.listSync()
+    final files = dir
+        .listSync()
         .whereType<File>()
         .where((f) => f.path.endsWith('.log'))
         .toList();
 
-    files.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+    files.sort(
+      (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+    );
 
     return files.map((f) {
       final stat = f.statSync();
@@ -110,11 +113,13 @@ class LogCenterService {
     for (final category in LogCategory.values) {
       final files = await getCategoryFiles(category);
       for (final file in files.take(5)) {
-        activities.add(LogActivity(
-          category: category,
-          title: _extractTitle(file.name),
-          timestamp: file.lastModified,
-        ));
+        activities.add(
+          LogActivity(
+            category: category,
+            title: _extractTitle(file.name),
+            timestamp: file.lastModified,
+          ),
+        );
       }
     }
 
@@ -141,51 +146,65 @@ class LogCenterService {
   }
 
   Future<String> exportLogs() async {
-    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    
+    final timestamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .split('.')
+        .first;
+
     String downloadsPath;
     try {
       final result = await Process.run('powershell', [
         '-NoProfile',
         '-Command',
-        '[Environment]::GetFolderPath("UserProfile")'
+        '[Environment]::GetFolderPath("UserProfile")',
       ]);
       if (result.exitCode == 0) {
         downloadsPath = p.join(result.stdout.toString().trim(), 'Downloads');
       } else {
-        downloadsPath = p.join(Platform.environment['USERPROFILE'] ?? '', 'Downloads');
+        downloadsPath = p.join(
+          Platform.environment['USERPROFILE'] ?? '',
+          'Downloads',
+        );
       }
     } catch (_) {
-      downloadsPath = p.join(Platform.environment['USERPROFILE'] ?? '', 'Downloads');
+      downloadsPath = p.join(
+        Platform.environment['USERPROFILE'] ?? '',
+        'Downloads',
+      );
     }
-    
+
     final downloadsDir = Directory(downloadsPath);
     if (!downloadsDir.existsSync()) {
       downloadsDir.createSync(recursive: true);
     }
-    
+
     final zipPath = p.join(
       downloadsPath,
       'WinDeployStudio_Logs_$timestamp.zip',
     );
-    
+
     final result = await Process.run('powershell', [
       '-NoProfile',
-      '-ExecutionPolicy', 'Bypass',
+      '-ExecutionPolicy',
+      'Bypass',
       '-Command',
-      'if (Get-ChildItem -Path "$_logsBasePath" -Recurse -File) { Compress-Archive -Path "$_logsBasePath\\*" -DestinationPath "$zipPath" -Force } else { New-Item -ItemType File -Path "$zipPath" -Force | Out-Null; Add-Content -Path "$zipPath" -Value "No log files found" }'
+      'if (Get-ChildItem -Path "$_logsBasePath" -Recurse -File) { Compress-Archive -Path "$_logsBasePath\\*" -DestinationPath "$zipPath" -Force } else { New-Item -ItemType File -Path "$zipPath" -Force | Out-Null; Add-Content -Path "$zipPath" -Value "No log files found" }',
     ]);
-    
+
     if (result.exitCode != 0) {
       throw Exception('Export failed: ${result.stderr}');
     }
-    
+
     await Process.run('explorer', ['/select,', zipPath]);
-    
+
     return zipPath;
   }
 
-  Future<int> clearOldLogs({int? daysOld, List<LogCategory>? categories}) async {
+  Future<int> clearOldLogs({
+    int? daysOld,
+    List<LogCategory>? categories,
+  }) async {
     int deletedCount = 0;
     final cutoff = daysOld != null
         ? DateTime.now().subtract(Duration(days: daysOld))
@@ -195,7 +214,9 @@ class LogCenterService {
     for (final category in targetCategories) {
       final dir = Directory(p.join(_logsBasePath, category.folderName));
       if (dir.existsSync()) {
-        final files = dir.listSync().whereType<File>().where((f) => f.path.endsWith('.log'));
+        final files = dir.listSync().whereType<File>().where(
+          (f) => f.path.endsWith('.log'),
+        );
         for (final file in files) {
           if (cutoff == null || file.statSync().modified.isBefore(cutoff)) {
             await file.delete();

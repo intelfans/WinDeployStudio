@@ -223,9 +223,9 @@ class WtgService {
       Process.run('taskkill', ['/F', '/T', '/PID', '${_currentProcess!.pid}']);
       _currentProcess?.kill(ProcessSignal.sigkill);
       _currentProcess = null;
-      debugPrint('[WTG] Killed DISM process tree');
+      debugPrint('[ToGo] Killed DISM process tree');
     } catch (e) {
-      debugPrint('[WTG] Failed to kill process: $e');
+      debugPrint('[ToGo] Failed to kill process: $e');
     }
   }
 
@@ -248,7 +248,7 @@ class WtgService {
 
   void cancel() {
     _cancelled = true;
-    _logLine('=== WTG Creation Cancelled ===');
+    _logLine('=== Windows To Go Creation Cancelled ===');
     _killCurrentProcess();
     if (_currentIsoPath != null) {
       _ejectIso(_currentIsoPath!);
@@ -396,7 +396,7 @@ class WtgService {
 
   void _addDebug(String message) {
     _debugLogs.add(message);
-    debugPrint('[WTG-DEBUG] $message');
+    debugPrint('[ToGo-DEBUG] $message');
   }
 
   List<Map<String, dynamic>> _parseDismImageInfo(String output) {
@@ -521,20 +521,20 @@ class WtgService {
     _log.clear();
     _cancelled = false;
     _currentIsoPath = isoPath;
-    _logLine('=== WTG Creation Start ===');
+    _logLine('=== Windows To Go Creation Start ===');
     _logLine('ISO: $isoPath');
     _logLine('Image Index: $imageIndex');
     _logLine('Disk: $diskNumber');
     _logLine('Drive: $driveLetter');
 
     final logCenter = LogCenterService();
-    await logCenter.logWTG(
-      'WTG 创建开始 | 磁盘: $diskNumber | ISO: $isoPath | 镜像索引: $imageIndex',
+    await logCenter.logToGo(
+      'Windows To Go 创建开始 | 磁盘: $diskNumber | ISO: $isoPath | 镜像索引: $imageIndex',
     );
 
     final logger = ref.read(fileLoggerServiceProvider);
     await logger.log(
-      action: 'Create WTG',
+      action: 'Create Windows To Go',
       target: 'Disk $diskNumber',
       result: 'Starting - ISO: $isoPath, Index: $imageIndex',
     );
@@ -651,7 +651,7 @@ class WtgService {
 
       final windowsDriveReady = await _waitForPartitionRoot(
         drive: windowsDrive,
-        expectedLabel: 'WDS_WTG',
+        expectedLabel: 'WDS_TOGO',
       );
       if (!windowsDriveReady) {
         _logLine('Windows partition is not accessible: $windowsDrive');
@@ -696,7 +696,7 @@ class WtgService {
 
       final configResult = await _configureWtgImage(windowsDrive: windowsDrive);
       if (!configResult) {
-        _logLine('WTG offline configuration FAILED');
+        _logLine('Windows To Go offline configuration FAILED');
         await _unmountIso(isoPath);
         final logPath = await saveLogToFile();
         _notify(
@@ -708,7 +708,7 @@ class WtgService {
         );
         return false;
       }
-      _logLine('WTG offline configuration OK');
+      _logLine('Windows To Go offline configuration OK');
 
       if (_cancelled) {
         await _unmountIso(isoPath);
@@ -795,7 +795,7 @@ class WtgService {
       );
 
       await logger.log(
-        action: 'Create WTG',
+        action: 'Create Windows To Go',
         target: 'Disk $diskNumber',
         result: verifyResult ? 'Success - Verified' : 'Failed - Verification',
         level: verifyResult ? LogLevel.success : LogLevel.error,
@@ -805,16 +805,16 @@ class WtgService {
       _logLine('Log saved to: $logPath');
 
       if (verifyResult) {
-        await logCenter.logWTG('WTG 创建成功 | 磁盘: $diskNumber');
+        await logCenter.logToGo('Windows To Go 创建成功 | 磁盘: $diskNumber');
       } else {
-        await logCenter.logError('WTG 验证失败 | 磁盘: $diskNumber');
+        await logCenter.logError('Windows To Go 验证失败 | 磁盘: $diskNumber');
       }
 
       return verifyResult;
     } on TimeoutException catch (e) {
       _logLine('TIMEOUT: $e');
       final logPath = await saveLogToFile();
-      await logCenter.logError('WTG 创建超时 | 磁盘: $diskNumber | 错误: $e');
+      await logCenter.logError('Windows To Go 创建超时 | 磁盘: $diskNumber | 错误: $e');
       _notify(
         onProgress,
         WtgProgress(
@@ -823,7 +823,7 @@ class WtgService {
         ),
       );
       await logger.log(
-        action: 'Create WTG',
+        action: 'Create Windows To Go',
         target: 'Disk $diskNumber',
         result: 'Timeout: $e',
         level: LogLevel.error,
@@ -832,7 +832,7 @@ class WtgService {
     } catch (e) {
       _logLine('EXCEPTION: $e');
       final logPath = await saveLogToFile();
-      await logCenter.logError('WTG 创建异常 | 磁盘: $diskNumber | 错误: $e');
+      await logCenter.logError('Windows To Go 创建异常 | 磁盘: $diskNumber | 错误: $e');
       _notify(
         onProgress,
         WtgProgress(
@@ -841,7 +841,7 @@ class WtgService {
         ),
       );
       await logger.log(
-        action: 'Create WTG',
+        action: 'Create Windows To Go',
         target: 'Disk $diskNumber',
         result: 'Exception: $e',
         level: LogLevel.error,
@@ -853,11 +853,11 @@ class WtgService {
   Future<_WtgPartitionLayout?> _partitionDisk({required int diskNumber}) async {
     final letters = await _reserveWtgDriveLetters();
     if (letters == null) {
-      _logLine('Unable to reserve drive letters for WTG partitions');
+      _logLine('Unable to reserve drive letters for Windows To Go partitions');
       return null;
     }
 
-    _logLine('Creating GPT/UEFI WTG partition scheme...');
+    _logLine('Creating GPT/UEFI Windows To Go partition scheme...');
     final gptResult = await _partitionDiskGpt(diskNumber, letters);
 
     if (gptResult) {
@@ -886,7 +886,7 @@ class WtgService {
       );
     }
 
-    _logLine('All WTG partition schemes failed');
+    _logLine('All Windows To Go partition schemes failed');
     return null;
   }
 
@@ -928,7 +928,7 @@ format fs=fat32 label="WDS_EFI" quick
 assign letter=${letters.efiLetter}
 create partition msr size=16
 create partition primary
-format fs=ntfs label="WDS_WTG" quick
+format fs=ntfs label="WDS_TOGO" quick
 assign letter=${letters.windowsLetter}
 exit
 ''';
@@ -981,7 +981,7 @@ format fs=fat32 label="WDS_EFI" quick
 active
 assign letter=${letters.efiLetter}
 create partition primary
-format fs=ntfs label="WDS_WTG" quick
+format fs=ntfs label="WDS_TOGO" quick
 assign letter=${letters.windowsLetter}
 exit
 ''';
@@ -1053,7 +1053,7 @@ exit
     );
     if (windows == null) return null;
 
-    _logLine('Reserved WTG drive letters: EFI=$efi Windows=$windows');
+    _logLine('Reserved Windows To Go drive letters: EFI=$efi Windows=$windows');
     return _WtgDriveLetters(efiLetter: efi, windowsLetter: windows);
   }
 
@@ -1292,14 +1292,14 @@ $letters |
   }
 
   Future<bool> _configureWtgImage({required String windowsDrive}) async {
-    const hiveName = 'WDS_WTG_SYSTEM';
+    const hiveName = 'WDS_TOGO_SYSTEM';
     final systemHive = _drivePath(
       windowsDrive,
       'Windows\\System32\\config\\SYSTEM',
     );
 
     try {
-      _logLine('Configuring offline WTG image: $windowsDrive');
+      _logLine('Configuring offline Windows To Go image: $windowsDrive');
       if (!await File(systemHive).exists()) {
         _logLine('SYSTEM hive not found: $systemHive');
         return false;
@@ -1368,7 +1368,7 @@ $letters |
 
       return true;
     } catch (e) {
-      _logLine('WTG offline configuration error: $e');
+      _logLine('Windows To Go offline configuration error: $e');
       return false;
     } finally {
       await _unloadRegistryHive(hiveName);
@@ -1448,7 +1448,7 @@ $letters |
         await sysprepDir.create(recursive: true);
       }
       await File(unattendPath).writeAsString(unattendXml);
-      _logLine('Wrote WTG WinRE unattend: $unattendPath');
+      _logLine('Wrote Windows To Go WinRE unattend: $unattendPath');
       return true;
     } catch (e) {
       _logLine('Write WinRE unattend error: $e');

@@ -46,7 +46,7 @@ The project is distributed under the MIT License.
   - Supports custom OpenAI-compatible proxy endpoints.
 
 - **Log Center**
-  - Centralized logs for installation media creation, WTG, image operations, downloads, updates, AI, and errors.
+  - Centralized logs for installation media creation, To Go workspaces, image operations, downloads, updates, AI, and errors.
   - Quick log browsing and folder access.
 
 - **International UI**
@@ -106,13 +106,13 @@ The Windows To Go area creates portable Windows workspaces on external drives. I
 
 <table>
   <tr>
-    <td><img src="screenshots/7.png" alt="Windows To Go creator"><br><sub><b>7. WTG Creator</b> - Review the selected external disk, apply a Windows image, create the boot layout, and monitor the process without misleading ETA values.</sub></td>
+    <td><img src="screenshots/7.png" alt="Windows To Go creator"><br><sub><b>7. To Go Creator</b> - Review the selected external disk, apply a Windows image, create the boot layout, and monitor the process without misleading ETA values.</sub></td>
   </tr>
 </table>
 
 ### 5. Logs
 
-The Logs area collects operation output from installation media creation, WTG, image downloads, update checks, AI requests, and errors. It helps users review what happened without searching through scattered files.
+The Logs area collects operation output from installation media creation, To Go workspace creation, image downloads, update checks, AI requests, and errors. It helps users review what happened without searching through scattered files.
 
 <table>
   <tr>
@@ -222,7 +222,7 @@ lib/
     constants/          App constants
     database/           Local SQLite support
     localization/       11-language UI strings
-    services/           Disk, ISO, WTG, update, and mirror services
+    services/           Disk, ISO, To Go, update, and mirror services
     utils/              Shared helpers
   features/
     ai_assistant/       AI assistant UI and services
@@ -304,7 +304,7 @@ WinDeploy Studio 是一个现代化 Windows 部署工具，面向 Windows 安装
   - 支持自定义 OpenAI 兼容代理端点。
 
 - **日志中心**
-  - 汇总安装盘、WTG、镜像、下载、更新、AI 和错误日志。
+  - 汇总安装盘、随身系统、镜像、下载、更新、AI 和错误日志。
   - 支持分类查看和快速打开日志目录。
 
 - **多语言**
@@ -316,11 +316,11 @@ WinDeploy Studio 是一个现代化 Windows 部署工具，面向 Windows 安装
 
 ### 1. 首页
 
-首页是 WinDeploy Studio 的起点，用来集中展示常用入口、项目状态和基础信息。新用户可以从这里快速进入安装盘制作、Windows To Go、镜像中心、日志、工具箱和 AI 助手。
+首页是 WinDeploy Studio 的起点，用来集中展示常用入口、项目状态和基础信息。新用户可以从这里快速进入安装盘制作、随身系统、镜像中心、日志、工具箱和 AI 助手。
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/1.png" alt="首页仪表盘"><br><sub><b>1. 主仪表盘</b> - 集中展示安装盘、WTG、镜像中心、日志、工具箱和 AI 助手等核心功能入口。</sub></td>
+    <td width="50%"><img src="screenshots/1.png" alt="首页仪表盘"><br><sub><b>1. 主仪表盘</b> - 集中展示安装盘、随身系统、镜像中心、日志、工具箱和 AI 助手等核心功能入口。</sub></td>
     <td width="50%"><img src="screenshots/2.png" alt="首页概览"><br><sub><b>2. 概览信息</b> - 展示版本、平台、许可证、GitHub 仓库和项目鸣谢等信息。</sub></td>
   </tr>
 </table>
@@ -353,13 +353,13 @@ Windows To Go 区域用于在外接磁盘上创建可随身携带的 Windows 工
 
 <table>
   <tr>
-    <td><img src="screenshots/7.png" alt="Windows To Go 创建工具"><br><sub><b>7. WTG 创建</b> - 检查已选外接磁盘，应用 Windows 镜像，创建启动布局，并用可靠进度信息替代容易误导的剩余时间估算。</sub></td>
+    <td><img src="screenshots/7.png" alt="Windows To Go 创建工具"><br><sub><b>7. 随身系统创建</b> - 检查已选外接磁盘，应用 Windows 镜像，创建启动布局，并用可靠进度信息替代容易误导的剩余时间估算。</sub></td>
   </tr>
 </table>
 
 ### 5. 日志中心
 
-日志中心汇总安装盘制作、WTG、镜像下载、更新检查、AI 请求和错误信息等输出。用户可以在一个地方回看操作过程，不需要到多个目录里手动找日志。
+日志中心汇总安装盘制作、随身系统、镜像下载、更新检查、AI 请求和错误信息等输出。用户可以在一个地方回看操作过程，不需要到多个目录里手动找日志。
 
 <table>
   <tr>
@@ -467,7 +467,7 @@ lib/
     constants/          应用常量
     database/           本地 SQLite 支持
     localization/       11 种界面语言
-    services/           磁盘、ISO、WTG、更新和镜像服务
+    services/           磁盘、ISO、随身系统、更新和镜像服务
     utils/              通用工具函数
   features/
     ai_assistant/       AI 助手界面与服务

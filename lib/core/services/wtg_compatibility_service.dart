@@ -104,7 +104,7 @@ class WtgCompatibilityService {
   void _addDebug(String message) {
     final line = '[${DateTime.now().toIso8601String()}] $message';
     _debugLogs.add(line);
-    debugPrint('[WTG-COMPAT] $message');
+    debugPrint('[ToGo-COMPAT] $message');
   }
 
   Future<WtgCompatibilityResult> checkCompatibility({
@@ -113,7 +113,7 @@ class WtgCompatibilityService {
     DiskInfo? fallbackDisk,
   }) async {
     _debugLogs.clear();
-    _addDebug('=== WTG Compatibility Check ===');
+    _addDebug('=== To Go Compatibility Check ===');
     _addDebug('Disk Number: $diskNumber');
     _addDebug('Drive Letter: $driveLetter');
 
@@ -277,7 +277,7 @@ class WtgCompatibilityService {
 
     // Add warnings based on speed test
     if (speedTestSuccess) {
-      // Microsoft WTG requires ~80MB/s sequential read/write
+      // Microsoft Windows To Go requires ~80MB/s sequential read/write
       if (readSpeedMBps < 80 || writeSpeedMBps < 80) {
         warnings.add('wtg_warn_performance_low');
       }

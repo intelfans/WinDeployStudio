@@ -1614,6 +1614,12 @@ exit
           : '$targetDrive\\';
       _logLine('robocopy: $srcDir -> $dstDir');
 
+      final excludedNames = <String>{
+        if (excludeWim) ...['install.wim', 'install.esd'],
+        'AutoUnattend.xml',
+        'autounattend.xml',
+      };
+
       // robocopy args
       final args = <String>[
         srcDir,
@@ -1638,15 +1644,58 @@ exit
 
       _logLine('robocopy args: ${args.join(" ")}');
 
-      // Report indeterminate progress while copying
-      if (onProgress != null) {
-        onProgress(0.0);
+      final totalBytes = await _directorySize(
+        srcDir,
+        excludedNames: excludedNames,
+      );
+      _logLine('robocopy total bytes: $totalBytes');
+
+      onProgress?.call(0.0);
+
+      final process = await Process.start('robocopy', args);
+      final stdoutBuffer = StringBuffer();
+      final stderrBuffer = StringBuffer();
+      final stdoutSub = process.stdout
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(stdoutBuffer.write);
+      final stderrSub = process.stderr
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(stderrBuffer.write);
+
+      var completed = false;
+      final exitFuture = process.exitCode.then((code) {
+        completed = true;
+        return code;
+      });
+
+      var lastLoggedPercent = -1;
+      while (!completed) {
+        await Future.any([
+          exitFuture,
+          Future<void>.delayed(const Duration(seconds: 1)),
+        ]);
+
+        if (totalBytes <= 0) continue;
+
+        final copiedBytes = await _directorySize(
+          dstDir,
+          excludedNames: excludedNames,
+        );
+        final progress = (copiedBytes / totalBytes).clamp(0.0, 0.99);
+        onProgress?.call(progress);
+
+        final percent = (progress * 100).floor();
+        if (percent >= lastLoggedPercent + 10) {
+          lastLoggedPercent = percent;
+          _logLine(
+            'robocopy progress: $percent% ($copiedBytes / $totalBytes bytes)',
+          );
+        }
       }
 
-      final result = await Process.run(
-        'robocopy',
-        args,
-      ).timeout(const Duration(minutes: 15));
+      final exitCode = await exitFuture;
+      await stdoutSub.cancel();
+      await stderrSub.cancel();
 
       // robocopy exit codes: 0-7 are success, 8+ are failures
       // 0 = no files copied (already up to date)
@@ -1657,25 +1706,52 @@ exit
       // 5 = files copied + mismatched
       // 6 = extra + mismatched
       // 7 = all of the above
-      final exitCode = result.exitCode;
       _logLine('robocopy exit: $exitCode');
 
-      if (onProgress != null) {
-        onProgress(1.0);
-      }
-
       if (exitCode >= 8) {
-        _logLine('robocopy FAILED: ${result.stderr}');
-        _logLine('robocopy stdout: ${result.stdout}');
+        _logLine('robocopy FAILED: ${stderrBuffer.toString().trim()}');
+        _logLine('robocopy stdout: ${stdoutBuffer.toString().trim()}');
         return false;
       }
 
+      onProgress?.call(1.0);
       _logLine('robocopy OK');
       return true;
     } catch (e) {
       _logLine('robocopy error: $e');
       return false;
     }
+  }
+
+  Future<int> _directorySize(
+    String rootPath, {
+    Set<String> excludedNames = const {},
+  }) async {
+    final root = Directory(rootPath);
+    if (!await root.exists()) return 0;
+
+    final excluded = excludedNames.map((name) => name.toLowerCase()).toSet();
+    var total = 0;
+
+    try {
+      await for (final entity in root.list(
+        recursive: true,
+        followLinks: false,
+      )) {
+        if (entity is! File) continue;
+        if (excluded.contains(p.basename(entity.path).toLowerCase())) continue;
+
+        try {
+          total += await entity.length();
+        } catch (_) {
+          // Files can appear or disappear while robocopy is still working.
+        }
+      }
+    } catch (e) {
+      _logLine('directory size scan skipped: $rootPath ($e)');
+    }
+
+    return total;
   }
 
   // --- WIM Splitting ---

@@ -13,7 +13,7 @@ All notable changes to WinDeploy Studio are documented here.
 ### Improvements
 
 - Improved disk enumeration by parsing structured PowerShell JSON with real partition metadata.
-- Improved WTG drive-letter reservation by checking both Windows volumes and file-system PSDrives before assigning temporary letters.
+- Improved To Go drive-letter reservation by checking both Windows volumes and file-system PSDrives before assigning temporary letters.
 - Reduced repeated Enterprise/LTSC prompts in Image Center; the expert notice is now shown at the download action point.
 - Added explicit community image download log entries in the requested `[CommunityDownload]` format.
 - Updated app, Windows metadata, installer, scripts, README, handover notes, and release notes to version 1.1.2.
@@ -22,14 +22,14 @@ All notable changes to WinDeploy Studio are documented here.
 
 - Fixed removable disk diagnostics showing partition count as `0` because partitions were never populated.
 - Fixed fragile hand-written JSON parsing in disk detection that could lose nested values.
-- Fixed WTG temporary drive-letter selection relying on `Directory.existsSync`, which could miss occupied or special drive letters.
+- Fixed To Go temporary drive-letter selection relying on `Directory.existsSync`, which could miss occupied or special drive letters.
 - Fixed unsigned project installers being blocked by the in-app updater while retaining signature-status logging.
 - Fixed duplicate Russian installer custom messages.
 - Fixed `scripts/build_windows.ps1` to use the same `flutter analyze --no-fatal-infos` behavior as the installer build.
 
 ### Notes
 
-WTG creation and Windows installation media creation behavior remain unchanged except for safer drive-letter handling and more complete disk metadata.
+To Go creation and Windows installation media creation behavior remain unchanged except for safer drive-letter handling and more complete disk metadata.
 
 ## v1.1.1
 
@@ -74,14 +74,14 @@ This is a small polish and consistency release focused on Image Center wording, 
 - Added AI Assistant Notice with local "Do not show again" preference.
 - Added MIT-friendly installer Open Source Notice.
 - Added Special Thanks section in About and installer acknowledgement text.
-- Added WTG waiting mini-game during image application.
+- Added To Go waiting mini-game during image application.
 
 ### Improvements
 
 - Renamed the Windows installation media feature to a clearer beginner-friendly name.
 - Improved Image Center trust and transparency by separating official Microsoft sources from community-maintained images.
-- Improved WTG progress UI by showing only reliable elapsed time during image application.
-- Improved WTG compatibility detection by using selected disk metadata as fallback source of truth.
+- Improved To Go progress UI by showing only reliable elapsed time during image application.
+- Improved To Go compatibility detection by using selected disk metadata as fallback source of truth.
 - Improved installer licensing language to align with MIT License.
 - Updated version numbers across the app, Windows metadata, installer, scripts, and documentation to 1.1.0.
 - Removed default download source selection from Settings and cleaned related UI remnants.
@@ -90,8 +90,8 @@ This is a small polish and consistency release focused on Image Center wording, 
 
 ### Fixes
 
-- Fixed external USB/NVMe disks sometimes showing `0 B`, `Unknown`, and `N/A` in the WTG compatibility card.
-- Fixed WTG image application details showing misleading written size, write speed, and remaining size values.
+- Fixed external USB/NVMe disks sometimes showing `0 B`, `Unknown`, and `N/A` in the To Go compatibility card.
+- Fixed To Go image application details showing misleading written size, write speed, and remaining size values.
 - Fixed low-speed warning appearing based on unreliable synthetic progress data.
 - Fixed English navigation labels showing localization keys such as `nav_xxx`.
 - Fixed text clipping in recommendation and tool cards.
@@ -109,26 +109,26 @@ This is a small polish and consistency release focused on Image Center wording, 
 
 Official Microsoft images now always redirect users to Microsoft's official download websites. Community images remain available through the existing mirror-based flow.
 
-WTG creation behavior was intentionally kept stable. The v1.1.0 WTG progress change only affects display logic: unreliable synthetic write metrics were removed from the UI, while the creation pipeline remains unchanged.
+To Go creation behavior was intentionally kept stable. The v1.1.0 To Go progress change only affects display logic: unreliable synthetic write metrics were removed from the UI, while the creation pipeline remains unchanged.
 
 ## v1.0.2
 
 ### New Features
 
-- Added WTG real-time progress metrics dashboard.
+- Added To Go real-time progress metrics dashboard.
 - Added elapsed time, write speed, written size, and remaining size display during imaging.
 - Added Markdown rendering for update release notes.
 - Added browser download button in the update dialog.
 
 ### Improvements
 
-- Improved WTG progress calculation and UI responsiveness.
+- Improved To Go progress calculation and UI responsiveness.
 - Improved update dialog readability.
 - Updated project version to 1.0.2.
 
 ### Fixes
 
-- Fixed inaccurate remaining time estimation in WTG module.
+- Fixed inaccurate remaining time estimation in the To Go module.
 - Fixed UI lag when updating progress under high-speed write conditions.
 - Fixed mismatch between displayed and actual written size in some cases.
 
