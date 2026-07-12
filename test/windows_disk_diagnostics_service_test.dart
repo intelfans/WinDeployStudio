@@ -23,13 +23,17 @@ void main() {
           stdout: jsonEncode({
             'ok': true,
             'isAdministrator': false,
-            'warnings': ['One disk did not expose a health log.'],
+            'warnings': [
+              {'code': 'disk_diag_warning_partial'},
+            ],
             'reports': [
               {
                 'diskNumber': 0,
                 'model': 'Example NVMe',
                 'sizeBytes': '1024',
                 'busType': 'NVMe',
+                'health': 'healthy',
+                'healthSource': 'Intel RST NVMe miniport protocol',
                 'devicePath': r'\\.\PhysicalDrive0',
                 'isSystem': true,
                 'isBoot': true,
@@ -38,6 +42,7 @@ void main() {
                 'isRemovable': false,
                 'nvme': {
                   'available': true,
+                  'source': 'Intel RST NVMe miniport protocol',
                   'temperatureCelsius': 31,
                   'percentageUsed': 7,
                   'hostReadBytes': '512000',
@@ -60,15 +65,92 @@ void main() {
           final snapshot = await service.collect();
 
           expect(snapshot.isAdministrator, isFalse);
-          expect(snapshot.collectionWarnings, hasLength(1));
+          expect(snapshot.collectionWarnings, const [
+            'disk_diag_warning_partial',
+          ]);
           expect(snapshot.reports, hasLength(1));
           final report = snapshot.reports.single;
           expect(report.model.value, 'Example NVMe');
           expect(report.temperatureCelsius.value, 31);
+          expect(
+            report.temperatureCelsius.source,
+            'Intel RST NVMe miniport protocol',
+          );
           expect(report.wearPercent.value, 7);
           expect(report.estimatedRemainingLifePercent.value, 93);
           expect(report.hostWrittenBytes.value, BigInt.from(1024000));
           expect(report.isSystem, isTrue);
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      },
+      skip: !Platform.isWindows,
+    );
+
+    test(
+      'normalizes legacy helper warning text without exposing it to the UI',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'wds_disk_diagnostics_test_',
+        );
+        final helper = File(
+          '${directory.path}\\wds_disk_diagnostics_helper.exe',
+        );
+        await helper.create();
+        final process = _FakeNativeProcess(712);
+        process.complete(
+          stdout: jsonEncode({
+            'ok': true,
+            'isAdministrator': false,
+            'warnings': ['Raw driver warning in English'],
+            'reports': const [],
+          }),
+        );
+        final service = WindowsDiskDiagnosticsService(
+          helperPath: () => helper.path,
+          nativeProcessStarter: (_, _) async => process,
+        );
+
+        try {
+          final snapshot = await service.collect();
+          expect(snapshot.collectionWarnings, const [
+            'disk_diag_warning_partial',
+          ]);
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      },
+      skip: !Platform.isWindows,
+    );
+
+    test(
+      'uses a localized error key when the helper returns no data',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'wds_disk_diagnostics_test_',
+        );
+        final helper = File(
+          '${directory.path}\\wds_disk_diagnostics_helper.exe',
+        );
+        await helper.create();
+        final process = _FakeNativeProcess(713);
+        process.complete();
+        final service = WindowsDiskDiagnosticsService(
+          helperPath: () => helper.path,
+          nativeProcessStarter: (_, _) async => process,
+        );
+
+        try {
+          await expectLater(
+            service.collect(),
+            throwsA(
+              isA<DiskDiagnosticsException>().having(
+                (error) => error.localizationKey,
+                'localizationKey',
+                'disk_diag_error_no_data',
+              ),
+            ),
+          );
         } finally {
           await directory.delete(recursive: true);
         }

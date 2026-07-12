@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <ntddscsi.h>
 #include <winioctl.h>
 
 #include <algorithm>
@@ -29,7 +30,55 @@ constexpr DWORD kMaximumDescriptorSize = 64 * 1024;
 constexpr std::size_t kMaximumDescriptorTextLength = 512;
 constexpr std::size_t kMaximumIdentifierLength = 256;
 constexpr std::size_t kMaximumWorkerOutputLength = 64 * 1024;
+constexpr std::size_t kMaximumStorageCountersSize = 64 * 1024;
 constexpr int kDiskNotPresentExitCode = 3;
+constexpr DWORD kIntelRstNvmeControlCode = static_cast<DWORD>(
+    CTL_CODE(0xf000u, 0xA02u, METHOD_BUFFERED, FILE_ANY_ACCESS));
+constexpr DWORD kIntelVrocNvmeControlCode = static_cast<DWORD>(
+    CTL_CODE(0xe000u, 0x800u, METHOD_BUFFERED, FILE_ANY_ACCESS));
+
+#pragma pack(push, 1)
+// Intel RST exposes NVMe health data through a documented-by-driver miniport
+// envelope rather than the standard Storage Protocol query. The request below
+// is copied from the public Intel RST wire layout used by storage diagnostic
+// tools; only the read-only NVMe Get Log Page command is issued.
+struct IntelRstNvmePayload {
+  std::uint8_t version;
+  std::uint8_t path_id;
+  std::uint8_t target_id;
+  std::uint8_t lun;
+  std::array<DWORD, 16> command;
+  std::array<DWORD, 4> completion;
+  DWORD queue_id;
+  DWORD parameter_buffer_length;
+  DWORD return_buffer_length;
+  std::array<std::uint8_t, 0x28> reserved;
+};
+
+struct IntelRstNvmePassThrough {
+  SRB_IO_CONTROL srb;
+  IntelRstNvmePayload payload;
+  std::array<std::uint8_t, 0x1000> data;
+};
+
+struct IntelVrocNvmePassThrough {
+  SRB_IO_CONTROL srb;
+  std::array<DWORD, 6> vendor_specific;
+  std::array<DWORD, 16> command;
+  std::array<DWORD, 4> completion;
+  DWORD direction;
+  DWORD queue_id;
+  DWORD data_buffer_length;
+  DWORD metadata_length;
+  DWORD return_buffer_length;
+  std::array<std::uint8_t, 0x1000> data;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(SRB_IO_CONTROL) == 0x1c,
+              "Unexpected SRB_IO_CONTROL ABI.");
+static_assert(sizeof(IntelRstNvmePayload) == 0x88,
+              "Unexpected Intel RST NVMe payload ABI.");
 
 class ScopedHandle {
  public:
@@ -76,6 +125,7 @@ struct NvmeHealthData {
   bool available = false;
   std::string reason =
       "The device or storage driver does not expose NVMe health data.";
+  std::string source = "Windows NVMe protocol query";
   DWORD windows_error = ERROR_SUCCESS;
   std::optional<int> temperature_celsius;
   std::optional<int> percentage_used;
@@ -109,6 +159,15 @@ struct DiskReport {
   std::optional<std::string> product_id;
   std::optional<std::string> health;
   std::optional<std::string> health_source;
+  std::optional<int> temperature_celsius;
+  std::optional<int> wear_percent;
+  std::optional<std::string> read_errors_corrected;
+  std::optional<std::string> read_errors_uncorrected;
+  std::optional<std::string> read_errors_total;
+  std::optional<std::string> write_errors_corrected;
+  std::optional<std::string> write_errors_uncorrected;
+  std::optional<std::string> write_errors_total;
+  std::optional<std::string> power_on_hours;
   std::optional<std::string> firmware_version;
   std::optional<std::string> media_type;
   std::optional<std::string> partition_style;
@@ -122,8 +181,7 @@ struct DiskReport {
   std::optional<bool> is_read_only;
   std::optional<bool> is_removable;
   std::string reliability_unavailable_reason =
-      "The native read-only inventory does not query the Storage Reliability "
-      "Counter.";
+      "The storage driver did not expose supported reliability counters.";
   NvmeHealthData nvme;
   DiskTopology topology;
   std::vector<std::string> warnings;
@@ -235,6 +293,18 @@ void AppendJsonStringArray(std::ostream& stream,
       stream << ',';
     }
     AppendJsonString(stream, values[index]);
+  }
+  stream << ']';
+}
+
+void AppendDiagnosticWarningArray(std::ostream& stream,
+                                  const std::vector<std::string>& warnings) {
+  // Keep diagnostic transport details out of the UI. They are useful to a
+  // developer but are not localized and can vary between storage drivers.
+  // The Dart client maps this stable code to the current application locale.
+  stream << '[';
+  if (!warnings.empty()) {
+    stream << "{\"code\":\"disk_diag_warning_partial\"}";
   }
   stream << ']';
 }
@@ -753,74 +823,22 @@ void PopulateReadOnlyFlag(HANDLE disk, DiskReport* report) {
   }
 }
 
-void PopulateNvmeHealth(HANDLE disk, NvmeHealthData* health) {
-  constexpr std::size_t kQueryHeaderSize =
-      offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters);
-  constexpr std::size_t kQueryBufferSize =
-      kQueryHeaderSize + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
-      kNvmeHealthLogSize;
-  std::array<std::uint8_t, kQueryBufferSize> buffer{};
-  auto* query = reinterpret_cast<STORAGE_PROPERTY_QUERY*>(buffer.data());
-  query->PropertyId = StorageDeviceProtocolSpecificProperty;
-  query->QueryType = PropertyStandardQuery;
+bool HasNonZeroBytes(const std::uint8_t* data, std::size_t length) {
+  return std::any_of(data, data + length,
+                     [](std::uint8_t value) { return value != 0; });
+}
 
-  auto* protocol = reinterpret_cast<STORAGE_PROTOCOL_SPECIFIC_DATA*>(
-      query->AdditionalParameters);
-  protocol->ProtocolType = ProtocolTypeNvme;
-  protocol->DataType = NVMeDataTypeLogPage;
-  protocol->ProtocolDataRequestValue = kNvmeHealthLogPage;
-  protocol->ProtocolDataRequestSubValue = 0;
-  protocol->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
-  protocol->ProtocolDataLength = kNvmeHealthLogSize;
-
-  DWORD returned = 0;
-  DWORD error_code = ERROR_SUCCESS;
-  if (!DeviceIoControlQuery(disk, IOCTL_STORAGE_QUERY_PROPERTY, buffer.data(),
-                            static_cast<DWORD>(buffer.size()), buffer.data(),
-                            static_cast<DWORD>(buffer.size()), &returned,
-                            &error_code)) {
+void PopulateNvmeHealthFromLog(const std::uint8_t* data,
+                               std::string source,
+                               NvmeHealthData* health) {
+  health->source = std::move(source);
+  if (!HasNonZeroBytes(data, kNvmeHealthLogSize)) {
     health->reason =
-        "The storage driver does not expose the NVMe health log for this disk.";
-    health->windows_error = error_code;
-    return;
-  }
-
-  constexpr std::size_t kProtocolOffset =
-      offsetof(STORAGE_PROTOCOL_DATA_DESCRIPTOR, ProtocolSpecificData);
-  if (returned < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) {
-    health->reason = "Windows returned an incomplete NVMe protocol descriptor.";
+        "The storage driver returned an empty NVMe health log.";
     health->windows_error = ERROR_INVALID_DATA;
     return;
   }
 
-  const auto* descriptor =
-      reinterpret_cast<const STORAGE_PROTOCOL_DATA_DESCRIPTOR*>(buffer.data());
-  const auto& result = descriptor->ProtocolSpecificData;
-  const std::size_t descriptor_size =
-      std::min<std::size_t>(returned, descriptor->Size);
-  if (descriptor->Version < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR) ||
-      descriptor->Size < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR) ||
-      descriptor_size < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR) ||
-      result.ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) ||
-      result.ProtocolDataOffset > descriptor_size - kProtocolOffset) {
-    health->reason = "Windows returned invalid NVMe protocol descriptor metadata.";
-    health->windows_error = ERROR_INVALID_DATA;
-    return;
-  }
-
-  const std::size_t health_offset =
-      kProtocolOffset + static_cast<std::size_t>(result.ProtocolDataOffset);
-  if (result.ProtocolType != ProtocolTypeNvme ||
-      result.DataType != NVMeDataTypeLogPage ||
-      result.ProtocolDataLength < kNvmeHealthLogSize ||
-      health_offset < kProtocolOffset || health_offset > descriptor_size ||
-      kNvmeHealthLogSize > descriptor_size - health_offset) {
-    health->reason = "Windows returned invalid NVMe health-log metadata.";
-    health->windows_error = ERROR_INVALID_DATA;
-    return;
-  }
-
-  const auto* data = buffer.data() + health_offset;
   const std::uint16_t temperature_kelvin = ReadUint16(data + 1);
   health->critical_warning = data[0];
   if (temperature_kelvin >= 200U && temperature_kelvin <= 500U) {
@@ -842,6 +860,368 @@ void PopulateNvmeHealth(HANDLE disk, NvmeHealthData* health) {
   health->available = true;
   health->reason.clear();
   health->windows_error = ERROR_SUCCESS;
+}
+
+bool QueryNvmeHealthLog(HANDLE disk, STORAGE_PROPERTY_ID property,
+                        DWORD namespace_id, DWORD* error_code,
+                        NvmeHealthData* health) {
+  constexpr std::size_t kQueryHeaderSize =
+      offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters);
+  constexpr std::size_t kQueryBufferSize =
+      kQueryHeaderSize + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
+      kNvmeHealthLogSize;
+  std::array<std::uint8_t, kQueryBufferSize> buffer{};
+  auto* query = reinterpret_cast<STORAGE_PROPERTY_QUERY*>(buffer.data());
+  query->PropertyId = property;
+  query->QueryType = PropertyStandardQuery;
+
+  auto* protocol = reinterpret_cast<STORAGE_PROTOCOL_SPECIFIC_DATA*>(
+      query->AdditionalParameters);
+  protocol->ProtocolType = ProtocolTypeNvme;
+  protocol->DataType = NVMeDataTypeLogPage;
+  protocol->ProtocolDataRequestValue = kNvmeHealthLogPage;
+  protocol->ProtocolDataRequestSubValue = namespace_id;
+  protocol->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+  protocol->ProtocolDataLength = kNvmeHealthLogSize;
+
+  DWORD returned = 0;
+  *error_code = ERROR_SUCCESS;
+  if (!DeviceIoControlQuery(disk, IOCTL_STORAGE_QUERY_PROPERTY, buffer.data(),
+                            static_cast<DWORD>(buffer.size()), buffer.data(),
+                            static_cast<DWORD>(buffer.size()), &returned,
+                            error_code)) {
+    return false;
+  }
+
+  constexpr std::size_t kProtocolOffset =
+      offsetof(STORAGE_PROTOCOL_DATA_DESCRIPTOR, ProtocolSpecificData);
+  if (returned < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR)) {
+    *error_code = ERROR_INVALID_DATA;
+    return false;
+  }
+
+  const auto* descriptor =
+      reinterpret_cast<const STORAGE_PROTOCOL_DATA_DESCRIPTOR*>(buffer.data());
+  const auto& result = descriptor->ProtocolSpecificData;
+  const std::size_t descriptor_size =
+      std::min<std::size_t>(returned, descriptor->Size);
+  if (descriptor->Version < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR) ||
+      descriptor->Size < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR) ||
+      descriptor_size < sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR) ||
+      result.ProtocolDataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) ||
+      result.ProtocolDataOffset > descriptor_size - kProtocolOffset) {
+    *error_code = ERROR_INVALID_DATA;
+    return false;
+  }
+
+  const std::size_t health_offset =
+      kProtocolOffset + static_cast<std::size_t>(result.ProtocolDataOffset);
+  if (result.ProtocolType != ProtocolTypeNvme ||
+      result.DataType != NVMeDataTypeLogPage ||
+      result.ProtocolDataLength < kNvmeHealthLogSize ||
+      health_offset < kProtocolOffset || health_offset > descriptor_size ||
+      kNvmeHealthLogSize > descriptor_size - health_offset) {
+    *error_code = ERROR_INVALID_DATA;
+    return false;
+  }
+
+  const auto* data = buffer.data() + health_offset;
+  PopulateNvmeHealthFromLog(data, "Windows NVMe protocol query", health);
+  *error_code = health->windows_error;
+  return health->available;
+}
+
+void PopulateNvmeHealth(HANDLE disk, NvmeHealthData* health) {
+  DWORD device_error = ERROR_SUCCESS;
+  if (QueryNvmeHealthLog(disk, StorageDeviceProtocolSpecificProperty, 0,
+                         &device_error, health)) {
+    return;
+  }
+
+  DWORD adapter_error = ERROR_SUCCESS;
+  if (QueryNvmeHealthLog(disk, StorageAdapterProtocolSpecificProperty, 0,
+                         &adapter_error, health)) {
+    return;
+  }
+
+  // Some adapter drivers require the all-namespaces request even for the
+  // controller health log. This mirrors the compatibility fallback used by
+  // mature SMART tools while remaining a read-only protocol query.
+  DWORD all_namespaces_error = ERROR_SUCCESS;
+  if (QueryNvmeHealthLog(disk, StorageAdapterProtocolSpecificProperty,
+                         0xffffffff, &all_namespaces_error, health)) {
+    return;
+  }
+
+  health->available = false;
+  health->source = "Windows NVMe protocol query";
+  health->reason =
+      "The storage driver does not expose the NVMe health log for this disk.";
+  health->windows_error = all_namespaces_error != ERROR_SUCCESS
+      ? all_namespaces_error
+      : (adapter_error == ERROR_SUCCESS ? device_error : adapter_error);
+}
+
+void PopulateStorageCounters(HANDLE disk, DiskReport* report) {
+  STORAGE_COUNTERS probe{};
+  probe.Version = STORAGE_COUNTERS_VERSION_V1;
+  probe.Size = sizeof(probe);
+  DWORD returned = 0;
+  DWORD error_code = ERROR_SUCCESS;
+  const bool probe_succeeded = DeviceIoControlQuery(
+      disk, IOCTL_STORAGE_GET_COUNTERS, &probe, static_cast<DWORD>(sizeof(probe)),
+      &probe, static_cast<DWORD>(sizeof(probe)), &returned, &error_code);
+  const DWORD probe_returned = returned;
+
+  DWORD requested_size = probe.Size;
+  if (requested_size < sizeof(STORAGE_COUNTERS)) {
+    requested_size = sizeof(STORAGE_COUNTERS);
+  }
+  if (requested_size > kMaximumStorageCountersSize) {
+    report->reliability_unavailable_reason =
+        "Windows reported an invalid reliability counter size.";
+    return;
+  }
+
+  std::vector<std::uint8_t> buffer(requested_size, 0);
+  auto* request = reinterpret_cast<STORAGE_COUNTERS*>(buffer.data());
+  request->Version = STORAGE_COUNTERS_VERSION_V1;
+  request->Size = sizeof(STORAGE_COUNTERS);
+  returned = 0;
+  error_code = ERROR_SUCCESS;
+  if (!DeviceIoControlQuery(
+          disk, IOCTL_STORAGE_GET_COUNTERS, request,
+          static_cast<DWORD>(buffer.size()), request,
+          static_cast<DWORD>(buffer.size()), &returned, &error_code)) {
+    if (probe_succeeded &&
+        probe_returned >= offsetof(STORAGE_COUNTERS, Counters)) {
+      // A compact result was already returned by the probe. It still belongs
+      // to the same ABI and can be parsed from the probe buffer below.
+      buffer.assign(reinterpret_cast<std::uint8_t*>(&probe),
+                    reinterpret_cast<std::uint8_t*>(&probe) + sizeof(probe));
+      returned = sizeof(probe);
+    } else {
+      report->reliability_unavailable_reason =
+          "The storage driver did not expose supported reliability counters.";
+      return;
+    }
+  }
+
+  constexpr std::size_t kCountersOffset = offsetof(STORAGE_COUNTERS, Counters);
+  if (returned < kCountersOffset || buffer.size() < kCountersOffset) {
+    report->reliability_unavailable_reason =
+        "Windows returned invalid reliability counter metadata.";
+    return;
+  }
+  const auto* counters =
+      reinterpret_cast<const STORAGE_COUNTERS*>(buffer.data());
+  const std::size_t declared_size = std::min<std::size_t>(
+      std::min<std::size_t>(counters->Size, returned), buffer.size());
+  if (counters->Version < STORAGE_COUNTERS_VERSION_V1 ||
+      declared_size < kCountersOffset) {
+    report->reliability_unavailable_reason =
+        "Windows returned invalid reliability counter metadata.";
+    return;
+  }
+
+  const std::size_t capacity =
+      (declared_size - kCountersOffset) / sizeof(STORAGE_COUNTER);
+  const DWORD count = std::min<DWORD>(
+      counters->NumberOfCounters,
+      static_cast<DWORD>(std::min<std::size_t>(capacity, 128)));
+  bool found = false;
+  for (DWORD index = 0; index < count; ++index) {
+    const STORAGE_COUNTER& counter = counters->Counters[index];
+    const std::uint64_t value = static_cast<std::uint64_t>(counter.Value.AsUlonglong);
+    switch (counter.Type) {
+      case StorageCounterTypeTemperatureCelsius:
+        if (value <= 200) {
+          report->temperature_celsius = static_cast<int>(value);
+          found = true;
+        }
+        break;
+      case StorageCounterTypeWearPercentage:
+        if (value <= 100) {
+          report->wear_percent = static_cast<int>(value);
+          found = true;
+        }
+        break;
+      case StorageCounterTypeReadErrorsCorrected:
+        report->read_errors_corrected = std::to_string(value);
+        found = true;
+        break;
+      case StorageCounterTypeReadErrorsUncorrected:
+        report->read_errors_uncorrected = std::to_string(value);
+        found = true;
+        break;
+      case StorageCounterTypeReadErrorsTotal:
+        report->read_errors_total = std::to_string(value);
+        found = true;
+        break;
+      case StorageCounterTypeWriteErrorsCorrected:
+        report->write_errors_corrected = std::to_string(value);
+        found = true;
+        break;
+      case StorageCounterTypeWriteErrorsUncorrected:
+        report->write_errors_uncorrected = std::to_string(value);
+        found = true;
+        break;
+      case StorageCounterTypeWriteErrorsTotal:
+        report->write_errors_total = std::to_string(value);
+        found = true;
+        break;
+      case StorageCounterTypePowerOnHours:
+        report->power_on_hours = std::to_string(value);
+        found = true;
+        break;
+      default:
+        break;
+    }
+  }
+  if (!found) {
+    report->reliability_unavailable_reason =
+        "The storage driver returned no supported reliability counters.";
+  }
+}
+
+void PopulatePredictFailure(HANDLE disk, DiskReport* report) {
+  STORAGE_PREDICT_FAILURE prediction{};
+  DWORD returned = 0;
+  DWORD error_code = ERROR_SUCCESS;
+  if (!DeviceIoControlQuery(disk, IOCTL_STORAGE_PREDICT_FAILURE, nullptr, 0,
+                            &prediction,
+                            static_cast<DWORD>(sizeof(prediction)), &returned,
+                            &error_code) ||
+      returned < sizeof(prediction)) {
+    return;
+  }
+  report->health = prediction.PredictFailure == 0
+      ? "no_failure_predicted"
+      : "failure_predicted";
+  report->health_source = "Windows SMART failure prediction";
+}
+
+bool QueryScsiAddress(HANDLE disk, SCSI_ADDRESS* address, DWORD* error_code) {
+  DWORD returned = 0;
+  return DeviceIoControlQuery(disk, IOCTL_SCSI_GET_ADDRESS, nullptr, 0, address,
+                              static_cast<DWORD>(sizeof(*address)), &returned,
+                              error_code) &&
+         returned >= sizeof(*address);
+}
+
+void PopulateIntelRstNvmeHealth(HANDLE disk, NvmeHealthData* health) {
+  SCSI_ADDRESS address{};
+  DWORD error_code = ERROR_SUCCESS;
+  if (!QueryScsiAddress(disk, &address, &error_code)) {
+    health->reason = "Intel RST did not expose a SCSI address for this disk.";
+    health->source = "Intel RST NVMe miniport protocol";
+    health->windows_error = error_code == ERROR_SUCCESS ? ERROR_INVALID_DATA
+                                                         : error_code;
+    return;
+  }
+
+  const std::wstring controller =
+      L"\\\\.\\Scsi" + std::to_wstring(address.PortNumber) + L":";
+  ScopedHandle miniport(CreateFileW(
+      controller.c_str(), GENERIC_READ | GENERIC_WRITE,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL, nullptr));
+  if (!miniport.valid()) {
+    health->reason =
+        "Intel RST denied the read-only NVMe health-log miniport request.";
+    health->source = "Intel RST NVMe miniport protocol";
+    health->windows_error = GetLastError();
+    return;
+  }
+
+  IntelRstNvmePassThrough request{};
+  request.srb.HeaderLength = sizeof(SRB_IO_CONTROL);
+  std::memcpy(request.srb.Signature, "IntelNvm", sizeof(request.srb.Signature));
+  request.srb.Timeout = 10;
+  request.srb.ControlCode = kIntelRstNvmeControlCode;
+  request.srb.Length =
+      static_cast<ULONG>(sizeof(request) - sizeof(SRB_IO_CONTROL));
+  request.payload.version = 1;
+  request.payload.path_id = address.PathId;
+  request.payload.command[0] = 0x02;  // NVMe Admin Get Log Page.
+  request.payload.command[1] = 0xffffffff;  // All namespaces.
+  request.payload.command[10] = 0x007f0002;  // SMART / Health log, 512 bytes.
+  request.payload.parameter_buffer_length =
+      static_cast<DWORD>(sizeof(IntelRstNvmePayload) + sizeof(SRB_IO_CONTROL));
+  request.payload.return_buffer_length = static_cast<DWORD>(request.data.size());
+
+  DWORD returned = 0;
+  if (DeviceIoControl(miniport.get(), IOCTL_SCSI_MINIPORT, &request,
+                      static_cast<DWORD>(sizeof(request)), &request,
+                      static_cast<DWORD>(sizeof(request)), &returned,
+                      nullptr) == FALSE) {
+    health->reason =
+        "Intel RST did not expose the NVMe health log for this disk.";
+    health->source = "Intel RST NVMe miniport protocol";
+    health->windows_error = GetLastError();
+    return;
+  }
+  PopulateNvmeHealthFromLog(request.data.data(),
+                            "Intel RST NVMe miniport protocol", health);
+}
+
+void PopulateIntelVrocNvmeHealth(HANDLE disk, NvmeHealthData* health) {
+  SCSI_ADDRESS address{};
+  DWORD error_code = ERROR_SUCCESS;
+  if (!QueryScsiAddress(disk, &address, &error_code)) {
+    health->reason = "Intel VROC did not expose a SCSI address for this disk.";
+    health->source = "Intel VROC NVMe miniport protocol";
+    health->windows_error = error_code == ERROR_SUCCESS ? ERROR_INVALID_DATA
+                                                         : error_code;
+    return;
+  }
+
+  const std::wstring controller =
+      L"\\\\.\\Scsi" + std::to_wstring(address.PortNumber) + L":";
+  ScopedHandle miniport(CreateFileW(
+      controller.c_str(), GENERIC_READ | GENERIC_WRITE,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL, nullptr));
+  if (!miniport.valid()) {
+    health->reason =
+        "Intel VROC denied the read-only NVMe health-log miniport request.";
+    health->source = "Intel VROC NVMe miniport protocol";
+    health->windows_error = GetLastError();
+    return;
+  }
+
+  IntelVrocNvmePassThrough request{};
+  request.srb.HeaderLength = sizeof(SRB_IO_CONTROL);
+  std::memcpy(request.srb.Signature, "NvmeRAID", sizeof(request.srb.Signature));
+  request.srb.Timeout = 10;
+  request.srb.ControlCode = kIntelVrocNvmeControlCode;
+  request.srb.Length =
+      static_cast<ULONG>(sizeof(request) - sizeof(SRB_IO_CONTROL));
+  request.srb.ReturnCode = 0x86000000u +
+      (static_cast<DWORD>(address.PathId) << 16u) +
+      (static_cast<DWORD>(address.TargetId) << 8u) + address.Lun;
+  request.direction = 2;  // Device to host.
+  request.queue_id = 0;
+  request.data_buffer_length = static_cast<DWORD>(request.data.size());
+  request.metadata_length = 0;
+  request.return_buffer_length = static_cast<DWORD>(sizeof(request));
+  request.command[0] = 0x02;  // NVMe Admin Get Log Page.
+  request.command[1] = 0xffffffff;  // All namespaces.
+  request.command[10] = 0x007f0002;  // SMART / Health log, 512 bytes.
+
+  DWORD returned = 0;
+  if (DeviceIoControl(miniport.get(), IOCTL_SCSI_MINIPORT, &request,
+                      static_cast<DWORD>(sizeof(request)), &request,
+                      static_cast<DWORD>(sizeof(request)), &returned,
+                      nullptr) == FALSE) {
+    health->reason =
+        "Intel VROC did not expose the NVMe health log for this disk.";
+    health->source = "Intel VROC NVMe miniport protocol";
+    health->windows_error = GetLastError();
+    return;
+  }
+  PopulateNvmeHealthFromLog(request.data.data(),
+                            "Intel VROC NVMe miniport protocol", health);
 }
 
 std::vector<std::string> FindDriveLettersForDisk(DWORD disk_number) {
@@ -916,15 +1296,24 @@ std::string BuildDiskReportJson(const DiskReport& report) {
   AppendOptionalString(output, report.health);
   output << ",\"healthSource\":";
   AppendOptionalString(output, report.health_source);
-  output << ",\"temperatureCelsius\":null";
-  output << ",\"wearPercent\":null";
-  output << ",\"readErrorsCorrected\":null";
-  output << ",\"readErrorsUncorrected\":null";
-  output << ",\"readErrorsTotal\":null";
-  output << ",\"writeErrorsCorrected\":null";
-  output << ",\"writeErrorsUncorrected\":null";
-  output << ",\"writeErrorsTotal\":null";
-  output << ",\"powerOnHours\":null";
+  output << ",\"temperatureCelsius\":";
+  AppendOptionalInt(output, report.temperature_celsius);
+  output << ",\"wearPercent\":";
+  AppendOptionalInt(output, report.wear_percent);
+  output << ",\"readErrorsCorrected\":";
+  AppendOptionalString(output, report.read_errors_corrected);
+  output << ",\"readErrorsUncorrected\":";
+  AppendOptionalString(output, report.read_errors_uncorrected);
+  output << ",\"readErrorsTotal\":";
+  AppendOptionalString(output, report.read_errors_total);
+  output << ",\"writeErrorsCorrected\":";
+  AppendOptionalString(output, report.write_errors_corrected);
+  output << ",\"writeErrorsUncorrected\":";
+  AppendOptionalString(output, report.write_errors_uncorrected);
+  output << ",\"writeErrorsTotal\":";
+  AppendOptionalString(output, report.write_errors_total);
+  output << ",\"powerOnHours\":";
+  AppendOptionalString(output, report.power_on_hours);
   output << ",\"firmwareVersion\":";
   AppendOptionalString(output, report.firmware_version);
   output << ",\"mediaType\":";
@@ -967,6 +1356,8 @@ std::string BuildDiskReportJson(const DiskReport& report) {
   output << '}';
   output << ",\"nvme\":{";
   output << "\"available\":" << (report.nvme.available ? "true" : "false");
+  output << ",\"source\":";
+  AppendJsonString(output, report.nvme.source);
   output << ",\"reason\":";
   if (report.nvme.available) {
     output << "null";
@@ -1042,6 +1433,8 @@ DiskReport CollectDiskReport(DWORD disk_number, bool* present) {
   PopulateTopology(disk, &report);
   PopulatePartitionStyle(disk, &report);
   PopulateReadOnlyFlag(disk, &report);
+  PopulateStorageCounters(disk, &report);
+  PopulatePredictFailure(disk, &report);
 
   DWORD identifier_error = ERROR_SUCCESS;
   report.unique_id = QueryStorageIdentifier(disk, &identifier_error);
@@ -1050,9 +1443,16 @@ DiskReport CollectDiskReport(DWORD disk_number, bool* present) {
   }
 
   PopulateNvmeHealth(disk, &report.nvme);
+  if (!report.nvme.available && report.bus_type.has_value() &&
+      *report.bus_type == "RAID") {
+    PopulateIntelRstNvmeHealth(disk, &report.nvme);
+    if (!report.nvme.available) {
+      PopulateIntelVrocNvmeHealth(disk, &report.nvme);
+    }
+  }
   if (report.nvme.available) {
-    report.health = report.nvme.critical_warning == 0 ? "Healthy" : "Warning";
-    report.health_source = "Windows NVMe protocol query";
+    report.health = report.nvme.critical_warning == 0 ? "healthy" : "warning";
+    report.health_source = report.nvme.source;
   }
   CloseHandle(disk);
 
@@ -1245,7 +1645,7 @@ std::string BuildInventoryJson(bool ok, const std::vector<std::string>& reports,
     output << TrimAscii(reports[index]);
   }
   output << "],\"warnings\":";
-  AppendJsonStringArray(output, warnings);
+  AppendDiagnosticWarningArray(output, warnings);
   output << '}';
   return output.str();
 }

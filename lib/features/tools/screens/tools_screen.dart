@@ -18,10 +18,12 @@ class ToolsScreen extends StatefulWidget {
 }
 
 class _ToolsScreenState extends State<ToolsScreen> {
-  static const double _featuredCardHeight = 248;
-  static const double _featuredCardMinWidth = 196;
+  static const double _featuredCardHeight = 136;
   static const double _featuredCardSpacing = 12;
-  static const int _featuredMaxColumns = 5;
+  static const int _featuredDesktopColumns = 3;
+  static const int _featuredDesktopItemCount = 6;
+  static const double _featuredThreeColumnBreakpoint = 720;
+  static const double _featuredTwoColumnBreakpoint = 440;
   static const double _toolCardHeight = 320;
 
   ToolsData? _data;
@@ -40,7 +42,18 @@ class _ToolsScreenState extends State<ToolsScreen> {
     final all = _data?.featuredTools ?? [];
     final list = List<ToolItem>.from(all);
     list.shuffle(Random());
-    _featuredTools = list.take(5).toList();
+    _featuredTools = list.take(_featuredItemCount(all.length)).toList();
+  }
+
+  int _featuredItemCount(int availableCount) {
+    if (availableCount >= _featuredDesktopItemCount) {
+      return _featuredDesktopItemCount;
+    }
+    // Keep desktop grids balanced when the source has fewer than six items.
+    if (availableCount >= _featuredDesktopColumns) {
+      return _featuredDesktopColumns;
+    }
+    return availableCount;
   }
 
   Future<void> _loadData() async {
@@ -204,6 +217,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
               _featuredTools.length,
             );
             return GridView.builder(
+              key: const ValueKey('tools-featured-grid'),
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -213,8 +227,12 @@ class _ToolsScreenState extends State<ToolsScreen> {
                 mainAxisExtent: _featuredCardHeight,
               ),
               itemCount: _featuredTools.length,
-              itemBuilder: (context, index) =>
-                  _FeaturedCard(tool: _featuredTools[index]),
+              itemBuilder: (context, index) => _FeaturedCard(
+                key: ValueKey(
+                  'tools-featured-card-${_featuredTools[index].name}',
+                ),
+                tool: _featuredTools[index],
+              ),
             );
           },
         ),
@@ -224,16 +242,14 @@ class _ToolsScreenState extends State<ToolsScreen> {
 
   int _featuredColumnCount(double maxWidth, int itemCount) {
     if (itemCount <= 0) return 1;
-    final maxColumns = min(_featuredMaxColumns, itemCount);
-    if (maxWidth.isInfinite) return maxColumns;
-
-    final fit =
-        ((maxWidth + _featuredCardSpacing) /
-                (_featuredCardMinWidth + _featuredCardSpacing))
-            .floor();
-    final columns = max(1, min(maxColumns, fit));
-    if (itemCount == 5 && columns == 4) return 3;
-    return columns;
+    if (itemCount >= _featuredDesktopColumns &&
+        (maxWidth.isInfinite || maxWidth >= _featuredThreeColumnBreakpoint)) {
+      return _featuredDesktopColumns;
+    }
+    if (itemCount >= 2 && maxWidth >= _featuredTwoColumnBreakpoint) {
+      return 2;
+    }
+    return 1;
   }
 
   List<Widget> _buildCategorySections(
@@ -343,7 +359,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
 
 class _FeaturedCard extends StatelessWidget {
   final ToolItem tool;
-  const _FeaturedCard({required this.tool});
+  const _FeaturedCard({super.key, required this.tool});
 
   @override
   Widget build(BuildContext context) {
@@ -356,41 +372,51 @@ class _FeaturedCard extends StatelessWidget {
           rootNavigator: true,
         ).push(MaterialPageRoute(builder: (_) => ToolDetailScreen(tool: tool))),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   tool.iconData,
-                  size: 24,
+                  size: 22,
                   color: colorScheme.onPrimaryContainer,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                tool.name,
-                style: AppTypography.cardTitleWith(colorScheme.onSurface),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 6),
-              _SafetyBadge(tool: tool),
-              const SizedBox(height: 8),
               Expanded(
-                child: Text(
-                  tool.desc,
-                  style: AppTypography.captionWith(
-                    colorScheme.onSurfaceVariant,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tool.name,
+                        style: AppTypography.cardTitleWith(
+                          colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      _SafetyBadge(tool: tool),
+                      const SizedBox(height: 6),
+                      Text(
+                        tool.desc,
+                        style: AppTypography.captionWith(
+                          colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

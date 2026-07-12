@@ -21,7 +21,6 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
   int? _selectedDiskNumber;
   bool _loading = true;
   String? _errorKey;
-  String? _errorMessage;
   DiskToolsCancellationToken? _collectionCancellation;
 
   @override
@@ -43,7 +42,6 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
     setState(() {
       _loading = true;
       _errorKey = null;
-      _errorMessage = null;
     });
     try {
       final snapshot = await ref
@@ -75,8 +73,7 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
         _loading = false;
         _errorKey = error.elevationCancelled
             ? 'disk_diag_admin_cancelled'
-            : 'disk_diag_error';
-        _errorMessage = error.message;
+            : error.localizationKey;
       });
     } catch (_) {
       if (!mounted || !identical(_collectionCancellation, cancellationToken)) {
@@ -169,7 +166,9 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
                         const SizedBox(height: 12),
                         _InlineMessage(
                           icon: Icons.info_outline_rounded,
-                          text: warnings.join('\n'),
+                          text: warnings
+                              .map((code) => diskToolsText(context, code))
+                              .join('\n'),
                           color: colors.onSurfaceVariant,
                         ),
                       ],
@@ -182,9 +181,7 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
                         )
                       else if (_errorKey != null && _snapshot == null)
                         _ErrorStatus(
-                          message:
-                              _errorMessage ??
-                              diskToolsText(context, _errorKey!),
+                          message: diskToolsText(context, _errorKey!),
                           onRetry: _collect,
                         )
                       else if (_snapshot?.reports.isEmpty ?? true)
@@ -206,9 +203,7 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
                           const SizedBox(height: 12),
                           _InlineMessage(
                             icon: Icons.warning_amber_rounded,
-                            text:
-                                _errorMessage ??
-                                diskToolsText(context, _errorKey!),
+                            text: diskToolsText(context, _errorKey!),
                             color: colors.error,
                           ),
                         ],
@@ -594,6 +589,16 @@ class _DiagnosticReportView extends StatelessWidget {
     String key,
     DiagnosticValue<String> field,
   ) {
+    if (key == 'disk_diag_health') {
+      final statusKey = _healthStatusKey(field.value);
+      return _DiagnosticRowData(
+        labelKey: key,
+        value: statusKey,
+        valueIsKey: statusKey != null,
+        available: statusKey != null,
+        sourceKey: _sourceKey(field.source),
+      );
+    }
     return _DiagnosticRowData(
       labelKey: key,
       value: field.value,
@@ -642,6 +647,15 @@ class _DiagnosticReportView extends StatelessWidget {
 
   static String _sourceKey(String source) {
     final normalized = source.toLowerCase();
+    if (normalized.contains('intel rst')) {
+      return 'disk_diag_source_intel_rst';
+    }
+    if (normalized.contains('intel vroc')) {
+      return 'disk_diag_source_intel_vroc';
+    }
+    if (normalized.contains('smart failure')) {
+      return 'disk_diag_source_smart_prediction';
+    }
     if (normalized.contains('calculated')) {
       return 'disk_diag_source_calculated';
     }
@@ -651,6 +665,18 @@ class _DiagnosticReportView extends StatelessWidget {
     }
     if (normalized.contains('native')) return 'disk_diag_source_native';
     return 'disk_diag_source_cim';
+  }
+
+  static String? _healthStatusKey(String? value) {
+    return switch (value?.trim().toLowerCase()) {
+      'healthy' => 'disk_diag_health_healthy',
+      'warning' => 'disk_diag_health_warning',
+      'no_failure_predicted' ||
+      'no failure predicted' => 'disk_diag_health_no_failure_predicted',
+      'failure_predicted' ||
+      'failure predicted' => 'disk_diag_health_failure_predicted',
+      _ => null,
+    };
   }
 }
 

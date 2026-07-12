@@ -45,6 +45,7 @@ void main() {
       expect(find.text(trCurrent('home_wtg')), findsOneWidget);
       expect(find.text(trCurrent('home_image_library')), findsOneWidget);
       expect(find.byIcon(Icons.refresh_rounded), findsNothing);
+      expect(find.byIcon(Icons.arrow_forward_rounded), findsNothing);
 
       final imageCard = find.byKey(
         const ValueKey('home-quick-action-image-library'),
@@ -61,6 +62,7 @@ void main() {
       expect(installMediaPosition.dx, lessThan(toGoPosition.dx));
       expect(imagePosition.dy, closeTo(installMediaPosition.dy, 0.1));
       expect(installMediaPosition.dy, closeTo(toGoPosition.dy, 0.1));
+      expect(tester.getSize(imageCard).height, lessThanOrEqualTo(120));
     },
   );
 

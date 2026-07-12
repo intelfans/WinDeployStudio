@@ -15,11 +15,13 @@ final windowsDiskDiagnosticsServiceProvider =
 
 class DiskDiagnosticsException implements Exception {
   final String message;
+  final String localizationKey;
   final bool elevationCancelled;
   final bool operationCancelled;
 
   const DiskDiagnosticsException(
     this.message, {
+    this.localizationKey = 'disk_diag_error',
     this.elevationCancelled = false,
     this.operationCancelled = false,
   });
@@ -40,7 +42,6 @@ typedef DiskDiagnosticsProcessStarter =
 class WindowsDiskDiagnosticsService {
   static const _nativeSource = 'Native Windows storage APIs';
   static const _reliabilitySource = 'Windows Storage Reliability Counter';
-  static const _nvmeSource = 'Windows NVMe protocol query';
   static const _helperName = 'wds_disk_diagnostics_helper.exe';
   static const _helperTimeout = Duration(seconds: 24);
   static const _streamDrainTimeout = Duration(seconds: 2);
@@ -64,11 +65,13 @@ class WindowsDiskDiagnosticsService {
     if (!Platform.isWindows) {
       throw const DiskDiagnosticsException(
         'Disk diagnostics are available on Windows only.',
+        localizationKey: 'disk_tools_error_windows_only',
       );
     }
     if (cancellationToken?.isCancelled == true) {
       throw const DiskDiagnosticsException(
         'Disk diagnostic collection was cancelled.',
+        localizationKey: 'disk_diag_error_cancelled',
         operationCancelled: true,
       );
     }
@@ -77,6 +80,7 @@ class WindowsDiskDiagnosticsService {
     if (!await helper.exists()) {
       throw const DiskDiagnosticsException(
         'The bundled disk diagnostic helper is unavailable.',
+        localizationKey: 'disk_diag_error_helper_missing',
       );
     }
 
@@ -87,6 +91,7 @@ class WindowsDiskDiagnosticsService {
     if (root['ok'] != true) {
       throw DiskDiagnosticsException(
         _cleanString(root['error']) ?? 'Disk diagnostic collection failed.',
+        localizationKey: _errorLocalizationKey(root['errorCode']),
       );
     }
 
@@ -94,6 +99,7 @@ class WindowsDiskDiagnosticsService {
     if (rawReports is! List) {
       throw const DiskDiagnosticsException(
         'Windows returned no physical disk list.',
+        localizationKey: 'disk_diag_error_invalid_response',
       );
     }
 
@@ -102,6 +108,7 @@ class WindowsDiskDiagnosticsService {
       if (raw is! Map) {
         throw const DiskDiagnosticsException(
           'Windows returned an invalid physical disk entry.',
+          localizationKey: 'disk_diag_error_invalid_response',
         );
       }
       final report = Map<String, dynamic>.from(raw);
@@ -115,7 +122,7 @@ class WindowsDiskDiagnosticsService {
       reports: List.unmodifiable(reports),
       isAdministrator: root['isAdministrator'] == true,
       collectedAt: DateTime.now(),
-      collectionWarnings: List.unmodifiable(_stringList(root['warnings'])),
+      collectionWarnings: List.unmodifiable(_warningCodes(root['warnings'])),
     );
   }
 
@@ -129,6 +136,7 @@ class WindowsDiskDiagnosticsService {
     } on ProcessException {
       throw const DiskDiagnosticsException(
         'The bundled disk diagnostic helper could not be started.',
+        localizationKey: 'disk_diag_error_helper_start',
       );
     }
 
@@ -167,6 +175,9 @@ class WindowsDiskDiagnosticsService {
         event.kind == _HelperProcessEventKind.cancelled
             ? 'Disk diagnostic collection was cancelled.'
             : 'The native disk diagnostic helper timed out.',
+        localizationKey: event.kind == _HelperProcessEventKind.cancelled
+            ? 'disk_diag_error_cancelled'
+            : 'disk_diag_error_timeout',
         operationCancelled: event.kind == _HelperProcessEventKind.cancelled,
       );
     }
@@ -182,6 +193,7 @@ class WindowsDiskDiagnosticsService {
       unawaited(stderr.cancel());
       throw const DiskDiagnosticsException(
         'The native disk diagnostic helper did not finish reading its response.',
+        localizationKey: 'disk_diag_error_invalid_response',
       );
     }
 
@@ -191,12 +203,14 @@ class WindowsDiskDiagnosticsService {
         detail == null
             ? 'The native disk diagnostic helper did not complete.'
             : 'The native disk diagnostic helper failed: $detail',
+        localizationKey: 'disk_diag_error_helper_failed',
       );
     }
     final response = stdout.text.trim();
     if (response.isEmpty) {
       throw const DiskDiagnosticsException(
         'The native disk diagnostic helper returned no data.',
+        localizationKey: 'disk_diag_error_no_data',
       );
     }
     return response;
@@ -226,11 +240,13 @@ class WindowsDiskDiagnosticsService {
       if (result.timedOut) {
         throw const DiskDiagnosticsException(
           'The native disk diagnostic helper timed out.',
+          localizationKey: 'disk_diag_error_timeout',
         );
       }
       if (result.cancelled) {
         throw const DiskDiagnosticsException(
           'Disk diagnostic collection was cancelled.',
+          localizationKey: 'disk_diag_error_cancelled',
           operationCancelled: true,
         );
       }
@@ -240,6 +256,9 @@ class WindowsDiskDiagnosticsService {
           cancelled
               ? 'Administrator access was cancelled.'
               : 'The native disk diagnostic helper returned no data.',
+          localizationKey: cancelled
+              ? 'disk_diag_admin_cancelled'
+              : 'disk_diag_error_no_data',
           elevationCancelled: cancelled,
         );
       }
@@ -248,18 +267,21 @@ class WindowsDiskDiagnosticsService {
       if (envelope['responseNonce'] != workspace.nonce) {
         throw const DiskDiagnosticsException(
           'Windows returned an invalid diagnostic response.',
+          localizationKey: 'disk_diag_error_invalid_response',
         );
       }
       if (envelope['ok'] != true) {
         throw DiskDiagnosticsException(
           _cleanString(envelope['error']) ??
               'The native disk diagnostic helper did not complete.',
+          localizationKey: 'disk_diag_error_helper_failed',
         );
       }
       final nativeResponse = _cleanString(envelope['nativeResponse']);
       if (nativeResponse == null) {
         throw const DiskDiagnosticsException(
           'The native disk diagnostic helper returned no data.',
+          localizationKey: 'disk_diag_error_no_data',
         );
       }
       return nativeResponse;
@@ -282,7 +304,7 @@ class WindowsDiskDiagnosticsService {
       raw['wearPercent'],
       _reliabilitySource,
       reliabilityReason,
-    ).orElse(nvme.percentageUsed, _nvmeSource, nvme.unavailableReason);
+    ).orElse(nvme.percentageUsed, nvme.source, nvme.unavailableReason);
     final wearValue = wear.value;
     final remainingLife = wearValue == null
         ? DiagnosticValue<int>.unavailable(
@@ -342,7 +364,7 @@ class WindowsDiskDiagnosticsService {
         raw['temperatureCelsius'],
         _reliabilitySource,
         reliabilityReason,
-      ).orElse(nvme.temperatureCelsius, _nvmeSource, nvme.unavailableReason),
+      ).orElse(nvme.temperatureCelsius, nvme.source, nvme.unavailableReason),
       wearPercent: wear,
       estimatedRemainingLifePercent: remainingLife,
       readErrorsCorrected: _bigIntDiagnostic(
@@ -379,30 +401,30 @@ class WindowsDiskDiagnosticsService {
         raw['powerOnHours'],
         _reliabilitySource,
         reliabilityReason,
-      ).orElse(nvme.powerOnHours, _nvmeSource, nvme.unavailableReason),
+      ).orElse(nvme.powerOnHours, nvme.source, nvme.unavailableReason),
       hostReadBytes: _diagnosticFromNullable(
         nvme.hostReadBytes,
-        source: _nvmeSource,
+        source: nvme.source,
         unavailableReason: nvme.unavailableReason,
       ),
       hostWrittenBytes: _diagnosticFromNullable(
         nvme.hostWrittenBytes,
-        source: _nvmeSource,
+        source: nvme.source,
         unavailableReason: nvme.unavailableReason,
       ),
       hostReadCommands: _diagnosticFromNullable(
         nvme.hostReadCommands,
-        source: _nvmeSource,
+        source: nvme.source,
         unavailableReason: nvme.unavailableReason,
       ),
       hostWriteCommands: _diagnosticFromNullable(
         nvme.hostWriteCommands,
-        source: _nvmeSource,
+        source: nvme.source,
         unavailableReason: nvme.unavailableReason,
       ),
       mediaAndDataIntegrityErrors: _diagnosticFromNullable(
         nvme.mediaAndDataIntegrityErrors,
-        source: _nvmeSource,
+        source: nvme.source,
         unavailableReason: nvme.unavailableReason,
       ),
       firmwareVersion: _stringDiagnostic(
@@ -455,8 +477,43 @@ class WindowsDiskDiagnosticsService {
     } on FormatException {
       throw const DiskDiagnosticsException(
         'Windows returned malformed disk diagnostic data.',
+        localizationKey: 'disk_diag_error_invalid_response',
       );
     }
+  }
+
+  static String _errorLocalizationKey(dynamic rawCode) {
+    const supported = <String>{
+      'disk_diag_error_helper_missing',
+      'disk_diag_error_helper_start',
+      'disk_diag_error_helper_failed',
+      'disk_diag_error_timeout',
+      'disk_diag_error_no_data',
+      'disk_diag_error_invalid_response',
+    };
+    final code = _cleanString(rawCode);
+    return code != null && supported.contains(code) ? code : 'disk_diag_error';
+  }
+
+  static List<String> _warningCodes(dynamic raw) {
+    if (raw is! List || raw.isEmpty) return const [];
+    const supported = <String>{'disk_diag_warning_partial'};
+    final codes = <String>{};
+    for (final item in raw) {
+      final code = item is Map
+          ? _cleanString(item['code'])
+          : item is String
+          ? null
+          : null;
+      // Legacy helpers returned English warning text. Preserve the warning
+      // state without rendering their driver-specific text in the UI.
+      codes.add(
+        code != null && supported.contains(code)
+            ? code
+            : 'disk_diag_warning_partial',
+      );
+    }
+    return List.unmodifiable(codes);
   }
 
   static Future<Process> _defaultStartNativeProcess(
@@ -616,6 +673,7 @@ class _NvmeHealthData {
   final BigInt? hostWriteCommands;
   final BigInt? powerOnHours;
   final BigInt? mediaAndDataIntegrityErrors;
+  final String source;
   final String unavailableReason;
 
   const _NvmeHealthData({
@@ -627,18 +685,21 @@ class _NvmeHealthData {
     required this.hostWriteCommands,
     required this.powerOnHours,
     required this.mediaAndDataIntegrityErrors,
+    required this.source,
   }) : unavailableReason =
            'The device or storage driver did not expose this NVMe value.';
 
-  const _NvmeHealthData.unavailable(this.unavailableReason)
-    : temperatureCelsius = null,
-      percentageUsed = null,
-      hostReadBytes = null,
-      hostWrittenBytes = null,
-      hostReadCommands = null,
-      hostWriteCommands = null,
-      powerOnHours = null,
-      mediaAndDataIntegrityErrors = null;
+  const _NvmeHealthData.unavailable(
+    this.unavailableReason, {
+    this.source = 'Windows NVMe protocol query',
+  }) : temperatureCelsius = null,
+       percentageUsed = null,
+       hostReadBytes = null,
+       hostWrittenBytes = null,
+       hostReadCommands = null,
+       hostWriteCommands = null,
+       powerOnHours = null,
+       mediaAndDataIntegrityErrors = null;
 
   factory _NvmeHealthData.fromJson(dynamic raw) {
     if (raw is! Map) {
@@ -651,6 +712,7 @@ class _NvmeHealthData {
       return _NvmeHealthData.unavailable(
         _cleanString(map['reason']) ??
             'The device or storage driver did not expose NVMe health data.',
+        source: _cleanString(map['source']) ?? 'Windows NVMe protocol query',
       );
     }
     return _NvmeHealthData(
@@ -664,6 +726,7 @@ class _NvmeHealthData {
       mediaAndDataIntegrityErrors: _bigIntFrom(
         map['mediaAndDataIntegrityErrors'],
       ),
+      source: _cleanString(map['source']) ?? 'Windows NVMe protocol query',
     );
   }
 }

@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/app/visual_style.dart';
+import 'package:win_deploy_studio/core/localization/ai_benchmark_strings.dart';
 import 'package:win_deploy_studio/core/localization/strings.dart';
+import 'package:win_deploy_studio/core/localization/visual_style_strings.dart';
 import 'package:win_deploy_studio/features/benchmark_history/benchmark_history_copy.dart';
 import 'package:win_deploy_studio/features/disk_tools/localization/disk_tools_localization.dart';
 
@@ -52,6 +54,53 @@ void main() {
       }
     }
   });
+
+  test(
+    'supplemental localization modules provide translated values for every locale',
+    () {
+      final englishVisual = visualStyleStringsForCode('en');
+      final englishAiBenchmark = aiBenchmarkStringsForCode('en');
+      const translatedVisualKeys = <String>{
+        'visual_style_title',
+        'visual_style_description',
+        'visual_style_auto_label',
+        'visual_style_auto_description',
+        'visual_style_win11_description',
+        'visual_style_win10_description',
+        'visual_style_win7_description',
+      };
+
+      for (final locale in languages.keys.where((code) => code != 'en')) {
+        final visual = visualStyleStringsForCode(locale);
+        final aiBenchmark = aiBenchmarkStringsForCode(locale);
+        expect(
+          visual.keys.toSet(),
+          englishVisual.keys.toSet(),
+          reason: '$locale is missing visual-style keys',
+        );
+        expect(
+          aiBenchmark.keys.toSet(),
+          englishAiBenchmark.keys.toSet(),
+          reason: '$locale is missing AI benchmark keys',
+        );
+
+        for (final key in translatedVisualKeys) {
+          expect(
+            visual[key],
+            isNot(englishVisual[key]),
+            reason: '$locale.$key must not fall back to English',
+          );
+        }
+        for (final key in englishAiBenchmark.keys) {
+          expect(
+            aiBenchmark[key],
+            isNot(englishAiBenchmark[key]),
+            reason: '$locale.$key must not fall back to English',
+          );
+        }
+      }
+    },
+  );
 
   test(
     'all statically referenced translation keys exist in every language',
