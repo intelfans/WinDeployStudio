@@ -48,7 +48,8 @@ class MirrorNotifier extends StateNotifier<MirrorState> {
     state = state.copyWith(status: MirrorLoadStatus.loading);
 
     try {
-      final jsonStr = await rootBundle.loadString('data/mirrors.json');
+      final asset = await rootBundle.load('data/mirrors.json');
+      final jsonStr = utf8.decode(asset.buffer.asUint8List());
       final json = jsonDecode(jsonStr) as Map<String, dynamic>;
       final data = MirrorListData.fromJson(json);
 

@@ -1,13 +1,17 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../app/theme.dart';
 import '../../../app/typography.dart';
 import '../../../core/localization/strings.dart';
 import '../../../shared/webview/webview_helper.dart';
+import '../../../shared/widgets/app_page.dart';
 import '../models/tool_models.dart';
 
 class ToolsScreen extends StatefulWidget {
-  const ToolsScreen({super.key});
+  const ToolsScreen({super.key, this.dataLoader});
+
+  final Future<ToolsData> Function()? dataLoader;
 
   @override
   State<ToolsScreen> createState() => _ToolsScreenState();
@@ -40,8 +44,8 @@ class _ToolsScreenState extends State<ToolsScreen> {
   }
 
   Future<void> _loadData() async {
-    _lastLocale = L.currentLocale;
-    final data = await ToolsData.load();
+    _lastLocale = normalizeLocaleCode(L.currentLocale);
+    final data = await (widget.dataLoader?.call() ?? ToolsData.load());
     if (mounted) {
       setState(() {
         _data = data;
@@ -54,76 +58,47 @@ class _ToolsScreenState extends State<ToolsScreen> {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
-    final currentLocale =
-        locale.countryCode != null && locale.countryCode!.isNotEmpty
-        ? '${locale.languageCode}_${locale.countryCode}'
-        : locale.languageCode;
+    final currentLocale = normalizeLocaleCode(localeCodeFromLocale(locale));
     if (currentLocale != _lastLocale && !_loading) {
       _loadData();
     }
     final colorScheme = Theme.of(context).colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 900;
+    final tokens = AppVisualTokens.of(context);
 
     return Scaffold(
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isCompact ? 16 : 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context, colorScheme),
-                  const SizedBox(height: 20),
-                  _buildStatsBar(context, colorScheme),
-                  const SizedBox(height: 20),
-                  _buildSearchBar(context, colorScheme),
-                  const SizedBox(height: 24),
-                  if (_searchQuery.isEmpty) ...[
-                    _buildFeaturedSection(context, colorScheme),
-                    const SizedBox(height: 32),
+          : LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: EdgeInsets.all(
+                  constraints.maxWidth < 600 ? 16 : tokens.pagePadding,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context, colorScheme),
+                    SizedBox(height: tokens.sectionSpacing),
+                    _buildStatsBar(context, colorScheme),
+                    SizedBox(height: tokens.sectionSpacing),
+                    _buildSearchBar(context, colorScheme),
+                    SizedBox(height: tokens.sectionSpacing),
+                    if (_searchQuery.isEmpty) ...[
+                      _buildFeaturedSection(context, colorScheme),
+                      SizedBox(height: tokens.sectionSpacing * 1.5),
+                    ],
+                    ..._buildCategorySections(context, colorScheme),
                   ],
-                  ..._buildCategorySections(context, colorScheme, isCompact),
-                ],
+                ),
               ),
             ),
     );
   }
 
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
-    return Row(
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            Icons.handyman_rounded,
-            size: 32,
-            color: colorScheme.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tr(context, 'tools_title'),
-                style: AppTypography.pageTitleWith(colorScheme.onSurface),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                tr(context, 'tools_subtitle'),
-                style: AppTypography.bodyWith(colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return AppPageHeader(
+      icon: Icons.handyman_rounded,
+      title: tr(context, 'tools_title'),
+      subtitle: tr(context, 'tools_subtitle'),
     );
   }
 
@@ -133,29 +108,54 @@ class _ToolsScreenState extends State<ToolsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(
+          AppVisualTokens.of(context).surfaceRadius,
+        ),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _StatItem(
-            icon: Icons.apps_rounded,
-            label: tr(context, 'tools_stat_total'),
-            value: '${_data!.totalTools}',
-          ),
-          Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-          _StatItem(
-            icon: Icons.folder_rounded,
-            label: tr(context, 'tools_stat_categories'),
-            value: '${_data!.totalCategories}',
-          ),
-          Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-          _StatItem(
-            icon: Icons.update_rounded,
-            label: tr(context, 'tools_stat_updated'),
-            value: DateTime.now().toString().split(' ')[0],
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final items = [
+            _StatItem(
+              icon: Icons.apps_rounded,
+              label: tr(context, 'tools_stat_total'),
+              value: '${_data!.totalTools}',
+            ),
+            _StatItem(
+              icon: Icons.folder_rounded,
+              label: tr(context, 'tools_stat_categories'),
+              value: '${_data!.totalCategories}',
+            ),
+            _StatItem(
+              icon: Icons.update_rounded,
+              label: tr(context, 'tools_stat_updated'),
+              value: DateTime.now().toString().split(' ')[0],
+            ),
+          ];
+          if (constraints.maxWidth < 520) {
+            return Column(
+              children: [
+                for (var index = 0; index < items.length; index++) ...[
+                  items[index],
+                  if (index < items.length - 1) const Divider(height: 20),
+                ],
+              ],
+            );
+          }
+          return Row(
+            children: [
+              for (var index = 0; index < items.length; index++) ...[
+                Expanded(child: items[index]),
+                if (index < items.length - 1)
+                  Container(
+                    width: 1,
+                    height: 32,
+                    color: colorScheme.outlineVariant,
+                  ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -239,7 +239,6 @@ class _ToolsScreenState extends State<ToolsScreen> {
   List<Widget> _buildCategorySections(
     BuildContext context,
     ColorScheme colorScheme,
-    bool isCompact,
   ) {
     if (_data == null) return [];
     final sections = <Widget>[];
@@ -287,19 +286,23 @@ class _ToolsScreenState extends State<ToolsScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isCompact ? 1 : 2,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  mainAxisExtent: _toolCardHeight,
-                ),
-                itemCount: tools.length,
-                itemBuilder: (context, index) => _ToolCard(
-                  tool: tools[index],
-                  categoryColor: category.displayColor,
+              LayoutBuilder(
+                builder: (context, constraints) => GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: constraints.maxWidth < 980 ? 1 : 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    mainAxisExtent: constraints.maxWidth < 620
+                        ? 380
+                        : _toolCardHeight,
+                  ),
+                  itemCount: tools.length,
+                  itemBuilder: (context, index) => _ToolCard(
+                    tool: tools[index],
+                    categoryColor: category.displayColor,
+                  ),
                 ),
               ),
             ],
@@ -608,9 +611,7 @@ class _ToolCardState extends State<_ToolCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final tool = widget.tool;
+    final tokens = AppVisualTokens.of(context);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -630,7 +631,7 @@ class _ToolCardState extends State<_ToolCard> {
               ? (Matrix4.identity()..scaleByDouble(1.02, 1.02, 1.0, 1.0))
               : Matrix4.identity(),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(tokens.surfaceRadius),
             boxShadow: _hovered
                 ? [
                     BoxShadow(
@@ -650,167 +651,169 @@ class _ToolCardState extends State<_ToolCard> {
           child: Card(
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(tokens.surfaceRadius),
             ),
             child: InkWell(
               onTap: () => Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute(builder: (_) => ToolDetailScreen(tool: tool)),
+                MaterialPageRoute(
+                  builder: (_) => ToolDetailScreen(tool: widget.tool),
+                ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    // Logo / Icon
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: widget.categoryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        tool.iconData,
-                        size: 32,
-                        color: widget.categoryColor,
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    // Info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            tool.name,
-                            style: AppTypography.sectionTitleWith(
-                              colorScheme.onSurface,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-                          _SafetyBadge(tool: tool),
-                          if (tool.developer.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              '${tr(context, 'tools_developer')}: ${tool.developer}',
-                              style: AppTypography.captionWith(
-                                colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          if (tool.version.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              '${tr(context, 'tools_version')}: ${tool.version}',
-                              style: AppTypography.captionWith(
-                                colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          Text(
-                            tool.desc,
-                            style: AppTypography.bodyWith(
-                              colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: tool.tags
-                                .take(4)
-                                .map(
-                                  (tag) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: widget.categoryColor.withValues(
-                                        alpha: 0.08,
-                                      ),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      tag,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: widget.categoryColor,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Buttons
-                    SizedBox(
-                      width: 148,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          FilledButton.tonal(
-                            onPressed: () =>
-                                _openToolUrl(context, tool, tool.url),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(38),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                            ),
-                            child: Text(
-                              tr(context, 'tools_website'),
-                              style: const TextStyle(fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (tool.downloadUrl != null)
-                            FilledButton(
-                              onPressed: () => _openToolUrl(
-                                context,
-                                tool,
-                                tool.downloadUrl!,
-                              ),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(38),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 620;
+                  final icon = _buildIcon(compact ? 56 : 64);
+                  final info = _buildInfo(context);
+                  final buttons = _buildButtons(context);
+                  return Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: compact
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    icon,
+                                    const SizedBox(width: 16),
+                                    Expanded(child: info),
+                                  ],
                                 ),
                               ),
-                              child: Text(
-                                tr(context, 'tools_download'),
-                                style: const TextStyle(fontSize: 13),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                              const SizedBox(height: 12),
+                              buttons,
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              icon,
+                              const SizedBox(width: 20),
+                              Expanded(child: info),
+                              const SizedBox(width: 16),
+                              SizedBox(width: 148, child: buttons),
+                            ],
+                          ),
+                  );
+                },
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildIcon(double size) {
+    final tokens = AppVisualTokens.of(context);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: widget.categoryColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(tokens.controlRadius),
+      ),
+      child: Icon(
+        widget.tool.iconData,
+        size: size / 2,
+        color: widget.categoryColor,
+      ),
+    );
+  }
+
+  Widget _buildInfo(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final tool = widget.tool;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          tool.name,
+          style: AppTypography.cardTitleWith(colorScheme.onSurface),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 6),
+        _SafetyBadge(tool: tool),
+        if (tool.developer.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            '${tr(context, 'tools_developer')}: ${tool.developer}',
+            style: AppTypography.captionWith(colorScheme.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+        if (tool.version.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            '${tr(context, 'tools_version')}: ${tool.version}',
+            style: AppTypography.captionWith(colorScheme.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          tool.desc,
+          style: AppTypography.bodyWith(colorScheme.onSurfaceVariant),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (final tag in tool.tags.take(4))
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: widget.categoryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(fontSize: 11, color: widget.categoryColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildButtons(BuildContext context) {
+    final tool = widget.tool;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.tonalIcon(
+          onPressed: () => _openToolUrl(context, tool, tool.url),
+          icon: const Icon(Icons.language_rounded, size: 18),
+          label: Text(
+            tr(context, 'tools_website'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (tool.downloadUrl != null) ...[
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: () => _openToolUrl(context, tool, tool.downloadUrl!),
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: Text(
+              tr(context, 'tools_download'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -867,46 +870,24 @@ class ToolDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        tool.iconData,
-                        size: 36,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tool.name,
-                            style: AppTypography.pageTitleWith(
-                              colorScheme.onSurface,
-                            ),
+                AppPageHeader(
+                  icon: tool.iconData,
+                  title: tool.name,
+                  details: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SafetyBadge(tool: tool),
+                      if (tool.developer.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          tool.developer,
+                          style: AppTypography.bodyWith(
+                            colorScheme.onSurfaceVariant,
                           ),
-                          const SizedBox(height: 8),
-                          _SafetyBadge(tool: tool),
-                          if (tool.developer.isNotEmpty)
-                            Text(
-                              tool.developer,
-                              style: AppTypography.bodyWith(
-                                colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -1013,27 +994,43 @@ class ToolDetailScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                 ],
 
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.language_rounded),
-                        label: Text(tr(context, 'tools_website')),
-                        onPressed: () => _openToolUrl(context, tool, tool.url),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    if (tool.downloadUrl != null)
-                      Expanded(
-                        child: FilledButton.icon(
-                          icon: const Icon(Icons.download_rounded),
-                          label: Text(tr(context, 'tools_download')),
-                          onPressed: () =>
-                              _openToolUrl(context, tool, tool.downloadUrl!),
-                        ),
-                      ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final websiteButton = OutlinedButton.icon(
+                      icon: const Icon(Icons.language_rounded),
+                      label: Text(tr(context, 'tools_website')),
+                      onPressed: () => _openToolUrl(context, tool, tool.url),
+                    );
+                    final downloadButton = tool.downloadUrl == null
+                        ? null
+                        : FilledButton.icon(
+                            icon: const Icon(Icons.download_rounded),
+                            label: Text(tr(context, 'tools_download')),
+                            onPressed: () =>
+                                _openToolUrl(context, tool, tool.downloadUrl!),
+                          );
+                    if (constraints.maxWidth < 480) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          websiteButton,
+                          if (downloadButton != null) ...[
+                            const SizedBox(height: 8),
+                            downloadButton,
+                          ],
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: websiteButton),
+                        if (downloadButton != null) ...[
+                          const SizedBox(width: 12),
+                          Expanded(child: downloadButton),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -1097,24 +1094,29 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: AppTypography.captionWith(colorScheme.onSurfaceVariant),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTypography.bodyWith(colorScheme.onSurface),
-            ),
-          ),
-        ],
+    final labelWidget = Text(
+      label,
+      style: AppTypography.captionWith(colorScheme.onSurfaceVariant),
+    );
+    final valueWidget = Text(
+      value,
+      style: AppTypography.bodyWith(colorScheme.onSurface),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: constraints.maxWidth < 420
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [labelWidget, const SizedBox(height: 2), valueWidget],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(width: 120, child: labelWidget),
+                  Expanded(child: valueWidget),
+                ],
+              ),
       ),
     );
   }

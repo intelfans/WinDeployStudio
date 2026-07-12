@@ -1,6 +1,6 @@
 ﻿┌─────────────────────────────────────────────────────────────┐
 │                          WinDeploy Studio                                    │
-│                    Herramienta de despliegue Windows                              │
+│               Herramienta de despliegue Windows y Linux                      │
 └─────────────────────────────────────────────────────────────┘
 
 ¡Gracias por elegir WinDeploy Studio!
@@ -12,14 +12,15 @@ Características principales:
   🖼️ Biblioteca de imágenes
     Explorar imágenes de Windows y enlaces de descarga
     
-  💿 Creador de medio de instalación de Windows  
-    Crear medios de instalación de Windows desde archivos ISO
+  💿 Creador de medios de instalación  
+    Crear medios de Windows o escribir imágenes Linux ISOHybrid arrancables
     
-  🚀 Windows To Go
-    Crear espacios de trabajo Windows portátiles en unidades USB
+  🚀 Entornos To Go
+    Crear entornos Windows portátiles o Linux persistentes desde imágenes
+    Live x64 de Ubuntu/casper compatibles
     
-  🌍 Soporte multilingüe
-    Interfaz completa en chino e inglés
+  📊 Prueba nativa de unidades
+    Medir escritura secuencial, 4K, multihilo y sostenida
 
 ═══════════════════════════════════════════════════════════════
 
@@ -27,7 +28,7 @@ Requisitos del sistema:
 
   • Windows 10/11 (64 bits)
   • Unidad USB 3.0+ (recomendado)
-  • Se requieren privilegios de administrador
+  • Instalación y operaciones de disco requieren aprobación administrativa
 
 ═══════════════════════════════════════════════════════════════
 

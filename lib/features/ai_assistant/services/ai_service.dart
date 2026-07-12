@@ -33,11 +33,14 @@ class AiService {
     }
   }
 
-  String _mapNetworkError(Object error) {
+  String _mapNetworkError(Object error, {String? redactedBaseUrl}) {
     if (error is TimeoutException) {
       return trCurrent('ai_error_timeout');
     }
-    final text = error.toString();
+    var text = error.toString();
+    if (redactedBaseUrl != null && redactedBaseUrl.isNotEmpty) {
+      text = text.replaceAll(redactedBaseUrl, '<AI proxy>/');
+    }
     if (text.contains('SocketException') ||
         text.contains('ClientException') ||
         text.contains('errno = 121') ||
@@ -62,9 +65,10 @@ class AiService {
   }) async {
     final proxyUrl = await AiConfig.getProxyUrl();
     final url = '${proxyUrl}chat/completions';
+    final proxyOrigin = Uri.parse(proxyUrl).origin;
 
     LogCenterService().logSystem(
-      '[AI]\nProvider=OpenAICompatibleProxy\nURL=$proxyUrl',
+      '[AI]\nProvider=OpenAICompatibleProxy\nOrigin=$proxyOrigin',
     );
 
     http.Client? client;
@@ -169,9 +173,11 @@ class AiService {
       if (cancelToken?.cancelled ?? false) {
         completeOnce();
       } else {
-        final errorMsg = _mapNetworkError(e);
+        final errorMsg = _mapNetworkError(e, redactedBaseUrl: proxyUrl);
+        final diagnostic = e.toString().replaceAll(proxyUrl, '<AI proxy>/');
         LogCenterService().logSystem(
-          '[AI]\nRequestSuccess=false\nError=$e\nUserMessage=$errorMsg',
+          '[AI]\nRequestSuccess=false\nError=$diagnostic\n'
+          'UserMessage=$errorMsg',
         );
         onError(errorMsg);
       }

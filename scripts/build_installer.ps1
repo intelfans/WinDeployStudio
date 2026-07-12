@@ -101,7 +101,7 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "  Build Complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Installer location: dist\windows\WinDeployStudio_Setup_1.2.0.exe" -ForegroundColor Cyan
+Write-Host "Installer location: dist\windows\WinDeployStudio_Setup_2.0.0.exe" -ForegroundColor Cyan
 Write-Host ""
 
 # Open output directory

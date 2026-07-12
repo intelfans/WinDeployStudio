@@ -6,6 +6,7 @@ import '../models/log_category.dart';
 class LogCenterService {
   static LogCenterService? _instance;
   late final String _logsBasePath;
+  DateTime? _lastAutomaticCleanup;
 
   LogCenterService._() {
     _logsBasePath = p.join(AppConstants.appDataPath, 'WinDeployStudio', 'logs');
@@ -37,10 +38,47 @@ class LogCenterService {
     final file = File(filePath);
     final timestamp = now.toIso8601String();
     await file.writeAsString('[$timestamp] $message\n', mode: FileMode.append);
+    await _runAutomaticCleanup(now);
+  }
+
+  Future<void> _runAutomaticCleanup(DateTime now) async {
+    if (_lastAutomaticCleanup != null &&
+        now.difference(_lastAutomaticCleanup!).inHours < 1) {
+      return;
+    }
+    _lastAutomaticCleanup = now;
+    final cutoff = now.subtract(
+      const Duration(days: AppConstants.logRetentionDays),
+    );
+    for (final category in LogCategory.values) {
+      final directory = Directory(p.join(_logsBasePath, category.folderName));
+      if (!await directory.exists()) continue;
+      final files = await directory
+          .list()
+          .where((entity) => entity is File && entity.path.endsWith('.log'))
+          .cast<File>()
+          .toList();
+      files.sort(
+        (left, right) =>
+            right.lastModifiedSync().compareTo(left.lastModifiedSync()),
+      );
+      for (var index = 0; index < files.length; index++) {
+        final file = files[index];
+        final tooOld = file.lastModifiedSync().isBefore(cutoff);
+        final overLimit = index >= AppConstants.maxLogFiles;
+        if (tooOld || overLimit) {
+          try {
+            await file.delete();
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   Future<void> logUsb(String message) => log(LogCategory.usb, message);
   Future<void> logToGo(String message) => log(LogCategory.wtg, message);
+  Future<void> logBenchmark(String message) =>
+      log(LogCategory.benchmark, message);
   Future<void> logDownload(String message) =>
       log(LogCategory.downloads, message);
   Future<void> logIso(String message) => log(LogCategory.iso, message);
@@ -53,6 +91,7 @@ class LogCenterService {
     int totalSize = 0;
     DateTime? lastActivity;
     final categoryCounts = <LogCategory, int>{};
+    final categoryLastUpdates = <LogCategory, DateTime?>{};
 
     for (final category in LogCategory.values) {
       final dir = Directory(p.join(_logsBasePath, category.folderName));
@@ -61,6 +100,7 @@ class LogCenterService {
           (f) => f.path.endsWith('.log'),
         );
         int count = 0;
+        DateTime? categoryLastUpdate;
         for (final file in files) {
           count++;
           totalFiles++;
@@ -69,8 +109,16 @@ class LogCenterService {
           if (lastActivity == null || stat.modified.isAfter(lastActivity)) {
             lastActivity = stat.modified;
           }
+          if (categoryLastUpdate == null ||
+              stat.modified.isAfter(categoryLastUpdate)) {
+            categoryLastUpdate = stat.modified;
+          }
         }
         categoryCounts[category] = count;
+        categoryLastUpdates[category] = categoryLastUpdate;
+      } else {
+        categoryCounts[category] = 0;
+        categoryLastUpdates[category] = null;
       }
     }
 
@@ -79,6 +127,7 @@ class LogCenterService {
       totalSizeBytes: totalSize,
       lastActivity: lastActivity,
       categoryCounts: categoryCounts,
+      categoryLastUpdates: categoryLastUpdates,
     );
   }
 

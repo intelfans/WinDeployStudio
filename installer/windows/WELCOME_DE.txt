@@ -1,6 +1,6 @@
 ﻿┌─────────────────────────────────────────────────────────────┐
 │                          WinDeploy Studio                                    │
-│                    Windows-Bereitstellungstool                              │
+│                Windows- und Linux-Bereitstellungstool                       │
 └─────────────────────────────────────────────────────────────┘
 
 Vielen Dank für die Wahl von WinDeploy Studio!
@@ -12,14 +12,15 @@ Hauptfunktionen:
   🖼️ Image-Bibliothek
     Kuratierte Windows-Images und Download-Links durchsuchen
     
-  💿 Windows-Installationsmedium erstellen  
-    Windows-Installationsmedien aus ISO-Dateien erstellen
+  💿 Installationsmedium erstellen  
+    Windows-Medien erstellen oder bootfähige Linux-ISOHybrid-Images schreiben
     
-  🚀 Windows To Go
-    Portables Windows-Arbeitsplatz auf USB-Laufwerken erstellen
+  🚀 To Go-Umgebungen
+    Portable Windows-Umgebungen oder persistente Linux-Umgebungen aus
+    unterstützten x64-Ubuntu-/casper-Live-Images erstellen
     
-  🌍 Mehrsprachige Unterstützung
-    Vollständige chinesische und englische Oberfläche
+  📊 Nativer Laufwerkstest
+    Sequenzielle, 4K-, Multithread- und Dauerschreibtests
 
 ═══════════════════════════════════════════════════════════════
 
@@ -27,7 +28,7 @@ Systemanforderungen:
 
   • Windows 10/11 (64-Bit)
   • USB 3.0+ Laufwerk (empfohlen)
-  • Administratorrechte erforderlich
+  • Administratorbestätigung für Installation und Datenträgeroperationen
 
 ═══════════════════════════════════════════════════════════════
 

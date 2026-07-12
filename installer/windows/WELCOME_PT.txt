@@ -1,6 +1,6 @@
 ﻿┌─────────────────────────────────────────────────────────────┐
 │                          WinDeploy Studio                                    │
-│                    Ferramenta de implantação Windows                              │
+│                Ferramenta de implantação Windows e Linux                     │
 └─────────────────────────────────────────────────────────────┘
 
 Obrigado por escolher o WinDeploy Studio!
@@ -12,14 +12,15 @@ Recursos principais:
   🖼️ Biblioteca de imagens
     Navegar pelas imagens do Windows e links de download
     
-  💿 Criador de mídia de instalação do Windows  
-    Criar mídia de instalação do Windows a partir de arquivos ISO
+  💿 Criador de mídia de instalação  
+    Criar mídia do Windows ou gravar imagens Linux ISOHybrid inicializáveis
     
-  🚀 Windows To Go
-    Criar espaços de trabalho Windows portáteis em drives USB
+  🚀 Ambientes To Go
+    Criar ambientes Windows portáteis ou Linux persistentes com imagens
+    Live x64 Ubuntu/casper compatíveis
     
-  🌍 Suporte multilíngue
-    Interface completa em chinês e inglês
+  📊 Teste nativo de unidades
+    Medir gravações sequenciais, 4K, multithread e sustentadas
 
 ═══════════════════════════════════════════════════════════════
 
@@ -27,7 +28,7 @@ Requisitos do sistema:
 
   • Windows 10/11 (64 bits)
   • Drive USB 3.0+ (recomendado)
-  • Privilégios de administrador necessários
+  • A instalação e as operações de disco exigem aprovação do administrador
 
 ═══════════════════════════════════════════════════════════════
 

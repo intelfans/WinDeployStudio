@@ -16,6 +16,24 @@ add_executable(${BINARY_NAME} WIN32
   "runner.exe.manifest"
 )
 
+add_executable(wds_benchmark_helper
+  "../benchmark_helper/main.cpp"
+)
+apply_standard_settings(wds_benchmark_helper)
+target_compile_definitions(wds_benchmark_helper PRIVATE "NOMINMAX")
+
+add_executable(wds_wim_info_helper
+  "../wim_info_helper/main.cpp"
+)
+apply_standard_settings(wds_wim_info_helper)
+target_compile_definitions(wds_wim_info_helper PRIVATE "NOMINMAX")
+
+add_executable(wds_disk_diagnostics_helper
+  "../disk_diagnostics_helper/main.cpp"
+)
+apply_standard_settings(wds_disk_diagnostics_helper)
+target_compile_definitions(wds_disk_diagnostics_helper PRIVATE "NOMINMAX")
+
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import '../../features/logs/services/log_center_service.dart';
+import 'wim_info_service.dart';
 
 class IsoMetadata {
   final String filePath;
@@ -79,65 +80,53 @@ class IsoParseService {
     // Step 2: Mount ISO
     _report(onProgress, 'mount', 0);
     final mountPoint = await _mountIso(isoPath);
-    if (_cancelled || mountPoint == null) {
+    if (mountPoint == null) {
       debugPrint('Mount failed or cancelled');
       return fastResult;
     }
-    _report(onProgress, 'mount', 100);
-    debugPrint('Mounted at: $mountPoint');
-
-    // Step 3: Check for install.wim/esd
-    if (_cancelled) {
-      await _unmount(isoPath);
-      return null;
-    }
-    _report(onProgress, 'detect', 0);
-
-    final wimPath = '${mountPoint}sources\\install.wim';
-    final esdPath = '${mountPoint}sources\\install.esd';
-    final hasWim = await File(wimPath).exists();
-    final hasEsd = await File(esdPath).exists();
-
-    if (!hasWim && !hasEsd) {
-      debugPrint('No install.wim/esd found');
-      await _unmount(isoPath);
-      return fastResult;
-    }
-    _report(onProgress, 'detect', 100);
-    debugPrint('Found: ${hasWim ? "install.wim" : "install.esd"}');
-
-    // Step 4: DISM info with timeout
-    if (_cancelled) {
-      await _unmount(isoPath);
-      return null;
-    }
-    _report(onProgress, 'info', 0);
-
-    final sourcePath = hasWim ? wimPath : esdPath;
     Map<String, String>? dismInfo;
-
     try {
-      debugPrint('Starting DISM...');
+      if (_cancelled) return null;
+      _report(onProgress, 'mount', 100);
+      debugPrint('Mounted at: $mountPoint');
+      _report(onProgress, 'detect', 0);
+
+      final wimPath = '${mountPoint}sources\\install.wim';
+      final esdPath = '${mountPoint}sources\\install.esd';
+      final hasWim = await File(wimPath).exists();
+      final hasEsd = await File(esdPath).exists();
+      if (!hasWim && !hasEsd) return fastResult;
+      _report(onProgress, 'detect', 100);
+      if (_cancelled) return null;
+
       _report(onProgress, 'info', 30);
-
-      dismInfo = await _runDismWithTimeout(sourcePath);
-
-      if (_cancelled) {
-        await _unmount(isoPath);
-        return null;
+      final images = await WimInfoService.readImages(
+        hasWim ? wimPath : esdPath,
+      );
+      final image = images.first;
+      dismInfo = {
+        'build': image.build,
+        'architecture': image.architecture,
+        'language': image.language,
+        'edition': image.name.isEmpty ? image.edition : image.name,
+      };
+      final buildNumber = int.tryParse(image.build) ?? 0;
+      if (buildNumber >= 22000) {
+        dismInfo['version'] = 'Windows 11 (Build ${image.build})';
+      } else if (buildNumber >= 10240) {
+        dismInfo['version'] = 'Windows 10 (Build ${image.build})';
+      } else if (image.version.isNotEmpty) {
+        dismInfo['version'] = image.version;
       }
-
       _report(onProgress, 'info', 100);
-      debugPrint('DISM result: $dismInfo');
-    } catch (e) {
-      debugPrint('DISM failed: $e');
+    } catch (error) {
+      debugPrint('WIM metadata read failed: $error');
       _report(onProgress, 'info', 100);
+    } finally {
+      onProgress?.call('cleanup', 0);
+      await _unmount(isoPath);
+      onProgress?.call('cleanup', 100);
     }
-
-    // Unmount ISO — must always complete regardless of cancel
-    onProgress?.call('cleanup', 0);
-    await _unmount(isoPath);
-    onProgress?.call('cleanup', 100);
 
     if (_cancelled) return null;
 
@@ -193,73 +182,6 @@ class IsoParseService {
     }
   }
 
-  // --- DISM with reliable timeout ---
-
-  Future<Map<String, String>?> _runDismWithTimeout(String wimPath) async {
-    final process = await Process.start('dism', [
-      '/Get-WimInfo',
-      '/WimFile:$wimPath',
-      '/Index:1',
-    ]);
-
-    final stdoutFuture = process.stdout
-        .transform(const SystemEncoding().decoder)
-        .join();
-    final stderrFuture = process.stderr
-        .transform(const SystemEncoding().decoder)
-        .join();
-
-    final exitCode = await process.exitCode.timeout(
-      const Duration(seconds: 30),
-      onTimeout: () {
-        debugPrint('DISM timed out after 30s');
-        Process.run('taskkill', [
-          '/F',
-          '/T',
-          '/PID',
-          '${process.pid}',
-        ]).ignore();
-        return -1;
-      },
-    );
-    final output = await stdoutFuture;
-    final stderr = await stderrFuture;
-
-    if (_cancelled) return null;
-    if (exitCode != 0) {
-      debugPrint('DISM failed: $stderr');
-      return null;
-    }
-
-    if (output.isEmpty) return null;
-
-    final map = <String, String>{};
-    final versionMatch = RegExp(r'Version\s*:\s*([\d.]+)').firstMatch(output);
-    final buildMatch = RegExp(r'Build\s*:\s*(\d+)').firstMatch(output);
-    final archMatch = RegExp(r'Architecture\s*:\s*(\S+)').firstMatch(output);
-    final langMatch = RegExp(r'Languages?\s*:\s*(.+)').firstMatch(output);
-    final nameMatch = RegExp(r'Name\s*:\s*(.+)').firstMatch(output);
-
-    if (versionMatch != null) map['version'] = versionMatch.group(1)!;
-    if (buildMatch != null) map['build'] = buildMatch.group(1)!;
-    if (archMatch != null) map['architecture'] = archMatch.group(1)!;
-    if (langMatch != null) {
-      map['language'] = langMatch.group(1)!.trim().split('\n').first.trim();
-    }
-    if (nameMatch != null) map['edition'] = nameMatch.group(1)!.trim();
-
-    if (map.containsKey('build')) {
-      final build = int.tryParse(map['build']!) ?? 0;
-      if (build >= 22000) {
-        map['version'] = 'Windows 11 (Build ${map['build']})';
-      } else if (build >= 10240) {
-        map['version'] = 'Windows 10 (Build ${map['build']})';
-      }
-    }
-
-    return map;
-  }
-
   // --- Mount ---
 
   String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
@@ -275,12 +197,18 @@ class IsoParseService {
         "Mount-DiskImage -ImagePath $quotedPath",
       ]).timeout(const Duration(seconds: 15));
 
-      if (_cancelled) return null;
       if (result.exitCode != 0) return null;
+      if (_cancelled) {
+        await _unmount(isoPath);
+        return null;
+      }
 
       // Retry getting drive letter
       for (int i = 0; i < 5; i++) {
-        if (_cancelled) return null;
+        if (_cancelled) {
+          await _unmount(isoPath);
+          return null;
+        }
         await Future.delayed(const Duration(milliseconds: 500));
         final r = await Process.run('powershell', [
           '-NoProfile',
@@ -294,6 +222,7 @@ class IsoParseService {
           if (letter.isNotEmpty) return '$letter:\\';
         }
       }
+      await _unmount(isoPath);
       return null;
     } catch (e) {
       debugPrint('Mount error: $e');

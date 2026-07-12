@@ -1,117 +1,145 @@
 # WinDeploy Studio 交接文档
 
-最后更新：2026-07-08  
-当前版本：1.2.0  
-目标平台：Windows Desktop  
-项目目录：当前工作区根目录
+最后更新：2026-07-12  
+当前版本：2.0.0  
+目标平台：Windows 10/11 x64  
+主工作区：`D:\Dev\WinDeployStudio`
 
-本文档记录当前项目的真实状态、关键入口、已经完成的调整、构建方式和后续维护注意事项。旧交接文档中关于镜像源、AdBlock、工具数量、依赖版本和分析警告的部分已经过期，以本文件为准。
+本文档记录当前代码的真实状态。维护时仍应以源码、数据文件和实际构建结果为准，不要仅凭本文件推断磁盘写入行为。
 
-## 1. 项目概览
-
-WinDeploy Studio 是一个 Flutter Windows 桌面工具，面向 Windows 部署、Windows 安装盘创建、Windows To Go、镜像下载、常用工具集合、日志、更新和 AI 助手场景。
-
-技术栈：
+## 1. 技术栈
 
 | 项目 | 当前状态 |
 | --- | --- |
-| Flutter | 3.44.4 stable |
-| Dart | 3.12.2 |
+| Flutter / Dart | Flutter 3.44.4 stable / Dart 3.12.2 |
 | UI | Material 3 |
 | 状态管理 | Riverpod 3 |
 | 路由 | GoRouter 17 |
-| 数据文件 | `data/mirrors.json`, `data/tools.json` |
-| 本地存储 | `shared_preferences`, `sqflite_common_ffi` |
+| 本地偏好 | `shared_preferences` |
+| HTTP | `http` |
 | WebView | `webview_windows` |
-| 外部浏览器 | `url_launcher` |
-| Markdown | `flutter_markdown_plus`, `markdown` |
+| Markdown | `flutter_markdown_plus` |
+| WIM 元数据 | 原生 `wds_wim_info_helper.exe` + WIMGAPI + `xml` |
+| 磁盘测试 | 原生 `wds_benchmark_helper.exe` |
+| 磁盘诊断 | 原生只读 `wds_disk_diagnostics_helper.exe` + Windows Storage API |
 
-当前目录不是 git 仓库。维护时不能依赖 `git diff`、`git status` 或分支记录判断改动来源。
+主程序 manifest 为 `asInvoker`。只有清盘、分区、写镜像和启动配置等高权限任务会启动独立 UAC 子进程；AI、设置、WebView 和普通 UI 不在管理员进程中运行。
 
-## 2. 版本号位置
+当前工作区不是 Git 仓库。用于发布的 Git 仓库位于 `D:\WinDeployStudio`，同步前必须保留用户在该目录中的独立改动。
 
-| 文件 | 字段 | 当前值 |
-| --- | --- | --- |
-| `pubspec.yaml` | `version` | `1.2.0` |
-| `lib/core/constants/app_constants.dart` | `appVersion` | `1.2.0` |
-| `installer/windows/WinDeployStudio.iss` | 安装包版本字段 | 应与 `1.2.0` 同步 |
-| `scripts/build_installer.ps1` | 输出安装包名 | 应与 `1.2.0` 同步 |
+## 2. 版本位置
 
-同步规则：
+发布版本必须同步检查：
 
-- Flutter 显示版本使用 `major.minor.patch+build`。
-- 应用内显示版本使用 `major.minor.patch`。
-- Inno Setup 版本通常使用 `major.minor.patch.build`。
-- 修改版本时必须同时检查 `pubspec.yaml`、`app_constants.dart`、Inno 脚本和构建脚本输出文案。
+| 文件 | 当前值 |
+| --- | --- |
+| `pubspec.yaml` | `2.0.0` |
+| `lib/core/constants/app_constants.dart` | `2.0.0` |
+| `windows/runner/Runner.rc` | `2.0.0` / `2,0,0,0` |
+| `installer/windows/WinDeployStudio.iss` | `2.0.0` / `2.0.0.0` |
+| `scripts/build_installer.ps1` | `WinDeployStudio_Setup_2.0.0.exe` |
+| `README.md` | 版本徽章 `2.0.0` |
 
-## 3. 入口和目录地图
+## 3. 目录与入口
 
 | 路径 | 作用 |
 | --- | --- |
-| `lib/main.dart` | 应用入口，初始化 Flutter、数据库和应用根组件 |
-| `lib/app/app.dart` | `MaterialApp`、主题、语言选择和 `supportedLocales` |
-| `lib/app/routes.dart` | GoRouter 路由、镜像详情路由和 StarValleyX 访问保护 |
-| `lib/core/localization/strings.dart` | 11 种语言的应用 UI 文案 |
-| `lib/core/constants/app_constants.dart` | 应用名、版本号、尺寸、安全确认文本 |
-| `lib/features/home/` | 首页 |
-| `lib/features/bootable_usb/` | Windows 安装盘制作 |
-| `lib/features/wtg/` | Windows To Go |
+| `lib/main.dart` | 普通主程序和提权任务模式入口 |
+| `lib/app/app.dart` | 应用根组件、主题、首次语言选择 |
+| `lib/app/routes.dart` | 10 个主页面与镜像详情路由 |
+| `lib/app/elevated_task_app.dart` | UAC 子进程任务界面 |
+| `lib/app/visual_style.dart` | 固定 Windows 11 风格的外观设置与原生标题栏同步 |
+| `lib/core/localization/strings.dart`、`deployment_strings.dart` | 11 种界面语言，基础与部署扩展键显式合并 |
+| `lib/core/services/disk_safety_service.dart` | 磁盘枚举、外接盘过滤与清盘前身份核验 |
+| `lib/core/services/bootable_usb_service.dart` | Windows/Linux 安装盘与持久化 LTG |
+| `lib/core/services/wtg_service.dart` | Windows To Go 部署、分区、BCD 与验证 |
+| `lib/core/services/linux_driver_staging_service.dart` | 受支持 LTG 的 Linux 首次启动载荷暂存与校验 |
+| `lib/core/services/elevation_service.dart` | UAC 子进程启动和进度桥接 |
+| `lib/core/services/wim_info_service.dart` | 调用 WIM 原生 helper 并解析 XML |
+| `lib/features/benchmark/` | 原生磁盘测试、评级与折线图 |
+| `lib/features/benchmark_history/` | 测试历史、详情、比较与 CSV/JSON 导出 |
+| `lib/features/creator/` | Windows/Linux 安装盘 UI |
+| `lib/features/deployment/` | 部署计划、兼容性矩阵与离线 Windows 策略 |
+| `lib/features/disk_tools/` | 只读磁盘诊断与外接盘启动修复 |
+| `lib/features/wtg/` | Windows/Linux To Go UI |
 | `lib/features/mirror/` | 镜像中心 |
-| `lib/features/tools/` | 工具箱 |
-| `lib/features/ai_assistant/` | AI 助手 |
+| `lib/features/ai_assistant/` | AI、隐私确认与加密会话 |
 | `lib/features/logs/` | 日志中心 |
-| `lib/features/update/` | 自动更新 |
-| `lib/features/settings/` | 设置 |
-| `lib/shared/webview/` | 内嵌 WebView2 浏览器与下载辅助 |
-| `data/mirrors.json` | 镜像中心数据 |
-| `data/tools.json` | 工具箱数据 |
-| `scripts/ensure_nuget.ps1` | NuGet 自动兜底 |
-| `scripts/build_windows.ps1` | 分析并构建 Windows release，不生成安装包 |
-| `scripts/build_installer.ps1` | 构建安装包 |
+| `lib/features/tools/` | 工具箱和安全提示 |
+| `lib/features/update/` | GitHub 更新检查、下载与安装 |
+| `lib/shared/widgets/deployment_shell/` | 响应式多层部署导航与共享控件 |
+| `lib/shared/webview/` | WebView2 和断点下载 |
+| `windows/benchmark_helper/main.cpp` | 无缓冲、写穿透磁盘测试 helper |
+| `windows/disk_diagnostics_helper/main.cpp` | 只读 NVMe 健康查询 helper |
+| `windows/wim_info_helper/main.cpp` | WIMGAPI 只读元数据 helper |
+| `data/mirrors.json` | 12 个镜像中心资源 |
+| `data/tools.json` | 27 个工具、9 个分类 |
 
-## 4. 当前功能状态
+## 4. 已实现功能
 
-| 模块 | 当前状态 |
+### 安装盘
+
+- Windows 安装盘：解析 ISO、选择版本、分区、复制文件并写启动文件。
+- Windows 安装盘可选择 UEFI + GPT、UEFI + MBR、Legacy BIOS，支持 D: 到 Z: 的目标分区盘符及自定义卷标/ICO 图标。
+- Linux 安装盘：支持可启动 ISOHybrid 原始写入，清盘前验证 ISOHybrid 结构。
+- 目标盘必须是已验证的 USB、SD、MMC 或系统报告为 removable 的外接磁盘。
+- 清盘前重新核验磁盘号、容量、型号和总线类型，并按“可靠序列号、设备路径、UniqueId”的顺序确认物理身份；缺少可靠身份时拒绝清盘。
+- 安装盘、To Go 与磁盘测试使用按物理磁盘号加锁的跨进程互斥，同一块盘不能被多个任务并发操作。
+- Linux 原始写入完成后逐块比较完整 ISO 内容，不只检查文件头。
+
+### To Go
+
+- Windows To Go 使用镜像、磁盘、部署方式、高级选项、配置摘要五步流程；摘要明确显示镜像、目标盘、启动模式、部署方式、驱动目录和已启用策略。
+- 启动布局可选 UEFI + GPT、UEFI + MBR、Legacy BIOS；Windows 可直接部署，也可部署到动态/固定 VHD 或 VHDX。Windows 7 禁止 VHDX，x86 Windows 7 仅允许 Legacy BIOS。
+- 兼容性校验会阻止无效组合：安装盘和 Linux 只允许直接部署；Windows 7 禁止 VHDX，且原生 VHD 仅限 Enterprise/Ultimate；WIMBoot 仅限 Windows 8.1 直接部署；CompactOS 仅限 Windows 10/11；虚拟磁盘不得小于 32 GB。
+- 本地磁盘 SAN policy、启动到 Audit 模式（跳过 OOBE）、禁用 WinRE、禁用 UASP、CompactOS、WIMBoot、VHD/VHDX 启动后盘符修复和 .NET Framework 3.5 均为可配置项，服务侧执行后会验证。UEFI 模式自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区，不提供无实际差异的开关。
+- Windows 可从所选目录离线注入 INF 驱动；可选择系统/启动分区盘符、自定义卷标和 ICO 图标。
+- 启动分区与 Windows 存储必须保持独立；BCD、默认设备、虚拟磁盘绑定和 UEFI fallback 文件均会验证。
+- Linux To Go：只支持 x64 Ubuntu 或兼容的 casper Live ISO。
+- LTG 使用独立 FAT32 启动/持久化分区与 NTFS Live 数据分区。GRUB 会加入 `persistent` 和明确的 `live-media` 参数，现代 Ubuntu 中超过 4 GiB 的 squashfs 层存放在 NTFS，最大约 4 GB 的 ext4 `writable` 持久化镜像存放在 FAT32。
+- 受支持 LTG 可选暂存 `.deb`/`.rpm`/Arch 包、匹配运行内核的 `.ko`/`.ko.xz` 模块或显式 `.sh` 脚本，并通过 manifest、SHA-256、casper hook 和一次性 systemd 服务在首次启动处理；这不会扩大 LTG 发行版范围。
+- 不支持的发行版会在清盘前拒绝；其他 Linux 发行版可使用“安装盘”原始写入模式。
+- To Go UI 只显示可靠的已用时间，并提供不影响部署进程的等待小游戏。
+
+### 原生磁盘测试
+
+- 模式：Quick、Standard、Extreme、Full Write。
+- 测试：顺序读写、4K 随机读写、真实多线程扩展、混合读写场景、延迟分位数、缓存拐点/稳定速度和可选全盘写入。
+- helper 使用 `FILE_FLAG_NO_BUFFERING` 与 `FILE_FLAG_WRITE_THROUGH`。
+- UI 提供全过程折线图、综合分数、实用等级、关键原因和未运行测试说明。
+- 成功结果自动写入本地 JSON 历史；支持详情曲线、日期筛选、两条记录比较、单条/范围/全部删除，以及 CSV/JSON 导出。
+- 临时目录带随机所有权标记，仅删除当前测试创建的文件；成功、取消和失败都会清理。
+
+### 磁盘工具与信息架构
+
+- 主导航现有 10 个页面，新增“磁盘工具”；Windows To Go 使用响应式 `DeploymentShell` 二级导航，宽屏显示侧栏，窄屏显示横向步骤条。
+- 应用在受支持的 Windows 10/11 主机上统一使用 Windows 11 风格；Flutter 主题、原生标题栏和部署导航保持同步，不再提供 Win10/Win7/自动外观选项。
+- 磁盘诊断只读收集 CIM、Storage Reliability Counter 与 NVMe helper 数据；健康、温度、寿命、磨损等未由设备或驱动提供时必须显示“不可用”，不能推测。
+- 启动修复只发现外接、在线、非系统、非启动磁盘上的 Windows；预检绑定物理身份与分区，要求复核摘要并输入 `REPAIR`，提权后再次校验，不执行格式化。
+- 修复会锁定目标物理盘、备份现有 BCD、调用系统 `bcdboot`、补齐 UEFI fallback（如适用），验证 BCD/启动管理器后写技术日志，并移除临时盘符。
+
+## 5. 镜像中心
+
+当前共 12 个条目：
+
+| 分类 | 条目 |
 | --- | --- |
-| Windows 安装盘创建 | 已实现，包含磁盘选择、格式化、ISO 写入等流程 |
-| Windows To Go | 已实现，包含镜像应用、BCD/启动配置和进度展示 |
-| 镜像中心 | 已重构为 Official Microsoft 和 Community Images 两类 |
-| 工具箱 | 27 个工具，9 个分类，支持 Beginner/Advanced/Expert 安全等级 |
-| AI 助手 | 已接入远程 API，并加入顶部免责声明 |
-| 日志中心 | 记录下载、镜像源、官方跳转等操作 |
-| 自动更新 | GitHub release 检查、下载和安装流程已实现 |
-| 设置 | 语言、主题、镜像源策略等基础设置已实现 |
-| AdBlock | 相关代码已删除，当前没有启用广告拦截功能 |
-
-## 5. 镜像中心规则
-
-镜像数据文件：`data/mirrors.json`  
-当前条目数：8
-
-| 类别 | 条目 |
-| --- | --- |
-| Official Microsoft | `official-win10`, `official-win11` |
-| Community Images | `tiny10`, `tiny11`, `xlite10`, `xlite11`, `starvalleyx` |
+| Official Microsoft Images | `official-win10`, `official-win11` |
+| Community Editions | `tiny10`, `tiny11`, `xlite10`, `xlite11`, `starvalleyx` |
+| Enterprise & LTSC Builds | 4 个 Windows 10/11 Enterprise / IoT LTSC 条目 |
 | Tools | `font-pack` |
 
-### Official Microsoft
+规则：
 
-官方条目只跳转 Microsoft 官方网页：
+- Windows 10/11 官方条目只显示确认框，随后用系统浏览器打开 Microsoft 官方网站；不走 WebView 和镜像选择。
+- 社区与 LTSC 条目保留 123 Cloud / GoFile 选择，并在 WebView2 中打开页面。
+- StarValleyX 只在 `zh` 和 `zh_TW` 中显示；列表和 `/mirror/starvalleyx` 直达路由都受保护。
+- CJK 字体包也只在 `zh` 和 `zh_TW` 中显示；非中文列表和 `/mirror/font-pack` 直达路由都受保护。
+- Tiny10、Tiny11、Windows X-Lite 10/11 在中文详情页显示字体包提示。
+- StarValleyX 明确不需要字体包，不能显示字体包提示。
+- 首页字体包快捷卡片已删除，下载入口位于镜像中心。
 
-| 条目 | URL |
-| --- | --- |
-| Windows 10 | `https://www.microsoft.com/en-us/software-download/windows10` |
-| Windows 11 | `https://www.microsoft.com/en-au/software-download/windows11` |
-
-点击下载时：
-
-- 显示确认弹窗：`Official Microsoft Download`。
-- 不显示镜像选择弹窗。
-- 不使用 123 Cloud。
-- 不使用 GoFile。
-- 不在 WebView2 内打开。
-- 确认后使用系统默认浏览器打开 Microsoft 网站。
-- 写入日志：
+日志格式包括：
 
 ```text
 [OfficialDownload]
@@ -120,373 +148,119 @@ Source=Microsoft
 Method=SystemBrowser
 ```
 
-或：
-
-```text
-[OfficialDownload]
-Product=Windows10
-Source=Microsoft
-Method=SystemBrowser
-```
-
-### Community Images
-
-社区镜像保持当前镜像选择流程：
-
-- 弹出镜像选择对话框。
-- China Mirror 对应 123 Cloud。
-- Global Mirror 对应 GoFile。
-- 选择后通过 WebView2 下载页打开。
-- 写入日志：
-
 ```text
 [CommunityDownload]
 Product=Tiny11
 Mirror=123
 ```
 
-或：
+## 6. 下载与更新
 
-```text
-[CommunityDownload]
-Product=Tiny11
-Mirror=GoFile
-```
+- WebView 下载支持基于 `Range` 的暂停/继续，并验证 ETag、Last-Modified、Content-Range 和最终长度。
+- 用户确认的保存路径不会被服务器 `Content-Disposition` 改写。
+- 下载失败、取消和异常路径会关闭流、文件句柄和 HTTP 客户端；失败的更新半成品会删除。
+- 更新通道 Stable / Beta / Nightly 会按 GitHub Release 类型筛选。
+- 更新下载仅允许 GitHub 与 GitHub Release 资源的 HTTPS 主机及受控重定向。
+- 更新下载前重新读取指定标签的 GitHub Release 元数据；资产必须提供 GitHub 发布摘要与准确长度。
+- 下载后重新计算 SHA-256，并同时验证 Authenticode `Status=Valid` 与允许的发布者 CN；任一验证失败都不会执行安装包。
+- 未签名、签名无效、发布者不匹配或哈希不匹配的安装包不会自动执行。
+- 更新按钮文案为“安装更新”；实际行为是关闭应用并启动安装器，不承诺无条件自动重启。
+- 目前只有 GitHub 更新源；Oracle Cloud 更新源仍在未来规划中。
 
-### StarValleyX 语言过滤
+## 7. AI、隐私与日志
 
-StarValleyX 是中文项目，只在中文界面显示。
+- AI 代理地址必须使用 HTTPS。
+- 首次使用先显示 AI 内容免责声明；未确认前不会发送初始提示。
+- 日志、ISO 或 USB 快捷分析会先说明数据将发送到远程服务并请求确认。
+- USB 序列号和完整本地日志路径不会发送给 AI。
+- 聊天会话使用 Windows DPAPI CurrentUser 加密；旧明文 JSON 会自动迁移。
+- AI 超时可能来自本机网络、Worker、TLS 或上游 API，不能只按客户端代码问题处理。
+- 日志按 30 天和每类最多 30 个文件清理。
 
-| 当前语言 | StarValleyX |
-| --- | --- |
-| 简体中文 `zh` | 显示 |
-| 繁体中文 `zh_TW` | 显示 |
-| 英文、日文、韩文、德文、法文、西班牙文、葡萄牙文、俄文、阿拉伯文 | 完全隐藏 |
+## 8. 工具安全提示
 
-隐藏范围包括：
+- 工具共 27 个、9 个分类：Beginner 13、Advanced 11、Expert 3。
+- Dism++、Windhawk 有专属 Advanced 提示。
+- Expert 工具有通用专家提示。
+- 激活相关工具使用统一的 Activation Tool Notice，并支持“不再显示”；HEU 不再叠加旧弹窗。
+- 设置/关于页包含 MIT、项目仓库、免责声明和 Special Thanks。
 
-- 镜像卡片。
-- 分类入口。
-- 搜索结果。
-- 直接访问 `/mirror/starvalleyx` 的路由。
+## 9. 本地化硬约束
 
-相关实现：
+支持代码：`zh`, `zh_TW`, `en`, `fr`, `de`, `es`, `pt`, `ru`, `ar`, `ko`, `ja`。
 
-- `lib/features/mirror/models/mirror_models.dart`
-- `lib/features/mirror/screens/mirror_screen.dart`
-- `lib/features/mirror/screens/mirror_detail_screen.dart`
-- `lib/app/routes.dart`
+- 基础表与部署扩展表的完整键集合由本地化契约测试动态校验；通用 UI 修改必须同步全部 11 种语言，部署、测试历史和磁盘工具文本主要位于 `deployment_strings.dart`。
+- 字体包是否可见由资源和路由的中文语言门控决定，不由翻译键是否存在决定；只允许 `zh`、`zh_TW` 显示和进入字体包条目。
+- 支持语言缺少键时返回该语言自己的 `translation_missing`，不能回退成英文或中文。
+- `data/tools.json` 和 `data/mirrors.json` 对支持语言缺失字段时返回空值，不回退其他语言。
+- 专有名词如 Windows、ISO、USB、Microsoft、WebView2、GoFile、PowerShell、DISM 可保留原文。
+- 不允许普通 UI 出现原始 key、连续问号、Unicode replacement character 或其他语言的硬编码提示。
+- 日志可使用稳定的英文结构化字段，避免本地化文本破坏机器检索。
 
-## 6. 工具箱安全提示
+## 10. 构建
 
-数据文件：`data/tools.json`  
-当前工具数：27  
-当前分类数：9
+PowerShell 7 推荐，但运行时仍调用系统 `powershell`，因为 Windows PowerShell 是受支持 Windows 的系统组件。所有脚本均显式传递参数和 UTF-8 数据，不依赖控制台代码页解析结构化结果。
 
-分类：
+NuGet 兜底：
 
-| 分类 key | 工具数 |
-| --- | ---: |
-| `tools_cat_deploy` | 4 |
-| `tools_cat_disk` | 4 |
-| `tools_cat_hardware` | 4 |
-| `tools_cat_network` | 3 |
-| `tools_cat_optimize` | 3 |
-| `tools_cat_rescue` | 3 |
-| `tools_cat_file` | 3 |
-| `tools_cat_advanced` | 1 |
-| `tools_cat_activation` | 2 |
+- `scripts/ensure_nuget.ps1` 优先使用 PATH 中的 `nuget.exe`。
+- 缺失时从 NuGet 官方地址下载并校验 Authenticode 签名。
+- 本地副本保存在 `.tools/nuget/nuget.exe`，CMake 会显式使用该路径。
 
-安全等级：
-
-| 等级 | 数量 | 工具 |
-| --- | ---: | --- |
-| Beginner | 13 | CrystalDiskInfo, CrystalDiskMark, WizTree, CPU-Z, GPU-Z, HWiNFO, AIDA64, WinSCP, PuTTY, MemTest86, 7-Zip, Everything, TeraCopy |
-| Advanced | 10 | Rufus, Ventoy, Dism++, Wireshark, Windhawk, ExplorerPatcher, StartAllBack, Hiren's BootCD PE, Sysinternals Suite, Office Tool Plus |
-| Expert | 4 | WinNTSetup, Victoria, GParted Live, HEU KMS Activator |
-
-UI 行为：
-
-- 工具卡片和详情页显示安全等级 badge。
-- Dism++ 打开前显示专属 Advanced 提示。
-- Windhawk 打开前显示专属 Advanced 提示。
-- Expert 工具打开前显示通用 Expert 提示。
-- 提示只做风险说明，不阻止用户继续使用。
-
-新增工具：
-
-| 字段 | 内容 |
-| --- | --- |
-| Name | Sysinternals Suite |
-| Developer | Microsoft |
-| Category | Advanced Tools |
-| Official Website | `https://learn.microsoft.com/sysinternals/` |
-| Download | `https://learn.microsoft.com/sysinternals/downloads/` |
-| Safety Level | Advanced |
-
-相关实现：
-
-- `lib/features/tools/models/tool_models.dart`
-- `lib/features/tools/screens/tools_screen.dart`
-- `data/tools.json`
-- `lib/core/localization/strings.dart`
-
-## 7. AI 助手
-
-AI 助手页面顶部有免责声明：
-
-- 标题：`AI Assistant Notice`
-- 说明 AI 生成内容可能不准确或不完整。
-- 提醒用户在应用到系统前自行检查重要操作。
-- 按钮：`Got it`、`Do not show again`。
-- 本地偏好 key：`ai_assistant_notice_hidden`。
-
-当前 AI API 相关文件：
-
-- `lib/core/config/ai_config.dart`
-- `lib/features/ai_assistant/screens/ai_assistant_screen.dart`
-- `lib/features/ai_assistant/services/ai_service.dart`
-
-注意事项：
-
-- AI 错误信息必须走本地化字符串，不能拼接未编码或未翻译的中文。
-- 如果再次出现连续问号占位符，优先检查响应解码、异常字符串和 PowerShell 输出编码。
-- 远程 API 域名或 Worker 出现超时，不等同于本地代码一定错误，需要分别排查网络、域名、TLS 和服务端状态。
-
-## 8. 多语言和编码硬约束
-
-项目支持且只支持 11 种应用语言：
-
-| 代码 | 语言 |
-| --- | --- |
-| `zh` | 简体中文 |
-| `zh_TW` | 繁体中文 |
-| `en` | English |
-| `fr` | Français |
-| `de` | Deutsch |
-| `es` | Español |
-| `pt` | Português |
-| `ru` | Русский |
-| `ar` | العربية |
-| `ko` | 한국어 |
-| `ja` | 日本語 |
-
-当前 `lib/core/localization/strings.dart` 中 11 个语言表均为 588 个 key，覆盖一致。
-
-维护原则：
-
-- 不允许 UI 显示导航、工具分类或镜像文案的原始 key。
-- 不允许出现连续问号占位符或 Unicode replacement character。
-- 不允许一个语言页面混入另一种语言的普通 UI 文案。
-- 专有名词可保留原文，例如 Windows、ISO、USB、Microsoft、WebView2、GoFile、123 Cloud、PowerShell、DISM、NuGet。
-- 新增字符串时必须同步补齐 11 个语言表。
-- 不要依赖英文 fallback 掩盖缺失翻译；缺 key 应视为问题。
-- 翻译要自然，避免逐词机翻，尤其是按钮、警告、错误提示和系统操作文案。
-
-建议每次修改翻译后运行：
-
-```powershell
-$env:PYTHONIOENCODING='utf-8'; @'
-import pathlib,re
-s=pathlib.Path('lib/core/localization/strings.dart').read_text(encoding='utf-8')
-langs=['en','zh','zhTW','fr','de','es','pt','ru','ar','ko','ja']
-sets={}
-for lang in langs:
-    m=re.search(r"const _%s = <String, String>\{([\s\S]*?)\n\};"%lang,s)
-    keys=re.findall(r"\n\s*'([^']+)'\s*:",m.group(1))
-    sets[lang]=set(keys)
-print({k:len(v) for k,v in sets.items()})
-print('coverage_equal', all(v==sets['en'] for v in sets.values()))
-bad_question_marker='?' * 4
-replacement_marker=chr(0xfffd)
-for path in ['lib/core/localization/strings.dart','data/tools.json','data/mirrors.json']:
-    text=pathlib.Path(path).read_text(encoding='utf-8')
-    print(path, text.count(bad_question_marker), text.count(replacement_marker))
-'@ | python -
-```
-
-## 9. PowerShell 和乱码防护
-
-建议使用 PowerShell 7，并将终端编码保持为 UTF-8。用户 profile 通常位于：
-
-```text
-%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1
-```
-
-维护编码规则：
-
-- Dart、JSON、Markdown、PowerShell 脚本默认使用 UTF-8。
-- 不要用 Windows PowerShell 5.1 的默认重定向写入中文文件。
-- 不要用 `Set-Content`、`Out-File`、`>` 写入非 ASCII 文本，除非明确指定 UTF-8。
-- 大段文件编辑优先使用 `apply_patch`。
-- 用 Python 读取验证编码可以，但不要用 Python 随手重写源文件。
-- 终端输出乱码不一定代表文件已损坏，必须用 UTF-8 读取文件验证。
-
-快速检查乱码：
-
-```powershell
-$env:PYTHONIOENCODING='utf-8'; @'
-import pathlib
-for path in ['HANDOVER.md','lib/core/localization/strings.dart','data/tools.json','data/mirrors.json']:
-    text=pathlib.Path(path).read_text(encoding='utf-8')
-    bad_question_marker='?' * 4
-    replacement_marker=chr(0xfffd)
-    print(path, 'question_marker=', text.count(bad_question_marker), 'replacement_marker=', text.count(replacement_marker))
-'@ | python -
-```
-
-## 10. NuGet 构建兜底
-
-Flutter Windows native asset 构建依赖 `nuget.exe`。当前项目已加入本地兜底脚本：
-
-- `scripts/ensure_nuget.ps1`
-- `scripts/build_windows.ps1`
-- `scripts/build_installer.ps1`
-
-行为：
-
-- 如果 PATH 中已有 `nuget.exe`，直接使用。
-- 如果没有，则下载官方 `https://dist.nuget.org/win-x86-commandline/latest/nuget.exe`。
-- 下载后校验 Authenticode 签名。
-- 保存到 `.tools\nuget\nuget.exe`。
-- 当前进程 PATH 自动加入 `.tools\nuget`。
-- 可通过 `-AddToUserPath` 写入用户 PATH 并广播环境变量变化。
-
-普通构建推荐使用：
+Release 构建（不生成安装包）：
 
 ```powershell
 .\scripts\build_windows.ps1
 ```
 
-只补 NuGet：
-
-```powershell
-.\scripts\ensure_nuget.ps1 -AddToUserPath
-```
-
-## 11. 构建和验证
-
-获取依赖：
-
-```powershell
-flutter pub get
-```
-
-静态分析：
-
-```powershell
-flutter analyze --no-fatal-infos
-```
-
-构建 Windows release，不生成安装包：
-
-```powershell
-flutter build windows --release
-```
-
-推荐一键流程：
-
-```powershell
-.\scripts\build_windows.ps1
-```
-
-当前 release exe：
-
-```text
-build\windows\x64\runner\Release\win_deploy_studio.exe
-```
-
-最近验证状态：
-
-| 命令 | 状态 |
-| --- | --- |
-| `flutter analyze --no-fatal-infos` | No issues found |
-| `flutter build windows --release` | 成功 |
-
-已知构建提示：
-
-- `webview_windows` 可能产生 CMake developer warning，内容与 `add_custom_command(TARGET): DEPENDS` 有关。
-- 该提示来自依赖插件 CMake 配置，当前不影响 release 构建。
-
-## 12. 安装包
-
-构建安装包：
+安装包构建：
 
 ```powershell
 .\scripts\build_installer.ps1
 ```
 
-输出目录：
+Release 目录必须至少包含：
 
-```text
-dist\windows
-```
+- `win_deploy_studio.exe`
+- `wds_benchmark_helper.exe`
+- `wds_disk_diagnostics_helper.exe`
+- `wds_wim_info_helper.exe`
+- `tools\e2fsprogs\mke2fs.exe`
+- `tools\e2fsprogs\README.md`
+- Flutter DLL、插件 DLL 与 `data\flutter_assets`
 
-注意：
+## 11. 已知边界
 
-- 用户上次明确要求“构建但不构建安装包”，除非再次要求，不要自动生成安装包。
-- Inno Setup 脚本内版本和输出文件名必须与应用版本同步。
-- 安装包文本文件涉及多语言和编码，修改前必须确认 Inno Setup 对对应语言文件的编码要求。
-
-## 13. 重要风险和后续待办
-
-| 风险 | 等级 | 说明 |
-| --- | --- | --- |
-| 磁盘操作误选盘 | 高 | Windows 安装盘和随身系统都涉及清盘、分区、格式化和启动配置，任何磁盘筛选或盘符绑定改动都必须谨慎验证 |
-| 随身系统分区和盘符 | 高 | 需要确保 DISM 应用目标始终绑定到正确磁盘和正确 Windows 分区，不能依赖“第一个有盘符的分区”这类脆弱规则 |
-| 下载校验 | 中 | 多数镜像 `sha256` 仍为空，下载后的完整性校验闭环仍不完整 |
-| 更新器安全 | 中 | 更新包下载流程应持续关注签名、哈希和来源校验 |
-| WebView 下载 | 中 | WebView 下载页依赖第三方站点行为，GoFile、123 Cloud、Cloudflare 或区域网络变化可能影响体验 |
-| AI 远程服务 | 中 | Worker 或上游 API 超时会导致 AI 不可用，需要服务端和客户端分别排查 |
-| 多语言回退 | 中 | 新增 UI 字符串必须同步 11 种语言，否则可能出现 key 直出或混语言 |
-| 依赖升级 | 低 | Flutter 和依赖已更新到当前可用范围，后续升级仍需跑分析和 Windows 构建 |
-
-## 14. 修改前检查清单
-
-改 UI 文案：
-
-- 检查 `strings.dart` 是否 11 语言全补齐。
-- 检查是否有 key 直出。
-- 检查是否引入连续问号占位符或 Unicode replacement character。
-
-改镜像中心：
-
-- Official Microsoft 不得走镜像选择和 WebView2。
-- Community Images 必须保留 123 Cloud / GoFile 选择。
-- StarValleyX 非中文必须隐藏，包括搜索和直达路由。
-- `font-pack` 属于 Tools，不属于 Official Microsoft 或 Community Images。
-
-改工具箱：
-
-- 新工具必须设置 `safetyLevel`。
-- Advanced 和 Expert 文案必须专业、克制，不把工具标记成“不安全”。
-- Dism++、Windhawk、Expert 工具打开前必须继续显示提示。
-
-改构建脚本：
-
-- 不要破坏 `ensure_nuget.ps1`。
-- 不要硬编码过期版本号。
-- 构建脚本应能在没有全局 NuGet 的环境下工作。
-
-改磁盘/部署流程：
-
-- 必须优先保护系统盘、启动盘和内置数据盘。
-- 盘符必须绑定到明确磁盘/分区，不能依赖全局最后一个盘符。
-- 清盘、格式化、DISM、BCD 操作前必须有明确确认和日志。
-
-## 15. 快速事实
-
-| 项目 | 当前值 |
+| 项目 | 说明 |
 | --- | --- |
-| 应用名 | WinDeploy Studio |
-| 版本 | 1.2.0 |
-| Flutter | 3.44.4 stable |
-| Dart | 3.12.2 |
-| 支持语言 | 11 |
-| 本地化 key 数 | 588/语言 |
-| 镜像条目 | 8 |
-| 工具条目 | 27 |
-| 工具分类 | 9 |
-| AdBlock | 已删除，未启用 |
-| 默认构建脚本 | `scripts/build_windows.ps1` |
-| release exe | `build\windows\x64\runner\Release\win_deploy_studio.exe` |
+| 更新签名 | 安全策略要求有效 Authenticode；发布流程必须给安装包签名，否则应用内安装会被拒绝 |
+| Linux 安装盘范围 | 支持可启动 ISOHybrid 镜像的原始写入，不宣称任意 Linux ISO 都可直接启动 |
+| LTG 范围 | 只支持 x64 Ubuntu / casper 持久化布局，不宣称支持所有 Linux 发行版 |
+| LTG 首启载荷 | 只在上述受支持 LTG 中暂存受控 Linux 包、匹配内核模块或显式脚本，不等同于跨发行版驱动注入 |
+| Windows 部署兼容性 | WIMBoot 仅限 Windows 8.1 直接部署；CompactOS 仅限 Windows 10/11；Windows 7 不支持 VHDX，原生 VHD 仅限 Enterprise/Ultimate，x86 Windows 7 仅支持 Legacy BIOS |
+| NTFS UEFI | UEFI 模式自动使用 NTFS Windows 存储配合独立 FAT32 EFI 分区，不提供假开关，也不宣称固件可直接从任意 NTFS 卷启动 |
+| 启动修复 | 只修改通过身份与分区复核的外接非系统磁盘，不格式化，但仍会改写 BCD 和启动文件，必须保留双重确认与备份 |
+| 全盘测试 | 会覆盖目标卷可用空间并产生高写入量，必须保持明确警告和主动选择 |
+| WebView 下载 | 第三方站点、Cloudflare 或区域网络变化仍可能影响页面和下载体验 |
+
+## 12. 未来规划
+
+原计划④-⑨中已经完成的策略、启动/部署模式、摘要流程、统一界面和分层导航已移入“已实现功能”。这里只保留真实未完成项：
+
+- 将持久化 Linux To Go 扩展到 x64 Ubuntu / casper 兼容 Live 镜像之外；任意发行版 Linux To Go 尚未实现，不能在文档或安装器中作此承诺。
+- 将离线 Windows 可选功能扩展到当前已实现的 .NET Framework 3.5 之外。原计划④中的“其他功能”仍属未来工作。
+- 原计划⑩：加入更新源选择，甲骨文云为推荐高速源，GitHub Releases 为备用源；当前只有 GitHub 更新源。
+
+## 13. 修改检查清单
+
+- 磁盘：不得放宽外接盘过滤；清盘前必须复核物理身份。
+- Windows To Go：EFI 与 Windows 分区必须独立；不能用“第一个盘符”或固定 `S:` / `W:`。
+- 部署计划：兼容性错误必须在清盘前阻止；新增选项必须同时接入摘要、UAC 任务序列化、服务执行和执行后验证。
+- Linux：安装盘先验 ISOHybrid；LTG 在清盘前检查 x64 casper 结构、可修改的 GRUB 启动项、内置 `mke2fs.exe`、FAT32 启动文件上限和目标磁盘空间。
+- 磁盘工具：诊断保持只读；启动修复不得放宽外接非系统盘限制、双重确认、BCD 备份和执行后验证。
+- 镜像：Official Microsoft 不进 WebView；StarValleyX 与字体包保持中文专属。
+- 字体包：仅 Tiny / X-Lite 提示，StarValleyX 永不提示，首页不恢复快捷卡片。
+- 本地化：通用 UI 同步 11 语；中文专属功能只在简繁中文保留键和数据。
+- 安装器：11 种欢迎文案都应覆盖 Windows/Linux 安装盘、Windows To Go、受支持的 Ubuntu/casper Linux To Go 和原生磁盘测试，且不得暗示支持任意 LTG 发行版。
+- 更新：不能绕过 HTTPS 主机限制、哈希、Authenticode 或发布者检查。
+- 构建：静态分析后构建 Release，并确认三个 helper 与 `mke2fs.exe` 均在产物中。

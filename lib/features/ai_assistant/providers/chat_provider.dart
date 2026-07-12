@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,8 +6,10 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
+import '../../../core/services/user_data_protection_service.dart';
 import '../models/chat_models.dart';
 import '../services/ai_service.dart';
+import '../../logs/services/log_center_service.dart';
 
 class ChatState {
   final List<ChatSession> sessions;
@@ -49,7 +52,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   String _streamBuffer = '';
 
   ChatNotifier(this._aiService) : super(ChatState()) {
-    _loadSessions();
+    unawaited(_loadSessions());
   }
 
   String get _storageDir {
@@ -64,37 +67,116 @@ class ChatNotifier extends StateNotifier<ChatState> {
         return;
       }
 
-      final files = dir.listSync().whereType<File>().where(
-        (f) => f.path.endsWith('.json'),
-      );
-      final sessions = <ChatSession>[];
+      final files =
+          dir
+              .listSync()
+              .whereType<File>()
+              .where(
+                (file) =>
+                    file.path.endsWith('.chat') || file.path.endsWith('.json'),
+              )
+              .toList()
+            ..sort((left, right) {
+              final leftPriority = left.path.endsWith('.chat') ? 0 : 1;
+              final rightPriority = right.path.endsWith('.chat') ? 0 : 1;
+              return leftPriority.compareTo(rightPriority);
+            });
+      final sessionsById = <String, ChatSession>{};
       for (final file in files) {
         try {
-          final content = await file.readAsString();
+          final stored = await file.readAsString();
+          final content = file.path.endsWith('.chat')
+              ? await UserDataProtectionService.unprotect(stored)
+              : stored;
           final json = jsonDecode(content) as Map<String, dynamic>;
-          sessions.add(ChatSession.fromJson(json));
-        } catch (_) {}
+          final session = ChatSession.fromJson(json);
+          if (file.path.endsWith('.json')) {
+            final encryptedCopy = sessionsById[session.id];
+            final plaintextIsNewer =
+                encryptedCopy == null ||
+                session.updatedAt.isAfter(encryptedCopy.updatedAt);
+            if (plaintextIsNewer && !await _saveSession(session)) {
+              sessionsById[session.id] = session;
+              continue;
+            }
+            if (encryptedCopy != null && !plaintextIsNewer) {
+              sessionsById[session.id] = encryptedCopy;
+            } else {
+              sessionsById[session.id] = session;
+            }
+            if (encryptedCopy != null || plaintextIsNewer) {
+              await _deleteHistoryFile(file, action: 'Migration cleanup');
+            }
+          }
+          if (file.path.endsWith('.chat')) {
+            sessionsById[session.id] = session;
+          }
+        } catch (error) {
+          await _logHistoryError('Load', file, error);
+        }
       }
 
+      for (final session in state.sessions) {
+        sessionsById[session.id] = session;
+      }
+      final sessions = sessionsById.values.toList();
       sessions.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      state = state.copyWith(sessions: sessions.take(50).toList());
-    } catch (_) {}
+      final retained = sessions.take(50).toList();
+      final retainedIds = retained.map((session) => session.id).toSet();
+      for (final file in dir.listSync().whereType<File>()) {
+        final id = p.basenameWithoutExtension(file.path);
+        if ((file.path.endsWith('.chat') || file.path.endsWith('.json')) &&
+            !retainedIds.contains(id)) {
+          await _deleteHistoryFile(file, action: 'Retention cleanup');
+        }
+      }
+      state = state.copyWith(sessions: retained);
+    } catch (error) {
+      await LogCenterService().logError(
+        '[ChatHistory] Load directory failed: $error',
+      );
+    }
   }
 
-  Future<void> _saveSession(ChatSession session) async {
+  Future<bool> _saveSession(ChatSession session) async {
     try {
       final dir = Directory(_storageDir);
       if (!dir.existsSync()) dir.createSync(recursive: true);
-      final file = File(p.join(_storageDir, '${session.id}.json'));
-      await file.writeAsString(jsonEncode(session.toJson()));
-    } catch (_) {}
+      final file = File(p.join(_storageDir, '${session.id}.chat'));
+      final protected = await UserDataProtectionService.protect(
+        jsonEncode(session.toJson()),
+      );
+      await file.writeAsString(protected, flush: true);
+      return true;
+    } catch (error) {
+      await LogCenterService().logError(
+        '[ChatHistory] Save failed for ${session.id}: $error',
+      );
+      return false;
+    }
   }
 
   Future<void> _deleteSessionFile(String sessionId) async {
+    for (final extension in ['chat', 'json']) {
+      final file = File(p.join(_storageDir, '$sessionId.$extension'));
+      if (file.existsSync()) {
+        await _deleteHistoryFile(file, action: 'Delete');
+      }
+    }
+  }
+
+  Future<void> _deleteHistoryFile(File file, {required String action}) async {
     try {
-      final file = File(p.join(_storageDir, '$sessionId.json'));
-      if (file.existsSync()) await file.delete();
-    } catch (_) {}
+      if (await file.exists()) await file.delete();
+    } catch (error) {
+      await _logHistoryError(action, file, error);
+    }
+  }
+
+  Future<void> _logHistoryError(String action, File file, Object error) {
+    return LogCenterService().logError(
+      '[ChatHistory] $action failed for ${p.basename(file.path)}: $error',
+    );
   }
 
   void createNewSession() {
@@ -104,7 +186,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       sessions: sessions.take(50).toList(),
       activeSessionId: session.id,
     );
-    _saveSession(session);
+    unawaited(_saveSession(session));
   }
 
   void selectSession(String sessionId) {
@@ -117,7 +199,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         ? (sessions.isNotEmpty ? sessions.first.id : null)
         : state.activeSessionId;
     state = state.copyWith(sessions: sessions, activeSessionId: newActiveId);
-    _deleteSessionFile(sessionId);
+    unawaited(_deleteSessionFile(sessionId));
   }
 
   void setSearchMode(SearchMode mode) {
@@ -249,7 +331,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void _saveCurrentSession() {
     final session = state.activeSession;
-    if (session != null) _saveSession(session);
+    if (session != null) unawaited(_saveSession(session));
   }
 
   void clearActiveSession() {
@@ -257,7 +339,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     if (session == null) return;
     final cleared = session.copyWith(messages: [], updatedAt: DateTime.now());
     _updateSession(cleared);
-    _saveSession(cleared);
+    unawaited(_saveSession(cleared));
   }
 }
 

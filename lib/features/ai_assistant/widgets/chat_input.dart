@@ -78,24 +78,38 @@ class _ChatInputState extends State<ChatInput> {
                       ),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHigh,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       suffixIcon: Padding(
                         padding: const EdgeInsets.only(right: 8, bottom: 4),
                         child: Text(
                           'Ctrl+Enter',
-                          style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
-                      suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                      suffixIconConstraints: const BoxConstraints(
+                        minWidth: 0,
+                        minHeight: 0,
+                      ),
                     ),
-                    style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colorScheme.onSurface,
+                    ),
                     onSubmitted: (_) => _handleSend(),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Material(
-                color: widget.enabled ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+                color: widget.enabled
+                    ? colorScheme.primary
+                    : colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16),
                 child: InkWell(
                   onTap: widget.enabled ? _handleSend : null,
@@ -106,7 +120,9 @@ class _ChatInputState extends State<ChatInput> {
                     child: Icon(
                       Icons.send_rounded,
                       size: 20,
-                      color: widget.enabled ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                      color: widget.enabled
+                          ? colorScheme.onPrimary
+                          : colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),

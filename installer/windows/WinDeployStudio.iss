@@ -1,10 +1,10 @@
 ﻿#define MyAppName "WinDeploy Studio"
-#define MyAppVersion "1.2.0"
-#define MyAppFileVersion "1.2.0.0"
+#define MyAppVersion "2.0.0"
+#define MyAppFileVersion "2.0.0.0"
 #define MyAppPublisher "Bob Steve"
 #define MyAppPublisherZH "Bob Steve"
 #define MyAppExeName "win_deploy_studio.exe"
-#define MyAppDescription "Windows Deployment Tool"
+#define MyAppDescription "Windows and Linux Deployment Toolkit"
 #define MyAppContact "https://github.com/intelfans"
 #define MyAppURL "https://github.com/intelfans"
 #define MyAppGitHub "https://github.com/intelfans/WinDeployStudio"
@@ -21,7 +21,7 @@ AppCopyright=© 2026 {#MyAppPublisher}. Released under the MIT License.
 DefaultDirName={autopf}\WinDeploy Studio
 DefaultGroupName=WinDeploy Studio
 OutputDir=..\..\dist\windows
-OutputBaseFilename=WinDeployStudio_Setup_1.2.0
+OutputBaseFilename=WinDeployStudio_Setup_2.0.0
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -190,12 +190,12 @@ japanese.LaunchProgram=%1 を起動
 [Messages]
 ; ── English messages ──
 english.WelcomeLabel1=Welcome to the WinDeploy Studio Setup Wizard
-english.WelcomeLabel2=This will install WinDeploy Studio %1 on your computer.%n%nWinDeploy Studio is a modern Windows deployment tool for creating Windows installation media and Windows To Go workspaces.%n%nIt is recommended that you close all other applications before continuing.
+english.WelcomeLabel2=This will install WinDeploy Studio %1 on your computer.%n%nWinDeploy Studio creates Windows installation media, writes bootable Linux ISOHybrid images, builds portable Windows To Go workspaces, and creates persistent Linux To Go workspaces from supported x64 Ubuntu/casper Live images. It also includes native drive testing.%n%nIt is recommended that you close all other applications before continuing.
 english.FinishedLabel=Setup has successfully installed WinDeploy Studio on your computer. The application may be launched by selecting the installed icons.
 
 ; ── 简体中文消息 ──
 chinesesimplified.WelcomeLabel1=欢迎使用 WinDeploy Studio 安装向导
-chinesesimplified.WelcomeLabel2=安装程序将在您的计算机上安装 WinDeploy Studio %1。%n%nWinDeploy Studio 是一款现代化的 Windows 部署工具，用于创建 Windows 安装盘和 Windows To Go 工作空间。%n%n建议您在继续之前关闭所有其他应用程序。
+chinesesimplified.WelcomeLabel2=安装程序将在您的计算机上安装 WinDeploy Studio %1。%n%nWinDeploy Studio 支持创建 Windows 安装盘、写入可启动的 Linux ISOHybrid 镜像、创建 Windows To Go，以及使用受支持的 x64 Ubuntu / casper Live 镜像创建持久化 Linux To Go，并提供原生磁盘测试。%n%n建议您在继续之前关闭所有其他应用程序。
 chinesesimplified.FinishedLabel=安装程序已成功将 WinDeploy Studio 安装到您的计算机上。您可以通过选择已安装的图标来启动应用程序。
 chinesesimplified.SetupAppTitle=WinDeploy Studio 安装程序
 chinesesimplified.SetupWindowTitle=WinDeploy Studio 安装程序
@@ -283,47 +283,47 @@ chinesesimplified.PrivilegesRequiredOverrideTitle=选择安装范围
 
 ; ── Русские сообщения ──
 russian.WelcomeLabel1=Добро пожаловать в мастер установки WinDeploy Studio
-russian.WelcomeLabel2=Эта программа установит WinDeploy Studio %1 на ваш компьютер.%n%nWinDeploy Studio — современный инструмент развёртывания Windows для создания установочных носителей Windows и рабочих пространств Windows To Go.%n%nРекомендуется закрыть все остальные приложения перед продолжением.
+russian.WelcomeLabel2=Эта программа установит WinDeploy Studio %1 на ваш компьютер.%n%nWinDeploy Studio создаёт установочные носители Windows, записывает загрузочные Linux ISOHybrid-образы, создаёт переносные среды Windows To Go и постоянные среды Linux To Go из поддерживаемых x64 Live-образов Ubuntu/casper. Также доступно нативное тестирование накопителей.%n%nРекомендуется закрыть все остальные приложения перед продолжением.
 russian.FinishedLabel=Установка WinDeploy Studio на ваш компьютер успешно завершена. Приложение можно запустить, выбрав установленные значки.
 
 ; ── Messages français ──
 french.WelcomeLabel1=Bienvenue dans l'assistant d'installation de WinDeploy Studio
-french.WelcomeLabel2=Cette procédure va installer WinDeploy Studio %1 sur votre ordinateur.%n%nWinDeploy Studio est un outil moderne de déploiement Windows pour créer des supports d'installation Windows et des espaces de travail Windows To Go.%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
+french.WelcomeLabel2=Cette procédure va installer WinDeploy Studio %1 sur votre ordinateur.%n%nWinDeploy Studio crée des supports d’installation Windows, écrit des images Linux ISOHybrid amorçables, crée des environnements Windows To Go portables et des environnements Linux To Go persistants à partir d’images Live x64 Ubuntu/casper compatibles. Il propose aussi un test natif des disques.%n%nIl est recommandé de fermer toutes les autres applications avant de continuer.
 french.FinishedLabel=L'installation de WinDeploy Studio sur votre ordinateur est terminée avec succès. L'application peut être lancée en sélectionnant les icônes installées.
 
 ; ── Mensagens em português ──
 portuguese.WelcomeLabel1=Bem-vindo ao assistente de instalação do WinDeploy Studio
-portuguese.WelcomeLabel2=Este procedimento instalará o WinDeploy Studio %1 no seu computador.%n%nO WinDeploy Studio é uma ferramenta moderna de implantação do Windows para criar mídia de instalação do Windows e espaços de trabalho Windows To Go.%n%nRecomenda-se fechar todos os outros aplicativos antes de continuar.
+portuguese.WelcomeLabel2=Este procedimento instalará o WinDeploy Studio %1 no seu computador.%n%nO WinDeploy Studio cria mídias de instalação do Windows, grava imagens Linux ISOHybrid inicializáveis, cria ambientes Windows To Go portáteis e ambientes Linux To Go persistentes com imagens Live x64 Ubuntu/casper compatíveis. Também oferece teste nativo de unidades.%n%nRecomenda-se fechar todos os outros aplicativos antes de continuar.
 portuguese.FinishedLabel=A instalação do WinDeploy Studio no seu computador foi concluída com sucesso. O aplicativo pode ser iniciado selecionando os ícones instalados.
 
 ; ── 日本語メッセージ ──
 japanese.WelcomeLabel1=WinDeploy Studio セットアップウィザードへようこそ
-japanese.WelcomeLabel2=このプログラムは WinDeploy Studio %1 をお使いのコンピューターにインストールします。%n%nWinDeploy Studio は、Windows インストールメディアと Windows To Go ワークスペースを作成するための最新の Windows デプロイメントツールです。%n%n続行する前に、他のすべてのアプリケーションを閉じることをお勧めします。
+japanese.WelcomeLabel2=このプログラムは WinDeploy Studio %1 をお使いのコンピューターにインストールします。%n%nWinDeploy Studio は Windows インストールメディアの作成、起動可能な Linux ISOHybrid の書き込み、ポータブルな Windows To Go、対応する x64 Ubuntu/casper Live イメージを使った永続化 Linux To Go の作成に対応し、ネイティブなドライブテストも提供します。%n%n続行する前に、他のすべてのアプリケーションを閉じることをお勧めします。
 japanese.FinishedLabel=WinDeploy Studio お使いのコンピューターへのインストールが正常に完了しました。インストールされたアイコンを選択してアプリケーションを起動できます。
 
 ; ── 繁體中文訊息 ──
 chinesetraditional.WelcomeLabel1=歡迎使用 WinDeploy Studio 安裝精靈
-chinesetraditional.WelcomeLabel2=安裝程式將在您的電腦上安裝 WinDeploy Studio %1。%n%nWinDeploy Studio 是一款現代化的 Windows 部署工具，用於建立 Windows 安裝盤和 Windows To Go 工作空間。%n%n建議您在繼續之前關閉所有其他應用程式。
+chinesetraditional.WelcomeLabel2=安裝程式將在您的電腦上安裝 WinDeploy Studio %1。%n%nWinDeploy Studio 支援建立 Windows 安裝盤、寫入可啟動的 Linux ISOHybrid 映像、建立 Windows To Go，以及使用支援的 x64 Ubuntu / casper Live 映像建立持久化 Linux To Go，並提供原生磁碟測試。%n%n建議您在繼續之前關閉所有其他應用程式。
 chinesetraditional.FinishedLabel=安裝程式已成功將 WinDeploy Studio 安裝到您的電腦上。您可以透過選擇已安裝的圖示來啟動應用程式。
 
 ; ── Mensajes en español ──
 spanish.WelcomeLabel1=Bienvenido al asistente de instalación de WinDeploy Studio
-spanish.WelcomeLabel2=Este procedimiento instalará WinDeploy Studio %1 en su equipo.%n%nWinDeploy Studio es una herramienta moderna de despliegue de Windows para crear medios de instalación de Windows y espacios de trabajo Windows To Go.%n%nSe recomienda cerrar todas las demás aplicaciones antes de continuar.
+spanish.WelcomeLabel2=Este procedimiento instalará WinDeploy Studio %1 en su equipo.%n%nWinDeploy Studio crea medios de instalación de Windows, escribe imágenes Linux ISOHybrid arrancables, crea entornos Windows To Go portátiles y entornos Linux To Go persistentes desde imágenes Live x64 de Ubuntu/casper compatibles. También incluye pruebas nativas de unidades.%n%nSe recomienda cerrar todas las demás aplicaciones antes de continuar.
 spanish.FinishedLabel=La instalación de WinDeploy Studio en su equipo se ha completado correctamente. Puede iniciar la aplicación seleccionando los iconos instalados.
 
 ; ── رسائل عربية ──
 arabic.WelcomeLabel1=مرحبًا بك في معالج تثبيت WinDeploy Studio
-arabic.WelcomeLabel2=سيقوم هذا المثبت بتثبيت WinDeploy Studio %1 على جهازك.%n%nWinDeploy Studio هو أداة حديثة لنشر Windows لإنشاء وسائط تثبيت Windows وبيئات عمل Windows To Go.%n%nيُوصى بإغلاق جميع التطبيقات الأخرى قبل المتابعة.
+arabic.WelcomeLabel2=سيقوم هذا المثبت بتثبيت WinDeploy Studio %1 على جهازك.%n%nينشئ WinDeploy Studio وسائط تثبيت Windows، ويكتب صور Linux ISOHybrid قابلة للإقلاع، وينشئ بيئات Windows To Go محمولة وبيئات Linux To Go دائمة من صور x64 Ubuntu/casper Live المدعومة. كما يوفر اختباراً أصلياً لمحركات الأقراص.%n%nيُوصى بإغلاق جميع التطبيقات الأخرى قبل المتابعة.
 arabic.FinishedLabel=تم تثبيت WinDeploy Studio على جهازك بنجاح. يمكنك تشغيل التطبيق من خلال اختيار الأيقونات المثبتة.
 
 ; ── 한국어 메시지 ──
 korean.WelcomeLabel1=WinDeploy Studio 설치 마법사에 오신 것을 환영합니다
-korean.WelcomeLabel2=이 프로그램은 WinDeploy Studio %1을(를) 컴퓨터에 설치합니다.%n%nWinDeploy Studio는 Windows 설치 미디어와 Windows To Go 작업 공간을 만들기 위한 최신 Windows 배포 도구입니다.%n%n계속하기 전에 다른 모든 애플리케이션을 닫는 것이 좋습니다.
+korean.WelcomeLabel2=이 프로그램은 WinDeploy Studio %1을(를) 컴퓨터에 설치합니다.%n%nWinDeploy Studio는 Windows 설치 미디어를 만들고 부팅 가능한 Linux ISOHybrid 이미지를 쓰며, 휴대용 Windows To Go 및 지원되는 x64 Ubuntu/casper Live 이미지 기반 영구 Linux To Go 환경을 만들고 네이티브 드라이브 테스트를 제공합니다.%n%n계속하기 전에 다른 모든 애플리케이션을 닫는 것이 좋습니다.
 korean.FinishedLabel=WinDeploy Studio가 컴퓨터에 성공적으로 설치되었습니다. 설치된 아이콘을 선택하여 애플리케이션을 시작할 수 있습니다.
 
 ; ── Deutsche Meldungen ──
 german.WelcomeLabel1=Willkommen beim WinDeploy Studio-Installationsassistenten
-german.WelcomeLabel2=Dies wird WinDeploy Studio %1 auf Ihrem Computer installieren.%n%nWinDeploy Studio ist ein modernes Windows-Bereitstellungstool zum Erstellen von Windows-Installationsmedien und Windows To Go-Arbeitsbereichen.%n%nEs wird empfohlen, alle anderen Anwendungen zu schließen, bevor Sie fortfahren.
+german.WelcomeLabel2=Dies wird WinDeploy Studio %1 auf Ihrem Computer installieren.%n%nWinDeploy Studio erstellt Windows-Installationsmedien, schreibt bootfähige Linux-ISOHybrid-Images, erstellt portable Windows To Go-Umgebungen und persistente Linux To Go-Umgebungen aus unterstützten x64-Ubuntu-/casper-Live-Images. Außerdem bietet es native Laufwerkstests.%n%nEs wird empfohlen, alle anderen Anwendungen zu schließen, bevor Sie fortfahren.
 german.FinishedLabel=Die Installation von WinDeploy Studio auf Ihrem Computer wurde erfolgreich abgeschlossen. Die Anwendung kann über die installierten Symbole gestartet werden.
 
 [Code]

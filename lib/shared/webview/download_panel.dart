@@ -18,8 +18,12 @@ class DownloadPanel extends StatelessWidget {
       listenable: manager,
       builder: (context, _) {
         final items = manager.items;
-        final hasCompleted = items.any((i) => i.status == DownloadStatus.completed ||
-            i.status == DownloadStatus.cancelled || i.status == DownloadStatus.error);
+        final hasCompleted = items.any(
+          (i) =>
+              i.status == DownloadStatus.completed ||
+              i.status == DownloadStatus.cancelled ||
+              i.status == DownloadStatus.error,
+        );
 
         return Material(
           elevation: 8,
@@ -36,14 +40,27 @@ class DownloadPanel extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                   child: Row(
                     children: [
-                      Icon(Icons.download_rounded, size: 18, color: colorScheme.primary),
+                      Icon(
+                        Icons.download_rounded,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
-                      Text(tr(context, 'dl_title'), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text(
+                        tr(context, 'dl_title'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
                       const Spacer(),
                       if (hasCompleted)
                         TextButton(
                           onPressed: () => manager.clearCompleted(),
-                          child: Text(tr(context, 'dl_clear'), style: TextStyle(fontSize: 12)),
+                          child: Text(
+                            tr(context, 'dl_clear'),
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                     ],
                   ),
@@ -55,9 +72,21 @@ class DownloadPanel extends StatelessWidget {
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       children: [
-                        Icon(Icons.download_done_rounded, size: 36, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                        Icon(
+                          Icons.download_done_rounded,
+                          size: 36,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.4,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        Text(tr(context, 'dl_empty'), style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
+                        Text(
+                          tr(context, 'dl_empty'),
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                   )
@@ -67,7 +96,8 @@ class DownloadPanel extends StatelessWidget {
                       shrinkWrap: true,
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       itemCount: items.length,
-                      itemBuilder: (context, index) => _DownloadTile(item: items[index]),
+                      itemBuilder: (context, index) =>
+                          _DownloadTile(item: items[index]),
                     ),
                   ),
                 const Divider(height: 1),
@@ -117,21 +147,27 @@ class _DownloadTile extends StatelessWidget {
                 IconButton(
                   icon: Icon(Icons.folder_open_rounded, size: 16),
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => Process.run('explorer', [p.dirname(item.savePath)]),
+                  onPressed: () =>
+                      Process.run('explorer', [p.dirname(item.savePath)]),
                   tooltip: tr(context, 'dl_open_folder'),
                 ),
               if (isActive || isPaused) ...[
                 IconButton(
-                  icon: Icon(isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 16),
+                  icon: Icon(
+                    isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                    size: 16,
+                  ),
                   visualDensity: VisualDensity.compact,
-                  onPressed: () {
+                  onPressed: () async {
                     if (isPaused) {
-                      DownloadManager().resumeDownload(item.id);
+                      await DownloadManager().resumeDownload(item.id);
                     } else {
-                      DownloadManager().pauseDownload(item.id);
+                      await DownloadManager().pauseDownload(item.id);
                     }
                   },
-                  tooltip: isPaused ? tr(context, 'dl_resume') : tr(context, 'dl_pause'),
+                  tooltip: isPaused
+                      ? tr(context, 'dl_resume')
+                      : tr(context, 'dl_pause'),
                 ),
                 IconButton(
                   icon: Icon(Icons.close_rounded, size: 16),
@@ -165,20 +201,30 @@ class _DownloadTile extends StatelessWidget {
             children: [
               Text(
                 _statusText(context),
-                style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
               if (isActive && item.speed.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Text(
                   item.speed,
-                  style: TextStyle(fontSize: 11, color: colorScheme.primary, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
               if (item.totalBytes > 0) ...[
                 const Spacer(),
                 Text(
                   '${_formatBytes(item.receivedBytes)} / ${_formatBytes(item.totalBytes)}',
-                  style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ],
@@ -227,16 +273,22 @@ class _DownloadTile extends StatelessWidget {
       case DownloadStatus.completed:
         return tr(context, 'dl_done');
       case DownloadStatus.error:
-        return '${tr(context, 'dl_failed')}: ${item.error ?? ''}';
+        return tr(context, 'dl_failed');
       case DownloadStatus.cancelled:
         return tr(context, 'dl_cancelled');
     }
   }
 
   String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

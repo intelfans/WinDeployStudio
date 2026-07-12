@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/theme.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/app_page.dart';
 import '../providers/mirror_provider.dart';
 import '../models/mirror_models.dart';
 
@@ -25,51 +27,30 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final mirrorState = ref.watch(mirrorProvider);
     final locale = Localizations.localeOf(context);
+    final tokens = AppVisualTokens.of(context);
 
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 600;
+          return Padding(
+            padding: EdgeInsets.all(compact ? 16 : tokens.pagePadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tr(context, 'images_title'),
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        tr(context, 'images_subtitle'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                AppPageHeader(
+                  icon: Icons.cloud_outlined,
+                  title: tr(context, 'images_title'),
+                  subtitle: tr(context, 'images_subtitle'),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: tr(context, 'images_retry'),
-                  onPressed: () => ref
-                      .read(mirrorProvider.notifier)
-                      .loadBuiltInMirrors(force: true),
-                ),
+                SizedBox(height: tokens.sectionSpacing),
+                Expanded(child: _buildContent(mirrorState, locale)),
               ],
             ),
-            const SizedBox(height: 24),
-            Expanded(child: _buildContent(mirrorState, locale)),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -131,50 +112,97 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
     List<LocalIsoInfo> localIsos,
     Locale locale,
   ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 200,
-          child: Card(
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                _CategoryTile(
-                  label: tr(context, 'images_category_all'),
-                  icon: Icons.apps,
-                  count:
-                      categories.fold(0, (sum, c) => sum + c.items.length) +
-                      localIsos.length,
-                  isSelected: _selectedCategory == null,
-                  onTap: () => setState(() => _selectedCategory = null),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 680) {
+          return Column(
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: _selectedCategory ?? '__all__',
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: tr(context, 'images_category_all'),
+                  prefixIcon: const Icon(Icons.filter_list),
                 ),
-                ...categories.map(
-                  (cat) => _CategoryTile(
-                    label: cat.name,
-                    icon: _getCategoryIcon(cat.icon),
-                    count: cat.items.length,
-                    isSelected: _selectedCategory == cat.id,
-                    skillLevel: cat.items.first.skillLevel,
-                    onTap: () => setState(() => _selectedCategory = cat.id),
+                items: [
+                  DropdownMenuItem(
+                    value: '__all__',
+                    child: Text(tr(context, 'images_category_all')),
                   ),
+                  for (final category in categories)
+                    DropdownMenuItem(
+                      value: category.id,
+                      child: Text(
+                        category.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  if (localIsos.isNotEmpty)
+                    DropdownMenuItem(
+                      value: '__local__',
+                      child: Text(tr(context, 'images_local_library')),
+                    ),
+                ],
+                onChanged: (value) => setState(
+                  () => _selectedCategory = value == '__all__' ? null : value,
                 ),
-                if (localIsos.isNotEmpty)
-                  _CategoryTile(
-                    label: tr(context, 'images_local_library'),
-                    icon: Icons.folder,
-                    count: localIsos.length,
-                    isSelected: _selectedCategory == '__local__',
-                    onTap: () =>
-                        setState(() => _selectedCategory = '__local__'),
-                  ),
-              ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(child: _buildItemsList(categories, localIsos, locale)),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 200,
+              child: Card(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    _CategoryTile(
+                      label: tr(context, 'images_category_all'),
+                      icon: Icons.apps,
+                      count:
+                          categories.fold(
+                            0,
+                            (sum, category) => sum + category.items.length,
+                          ) +
+                          localIsos.length,
+                      isSelected: _selectedCategory == null,
+                      onTap: () => setState(() => _selectedCategory = null),
+                    ),
+                    ...categories.map(
+                      (category) => _CategoryTile(
+                        label: category.name,
+                        icon: _getCategoryIcon(category.icon),
+                        count: category.items.length,
+                        isSelected: _selectedCategory == category.id,
+                        skillLevel: category.items.first.skillLevel,
+                        onTap: () =>
+                            setState(() => _selectedCategory = category.id),
+                      ),
+                    ),
+                    if (localIsos.isNotEmpty)
+                      _CategoryTile(
+                        label: tr(context, 'images_local_library'),
+                        icon: Icons.folder,
+                        count: localIsos.length,
+                        isSelected: _selectedCategory == '__local__',
+                        onTap: () =>
+                            setState(() => _selectedCategory = '__local__'),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(child: _buildItemsList(categories, localIsos, locale)),
-      ],
+            const SizedBox(width: 16),
+            Expanded(child: _buildItemsList(categories, localIsos, locale)),
+          ],
+        );
+      },
     );
   }
 
@@ -236,6 +264,8 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
         return Icons.groups_outlined;
       case 'ltsc':
         return Icons.admin_panel_settings_outlined;
+      case 'tools':
+        return Icons.build;
       default:
         return Icons.folder;
     }
@@ -346,7 +376,7 @@ class _MirrorItemCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  _catIcon(item.category),
+                  item.isFontPack ? Icons.build : _catIcon(item.category),
                   color: _catColor(item.category),
                 ),
               ),
@@ -426,7 +456,9 @@ class _MirrorItemCard extends StatelessWidget {
                 ),
               ),
               Icon(
-                Icons.chevron_right,
+                Directionality.of(context) == TextDirection.rtl
+                    ? Icons.chevron_left
+                    : Icons.chevron_right,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
@@ -465,6 +497,8 @@ class _MirrorItemCard extends StatelessWidget {
         return Icons.groups_outlined;
       case 'Enterprise & LTSC Builds':
         return Icons.admin_panel_settings_outlined;
+      case 'Tools':
+        return Icons.build;
       default:
         return Icons.folder;
     }
@@ -501,27 +535,14 @@ class _ArchitectureNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.28)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.memory_outlined, color: colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              tr(context, 'mirror_arch_notice'),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+    return AppInfoBox(
+      icon: Icons.memory_outlined,
+      child: Text(
+        tr(context, 'mirror_arch_notice'),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

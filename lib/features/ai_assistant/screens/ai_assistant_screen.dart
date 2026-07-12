@@ -1,15 +1,22 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../app/theme.dart';
 import '../../../app/typography.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/localization/ai_benchmark_strings.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
+import '../../../shared/widgets/app_page.dart';
+import '../../benchmark_history/models/benchmark_history_models.dart';
+import '../../benchmark_history/services/benchmark_history_service.dart';
 import '../models/chat_models.dart';
 import '../providers/chat_provider.dart';
 import '../services/ai_service.dart';
+import '../services/benchmark_record_context.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/chat_input.dart';
 import '../widgets/chat_sidebar.dart';
@@ -26,6 +33,7 @@ class AiAssistantScreen extends ConsumerStatefulWidget {
 class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   static const _noticePrefKey = 'ai_assistant_notice_hidden';
   final _scrollController = ScrollController();
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _showSidebar = true;
   bool _initialPromptSent = false;
   bool _showNotice = false;
@@ -34,15 +42,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   void initState() {
     super.initState();
     _loadNoticePreference();
-    // Send initial prompt after first frame
-    if (widget.initialPrompt != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_initialPromptSent && mounted) {
-          _initialPromptSent = true;
-          ref.read(chatProvider.notifier).sendMessage(widget.initialPrompt!);
-        }
-      });
-    }
   }
 
   Future<void> _loadNoticePreference() async {
@@ -51,6 +50,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     setState(() {
       _showNotice = !(prefs.getBool(_noticePrefKey) ?? false);
     });
+    if (!_showNotice) _sendInitialPromptIfReady();
   }
 
   Future<void> _dismissNotice({required bool persist}) async {
@@ -60,6 +60,38 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     }
     if (!mounted) return;
     setState(() => _showNotice = false);
+    _sendInitialPromptIfReady();
+  }
+
+  void _sendInitialPromptIfReady() {
+    if (_initialPromptSent || widget.initialPrompt == null || !mounted) return;
+    _initialPromptSent = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(chatProvider.notifier).sendMessage(widget.initialPrompt!);
+      }
+    });
+  }
+
+  Future<bool> _confirmSensitiveAnalysis() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr(dialogContext, 'ai_privacy_title')),
+        content: Text(tr(dialogContext, 'ai_privacy_message')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr(dialogContext, 'detail_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(tr(dialogContext, 'ai_privacy_continue')),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   @override
@@ -95,95 +127,92 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       }
     });
 
-    return Scaffold(
-      body: Row(
-        children: [
-          if (_showSidebar) const ChatSidebar(),
-          Expanded(
-            child: Column(
-              children: [
-                _buildHeader(context, chatState, colorScheme),
-                const Divider(height: 1),
-                if (_showNotice) _buildAiNotice(context, colorScheme),
-                Expanded(
-                  child: messages.isEmpty
-                      ? Column(
-                          children: [
-                            Expanded(
-                              child: WelcomeScreen(onSendPrompt: _handleSend),
-                            ),
-                            _buildQuickActions(context, colorScheme),
-                          ],
-                        )
-                      : _buildMessageList(messages, colorScheme),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 760;
+        return Scaffold(
+          key: _scaffoldKey,
+          drawer: compact
+              ? const Drawer(child: ChatSidebar(width: double.infinity))
+              : null,
+          body: Row(
+            children: [
+              if (!compact && _showSidebar) const ChatSidebar(),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildHeader(
+                      context,
+                      chatState,
+                      colorScheme,
+                      compact: compact,
+                    ),
+                    const Divider(height: 1),
+                    if (_showNotice) _buildAiNotice(context, colorScheme),
+                    Expanded(
+                      child: messages.isEmpty
+                          ? Column(
+                              children: [
+                                Expanded(
+                                  child: WelcomeScreen(
+                                    onSendPrompt: _handleSend,
+                                    onAnalyzeUsbQuestion: () =>
+                                        _handleAnalyzeUsb(
+                                          userQuestion: tr(
+                                            context,
+                                            'ai_example_q3',
+                                          ),
+                                        ),
+                                  ),
+                                ),
+                                _buildQuickActions(context, colorScheme),
+                              ],
+                            )
+                          : _buildMessageList(messages, colorScheme),
+                    ),
+                    ChatInput(
+                      enabled: !chatState.isGenerating,
+                      onSend: _handleSend,
+                    ),
+                  ],
                 ),
-                ChatInput(
-                  enabled: !chatState.isGenerating,
-                  onSend: _handleSend,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildAiNotice(BuildContext context, ColorScheme colorScheme) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            size: 20,
-            color: colorScheme.onSecondaryContainer,
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 0),
+      child: AppInfoBox(
+        icon: Icons.info_outline_rounded,
+        actions: [
+          FilledButton.tonal(
+            onPressed: () => _dismissNotice(persist: false),
+            child: Text(tr(context, 'ai_notice_got_it')),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tr(context, 'ai_notice_title'),
-                  style: AppTypography.cardTitleWith(
-                    colorScheme.onSecondaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  tr(context, 'ai_notice_message'),
-                  style: AppTypography.bodyWith(
-                    colorScheme.onSecondaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.tonal(
-                      onPressed: () => _dismissNotice(persist: false),
-                      child: Text(tr(context, 'ai_notice_got_it')),
-                    ),
-                    TextButton(
-                      onPressed: () => _dismissNotice(persist: true),
-                      child: Text(tr(context, 'ai_notice_do_not_show')),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          TextButton(
+            onPressed: () => _dismissNotice(persist: true),
+            child: Text(tr(context, 'ai_notice_do_not_show')),
           ),
         ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              tr(context, 'ai_notice_title'),
+              style: AppTypography.cardTitleWith(colorScheme.onSurface),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              tr(context, 'ai_notice_message'),
+              style: AppTypography.bodyWith(colorScheme.onSurface),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -191,76 +220,115 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   Widget _buildHeader(
     BuildContext context,
     ChatState chatState,
-    ColorScheme colorScheme,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(
-              _showSidebar ? Icons.menu_open_rounded : Icons.menu_rounded,
-            ),
-            onPressed: () => setState(() => _showSidebar = !_showSidebar),
-            tooltip: _showSidebar
-                ? tr(context, 'ai_hide_sidebar')
-                : tr(context, 'ai_show_sidebar'),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: Colors.green,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'WinDeploy AI',
-            style: AppTypography.cardTitleWith(colorScheme.onSurface),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              'MiMo 2.5 Pro',
-              style: TextStyle(
-                fontSize: 10,
-                color: colorScheme.onPrimaryContainer,
+    ColorScheme colorScheme, {
+    required bool compact,
+  }) {
+    final tokens = AppVisualTokens.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final veryCompact = constraints.maxWidth < 460;
+        return Container(
+          color: tokens.style == VisualStyle.win10
+              ? colorScheme.surface
+              : colorScheme.surfaceContainerLow,
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  compact || !_showSidebar
+                      ? Icons.menu_rounded
+                      : Icons.menu_open_rounded,
+                ),
+                onPressed: compact
+                    ? () => _scaffoldKey.currentState?.openDrawer()
+                    : () => setState(() => _showSidebar = !_showSidebar),
+                tooltip: compact || !_showSidebar
+                    ? tr(context, 'ai_show_sidebar')
+                    : tr(context, 'ai_hide_sidebar'),
               ),
-            ),
+              if (!veryCompact) ...[
+                const SizedBox(width: 4),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'WinDeploy AI',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.cardTitleWith(
+                          colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    if (!compact) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(
+                            tokens.compactRadius,
+                          ),
+                        ),
+                        child: Text(
+                          'MiMo 2.5 Pro',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              _buildSearchToggle(
+                context,
+                chatState.searchMode,
+                colorScheme,
+                compact: compact,
+              ),
+              if (!veryCompact && chatState.activeSession != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  onPressed: () =>
+                      ref.read(chatProvider.notifier).clearActiveSession(),
+                  tooltip: tr(context, 'ai_clear_chat'),
+                ),
+              IconButton(
+                icon: const Icon(Icons.add_comment_outlined, size: 20),
+                onPressed: () =>
+                    ref.read(chatProvider.notifier).createNewSession(),
+                tooltip: tr(context, 'ai_new_chat'),
+              ),
+            ],
           ),
-          const Spacer(),
-          _buildSearchToggle(context, chatState.searchMode, colorScheme),
-          const SizedBox(width: 8),
-          if (chatState.activeSession != null) ...[
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, size: 20),
-              onPressed: () =>
-                  ref.read(chatProvider.notifier).clearActiveSession(),
-              tooltip: tr(context, 'ai_clear_chat'),
-            ),
-          ],
-          IconButton(
-            icon: const Icon(Icons.add_comment_outlined, size: 20),
-            onPressed: () => ref.read(chatProvider.notifier).createNewSession(),
-            tooltip: tr(context, 'ai_new_chat'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildSearchToggle(
     BuildContext context,
     SearchMode mode,
-    ColorScheme colorScheme,
-  ) {
+    ColorScheme colorScheme, {
+    required bool compact,
+  }) {
     return PopupMenuButton<SearchMode>(
       onSelected: (m) => ref.read(chatProvider.notifier).setSearchMode(m),
       child: Container(
@@ -286,29 +354,31 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                   ? colorScheme.onPrimaryContainer
                   : colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 6),
-            Text(
-              mode == SearchMode.off
-                  ? tr(context, 'ai_search_off')
-                  : mode == SearchMode.auto
-                  ? tr(context, 'ai_search_auto')
-                  : tr(context, 'ai_search_force'),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+            if (!compact) ...[
+              const SizedBox(width: 6),
+              Text(
+                mode == SearchMode.off
+                    ? tr(context, 'ai_search_off')
+                    : mode == SearchMode.auto
+                    ? tr(context, 'ai_search_auto')
+                    : tr(context, 'ai_search_force'),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: mode != SearchMode.off
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.arrow_drop_down_rounded,
+                size: 16,
                 color: mode != SearchMode.off
                     ? colorScheme.onPrimaryContainer
                     : colorScheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 16,
-              color: mode != SearchMode.off
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurfaceVariant,
-            ),
+            ],
           ],
         ),
       ),
@@ -341,29 +411,31 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           size: 18,
         ),
         const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              mode == SearchMode.off
-                  ? tr(context, 'ai_search_off')
-                  : mode == SearchMode.auto
-                  ? tr(context, 'ai_search_auto')
-                  : tr(context, 'ai_search_force'),
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            Text(
-              mode == SearchMode.off
-                  ? tr(context, 'ai_search_off_desc')
-                  : mode == SearchMode.auto
-                  ? tr(context, 'ai_search_auto_desc')
-                  : tr(context, 'ai_search_force_desc'),
-              style: TextStyle(
-                fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                mode == SearchMode.off
+                    ? tr(context, 'ai_search_off')
+                    : mode == SearchMode.auto
+                    ? tr(context, 'ai_search_auto')
+                    : tr(context, 'ai_search_force'),
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
-            ),
-          ],
+              Text(
+                mode == SearchMode.off
+                    ? tr(context, 'ai_search_off_desc')
+                    : mode == SearchMode.auto
+                    ? tr(context, 'ai_search_auto_desc')
+                    : tr(context, 'ai_search_force_desc'),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -473,6 +545,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Future<void> _handleAnalyzeLogs() async {
+    if (!await _confirmSensitiveAnalysis()) return;
+    if (!mounted) return;
     final noLogsText = tr(context, 'ai_no_logs');
     final analyzePromptBuilder = buildAnalyzeLogsPrompt;
     final logsPath = p.join(
@@ -496,7 +570,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
         (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
       );
       for (final file in files.take(5)) {
-        buffer.writeln('=== ${file.path} ===');
+        buffer.writeln('=== ${p.basename(file.path)} ===');
         try {
           final content = await file.readAsString();
           final lines = content.split('\n');
@@ -519,6 +593,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Future<void> _handleAnalyzeIso() async {
+    if (!await _confirmSensitiveAnalysis()) return;
+    if (!mounted) return;
     final promptPrefix = getAnalyzePromptPrefix(context);
     final isoLogsLabel = tr(context, 'ai_prompt_iso_logs');
     final localIsosLabel = tr(context, 'ai_prompt_local_isos');
@@ -600,19 +676,187 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _handleSend(buffer.toString());
   }
 
-  Future<void> _handleAnalyzeUsb() async {
+  Future<List<BenchmarkHistoryRecord>?> _selectBenchmarkRecords() async {
+    List<BenchmarkHistoryRecord> records;
+    try {
+      records = await ref.read(benchmarkHistoryServiceProvider).list();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(tr(context, AiBenchmarkKeys.recordsLoadFailed)),
+          ),
+        );
+      }
+      return null;
+    }
+
+    if (!mounted) return null;
+    if (records.isEmpty) {
+      final action = await showDialog<_EmptyBenchmarkRecordsAction>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(tr(dialogContext, AiBenchmarkKeys.recordsNoneTitle)),
+          content: Text(tr(dialogContext, AiBenchmarkKeys.recordsNoneBody)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(tr(dialogContext, 'detail_cancel')),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.of(
+                dialogContext,
+              ).pop(_EmptyBenchmarkRecordsAction.analyzeWithout),
+              child: Text(tr(dialogContext, AiBenchmarkKeys.recordsWithout)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(
+                dialogContext,
+              ).pop(_EmptyBenchmarkRecordsAction.openStandardBenchmark),
+              child: Text(
+                tr(dialogContext, AiBenchmarkKeys.recordsRunStandard),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return null;
+      if (action == _EmptyBenchmarkRecordsAction.openStandardBenchmark) {
+        context.go('/benchmark');
+        return null;
+      }
+      return action == _EmptyBenchmarkRecordsAction.analyzeWithout
+          ? const <BenchmarkHistoryRecord>[]
+          : null;
+    }
+
+    final selectedIds = <String>{};
+    return showDialog<List<BenchmarkHistoryRecord>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final selectedCount = selectedIds.length;
+            final listHeight = (MediaQuery.sizeOf(dialogContext).height * 0.38)
+                .clamp(180.0, 360.0)
+                .toDouble();
+            return AlertDialog(
+              constraints: const BoxConstraints(maxWidth: 760),
+              title: Text(tr(dialogContext, AiBenchmarkKeys.recordsTitle)),
+              content: SizedBox(
+                width: 680,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr(dialogContext, AiBenchmarkKeys.recordsIntro)),
+                    const SizedBox(height: 8),
+                    Text(
+                      tr(dialogContext, AiBenchmarkKeys.recordsPlainTextNotice),
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _replaceAiTemplate(
+                        tr(dialogContext, AiBenchmarkKeys.recordsSelected),
+                        {'count': '$selectedCount'},
+                      ),
+                      style: Theme.of(dialogContext).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: listHeight,
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: records.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (itemContext, index) {
+                          final record = records[index];
+                          final selected = selectedIds.contains(record.id);
+                          return CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: selected,
+                            controlAffinity: ListTileControlAffinity.trailing,
+                            title: Text(
+                              record.result.device.model.isEmpty
+                                  ? record.result.disk.model
+                                  : record.result.device.model,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(_benchmarkRecordSummary(record)),
+                            onChanged: (value) {
+                              setDialogState(() {
+                                if (value == true) {
+                                  selectedIds.add(record.id);
+                                } else {
+                                  selectedIds.remove(record.id);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(tr(dialogContext, 'detail_cancel')),
+                ),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(
+                    dialogContext,
+                  ).pop(const <BenchmarkHistoryRecord>[]),
+                  child: Text(
+                    tr(dialogContext, AiBenchmarkKeys.recordsWithout),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: selectedCount == 0
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(
+                          records
+                              .where(
+                                (record) => selectedIds.contains(record.id),
+                              )
+                              .toList(growable: false),
+                        ),
+                  child: Text(tr(dialogContext, AiBenchmarkKeys.recordsSend)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _handleAnalyzeUsb({String? userQuestion}) async {
+    final selectedRecords = await _selectBenchmarkRecords();
+    if (selectedRecords == null) return;
+    if (!await _confirmSensitiveAnalysis()) return;
+    if (!mounted) return;
     final promptPrefix = getAnalyzePromptPrefix(context);
     final noUsbText = tr(context, 'ai_prompt_no_usb_detected');
     final usbDetectedTemplate = tr(context, 'ai_prompt_usb_detected');
     final diskLabel = tr(context, 'ai_prompt_disk');
     final capacityLabel = tr(context, 'ai_prompt_capacity');
     final busTypeLabel = tr(context, 'ai_prompt_bus_type');
-    final serialLabel = tr(context, 'ai_prompt_serial');
     final partitionStyleLabel = tr(context, 'ai_prompt_partition_style');
     final driveLettersLabel = tr(context, 'ai_prompt_drive_letters');
     final partitionCountLabel = tr(context, 'ai_prompt_partition_count');
     final usbGetFailedLabel = tr(context, 'ai_prompt_usb_get_failed');
     final buffer = StringBuffer(promptPrefix);
+
+    if (userQuestion != null && userQuestion.trim().isNotEmpty) {
+      buffer
+        ..writeln('[USER REQUEST]')
+        ..writeln(userQuestion.trim())
+        ..writeln();
+    }
 
     try {
       final safety = ref.read(diskSafetyServiceProvider);
@@ -629,9 +873,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
           buffer.writeln('$diskLabel ${disk.diskNumber}: ${disk.model}');
           buffer.writeln('  $capacityLabel: ${disk.sizeFormatted}');
           buffer.writeln('  $busTypeLabel: ${disk.busType}');
-          buffer.writeln(
-            '  $serialLabel: ${disk.serialNumber.isNotEmpty ? disk.serialNumber : "N/A"}',
-          );
           buffer.writeln('  $partitionStyleLabel: ${disk.partitionStyle}');
           buffer.writeln(
             '  $driveLettersLabel: ${disk.driveLetters.isNotEmpty ? disk.driveLetters.join(", ") : "-"}',
@@ -649,6 +890,17 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
       buffer.writeln('$usbGetFailedLabel $e');
     }
 
+    buffer.writeln();
+    if (selectedRecords.isEmpty) {
+      buffer
+        ..writeln('[DISK TEST RECORDS]')
+        ..writeln(
+          'No saved disk test record was selected. Recommend a Standard disk test before making a confident To Go suitability judgement. Explain which measurements would reduce uncertainty.',
+        );
+    } else {
+      buffer.write(buildBenchmarkRecordContext(selectedRecords));
+    }
+
     if (!mounted) {
       return;
     }
@@ -657,6 +909,8 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   }
 
   Future<void> _handleDiagnose() async {
+    if (!await _confirmSensitiveAnalysis()) return;
+    if (!mounted) return;
     final promptPrefix = getAnalyzePromptPrefix(context);
     final logSummaryLabel = tr(context, 'ai_prompt_log_summary');
     final filesLabel = tr(context, 'ai_prompt_files');
@@ -754,6 +1008,22 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
     _handleSend(buffer.toString());
   }
+}
+
+enum _EmptyBenchmarkRecordsAction { analyzeWithout, openStandardBenchmark }
+
+String _replaceAiTemplate(String template, Map<String, String> values) {
+  var result = template;
+  for (final entry in values.entries) {
+    result = result.replaceAll('{${entry.key}}', entry.value);
+  }
+  return result;
+}
+
+String _benchmarkRecordSummary(BenchmarkHistoryRecord record) {
+  final result = record.result;
+  final time = result.completedAt.toLocal().toString().split('.').first;
+  return '${result.mode.name}  |  ${result.score.round()}/100  |  $time';
 }
 
 class _QuickActionChip extends StatelessWidget {

@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'debug_dialog_strings.dart';
+import 'deployment_strings.dart';
+import 'visual_style_strings.dart';
+import 'ai_benchmark_strings.dart';
+
 const _prefKey = 'language_code';
 
 final localeProvider = StateNotifierProvider<LocaleNotifier, Locale>(
@@ -36,17 +41,17 @@ class LocaleNotifier extends StateNotifier<Locale> {
 }
 
 class L {
-  static Map<String, String> get en => _en;
-  static Map<String, String> get zh => _zh;
-  static Map<String, String> get ru => _ru;
-  static Map<String, String> get fr => _fr;
-  static Map<String, String> get de => _de;
-  static Map<String, String> get es => _es;
-  static Map<String, String> get pt => _pt;
-  static Map<String, String> get ar => _ar;
-  static Map<String, String> get ko => _ko;
-  static Map<String, String> get ja => _ja;
-  static Map<String, String> get zhTW => _zhTW;
+  static Map<String, String> get en => _enAll;
+  static Map<String, String> get zh => _zhAll;
+  static Map<String, String> get ru => _ruAll;
+  static Map<String, String> get fr => _frAll;
+  static Map<String, String> get de => _deAll;
+  static Map<String, String> get es => _esAll;
+  static Map<String, String> get pt => _ptAll;
+  static Map<String, String> get ar => _arAll;
+  static Map<String, String> get ko => _koAll;
+  static Map<String, String> get ja => _jaAll;
+  static Map<String, String> get zhTW => _zhTWAll;
 
   static String currentLocale = 'en';
 }
@@ -107,24 +112,24 @@ bool isSupportedLocaleCode(String code) =>
 
 Map<String, String> _mapForCode(String code) {
   return switch (normalizeLocaleCode(code)) {
-    'en' => _en,
-    'zh' => _zh,
-    'ru' => _ru,
-    'fr' => _fr,
-    'de' => _de,
-    'es' => _es,
-    'pt' => _pt,
-    'ar' => _ar,
-    'ko' => _ko,
-    'ja' => _ja,
-    'zh_TW' => _zhTW,
+    'en' => _enAll,
+    'zh' => _zhAll,
+    'ru' => _ruAll,
+    'fr' => _frAll,
+    'de' => _deAll,
+    'es' => _esAll,
+    'pt' => _ptAll,
+    'ar' => _arAll,
+    'ko' => _koAll,
+    'ja' => _jaAll,
+    'zh_TW' => _zhTWAll,
     _ => const {},
   };
 }
 
 String trByCode(String code, String key) {
   final map = _mapForCode(code);
-  return map[key] ?? key;
+  return map[key] ?? map['translation_missing'] ?? '';
 }
 
 String trCurrent(String key) => trByCode(L.currentLocale, key);
@@ -134,7 +139,61 @@ String tr(BuildContext context, String key) {
   return trByCode(localeCodeFromLocale(locale), key);
 }
 
+Map<String, String> _withDeploymentStrings(
+  String code,
+  Map<String, String> base,
+) => Map.unmodifiable({
+  ...base,
+  ...visualStyleStringsForCode(code),
+  ...deploymentStringsForCode(code),
+  ...debugDialogStringsForCode(code),
+  ...aiBenchmarkStringsForCode(code),
+});
+
+final _enAll = _withDeploymentStrings('en', _en);
+final _zhAll = _withDeploymentStrings('zh', _zh);
+final _ruAll = _withDeploymentStrings('ru', _ru);
+final _frAll = _withDeploymentStrings('fr', _fr);
+final _deAll = _withDeploymentStrings('de', _de);
+final _esAll = _withDeploymentStrings('es', _es);
+final _ptAll = _withDeploymentStrings('pt', _pt);
+final _arAll = _withDeploymentStrings('ar', _ar);
+final _koAll = _withDeploymentStrings('ko', _ko);
+final _jaAll = _withDeploymentStrings('ja', _ja);
+final _zhTWAll = _withDeploymentStrings('zh_TW', _zhTW);
+
 const _en = <String, String>{
+  'translation_missing': 'Text is unavailable in the selected language.',
+  'safety_disk_missing': 'The selected disk is no longer connected.',
+  'safety_disk_changed':
+      'The target disk changed after selection. Reconnect it and select it again.',
+  'safety_disk_busy':
+      'Another WinDeploy Studio operation is already using this disk. Wait for it to finish and try again.',
+  'safety_detection_failed':
+      'Disk safety information could not be verified. The operation was stopped.',
+  'safety_not_external': 'Only verified external disks can be erased.',
+  'safety_disk_offline': 'The selected disk is offline and cannot be used.',
+  'linux_not_isohybrid':
+      'This ISO is not a bootable ISOHybrid image. The target disk was not changed.',
+  'linux_togo_mount_preflight_failed':
+      'The Linux image could not be inspected. The target disk was not changed.',
+  'linux_togo_unsupported_iso':
+      'Persistent Linux To Go currently supports x64 Ubuntu and compatible casper-based Live images. Use Install Media for other distributions.',
+  'linux_togo_mke2fs_missing':
+      'The bundled Linux persistence component is missing. Reinstall WinDeploy Studio. The target disk was not changed.',
+  'linux_togo_boot_config_unsupported':
+      'This casper image has no supported GRUB entry for enabling persistence. The target disk was not changed.',
+  'linux_togo_boot_file_too_large':
+      'This image has a required boot file larger than FAT32 can store. The target disk was not changed.',
+  'bench_error_helper_missing':
+      'The native benchmark component is missing. Reinstall the application.',
+  'bench_error_cleanup_failed':
+      'Some benchmark files could not be removed. Close programs using the drive and remove the .wds_benchmark folder.',
+  'bench_error_native_failed': 'The native disk test could not be completed.',
+  'ai_privacy_title': 'Remote Analysis Notice',
+  'ai_privacy_message':
+      'This analysis sends selected log excerpts, image names, or device details to the configured AI service. File contents are limited to the preview shown by this feature, and USB serial numbers are not sent. Continue?',
+  'ai_privacy_continue': 'Continue and Send',
   // App
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Windows & Linux Install Media and To Go Creator',
@@ -154,8 +213,6 @@ const _en = <String, String>{
   'home_bootable_usb': 'Installation Media Creator',
   'home_bootable_usb_desc':
       'Create Windows or Linux installation USB media from ISO files',
-  'home_font_pack': 'Download Font Pack',
-  'home_font_pack_desc': 'CJK fonts for lite Windows ISOs',
   'home_wtg': 'To Go Workspace',
   'home_wtg_desc': 'Create portable Windows and Linux live workspaces',
   'home_local_iso': 'Local ISO Import',
@@ -194,7 +251,6 @@ const _en = <String, String>{
   'detail_cancel': 'Cancel',
   'detail_continue': 'Continue',
   'detail_link_copied': 'Link copied',
-  'detail_sha256_copied': 'SHA256 copied',
   'detail_open_failed': 'Could not open link',
   'images_error': 'Unknown error',
   'mirror_not_found': 'Mirror item not found',
@@ -206,15 +262,15 @@ const _en = <String, String>{
       'Cancel Windows installation media creation? The process cannot be resumed.',
 
   // Font pack warning
-  'fontpack_warning': 'This system may be missing Chinese fonts',
+  'fontpack_warning': 'This image may be missing CJK fonts',
   'fontpack_recommend':
-      'Recommend downloading and installing the Chinese Font Pack',
+      'Download and install the CJK font pack for complete Chinese, Japanese, and Korean text rendering',
   'fontpack_download': 'Download Font Pack',
   'fontpack_desc':
-      'Chinese font supplement pack for lite Windows ISOs. Includes common CJK fonts to ensure Chinese content displays correctly.',
-  'fontpack_feature_1': 'Includes HarmonyOS Sans SC and other Chinese fonts',
-  'fontpack_feature_2': 'Supports Windows 10/11',
-  'fontpack_feature_3': 'One-click install for all users',
+      'A CJK font supplement for Tiny10, Tiny11, and Windows X-Lite.',
+  'fontpack_feature_1': 'Includes CJK fonts such as HarmonyOS Sans SC',
+  'fontpack_feature_2': 'Supports Windows 10 and Windows 11',
+  'fontpack_feature_3': 'Can be installed for all users',
 
   // ISO parsing steps
   'iso_step_mount': 'Mounting ISO...',
@@ -447,23 +503,24 @@ const _en = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Linux To Go Creator',
-  'wtg_linux_subtitle': 'Create a portable bootable Linux live workspace',
+  'wtg_linux_subtitle':
+      'Create a portable persistent Ubuntu/casper Live workspace',
   'wtg_linux_select_iso': 'Select Linux ISO',
   'wtg_linux_select_iso_desc':
-      'Choose a Linux ISOHybrid live image. Persistence depends on the distribution and is not modified in this mode.',
+      'Choose an x64 Ubuntu or compatible casper-based Live ISO. WinDeploy Studio will create and enable persistent storage.',
   'wtg_linux_step1_title': 'Step 1: Select Linux ISO',
   'wtg_linux_step1_desc':
-      'Select a Linux live ISOHybrid image to create Linux To Go',
+      'Select an x64 Ubuntu or compatible casper-based Live ISO',
   'wtg_linux_step4_title': 'Step 2: Select Target Disk',
   'wtg_linux_step4_desc': 'Select the external disk for Linux To Go',
   'wtg_linux_confirm_title': 'Step 3: Confirm Linux To Go',
   'wtg_linux_confirm_desc':
-      'Review the ISO, disk, and live workspace mode before writing',
+      'Review the supported casper ISO, target disk, and persistent workspace before writing',
   'wtg_linux_workspace_type': 'Workspace Type',
-  'wtg_linux_live_workspace': 'Bootable Linux live workspace',
+  'wtg_linux_live_workspace': 'Persistent Ubuntu/casper Live workspace',
   'wtg_linux_persistence': 'Persistence',
   'wtg_linux_persistence_note':
-      'Depends on the distribution; boot configuration is not modified',
+      'Enabled with an ext4 writable image (up to about 4 GB)',
   'wtg_linux_step6_title': 'Step 4: Creating Linux To Go',
   'wtg_linux_step6_desc':
       'Please wait while the Linux ISO image is written to the target disk',
@@ -527,15 +584,19 @@ const _en = <String, String>{
   'update_release_notes': 'Release Notes',
   'update_now': 'Update Now',
   'update_open_browser': 'Open in Browser',
+  'update_install_verification_failed':
+      'The installer failed integrity or publisher verification. Use the browser download option instead.',
   'update_later': 'Remind Later',
   'update_ignore': 'Ignore This Version',
   'update_downloading': 'Downloading Update',
   'update_progress': 'Progress',
   'update_speed': 'Speed',
-  'update_install': 'Install & Restart',
-  'update_install_desc': 'The update has been downloaded. Install now?',
+  'update_install': 'Install Update',
+  'update_install_desc':
+      'The update is ready. WinDeploy Studio will close and start the installer. Continue?',
   'update_up_to_date': 'You are up to date',
   'update_checking': 'Checking for updates...',
+  'update_installing': 'Verifying and starting the installer...',
   'update_check_failed': 'Failed to check for updates',
   'update_channel': 'Update Channel',
   'update_channel_stable': 'Stable',
@@ -899,9 +960,174 @@ const _en = <String, String>{
   'mirror_global_tag': 'Global',
   'mirror_default_title': 'Download',
   'mirror_default_desc': 'Direct download link',
+  'nav_benchmark': 'Disk Test',
+  'home_benchmark': 'Drive Benchmark',
+  'home_benchmark_desc': 'Check real To Go drive performance before deployment',
+  'logs_cat_benchmark': 'Disk Test Logs',
+  'bench_title': 'Drive Benchmark',
+  'bench_subtitle':
+      'Measure real write behavior for Windows To Go and Linux To Go: sequential speed, 4K random writes, thread scaling, and long-write stability.',
+  'bench_refresh': 'Refresh',
+  'bench_target_disk': 'Target Drive',
+  'bench_detecting': 'Detecting removable drives...',
+  'bench_no_disk': 'No removable drive found',
+  'bench_no_disk_desc': 'Connect a USB drive or portable SSD, then refresh.',
+  'bench_no_drive_letter': 'No drive letter',
+  'bench_test_mode': 'Test Mode',
+  'bench_mode_quick': 'Quick',
+  'bench_mode_standard': 'Standard',
+  'bench_mode_extreme': 'Extreme',
+  'bench_mode_full_write': 'Full Write',
+  'bench_mode_quick_desc': 'A short safety check for basic To Go suitability.',
+  'bench_mode_standard_desc':
+      'Balanced coverage for daily Windows To Go and Linux To Go use.',
+  'bench_mode_extreme_desc':
+      'Longer 4K and multi-thread tests for stricter judgement.',
+  'bench_mode_full_write_desc':
+      'Adds a near-full sequential write pass to reveal cache drop-off.',
+  'bench_full_warning':
+      'Full Write mode writes across most free space and may take a long time. Existing files are not intentionally erased, but the drive will be heavily stressed.',
+  'bench_start': 'Start Test',
+  'bench_stop': 'Stop',
+  'bench_open_togo': 'Open To Go',
+  'bench_full_confirm_title': 'Full Write Test',
+  'bench_full_confirm_desc':
+      'This mode writes a large temporary file until the drive is almost full, then removes it. Continue only when the drive has enough free space and you can wait for the test to finish.',
+  'bench_full_confirm_start': 'Start Full Write',
+  'bench_phase_idle': 'Ready',
+  'bench_phase_preparing': 'Preparing',
+  'bench_phase_sequential': 'Sequential Write',
+  'bench_phase_random4k': '4K Random Write',
+  'bench_phase_multithread': 'Thread Scaling',
+  'bench_phase_full': 'Full Write Stability',
+  'bench_phase_finalizing': 'Finalizing',
+  'bench_phase_complete': 'Complete',
+  'bench_phase_cancelled': 'Cancelled',
+  'bench_phase_failed': 'Failed',
+  'bench_msg_ready': 'Choose a drive and start a test.',
+  'bench_msg_preparing': 'Creating temporary benchmark files.',
+  'bench_msg_sequential': 'Measuring sustained sequential write speed.',
+  'bench_msg_random4k':
+      'Measuring small random writes, the key To Go workload.',
+  'bench_msg_multithread': 'Checking how the drive behaves with parallel I/O.',
+  'bench_msg_full':
+      'Writing across free space to observe long-write stability.',
+  'bench_msg_finalizing': 'Cleaning up temporary files and scoring the result.',
+  'bench_msg_complete': 'Benchmark finished. Review the charts and score.',
+  'bench_msg_cancelled': 'Benchmark stopped by user.',
+  'bench_msg_failed': 'Benchmark failed. Check the drive and try again.',
+  'bench_elapsed': 'Elapsed',
+  'bench_current_speed': 'Current Speed',
+  'bench_progress': 'Progress',
+  'bench_rating_excellent': 'To Go Ready',
+  'bench_rating_good': 'Comfortable',
+  'bench_rating_usable': 'Usable',
+  'bench_rating_limited': 'Limited',
+  'bench_rating_not_recommended': 'Not Recommended',
+  'bench_rating_unmeasured': 'Not Measured',
+  'bench_rating_excellent_desc':
+      'Strong 4K and sustained write behavior. Suitable for demanding To Go use.',
+  'bench_rating_good_desc':
+      'Good overall behavior. Should feel smooth for normal portable systems.',
+  'bench_rating_usable_desc':
+      'Usable for light work, but heavy updates or multitasking may feel slower.',
+  'bench_rating_limited_desc':
+      'Works for simple tasks, but the drive is likely to feel sluggish as a To Go system.',
+  'bench_rating_not_recommended_desc':
+      'Too slow or unstable for a reliable To Go experience.',
+  'bench_rating_unmeasured_desc':
+      'Run a benchmark to get a suitability result.',
+  'bench_result_overall': 'Overall Rating',
+  'bench_result_recommendation': 'Recommendation',
+  'bench_result_reasons': 'Key Reasons',
+  'bench_result_notes': 'Notes',
+  'bench_recommend_excellent':
+      'Recommended for Windows To Go / Linux To Go, including heavier daily use.',
+  'bench_recommend_good': 'Recommended for Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'Usable for light To Go workloads; avoid heavy updates and multitasking.',
+  'bench_recommend_limited':
+      'Only suitable for emergency or lightweight To Go use.',
+  'bench_recommend_not_recommended':
+      'Not recommended for Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured': 'Run a benchmark to generate a recommendation.',
+  'bench_reason_4k_strong': '4K random writes are very strong.',
+  'bench_reason_4k_stable': '4K random writes are stable.',
+  'bench_reason_4k_limited': '4K random writes are limited.',
+  'bench_reason_4k_weak':
+      '4K random writes are too weak for a smooth portable OS.',
+  'bench_reason_thread_good':
+      'No severe slowdown under multi-threaded pressure.',
+  'bench_reason_thread_limited':
+      'Multi-threaded pressure causes noticeable slowdown.',
+  'bench_reason_seq_good': 'Sequential write speed is sufficient.',
+  'bench_reason_seq_acceptable':
+      'Later sequential write speed remains acceptable.',
+  'bench_reason_seq_slow': 'Sequential write speed is low.',
+  'bench_reason_full_stable':
+      'Full write behavior stayed stable with no obvious cache collapse.',
+  'bench_reason_full_drop':
+      'Full write speed dropped noticeably near the later stage, possibly due to SLC cache exhaustion.',
+  'bench_note_full_not_run':
+      'Full write test was not run, so SLC cache exhaustion behavior was not evaluated.',
+  'bench_note_full_skipped_low_space':
+      'Full write test produced no samples, usually because free space was too low or the test ended early.',
+  'bench_note_full_ran':
+      'Full write test was included in the long-write stability judgement.',
+  'bench_report_copied': 'Report copied',
+  'bench_copy_report': 'Copy Report',
+  'bench_score': 'Score',
+  'bench_4k_adjusted': '4K Adjusted',
+  'bench_seq_write': 'Seq Write',
+  'bench_duration': 'Duration',
+  'bench_chart_sequential': 'Sequential Write',
+  'bench_chart_sequential_desc': 'Sustained large-block write speed over time',
+  'bench_chart_4k': '4K Random Stability',
+  'bench_chart_4k_desc':
+      'Small-write consistency, weighted for To Go responsiveness',
+  'bench_chart_threads': 'Thread Scaling',
+  'bench_chart_threads_desc':
+      'Parallel 4K writes across increasing worker counts',
+  'bench_chart_full': 'Full Write Curve',
+  'bench_chart_full_desc':
+      'Long write behavior and cache drop-off in Full Write mode',
+  'bench_chart_waiting': 'Chart will appear during the test',
+  'bench_chart_full_skip': 'Use Full Write mode to collect this curve',
+  'bench_error_no_drive_letter':
+      'This drive has no usable drive letter. Reconnect it or assign a letter in Disk Management.',
+  'bench_error_drive_not_ready':
+      'The selected drive is not ready. Reconnect it and try again.',
+  'wtg_benchmark_tip_title': 'Recommended before To Go creation',
+  'wtg_benchmark_tip_desc':
+      'Run the disk test first if you want to check 4K write behavior, thread scaling, and long-write stability. You can continue without testing.',
+  'wtg_benchmark_tip_button': 'Disk Test',
 };
 
 const _zh = <String, String>{
+  'translation_missing': '所选语言中的这段文字暂不可用。',
+  'safety_disk_missing': '所选磁盘已断开连接。',
+  'safety_disk_changed': '选择后目标磁盘发生了变化，请重新连接并再次选择。',
+  'safety_disk_busy': '另一个 WinDeploy Studio 任务正在使用此磁盘，请等待任务完成后重试。',
+  'safety_detection_failed': '无法确认磁盘安全信息，操作已停止。',
+  'safety_not_external': '只能擦除已确认的外接磁盘。',
+  'safety_disk_offline': '所选磁盘处于脱机状态，无法使用。',
+  'linux_not_isohybrid': '此 ISO 不是可启动的 ISOHybrid 镜像，目标磁盘未被修改。',
+  'linux_togo_mount_preflight_failed': '无法检查此 Linux 镜像，目标磁盘未被修改。',
+  'linux_togo_unsupported_iso':
+      '持久化 Linux To Go 目前支持 x64 Ubuntu 及兼容的 casper Live 镜像。其他发行版请使用“安装盘”功能。',
+  'linux_togo_mke2fs_missing':
+      '内置的 Linux 持久化组件缺失。请重新安装 WinDeploy Studio，目标磁盘未被修改。',
+  'linux_togo_boot_config_unsupported':
+      '此 casper 镜像没有可用于启用持久化的受支持 GRUB 启动项，目标磁盘未被修改。',
+  'linux_togo_boot_file_too_large': '此镜像包含超过 FAT32 单文件容量上限的必要启动文件，目标磁盘未被修改。',
+  'bench_error_helper_missing': '缺少原生磁盘测试组件，请重新安装应用。',
+  'bench_error_cleanup_failed':
+      '部分测试文件无法删除。请关闭正在使用该磁盘的程序，并删除 .wds_benchmark 文件夹。',
+  'bench_error_native_failed': '原生磁盘测试未能完成。',
+  'ai_privacy_title': '远程分析提示',
+  'ai_privacy_message':
+      '此分析会把选定的日志片段、镜像名称或设备信息发送到你配置的 AI 服务。文件内容仅限本功能读取的预览，且不会发送 USB 序列号。是否继续？',
+  'ai_privacy_continue': '继续并发送',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Windows 与 Linux 安装盘和 To Go 创建工具',
   'nav_home': '首页',
@@ -917,8 +1143,6 @@ const _zh = <String, String>{
   'home_image_library_desc': '浏览 Windows 镜像并获取下载链接',
   'home_bootable_usb': '安装盘创建工具',
   'home_bootable_usb_desc': '从 ISO 创建 Windows 或 Linux 安装 U 盘',
-  'home_font_pack': '下载字体包',
-  'home_font_pack_desc': '适用于精简版 Windows ISO 的 CJK 字体',
   'home_wtg': 'To Go 工作空间',
   'home_wtg_desc': '创建便携式 Windows 与 Linux 随身工作环境',
   'home_local_iso': '本地 ISO 导入',
@@ -953,7 +1177,6 @@ const _zh = <String, String>{
   'detail_cancel': '取消',
   'detail_continue': '继续',
   'detail_link_copied': '链接已复制',
-  'detail_sha256_copied': 'SHA256 已复制',
   'detail_open_failed': '无法打开链接',
   'images_error': '未知错误',
   'mirror_not_found': '未找到镜像项',
@@ -961,13 +1184,13 @@ const _zh = <String, String>{
   'cancel_parse_desc': '取消 ISO 解析？已挂载的镜像将被卸载。',
   'cancel_confirm': '确认取消',
   'cancel_create_desc': '取消 Windows 安装盘创建？此操作不可恢复。',
-  'fontpack_warning': '此系统可能缺少中文字体',
-  'fontpack_recommend': '建议下载并安装中文字体包',
+  'fontpack_warning': '此镜像可能缺少 CJK 字体',
+  'fontpack_recommend': '建议下载并安装 CJK 字体包，以完整显示中日韩文字',
   'fontpack_download': '下载字体包',
-  'fontpack_desc': '适用于精简版 Windows ISO 的中文字体补充包。包含常用 CJK 字体，确保中文内容正常显示。',
-  'fontpack_feature_1': '包含 HarmonyOS Sans SC 等中文字体',
-  'fontpack_feature_2': '支持 Windows 10/11',
-  'fontpack_feature_3': '一键安装，适用于所有用户',
+  'fontpack_desc': '适用于 Tiny10、Tiny11 和 Windows X-Lite 的 CJK 字体补充包。',
+  'fontpack_feature_1': '包含 HarmonyOS Sans SC 等 CJK 字体',
+  'fontpack_feature_2': '支持 Windows 10 和 Windows 11',
+  'fontpack_feature_3': '可为所有用户安装',
   'iso_step_mount': '正在挂载 ISO...',
   'iso_step_detect': '正在检测安装程序...',
   'iso_step_info': '正在读取镜像信息...',
@@ -1175,20 +1398,20 @@ const _zh = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Linux To Go 创建工具',
-  'wtg_linux_subtitle': '创建可随身启动的 Linux Live 工作环境',
+  'wtg_linux_subtitle': '创建可随身启动并保存更改的 Ubuntu/casper Live 工作环境',
   'wtg_linux_select_iso': '选择 Linux ISO',
   'wtg_linux_select_iso_desc':
-      '选择 Linux ISOHybrid Live 镜像。持久化能力取决于发行版，本模式不会修改启动配置。',
+      '选择 x64 Ubuntu 或兼容的 casper Live ISO。WinDeploy Studio 将创建并启用持久化存储。',
   'wtg_linux_step1_title': '步骤 1：选择 Linux ISO',
-  'wtg_linux_step1_desc': '选择 Linux Live ISOHybrid 镜像来创建 Linux To Go',
+  'wtg_linux_step1_desc': '选择 x64 Ubuntu 或兼容的 casper Live ISO',
   'wtg_linux_step4_title': '步骤 2：选择目标磁盘',
   'wtg_linux_step4_desc': '选择用于 Linux To Go 的外接磁盘',
   'wtg_linux_confirm_title': '步骤 3：确认 Linux To Go',
-  'wtg_linux_confirm_desc': '写入前确认 ISO、磁盘和 Live 工作环境模式',
+  'wtg_linux_confirm_desc': '写入前确认受支持的 casper ISO、目标磁盘和持久化工作环境',
   'wtg_linux_workspace_type': '工作环境类型',
-  'wtg_linux_live_workspace': '可启动 Linux Live 工作环境',
+  'wtg_linux_live_workspace': '持久化 Ubuntu/casper Live 工作环境',
   'wtg_linux_persistence': '持久化',
-  'wtg_linux_persistence_note': '取决于发行版；不会修改启动配置',
+  'wtg_linux_persistence_note': '通过 ext4 writable 镜像启用（最大约 4 GB）',
   'wtg_linux_step6_title': '步骤 4：正在创建 Linux To Go',
   'wtg_linux_step6_desc': '正在将 Linux ISO 镜像写入目标磁盘，请稍候',
   'wtg_linux_step_complete_title': '步骤 5：完成',
@@ -1250,15 +1473,17 @@ const _zh = <String, String>{
   'update_release_notes': '更新内容',
   'update_now': '立即更新',
   'update_open_browser': '在浏览器中打开',
+  'update_install_verification_failed': '安装程序未通过完整性或发布者验证，请改用浏览器下载。',
   'update_later': '稍后提醒',
   'update_ignore': '忽略此版本',
   'update_downloading': '正在下载更新',
   'update_progress': '进度',
   'update_speed': '速度',
-  'update_install': '安装并重启',
-  'update_install_desc': '更新已下载完成。是否立即安装？',
+  'update_install': '安装更新',
+  'update_install_desc': '更新已准备好。继续后 WinDeploy Studio 将关闭并启动安装程序。',
   'update_up_to_date': '已是最新版本',
   'update_checking': '正在检查更新...',
+  'update_installing': '正在验证并启动安装程序...',
   'update_check_failed': '检查更新失败',
   'update_channel': '更新通道',
   'update_channel_stable': '稳定版',
@@ -1584,9 +1809,150 @@ const _zh = <String, String>{
   'mirror_global_tag': '国际',
   'mirror_default_title': '下载',
   'mirror_default_desc': '直接下载链接',
+  'nav_benchmark': '磁盘测试',
+  'home_benchmark': '磁盘性能测试',
+  'home_benchmark_desc': '部署前检查 To Go 目标盘的真实性能',
+  'logs_cat_benchmark': '磁盘测试日志',
+  'bench_title': '磁盘性能测试',
+  'bench_subtitle':
+      '面向 Windows To Go 和 Linux To Go 的真实写入测试，覆盖顺序写入、4K 随机、多线程扩展与长时间写入稳定性。',
+  'bench_refresh': '刷新',
+  'bench_target_disk': '目标磁盘',
+  'bench_detecting': '正在检测可移动磁盘...',
+  'bench_no_disk': '未发现可移动磁盘',
+  'bench_no_disk_desc': '请连接 U 盘或移动固态硬盘，然后刷新。',
+  'bench_no_drive_letter': '无盘符',
+  'bench_test_mode': '测试模式',
+  'bench_mode_quick': '快速',
+  'bench_mode_standard': '标准',
+  'bench_mode_extreme': '极限',
+  'bench_mode_full_write': '全盘写入',
+  'bench_mode_quick_desc': '用于快速判断是否基本适合 To Go 的短测试。',
+  'bench_mode_standard_desc': '覆盖日常 Windows To Go 与 Linux To Go 使用场景，耗时适中。',
+  'bench_mode_extreme_desc': '延长 4K 与多线程测试时间，给出更严格的判断。',
+  'bench_mode_full_write_desc': '额外执行接近全盘的顺序写入，用于观察缓存掉速。',
+  'bench_full_warning': '全盘写入模式会写满大部分可用空间，耗时可能较长。测试不会主动删除已有文件，但会让磁盘承受较高负载。',
+  'bench_start': '开始测试',
+  'bench_stop': '停止',
+  'bench_open_togo': '打开 To Go',
+  'bench_full_confirm_title': '全盘写入测试',
+  'bench_full_confirm_desc':
+      '此模式会创建一个大型临时文件，持续写入到磁盘接近写满后再删除。请确认磁盘有足够空间，并且你可以等待测试完成。',
+  'bench_full_confirm_start': '开始全盘写入',
+  'bench_phase_idle': '就绪',
+  'bench_phase_preparing': '准备中',
+  'bench_phase_sequential': '顺序写入',
+  'bench_phase_random4k': '4K 随机写入',
+  'bench_phase_multithread': '多线程扩展',
+  'bench_phase_full': '全盘写入稳定性',
+  'bench_phase_finalizing': '收尾中',
+  'bench_phase_complete': '完成',
+  'bench_phase_cancelled': '已取消',
+  'bench_phase_failed': '失败',
+  'bench_msg_ready': '选择磁盘后即可开始测试。',
+  'bench_msg_preparing': '正在创建临时测试文件。',
+  'bench_msg_sequential': '正在测量持续顺序写入速度。',
+  'bench_msg_random4k': '正在测量小块随机写入，这是 To Go 响应速度的关键指标。',
+  'bench_msg_multithread': '正在检查并行 I/O 下的磁盘表现。',
+  'bench_msg_full': '正在写入可用空间，观察长时间写入稳定性。',
+  'bench_msg_finalizing': '正在清理临时文件并计算评分。',
+  'bench_msg_complete': '测试完成，可查看图表与评分。',
+  'bench_msg_cancelled': '测试已由用户停止。',
+  'bench_msg_failed': '测试失败，请检查磁盘后重试。',
+  'bench_elapsed': '已用时间',
+  'bench_current_speed': '当前速度',
+  'bench_progress': '进度',
+  'bench_rating_excellent': 'To Go 优选',
+  'bench_rating_good': '表现良好',
+  'bench_rating_usable': '可以使用',
+  'bench_rating_limited': '体验受限',
+  'bench_rating_not_recommended': '不建议使用',
+  'bench_rating_unmeasured': '未测量',
+  'bench_rating_excellent_desc': '4K 与持续写入表现都很强，适合较高负载的 To Go 使用。',
+  'bench_rating_good_desc': '整体表现良好，日常便携系统体验通常会比较顺畅。',
+  'bench_rating_usable_desc': '适合轻度使用，但系统更新或多任务时可能会变慢。',
+  'bench_rating_limited_desc': '可以完成简单任务，但作为 To Go 系统大概率会有明显卡顿。',
+  'bench_rating_not_recommended_desc': '速度或稳定性不足，不适合作为可靠的 To Go 系统。',
+  'bench_rating_unmeasured_desc': '运行一次测试后即可得到适用性结果。',
+  'bench_result_overall': '综合评级',
+  'bench_result_recommendation': '建议',
+  'bench_result_reasons': '关键原因',
+  'bench_result_notes': '注意',
+  'bench_recommend_excellent': '推荐用于 Windows To Go / Linux To Go，也适合较高负载的日常使用。',
+  'bench_recommend_good': '推荐用于 Windows To Go / Linux To Go。',
+  'bench_recommend_usable': '可用于轻度 To Go 场景，建议避免重负载更新和多任务。',
+  'bench_recommend_limited': '仅建议应急或轻量 To Go 使用，体验可能受限。',
+  'bench_recommend_not_recommended': '不推荐用于 Windows To Go / Linux To Go。',
+  'bench_recommend_unmeasured': '运行测试后会生成建议。',
+  'bench_reason_4k_strong': '4K 随机写入表现很强。',
+  'bench_reason_4k_stable': '4K 随机写入稳定。',
+  'bench_reason_4k_limited': '4K 随机写入偏弱。',
+  'bench_reason_4k_weak': '4K 随机写入不足，难以保证流畅的便携系统体验。',
+  'bench_reason_thread_good': '多线程压力下没有严重掉速。',
+  'bench_reason_thread_limited': '多线程压力下掉速明显。',
+  'bench_reason_seq_good': '顺序写入速度充足。',
+  'bench_reason_seq_acceptable': '顺序写入后段速度仍可接受。',
+  'bench_reason_seq_slow': '顺序写入速度偏低。',
+  'bench_reason_full_stable': '全盘写入稳定，未发现明显缓存崩塌。',
+  'bench_reason_full_drop': '全盘写入后段掉速明显，可能受 SLC 缓存耗尽影响。',
+  'bench_note_full_not_run': '全盘写入测试未运行，因此未评估 SLC 缓存耗尽后的表现。',
+  'bench_note_full_skipped_low_space': '全盘写入测试未产生采样，通常是可用空间不足或测试提前结束。',
+  'bench_note_full_ran': '已运行全盘写入测试，已纳入长时间写入稳定性判断。',
+  'bench_report_copied': '报告已复制',
+  'bench_copy_report': '复制报告',
+  'bench_score': '评分',
+  'bench_4k_adjusted': '4K 修正值',
+  'bench_seq_write': '顺序写入',
+  'bench_duration': '耗时',
+  'bench_chart_sequential': '顺序写入',
+  'bench_chart_sequential_desc': '大块连续写入速度随时间变化',
+  'bench_chart_4k': '4K 随机稳定性',
+  'bench_chart_4k_desc': '小块写入一致性，重点反映 To Go 响应速度',
+  'bench_chart_threads': '多线程扩展',
+  'bench_chart_threads_desc': '不同并发数量下的 4K 写入表现',
+  'bench_chart_full': '全盘写入曲线',
+  'bench_chart_full_desc': '全盘写入模式下的长时间写入与缓存掉速',
+  'bench_chart_waiting': '测试过程中会生成图表',
+  'bench_chart_full_skip': '使用全盘写入模式后会生成此曲线',
+  'bench_error_no_drive_letter': '此磁盘没有可用盘符，请重新连接或在磁盘管理中分配盘符。',
+  'bench_error_drive_not_ready': '所选磁盘未就绪，请重新连接后再试。',
+  'wtg_benchmark_tip_title': '建议在创建 To Go 前测试',
+  'wtg_benchmark_tip_desc': '如果想确认 4K 写入、多线程扩展和长时间写入稳定性，可以先运行磁盘测试。不测试也可以继续创建。',
+  'wtg_benchmark_tip_button': '磁盘测试',
 };
 
 const _ru = <String, String>{
+  'translation_missing': 'Этот текст недоступен на выбранном языке.',
+  'safety_disk_missing': 'Выбранный диск больше не подключен.',
+  'safety_disk_changed':
+      'После выбора целевой диск изменился. Подключите его заново и повторите выбор.',
+  'safety_disk_busy':
+      'Этот диск уже используется другой операцией WinDeploy Studio. Дождитесь её завершения и повторите попытку.',
+  'safety_detection_failed':
+      'Не удалось проверить безопасность диска. Операция остановлена.',
+  'safety_not_external': 'Стирать можно только проверенные внешние диски.',
+  'safety_disk_offline': 'Выбранный диск отключен и недоступен.',
+  'linux_not_isohybrid':
+      'Этот ISO не является загрузочным образом ISOHybrid. Целевой диск не изменен.',
+  'linux_togo_mount_preflight_failed':
+      'Не удалось проверить образ Linux. Целевой диск не изменен.',
+  'linux_togo_unsupported_iso':
+      'Linux To Go с постоянным хранилищем сейчас поддерживает x64-образы Ubuntu и совместимые Live-образы на базе casper. Для других дистрибутивов используйте создание установочного носителя.',
+  'linux_togo_mke2fs_missing':
+      'Встроенный компонент постоянного хранения Linux отсутствует. Переустановите WinDeploy Studio. Целевой диск не изменён.',
+  'linux_togo_boot_config_unsupported':
+      'В этом образе casper нет поддерживаемой записи GRUB для включения постоянного хранения. Целевой диск не изменён.',
+  'linux_togo_boot_file_too_large':
+      'В образе есть обязательный загрузочный файл, превышающий допустимый для FAT32 размер. Целевой диск не изменён.',
+  'bench_error_helper_missing':
+      'Отсутствует нативный компонент тестирования. Переустановите приложение.',
+  'bench_error_cleanup_failed':
+      'Не удалось удалить часть тестовых файлов. Закройте программы, использующие диск, и удалите папку .wds_benchmark.',
+  'bench_error_native_failed': 'Не удалось завершить нативный тест диска.',
+  'ai_privacy_title': 'Уведомление об удаленном анализе',
+  'ai_privacy_message':
+      'Для анализа выбранные фрагменты журналов, имена образов или сведения об устройстве отправляются настроенному сервису ИИ. Передаются только прочитанные функцией фрагменты файлов; серийные номера USB не отправляются. Продолжить?',
+  'ai_privacy_continue': 'Продолжить и отправить',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Создание установочных носителей и To Go для Windows и Linux',
   'nav_home': 'Главная',
@@ -1604,8 +1970,6 @@ const _ru = <String, String>{
   'home_bootable_usb': 'Создание установочного носителя',
   'home_bootable_usb_desc':
       'Создавайте установочные USB-носители Windows или Linux из ISO-файлов',
-  'home_font_pack': 'Скачать пакет шрифтов',
-  'home_font_pack_desc': 'Шрифты CJK для облегчённых образов Windows',
   'home_wtg': 'Рабочая среда To Go',
   'home_wtg_desc': 'Создавайте переносные рабочие среды Windows и Linux',
   'home_local_iso': 'Импорт локального ISO',
@@ -1640,7 +2004,6 @@ const _ru = <String, String>{
   'detail_cancel': 'Отмена',
   'detail_continue': 'Продолжить',
   'detail_link_copied': 'Ссылка скопирована',
-  'detail_sha256_copied': 'SHA256 скопирован',
   'detail_open_failed': 'Не удалось открыть ссылку',
   'images_error': 'Неизвестная ошибка',
   'mirror_not_found': 'Зеркало не найдено',
@@ -1650,15 +2013,15 @@ const _ru = <String, String>{
   'cancel_confirm': 'Подтвердить отмену',
   'cancel_create_desc':
       'Отменить создание установочного носителя Windows? Процесс нельзя будет возобновить.',
-  'fontpack_warning': 'В системе могут отсутствовать китайские шрифты',
+  'fontpack_warning': 'В этом образе могут отсутствовать шрифты CJK',
   'fontpack_recommend':
-      'Рекомендуется скачать и установить пакет китайских шрифтов',
+      'Загрузите и установите пакет шрифтов CJK для полноценного отображения китайского, японского и корейского текста',
   'fontpack_download': 'Скачать пакет шрифтов',
   'fontpack_desc':
-      'Пакет китайских шрифтов для облегчённых образов Windows. Включает основные шрифты CJK для корректного отображения китайского контента.',
-  'fontpack_feature_1': 'Включает HarmonyOS Sans SC и другие китайские шрифты',
-  'fontpack_feature_2': 'Поддержка Windows 10/11',
-  'fontpack_feature_3': 'Установка в один клик для всех пользователей',
+      'Дополнительный пакет шрифтов CJK для Tiny10, Tiny11 и Windows X-Lite.',
+  'fontpack_feature_1': 'Включает шрифты CJK, такие как HarmonyOS Sans SC',
+  'fontpack_feature_2': 'Поддерживает Windows 10 и Windows 11',
+  'fontpack_feature_3': 'Можно установить для всех пользователей',
   'iso_step_mount': 'Монтирование ISO...',
   'iso_step_detect': 'Обнаружение установщика...',
   'iso_step_info': 'Чтение информации об образе...',
@@ -1878,23 +2241,24 @@ const _ru = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Создание Linux To Go',
-  'wtg_linux_subtitle': 'Создайте переносную загрузочную Linux Live-среду',
+  'wtg_linux_subtitle':
+      'Создайте переносную Ubuntu/casper Live-среду с сохранением изменений',
   'wtg_linux_select_iso': 'Выбрать ISO Linux',
   'wtg_linux_select_iso_desc':
-      'Выберите Linux ISOHybrid Live-образ. Сохранение изменений зависит от дистрибутива и в этом режиме не настраивается.',
+      'Выберите x64-образ Ubuntu или совместимый Live ISO на базе casper. WinDeploy Studio создаст и включит постоянное хранилище.',
   'wtg_linux_step1_title': 'Шаг 1: выберите ISO Linux',
   'wtg_linux_step1_desc':
-      'Выберите Linux Live ISOHybrid-образ для создания Linux To Go',
+      'Выберите x64-образ Ubuntu или совместимый Live ISO на базе casper',
   'wtg_linux_step4_title': 'Шаг 2: выберите целевой диск',
   'wtg_linux_step4_desc': 'Выберите внешний диск для Linux To Go',
   'wtg_linux_confirm_title': 'Шаг 3: подтвердите Linux To Go',
   'wtg_linux_confirm_desc':
-      'Проверьте ISO, диск и режим Live-среды перед записью',
+      'Перед записью проверьте поддерживаемый casper ISO, целевой диск и постоянное хранилище',
   'wtg_linux_workspace_type': 'Тип среды',
-  'wtg_linux_live_workspace': 'Загрузочная Linux Live-среда',
+  'wtg_linux_live_workspace':
+      'Ubuntu/casper Live-среда с сохранением изменений',
   'wtg_linux_persistence': 'Сохранение изменений',
-  'wtg_linux_persistence_note':
-      'Зависит от дистрибутива; загрузочная конфигурация не изменяется',
+  'wtg_linux_persistence_note': 'Включено через ext4-образ writable (до 4 ГБ)',
   'wtg_linux_step6_title': 'Шаг 4: создание Linux To Go',
   'wtg_linux_step6_desc':
       'Подождите, пока ISO-образ Linux записывается на целевой диск',
@@ -1958,15 +2322,19 @@ const _ru = <String, String>{
   'update_release_notes': 'Примечания к выпуску',
   'update_now': 'Обновить сейчас',
   'update_open_browser': 'Открыть в браузере',
+  'update_install_verification_failed':
+      'Установщик не прошёл проверку целостности или издателя. Используйте загрузку через браузер.',
   'update_later': 'Напомнить позже',
   'update_ignore': 'Игнорировать эту версию',
   'update_downloading': 'Загрузка обновления',
   'update_progress': 'Прогресс',
   'update_speed': 'Скорость',
-  'update_install': 'Установить и перезапустить',
-  'update_install_desc': 'Обновление загружено. Установить сейчас?',
+  'update_install': 'Установить обновление',
+  'update_install_desc':
+      'Обновление готово. WinDeploy Studio закроется и запустит установщик. Продолжить?',
   'update_up_to_date': 'У вас последняя версия',
   'update_checking': 'Проверка обновлений...',
+  'update_installing': 'Проверка и запуск установщика...',
   'update_check_failed': 'Не удалось проверить обновления',
   'update_channel': 'Канал обновлений',
   'update_channel_stable': 'Стабильный',
@@ -2326,9 +2694,183 @@ const _ru = <String, String>{
   'mirror_global_tag': 'Глобальное',
   'mirror_default_title': 'Скачать',
   'mirror_default_desc': 'Прямая ссылка для скачивания',
+  'nav_benchmark': 'Тест диска',
+  'home_benchmark': 'Тест накопителя',
+  'home_benchmark_desc': 'Проверьте реальную скорость диска перед To Go',
+  'logs_cat_benchmark': 'Журналы теста диска',
+  'bench_title': 'Тест накопителя',
+  'bench_subtitle':
+      'Проверяет реальную запись для Windows To Go и Linux To Go: последовательную скорость, 4K random, масштабирование потоков и устойчивость долгой записи.',
+  'bench_refresh': 'Обновить',
+  'bench_target_disk': 'Целевой диск',
+  'bench_detecting': 'Поиск съемных дисков...',
+  'bench_no_disk': 'Съемный диск не найден',
+  'bench_no_disk_desc':
+      'Подключите USB-накопитель или внешний SSD и обновите список.',
+  'bench_no_drive_letter': 'Нет буквы диска',
+  'bench_test_mode': 'Режим теста',
+  'bench_mode_quick': 'Быстрый',
+  'bench_mode_standard': 'Стандартный',
+  'bench_mode_extreme': 'Экстремальный',
+  'bench_mode_full_write': 'Полная запись',
+  'bench_mode_quick_desc': 'Короткая проверка базовой пригодности для To Go.',
+  'bench_mode_standard_desc':
+      'Сбалансированная проверка для обычного Windows To Go и Linux To Go.',
+  'bench_mode_extreme_desc':
+      'Более долгие 4K и многопоточные тесты для строгой оценки.',
+  'bench_mode_full_write_desc':
+      'Добавляет почти полную последовательную запись, чтобы увидеть просадку кэша.',
+  'bench_full_warning':
+      'Режим полной записи использует большую часть свободного места и может идти долго. Существующие файлы не удаляются намеренно, но нагрузка на диск будет высокой.',
+  'bench_start': 'Начать тест',
+  'bench_stop': 'Остановить',
+  'bench_open_togo': 'Открыть To Go',
+  'bench_full_confirm_title': 'Тест полной записи',
+  'bench_full_confirm_desc':
+      'Этот режим создает большой временный файл, пишет почти до заполнения диска, затем удаляет его. Продолжайте, если есть достаточно места и времени.',
+  'bench_full_confirm_start': 'Начать полную запись',
+  'bench_phase_idle': 'Готово',
+  'bench_phase_preparing': 'Подготовка',
+  'bench_phase_sequential': 'Последовательная запись',
+  'bench_phase_random4k': 'Случайная 4K запись',
+  'bench_phase_multithread': 'Масштабирование потоков',
+  'bench_phase_full': 'Устойчивость полной записи',
+  'bench_phase_finalizing': 'Завершение',
+  'bench_phase_complete': 'Готово',
+  'bench_phase_cancelled': 'Отменено',
+  'bench_phase_failed': 'Ошибка',
+  'bench_msg_ready': 'Выберите диск и запустите тест.',
+  'bench_msg_preparing': 'Создание временных файлов теста.',
+  'bench_msg_sequential': 'Измерение устойчивой последовательной записи.',
+  'bench_msg_random4k':
+      'Измерение мелких случайных записей, ключевой нагрузки To Go.',
+  'bench_msg_multithread': 'Проверка поведения диска при параллельном I/O.',
+  'bench_msg_full':
+      'Запись в свободное место для проверки долгой стабильности.',
+  'bench_msg_finalizing': 'Очистка временных файлов и расчет оценки.',
+  'bench_msg_complete': 'Тест завершен. Проверьте графики и оценку.',
+  'bench_msg_cancelled': 'Тест остановлен пользователем.',
+  'bench_msg_failed': 'Тест не выполнен. Проверьте диск и повторите.',
+  'bench_elapsed': 'Время',
+  'bench_current_speed': 'Текущая скорость',
+  'bench_progress': 'Прогресс',
+  'bench_rating_excellent': 'Готов для To Go',
+  'bench_rating_good': 'Комфортно',
+  'bench_rating_usable': 'Можно использовать',
+  'bench_rating_limited': 'Ограниченно',
+  'bench_rating_not_recommended': 'Не рекомендуется',
+  'bench_rating_unmeasured': 'Не измерено',
+  'bench_rating_excellent_desc':
+      'Сильная 4K и длительная запись. Подходит для требовательного To Go.',
+  'bench_rating_good_desc':
+      'Хорошее общее поведение. Обычная портативная система должна работать плавно.',
+  'bench_rating_usable_desc':
+      'Подойдет для легких задач, но обновления и многозадачность могут быть медленнее.',
+  'bench_rating_limited_desc':
+      'Годится для простых задач, но To Go система, вероятно, будет заметно тормозить.',
+  'bench_rating_not_recommended_desc':
+      'Слишком медленно или нестабильно для надежного To Go.',
+  'bench_rating_unmeasured_desc':
+      'Запустите тест, чтобы получить результат пригодности.',
+  'bench_result_overall': 'Общая оценка',
+  'bench_result_recommendation': 'Рекомендация',
+  'bench_result_reasons': 'Ключевые причины',
+  'bench_result_notes': 'Примечания',
+  'bench_recommend_excellent':
+      'Рекомендуется для Windows To Go / Linux To Go, включая более тяжелое ежедневное использование.',
+  'bench_recommend_good': 'Рекомендуется для Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'Подходит для легких To Go-сценариев; лучше избегать тяжелых обновлений и многозадачности.',
+  'bench_recommend_limited':
+      'Подходит только для аварийного или легкого To Go-использования.',
+  'bench_recommend_not_recommended':
+      'Не рекомендуется для Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured': 'Запустите тест, чтобы получить рекомендацию.',
+  'bench_reason_4k_strong': 'Случайная запись 4K очень высокая.',
+  'bench_reason_4k_stable': 'Случайная запись 4K стабильна.',
+  'bench_reason_4k_limited': 'Случайная запись 4K ограничена.',
+  'bench_reason_4k_weak':
+      'Случайная запись 4K слишком слабая для плавной портативной ОС.',
+  'bench_reason_thread_good':
+      'Под многопоточной нагрузкой нет серьезного падения скорости.',
+  'bench_reason_thread_limited':
+      'Под многопоточной нагрузкой заметно падает скорость.',
+  'bench_reason_seq_good': 'Скорости последовательной записи достаточно.',
+  'bench_reason_seq_acceptable':
+      'Скорость последовательной записи в конце остается приемлемой.',
+  'bench_reason_seq_slow': 'Скорость последовательной записи низкая.',
+  'bench_reason_full_stable':
+      'Полная запись оставалась стабильной, явного обвала кэша нет.',
+  'bench_reason_full_drop':
+      'Скорость полной записи заметно упала к концу, возможно из-за исчерпания SLC-кэша.',
+  'bench_note_full_not_run':
+      'Тест полной записи не запускался, поэтому поведение после исчерпания SLC-кэша не оценивалось.',
+  'bench_note_full_skipped_low_space':
+      'Тест полной записи не дал образцов, обычно из-за нехватки места или раннего завершения.',
+  'bench_note_full_ran':
+      'Тест полной записи учтен при оценке длительной стабильности записи.',
+  'bench_report_copied': 'Отчет скопирован',
+  'bench_copy_report': 'Копировать отчет',
+  'bench_score': 'Оценка',
+  'bench_4k_adjusted': '4K с поправкой',
+  'bench_seq_write': 'Послед. запись',
+  'bench_duration': 'Длительность',
+  'bench_chart_sequential': 'Последовательная запись',
+  'bench_chart_sequential_desc': 'Скорость крупноблочной записи во времени',
+  'bench_chart_4k': 'Стабильность 4K random',
+  'bench_chart_4k_desc': 'Постоянство мелких записей для отзывчивости To Go',
+  'bench_chart_threads': 'Масштабирование потоков',
+  'bench_chart_threads_desc': 'Параллельные 4K записи при разном числе потоков',
+  'bench_chart_full': 'Кривая полной записи',
+  'bench_chart_full_desc':
+      'Долгая запись и просадка кэша в режиме полной записи',
+  'bench_chart_waiting': 'График появится во время теста',
+  'bench_chart_full_skip': 'Для этой кривой используйте режим полной записи',
+  'bench_error_no_drive_letter':
+      'У диска нет пригодной буквы. Подключите его заново или назначьте букву в управлении дисками.',
+  'bench_error_drive_not_ready':
+      'Выбранный диск не готов. Подключите его заново и повторите.',
+  'wtg_benchmark_tip_title': 'Рекомендуется перед созданием To Go',
+  'wtg_benchmark_tip_desc':
+      'Запустите тест диска, если хотите проверить 4K запись, потоки и долгую стабильность. Создание можно продолжить и без теста.',
+  'wtg_benchmark_tip_button': 'Тест диска',
 };
 
 const _fr = <String, String>{
+  'translation_missing':
+      'Ce texte n’est pas disponible dans la langue choisie.',
+  'safety_disk_missing': 'Le disque sélectionné n’est plus connecté.',
+  'safety_disk_changed':
+      'Le disque cible a changé après la sélection. Reconnectez-le et sélectionnez-le à nouveau.',
+  'safety_disk_busy':
+      'Ce disque est déjà utilisé par une autre opération de WinDeploy Studio. Attendez qu’elle se termine, puis réessayez.',
+  'safety_detection_failed':
+      'Les informations de sécurité du disque n’ont pas pu être vérifiées. L’opération a été arrêtée.',
+  'safety_not_external':
+      'Seuls les disques externes vérifiés peuvent être effacés.',
+  'safety_disk_offline':
+      'Le disque sélectionné est hors ligne et inutilisable.',
+  'linux_not_isohybrid':
+      'Cet ISO n’est pas une image ISOHybrid amorçable. Le disque cible n’a pas été modifié.',
+  'linux_togo_mount_preflight_failed':
+      'L’image Linux n’a pas pu être inspectée. Le disque cible n’a pas été modifié.',
+  'linux_togo_unsupported_iso':
+      'Linux To Go persistant prend actuellement en charge Ubuntu x64 et les images Live compatibles basées sur casper. Pour les autres distributions, utilisez le créateur de support d’installation.',
+  'linux_togo_mke2fs_missing':
+      'Le composant de persistance Linux fourni est manquant. Réinstallez WinDeploy Studio. Le disque cible n’a pas été modifié.',
+  'linux_togo_boot_config_unsupported':
+      'Cette image casper ne contient aucune entrée GRUB prise en charge pour activer la persistance. Le disque cible n’a pas été modifié.',
+  'linux_togo_boot_file_too_large':
+      'Cette image contient un fichier de démarrage requis trop volumineux pour FAT32. Le disque cible n’a pas été modifié.',
+  'bench_error_helper_missing':
+      'Le composant natif de test est manquant. Réinstallez l’application.',
+  'bench_error_cleanup_failed':
+      'Certains fichiers de test n’ont pas pu être supprimés. Fermez les programmes utilisant le disque, puis supprimez le dossier .wds_benchmark.',
+  'bench_error_native_failed': 'Le test natif du disque n’a pas pu aboutir.',
+  'ai_privacy_title': 'Avis d’analyse à distance',
+  'ai_privacy_message':
+      'Cette analyse envoie des extraits de journaux, des noms d’images ou des informations sur l’appareil au service d’IA configuré. Seuls les aperçus lus par cette fonction sont envoyés, jamais les numéros de série USB. Continuer ?',
+  'ai_privacy_continue': 'Continuer et envoyer',
   'app_name': 'WinDeploy Studio',
   'app_subtitle':
       'Créateur de supports d’installation et To Go Windows et Linux',
@@ -2348,8 +2890,6 @@ const _fr = <String, String>{
   'home_bootable_usb': 'Créateur de support d’installation',
   'home_bootable_usb_desc':
       'Créer des supports USB d’installation Windows ou Linux à partir de fichiers ISO',
-  'home_font_pack': 'Télécharger le pack de polices',
-  'home_font_pack_desc': 'Polices CJK pour les ISO Windows allégés',
   'home_wtg': 'Espace de travail To Go',
   'home_wtg_desc': 'Créer des espaces de travail portables Windows et Linux',
   'home_local_iso': 'Import ISO local',
@@ -2385,7 +2925,6 @@ const _fr = <String, String>{
   'detail_cancel': 'Annuler',
   'detail_continue': 'Continuer',
   'detail_link_copied': 'Lien copié',
-  'detail_sha256_copied': 'SHA256 copié',
   'detail_open_failed': 'Impossible d\'ouvrir le lien',
   'images_error': 'Erreur inconnue',
   'mirror_not_found': 'Élément miroir introuvable',
@@ -2395,16 +2934,15 @@ const _fr = <String, String>{
   'cancel_confirm': 'Confirmer l\'annulation',
   'cancel_create_desc':
       'Annuler la création du support d\'installation Windows ? Le processus ne pourra pas être repris.',
-  'fontpack_warning': 'Ce système pourrait ne pas avoir les polices chinoises',
+  'fontpack_warning': 'Cette image peut ne pas contenir les polices CJK',
   'fontpack_recommend':
-      'Nous recommandons de télécharger et installer le pack de polices chinoises',
+      'Téléchargez et installez le pack de polices CJK pour afficher correctement les textes chinois, japonais et coréens',
   'fontpack_download': 'Télécharger le pack de polices',
   'fontpack_desc':
-      'Pack de polices chinoises pour les ISO Windows allégés. Inclut les polices CJK courantes pour garantir l\'affichage correct du contenu chinois.',
-  'fontpack_feature_1':
-      'Inclut HarmonyOS Sans SC et d\'autres polices chinoises',
-  'fontpack_feature_2': 'Compatible Windows 10/11',
-  'fontpack_feature_3': 'Installation en un clic pour tous les utilisateurs',
+      'Pack de polices CJK complémentaire pour Tiny10, Tiny11 et Windows X-Lite.',
+  'fontpack_feature_1': 'Comprend des polices CJK telles que HarmonyOS Sans SC',
+  'fontpack_feature_2': 'Prend en charge Windows 10 et Windows 11',
+  'fontpack_feature_3': 'Peut être installé pour tous les utilisateurs',
   'iso_step_mount': 'Montage de l\'ISO...',
   'iso_step_detect': 'Détection de l\'installateur...',
   'iso_step_info': 'Lecture des informations de l\'image...',
@@ -2631,23 +3169,24 @@ const _fr = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Créateur Linux To Go',
-  'wtg_linux_subtitle': 'Créer un espace Linux Live portable et amorçable',
+  'wtg_linux_subtitle':
+      'Créer un environnement Ubuntu/casper Live portable et persistant',
   'wtg_linux_select_iso': 'Sélectionner l’ISO Linux',
   'wtg_linux_select_iso_desc':
-      'Choisissez une image Linux ISOHybrid Live. La persistance dépend de la distribution et n’est pas modifiée dans ce mode.',
+      'Choisissez une image Ubuntu x64 ou une image Live compatible basée sur casper. WinDeploy Studio créera et activera le stockage persistant.',
   'wtg_linux_step1_title': 'Étape 1 : sélectionner l’ISO Linux',
   'wtg_linux_step1_desc':
-      'Sélectionnez une image Linux Live ISOHybrid pour créer Linux To Go',
+      'Sélectionnez une image Ubuntu x64 ou une image Live compatible basée sur casper',
   'wtg_linux_step4_title': 'Étape 2 : sélectionner le disque cible',
   'wtg_linux_step4_desc': 'Sélectionnez le disque externe pour Linux To Go',
   'wtg_linux_confirm_title': 'Étape 3 : confirmer Linux To Go',
   'wtg_linux_confirm_desc':
-      'Vérifiez l’ISO, le disque et le mode d’espace Live avant l’écriture',
+      'Avant l’écriture, vérifiez l’ISO casper pris en charge, le disque cible et l’espace persistant',
   'wtg_linux_workspace_type': 'Type d’espace',
-  'wtg_linux_live_workspace': 'Espace Linux Live amorçable',
+  'wtg_linux_live_workspace': 'Environnement Ubuntu/casper Live persistant',
   'wtg_linux_persistence': 'Persistance',
   'wtg_linux_persistence_note':
-      'Dépend de la distribution ; la configuration de démarrage n’est pas modifiée',
+      'Activée avec une image ext4 writable (jusqu’à environ 4 Go)',
   'wtg_linux_step6_title': 'Étape 4 : création de Linux To Go',
   'wtg_linux_step6_desc':
       'Veuillez patienter pendant l’écriture de l’image ISO Linux sur le disque cible',
@@ -2713,16 +3252,20 @@ const _fr = <String, String>{
   'update_release_notes': 'Notes de version',
   'update_now': 'Mettre à jour maintenant',
   'update_open_browser': 'Ouvrir dans le navigateur',
+  'update_install_verification_failed':
+      'Le programme d’installation n’a pas réussi la vérification d’intégrité ou d’éditeur. Utilisez plutôt le téléchargement dans le navigateur.',
   'update_later': 'Rappeler plus tard',
   'update_ignore': 'Ignorer cette version',
   'update_downloading': 'Téléchargement de la mise à jour',
   'update_progress': 'Progression',
   'update_speed': 'Vitesse',
-  'update_install': 'Installer et redémarrer',
+  'update_install': 'Installer la mise à jour',
   'update_install_desc':
-      'La mise à jour a été téléchargée. Installer maintenant ?',
+      'La mise à jour est prête. WinDeploy Studio va se fermer et lancer le programme d’installation. Continuer ?',
   'update_up_to_date': 'Vous êtes à jour',
   'update_checking': 'Vérification des mises à jour...',
+  'update_installing':
+      'Vérification et lancement du programme d’installation...',
   'update_check_failed': 'Échec de la vérification des mises à jour',
   'update_channel': 'Canal de mise à jour',
   'update_channel_stable': 'Stable',
@@ -3075,9 +3618,184 @@ const _fr = <String, String>{
   'mirror_global_tag': 'Global',
   'mirror_default_title': 'Télécharger',
   'mirror_default_desc': 'Lien de téléchargement direct',
+  'nav_benchmark': 'Test disque',
+  'home_benchmark': 'Benchmark de disque',
+  'home_benchmark_desc': 'Vérifier les performances réelles avant To Go',
+  'logs_cat_benchmark': 'Journaux de test disque',
+  'bench_title': 'Benchmark de disque',
+  'bench_subtitle':
+      'Mesure le comportement réel en écriture pour Windows To Go et Linux To Go : séquentiel, aléatoire 4K, montée en threads et stabilité longue durée.',
+  'bench_refresh': 'Actualiser',
+  'bench_target_disk': 'Disque cible',
+  'bench_detecting': 'Détection des disques amovibles...',
+  'bench_no_disk': 'Aucun disque amovible trouvé',
+  'bench_no_disk_desc':
+      'Connectez une clé USB ou un SSD portable, puis actualisez.',
+  'bench_no_drive_letter': 'Aucune lettre',
+  'bench_test_mode': 'Mode de test',
+  'bench_mode_quick': 'Rapide',
+  'bench_mode_standard': 'Standard',
+  'bench_mode_extreme': 'Extrême',
+  'bench_mode_full_write': 'Écriture complète',
+  'bench_mode_quick_desc':
+      'Contrôle court pour juger une compatibilité To Go de base.',
+  'bench_mode_standard_desc':
+      'Couverture équilibrée pour un usage Windows To Go et Linux To Go quotidien.',
+  'bench_mode_extreme_desc':
+      'Tests 4K et multithread plus longs pour un avis plus strict.',
+  'bench_mode_full_write_desc':
+      'Ajoute une écriture presque complète pour révéler la chute du cache.',
+  'bench_full_warning':
+      'Le mode Écriture complète écrit sur la majeure partie de l’espace libre et peut durer longtemps. Les fichiers existants ne sont pas supprimés volontairement, mais le disque sera fortement sollicité.',
+  'bench_start': 'Lancer le test',
+  'bench_stop': 'Arrêter',
+  'bench_open_togo': 'Ouvrir To Go',
+  'bench_full_confirm_title': 'Test écriture complète',
+  'bench_full_confirm_desc':
+      'Ce mode crée un gros fichier temporaire, écrit presque jusqu’au remplissage du disque, puis le supprime. Continuez seulement si vous avez assez d’espace et de temps.',
+  'bench_full_confirm_start': 'Lancer écriture complète',
+  'bench_phase_idle': 'Prêt',
+  'bench_phase_preparing': 'Préparation',
+  'bench_phase_sequential': 'Écriture séquentielle',
+  'bench_phase_random4k': 'Écriture aléatoire 4K',
+  'bench_phase_multithread': 'Montée en threads',
+  'bench_phase_full': 'Stabilité écriture complète',
+  'bench_phase_finalizing': 'Finalisation',
+  'bench_phase_complete': 'Terminé',
+  'bench_phase_cancelled': 'Annulé',
+  'bench_phase_failed': 'Échec',
+  'bench_msg_ready': 'Choisissez un disque et lancez un test.',
+  'bench_msg_preparing': 'Création des fichiers temporaires de test.',
+  'bench_msg_sequential':
+      'Mesure de la vitesse d’écriture séquentielle soutenue.',
+  'bench_msg_random4k':
+      'Mesure des petites écritures aléatoires, charge clé pour To Go.',
+  'bench_msg_multithread':
+      'Vérification du comportement avec des I/O parallèles.',
+  'bench_msg_full':
+      'Écriture sur l’espace libre pour observer la stabilité longue durée.',
+  'bench_msg_finalizing':
+      'Nettoyage des fichiers temporaires et calcul du score.',
+  'bench_msg_complete':
+      'Benchmark terminé. Consultez les graphiques et le score.',
+  'bench_msg_cancelled': 'Benchmark arrêté par l’utilisateur.',
+  'bench_msg_failed': 'Benchmark échoué. Vérifiez le disque puis réessayez.',
+  'bench_elapsed': 'Temps écoulé',
+  'bench_current_speed': 'Vitesse actuelle',
+  'bench_progress': 'Progression',
+  'bench_rating_excellent': 'Prêt pour To Go',
+  'bench_rating_good': 'Confortable',
+  'bench_rating_usable': 'Utilisable',
+  'bench_rating_limited': 'Limité',
+  'bench_rating_not_recommended': 'Déconseillé',
+  'bench_rating_unmeasured': 'Non mesuré',
+  'bench_rating_excellent_desc':
+      'Très bon 4K et écriture soutenue. Adapté à un usage To Go exigeant.',
+  'bench_rating_good_desc':
+      'Bon comportement global. Un système portable courant devrait rester fluide.',
+  'bench_rating_usable_desc':
+      'Utilisable pour un usage léger, mais les mises à jour ou le multitâche peuvent ralentir.',
+  'bench_rating_limited_desc':
+      'Convient aux tâches simples, mais un système To Go risque d’être lent.',
+  'bench_rating_not_recommended_desc':
+      'Trop lent ou instable pour une expérience To Go fiable.',
+  'bench_rating_unmeasured_desc':
+      'Lancez un benchmark pour obtenir un résultat.',
+  'bench_result_overall': 'Évaluation globale',
+  'bench_result_recommendation': 'Recommandation',
+  'bench_result_reasons': 'Raisons clés',
+  'bench_result_notes': 'Notes',
+  'bench_recommend_excellent':
+      'Recommandé pour Windows To Go / Linux To Go, y compris pour un usage quotidien plus exigeant.',
+  'bench_recommend_good': 'Recommandé pour Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'Utilisable pour des scénarios To Go légers; évitez les grosses mises à jour et le multitâche lourd.',
+  'bench_recommend_limited':
+      'À réserver au dépannage ou à un usage To Go très léger.',
+  'bench_recommend_not_recommended':
+      'Non recommandé pour Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured':
+      'Lancez un test pour obtenir une recommandation.',
+  'bench_reason_4k_strong': 'Les écritures aléatoires 4K sont très solides.',
+  'bench_reason_4k_stable': 'Les écritures aléatoires 4K sont stables.',
+  'bench_reason_4k_limited': 'Les écritures aléatoires 4K sont limitées.',
+  'bench_reason_4k_weak':
+      'Les écritures aléatoires 4K sont trop faibles pour un OS portable fluide.',
+  'bench_reason_thread_good':
+      'Pas de fort ralentissement sous pression multithread.',
+  'bench_reason_thread_limited':
+      'Ralentissement visible sous pression multithread.',
+  'bench_reason_seq_good': 'La vitesse d’écriture séquentielle est suffisante.',
+  'bench_reason_seq_acceptable':
+      'La vitesse d’écriture séquentielle reste acceptable en fin de test.',
+  'bench_reason_seq_slow': 'La vitesse d’écriture séquentielle est faible.',
+  'bench_reason_full_stable':
+      'L’écriture complète est restée stable, sans effondrement évident du cache.',
+  'bench_reason_full_drop':
+      'La vitesse d’écriture complète chute nettement en fin de test, possiblement à cause de l’épuisement du cache SLC.',
+  'bench_note_full_not_run':
+      'Le test d’écriture complète n’a pas été lancé; le comportement après épuisement du cache SLC n’a donc pas été évalué.',
+  'bench_note_full_skipped_low_space':
+      'Le test d’écriture complète n’a produit aucun échantillon, généralement par manque d’espace ou arrêt anticipé.',
+  'bench_note_full_ran':
+      'Le test d’écriture complète est inclus dans le jugement de stabilité longue durée.',
+  'bench_report_copied': 'Rapport copié',
+  'bench_copy_report': 'Copier le rapport',
+  'bench_score': 'Score',
+  'bench_4k_adjusted': '4K ajusté',
+  'bench_seq_write': 'Écriture seq.',
+  'bench_duration': 'Durée',
+  'bench_chart_sequential': 'Écriture séquentielle',
+  'bench_chart_sequential_desc': 'Vitesse des gros blocs au fil du temps',
+  'bench_chart_4k': 'Stabilité 4K aléatoire',
+  'bench_chart_4k_desc':
+      'Régularité des petites écritures pour la réactivité To Go',
+  'bench_chart_threads': 'Montée en threads',
+  'bench_chart_threads_desc': 'Écritures 4K parallèles avec plus de workers',
+  'bench_chart_full': 'Courbe écriture complète',
+  'bench_chart_full_desc':
+      'Écriture longue durée et chute du cache en mode complet',
+  'bench_chart_waiting': 'Le graphique apparaîtra pendant le test',
+  'bench_chart_full_skip':
+      'Utilisez le mode Écriture complète pour collecter cette courbe',
+  'bench_error_no_drive_letter':
+      'Ce disque n’a pas de lettre utilisable. Reconnectez-le ou attribuez une lettre dans la gestion des disques.',
+  'bench_error_drive_not_ready':
+      'Le disque sélectionné n’est pas prêt. Reconnectez-le puis réessayez.',
+  'wtg_benchmark_tip_title': 'Recommandé avant de créer To Go',
+  'wtg_benchmark_tip_desc':
+      'Lancez le test disque pour vérifier le 4K, les threads et la stabilité longue durée. Vous pouvez aussi continuer sans test.',
+  'wtg_benchmark_tip_button': 'Test disque',
 };
 
 const _ja = <String, String>{
+  'translation_missing': '選択した言語では、このテキストを利用できません。',
+  'safety_disk_missing': '選択したディスクは接続されていません。',
+  'safety_disk_changed': '選択後に対象ディスクが変わりました。再接続して選び直してください。',
+  'safety_disk_busy': '別の WinDeploy Studio の処理がこのディスクを使用中です。完了してからもう一度お試しください。',
+  'safety_detection_failed': 'ディスクの安全性を確認できなかったため、処理を中止しました。',
+  'safety_not_external': '消去できるのは、確認済みの外付けディスクだけです。',
+  'safety_disk_offline': '選択したディスクはオフラインのため使用できません。',
+  'linux_not_isohybrid':
+      'この ISO は起動可能な ISOHybrid イメージではありません。対象ディスクは変更されていません。',
+  'linux_togo_mount_preflight_failed':
+      'Linux イメージを確認できませんでした。対象ディスクは変更されていません。',
+  'linux_togo_unsupported_iso':
+      '永続化 Linux To Go は現在、x64 Ubuntu および互換性のある casper ベースの Live イメージに対応しています。その他のディストリビューションにはインストールメディア作成機能を使用してください。',
+  'linux_togo_mke2fs_missing':
+      '同梱の Linux 永続化コンポーネントが見つかりません。WinDeploy Studio を再インストールしてください。対象ディスクは変更されていません。',
+  'linux_togo_boot_config_unsupported':
+      'この casper イメージには、永続化を有効にできる対応 GRUB エントリがありません。対象ディスクは変更されていません。',
+  'linux_togo_boot_file_too_large':
+      'このイメージには FAT32 の単一ファイル上限を超える必須の起動ファイルがあります。対象ディスクは変更されていません。',
+  'bench_error_helper_missing': 'ネイティブのディスクテストコンポーネントがありません。アプリを再インストールしてください。',
+  'bench_error_cleanup_failed':
+      '一部のテストファイルを削除できませんでした。ドライブを使用中のアプリを閉じ、.wds_benchmark フォルダーを削除してください。',
+  'bench_error_native_failed': 'ネイティブのディスクテストを完了できませんでした。',
+  'ai_privacy_title': 'リモート解析について',
+  'ai_privacy_message':
+      'この解析では、選択したログの抜粋、イメージ名、またはデバイス情報を設定済みの AI サービスへ送信します。ファイル内容は本機能が読み取る範囲に限られ、USB のシリアル番号は送信されません。続行しますか？',
+  'ai_privacy_continue': '続行して送信',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Windows / Linux インストールメディア & To Go 作成ツール',
   'nav_home': 'ホーム',
@@ -3093,8 +3811,6 @@ const _ja = <String, String>{
   'home_image_library_desc': 'Windowsイメージを閲覧し、ダウンロードリンクを取得',
   'home_bootable_usb': 'インストールメディア作成ツール',
   'home_bootable_usb_desc': 'ISO から Windows または Linux のインストール USB を作成',
-  'home_font_pack': 'フォントパックのダウンロード',
-  'home_font_pack_desc': '軽量Windows ISO用CJKフォント',
   'home_wtg': 'To Go ワークスペース',
   'home_wtg_desc': 'ポータブルな Windows / Linux ワークスペースを作成',
   'home_local_iso': 'ローカルISOインポート',
@@ -3129,7 +3845,6 @@ const _ja = <String, String>{
   'detail_cancel': 'キャンセル',
   'detail_continue': '続行',
   'detail_link_copied': 'リンクをコピーしました',
-  'detail_sha256_copied': 'SHA256をコピーしました',
   'detail_open_failed': 'リンクを開けませんでした',
   'images_error': '不明なエラー',
   'mirror_not_found': 'ミラーアイテムが見つかりません',
@@ -3137,13 +3852,14 @@ const _ja = <String, String>{
   'cancel_parse_desc': 'ISO解析をキャンセルしますか？マウントされたイメージはアンマウントされます。',
   'cancel_confirm': 'キャンセルの確認',
   'cancel_create_desc': 'Windows インストールメディアの作成をキャンセルしますか？処理を再開することはできません。',
-  'fontpack_warning': 'このシステムには中国語フォントが含まれていない可能性があります',
-  'fontpack_recommend': '中国語フォントパックのダウンロードとインストールをお勧めします',
-  'fontpack_download': 'フォントパックをダウンロード',
-  'fontpack_desc': '軽量Windows ISO用の中国語フォント補助パック。CJKフォントを含み、中国語コンテンツを正しく表示します。',
-  'fontpack_feature_1': 'HarmonyOS Sans SCなどの中国語フォントを含む',
-  'fontpack_feature_2': 'Windows 10/11に対応',
-  'fontpack_feature_3': '全ユーザー向けワンクリックインストール',
+  'fontpack_warning': 'このイメージにはCJKフォントが含まれていない可能性があります',
+  'fontpack_recommend':
+      '中国語、日本語、韓国語のテキストを完全に表示するには、CJKフォントパックをダウンロードしてインストールしてください',
+  'fontpack_download': 'CJKフォントパックをダウンロード',
+  'fontpack_desc': 'Tiny10、Tiny11、Windows X-Lite向けのCJKフォント補完パックです。',
+  'fontpack_feature_1': 'HarmonyOS Sans SCなどのCJKフォントを収録',
+  'fontpack_feature_2': 'Windows 10およびWindows 11に対応',
+  'fontpack_feature_3': 'すべてのユーザーにインストール可能',
   'iso_step_mount': 'ISOをマウント中...',
   'iso_step_detect': 'インストーラーを検出中...',
   'iso_step_info': 'イメージ情報を読み取り中...',
@@ -3356,20 +4072,20 @@ const _ja = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Linux To Go 作成ツール',
-  'wtg_linux_subtitle': '持ち運べる起動可能な Linux Live 環境を作成',
+  'wtg_linux_subtitle': '変更を保存できる Ubuntu/casper Live 環境を作成',
   'wtg_linux_select_iso': 'Linux ISO を選択',
   'wtg_linux_select_iso_desc':
-      'Linux ISOHybrid Live イメージを選択します。永続化はディストリビューションに依存し、このモードでは起動設定を変更しません。',
+      'x64 Ubuntu、または casper ベースの互換 Live ISO を選択してください。WinDeploy Studio が永続ストレージを作成して有効にします。',
   'wtg_linux_step1_title': 'ステップ 1: Linux ISO を選択',
-  'wtg_linux_step1_desc': 'Linux To Go を作成する Linux Live ISOHybrid イメージを選択',
+  'wtg_linux_step1_desc': 'x64 Ubuntu、または casper ベースの互換 Live ISO を選択',
   'wtg_linux_step4_title': 'ステップ 2: 対象ディスクを選択',
   'wtg_linux_step4_desc': 'Linux To Go に使用する外部ディスクを選択',
   'wtg_linux_confirm_title': 'ステップ 3: Linux To Go の確認',
-  'wtg_linux_confirm_desc': '書き込み前に ISO、ディスク、Live 環境モードを確認します',
+  'wtg_linux_confirm_desc': '書き込み前に対応 casper ISO、対象ディスク、永続環境を確認します',
   'wtg_linux_workspace_type': 'ワークスペースの種類',
-  'wtg_linux_live_workspace': '起動可能な Linux Live 環境',
+  'wtg_linux_live_workspace': '永続化 Ubuntu/casper Live 環境',
   'wtg_linux_persistence': '永続化',
-  'wtg_linux_persistence_note': 'ディストリビューションに依存します。起動設定は変更されません',
+  'wtg_linux_persistence_note': 'ext4 writable イメージで有効化（最大約 4 GB）',
   'wtg_linux_step6_title': 'ステップ 4: Linux To Go を作成中',
   'wtg_linux_step6_desc': 'Linux ISO イメージを対象ディスクへ書き込んでいます',
   'wtg_linux_step_complete_title': 'ステップ 5: 完了',
@@ -3431,15 +4147,19 @@ const _ja = <String, String>{
   'update_release_notes': 'リリースノート',
   'update_now': '今すぐアップデート',
   'update_open_browser': 'ブラウザで開く',
+  'update_install_verification_failed':
+      'インストーラーの整合性または発行元を確認できませんでした。ブラウザーからダウンロードしてください。',
   'update_later': '後でリマインド',
   'update_ignore': 'このバージョンを無視',
   'update_downloading': 'アップデートをダウンロード中',
   'update_progress': '進捗',
   'update_speed': '速度',
-  'update_install': 'インストールして再起動',
-  'update_install_desc': 'アップデートがダウンロードされました。今すぐインストールしますか？',
+  'update_install': 'アップデートをインストール',
+  'update_install_desc':
+      'アップデートの準備ができました。WinDeploy Studio を終了してインストーラーを起動します。続行しますか？',
   'update_up_to_date': '最新バージョンです',
   'update_checking': 'アップデートを確認中...',
+  'update_installing': 'インストーラーを確認して起動しています...',
   'update_check_failed': 'アップデートの確認に失敗しました',
   'update_channel': 'アップデートチャネル',
   'update_channel_stable': '安定版',
@@ -3775,9 +4495,148 @@ const _ja = <String, String>{
   'mirror_global_tag': 'グローバル',
   'mirror_default_title': 'ダウンロード',
   'mirror_default_desc': '直接ダウンロードリンク',
+  'nav_benchmark': 'ディスクテスト',
+  'home_benchmark': 'ドライブベンチマーク',
+  'home_benchmark_desc': 'To Go 作成前に実際の性能を確認',
+  'logs_cat_benchmark': 'ディスクテストログ',
+  'bench_title': 'ドライブベンチマーク',
+  'bench_subtitle':
+      'Windows To Go と Linux To Go 向けに、シーケンシャル書き込み、4Kランダム、スレッド拡張、長時間書き込みの安定性を測定します。',
+  'bench_refresh': '更新',
+  'bench_target_disk': '対象ドライブ',
+  'bench_detecting': 'リムーバブルドライブを検出中...',
+  'bench_no_disk': 'リムーバブルドライブが見つかりません',
+  'bench_no_disk_desc': 'USBドライブまたはポータブルSSDを接続して更新してください。',
+  'bench_no_drive_letter': 'ドライブ文字なし',
+  'bench_test_mode': 'テストモード',
+  'bench_mode_quick': 'クイック',
+  'bench_mode_standard': '標準',
+  'bench_mode_extreme': '極限',
+  'bench_mode_full_write': '全域書き込み',
+  'bench_mode_quick_desc': 'To Go に最低限向くかを短時間で確認します。',
+  'bench_mode_standard_desc': '日常的な Windows To Go と Linux To Go 用にバランスよく測定します。',
+  'bench_mode_extreme_desc': '4K とマルチスレッドを長めに測り、より厳しく評価します。',
+  'bench_mode_full_write_desc': '空き領域の大部分を書き込み、キャッシュ低下を確認します。',
+  'bench_full_warning':
+      '全域書き込みモードは空き領域の大部分に書き込み、長時間かかる場合があります。既存ファイルを意図的に削除しませんが、ドライブに強い負荷がかかります。',
+  'bench_start': 'テスト開始',
+  'bench_stop': '停止',
+  'bench_open_togo': 'To Go を開く',
+  'bench_full_confirm_title': '全域書き込みテスト',
+  'bench_full_confirm_desc':
+      'このモードは大きな一時ファイルを作成し、ドライブがほぼいっぱいになるまで書き込んでから削除します。十分な空き容量と時間がある場合のみ続行してください。',
+  'bench_full_confirm_start': '全域書き込みを開始',
+  'bench_phase_idle': '準備完了',
+  'bench_phase_preparing': '準備中',
+  'bench_phase_sequential': 'シーケンシャル書き込み',
+  'bench_phase_random4k': '4Kランダム書き込み',
+  'bench_phase_multithread': 'スレッド拡張',
+  'bench_phase_full': '全域書き込み安定性',
+  'bench_phase_finalizing': '仕上げ中',
+  'bench_phase_complete': '完了',
+  'bench_phase_cancelled': 'キャンセル済み',
+  'bench_phase_failed': '失敗',
+  'bench_msg_ready': 'ドライブを選択してテストを開始してください。',
+  'bench_msg_preparing': '一時ベンチマークファイルを作成しています。',
+  'bench_msg_sequential': '持続シーケンシャル書き込み速度を測定しています。',
+  'bench_msg_random4k': 'To Go の応答性に重要な小さなランダム書き込みを測定しています。',
+  'bench_msg_multithread': '並列 I/O でのドライブ挙動を確認しています。',
+  'bench_msg_full': '空き領域に書き込み、長時間安定性を観察しています。',
+  'bench_msg_finalizing': '一時ファイルを削除し、スコアを計算しています。',
+  'bench_msg_complete': 'ベンチマークが完了しました。グラフとスコアを確認してください。',
+  'bench_msg_cancelled': 'ユーザーによりテストが停止されました。',
+  'bench_msg_failed': 'ベンチマークに失敗しました。ドライブを確認して再試行してください。',
+  'bench_elapsed': '経過時間',
+  'bench_current_speed': '現在速度',
+  'bench_progress': '進行状況',
+  'bench_rating_excellent': 'To Go 向き',
+  'bench_rating_good': '快適',
+  'bench_rating_usable': '使用可能',
+  'bench_rating_limited': '制限あり',
+  'bench_rating_not_recommended': '非推奨',
+  'bench_rating_unmeasured': '未測定',
+  'bench_rating_excellent_desc': '4K と持続書き込みが強く、負荷の高い To Go 利用にも向いています。',
+  'bench_rating_good_desc': '全体的に良好で、通常のポータブル環境なら快適に動作しやすいです。',
+  'bench_rating_usable_desc': '軽い作業には使えますが、更新やマルチタスクでは遅く感じる可能性があります。',
+  'bench_rating_limited_desc': '簡単な作業は可能ですが、To Go システムとしてはもたつきやすいです。',
+  'bench_rating_not_recommended_desc': '信頼できる To Go 体験には速度または安定性が不足しています。',
+  'bench_rating_unmeasured_desc': 'ベンチマークを実行すると適性結果が表示されます。',
+  'bench_result_overall': '総合評価',
+  'bench_result_recommendation': '推奨',
+  'bench_result_reasons': '主な理由',
+  'bench_result_notes': '注意',
+  'bench_recommend_excellent':
+      'Windows To Go / Linux To Go に推奨。やや重い日常利用にも向いています。',
+  'bench_recommend_good': 'Windows To Go / Linux To Go に推奨。',
+  'bench_recommend_usable': '軽い To Go 用途なら使用可能です。重い更新や多重作業は避けるのが無難です。',
+  'bench_recommend_limited': '緊急用または軽量な To Go 用途に限って推奨します。',
+  'bench_recommend_not_recommended': 'Windows To Go / Linux To Go には推奨しません。',
+  'bench_recommend_unmeasured': 'テストを実行すると推奨内容が生成されます。',
+  'bench_reason_4k_strong': '4K ランダム書き込みが非常に強力です。',
+  'bench_reason_4k_stable': '4K ランダム書き込みが安定しています。',
+  'bench_reason_4k_limited': '4K ランダム書き込みは控えめです。',
+  'bench_reason_4k_weak': '4K ランダム書き込みが弱く、快適なポータブル OS には不足します。',
+  'bench_reason_thread_good': 'マルチスレッド負荷でも大きな速度低下はありません。',
+  'bench_reason_thread_limited': 'マルチスレッド負荷で目立つ速度低下があります。',
+  'bench_reason_seq_good': 'シーケンシャル書き込み速度は十分です。',
+  'bench_reason_seq_acceptable': '後半のシーケンシャル書き込み速度も許容範囲です。',
+  'bench_reason_seq_slow': 'シーケンシャル書き込み速度は低めです。',
+  'bench_reason_full_stable': '全域書き込みは安定しており、明確なキャッシュ崩れは見られません。',
+  'bench_reason_full_drop': '全域書き込みの後半で速度低下が目立ちます。SLC キャッシュ枯渇の影響が考えられます。',
+  'bench_note_full_not_run': '全域書き込みテストは未実行のため、SLC キャッシュ枯渇後の挙動は未評価です。',
+  'bench_note_full_skipped_low_space':
+      '全域書き込みテストのサンプルがありません。空き容量不足または早期終了が主な原因です。',
+  'bench_note_full_ran': '全域書き込みテストを実行済みで、長時間書き込み安定性の判定に含めています。',
+  'bench_report_copied': 'レポートをコピーしました',
+  'bench_copy_report': 'レポートをコピー',
+  'bench_score': 'スコア',
+  'bench_4k_adjusted': '4K補正値',
+  'bench_seq_write': '順次書き込み',
+  'bench_duration': '所要時間',
+  'bench_chart_sequential': 'シーケンシャル書き込み',
+  'bench_chart_sequential_desc': '大きなブロックの書き込み速度の推移',
+  'bench_chart_4k': '4Kランダム安定性',
+  'bench_chart_4k_desc': 'To Go の応答性に関わる小さな書き込みの安定性',
+  'bench_chart_threads': 'スレッド拡張',
+  'bench_chart_threads_desc': '同時実行数を増やした 4K 書き込み性能',
+  'bench_chart_full': '全域書き込み曲線',
+  'bench_chart_full_desc': '全域書き込みモードでの長時間書き込みとキャッシュ低下',
+  'bench_chart_waiting': 'テスト中にグラフが表示されます',
+  'bench_chart_full_skip': 'この曲線は全域書き込みモードで取得できます',
+  'bench_error_no_drive_letter':
+      'このドライブには使用できるドライブ文字がありません。再接続するか、ディスクの管理で文字を割り当ててください。',
+  'bench_error_drive_not_ready': '選択したドライブは準備できていません。再接続してから再試行してください。',
+  'wtg_benchmark_tip_title': 'To Go 作成前のテストを推奨',
+  'wtg_benchmark_tip_desc':
+      '4K 書き込み、スレッド拡張、長時間安定性を確認したい場合は、先にディスクテストを実行してください。テストせずに続行することもできます。',
+  'wtg_benchmark_tip_button': 'ディスクテスト',
 };
 
 const _zhTW = <String, String>{
+  'translation_missing': '所選語言中的這段文字暫時無法使用。',
+  'safety_disk_missing': '所選磁碟已中斷連線。',
+  'safety_disk_changed': '選擇後目標磁碟發生變化，請重新連接並再次選擇。',
+  'safety_disk_busy': '另一個 WinDeploy Studio 工作正在使用此磁碟，請等待工作完成後再試。',
+  'safety_detection_failed': '無法確認磁碟安全資訊，操作已停止。',
+  'safety_not_external': '只能清除已確認的外接磁碟。',
+  'safety_disk_offline': '所選磁碟處於離線狀態，無法使用。',
+  'linux_not_isohybrid': '此 ISO 不是可開機的 ISOHybrid 映像，目標磁碟未被修改。',
+  'linux_togo_mount_preflight_failed': '無法檢查此 Linux 映像，目標磁碟未被修改。',
+  'linux_togo_unsupported_iso':
+      '持久化 Linux To Go 目前支援 x64 Ubuntu 及相容的 casper Live 映像。其他發行版請使用「安裝盤」功能。',
+  'linux_togo_mke2fs_missing':
+      '內建的 Linux 持久化元件遺失。請重新安裝 WinDeploy Studio，目標磁碟未被修改。',
+  'linux_togo_boot_config_unsupported':
+      '此 casper 映像沒有可用來啟用持久化的受支援 GRUB 啟動項，目標磁碟未被修改。',
+  'linux_togo_boot_file_too_large': '此映像包含超過 FAT32 單一檔案容量上限的必要開機檔案，目標磁碟未被修改。',
+  'bench_error_helper_missing': '缺少原生磁碟測試元件，請重新安裝應用程式。',
+  'bench_error_cleanup_failed':
+      '部分測試檔案無法刪除。請關閉正在使用該磁碟的程式，並刪除 .wds_benchmark 資料夾。',
+  'bench_error_native_failed': '原生磁碟測試未能完成。',
+  'ai_privacy_title': '遠端分析提示',
+  'ai_privacy_message':
+      '此分析會將選定的記錄片段、映像名稱或裝置資訊傳送至你設定的 AI 服務。檔案內容僅限本功能讀取的預覽，且不會傳送 USB 序號。是否繼續？',
+  'ai_privacy_continue': '繼續並傳送',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Windows 與 Linux 安裝盤和 To Go 建立工具',
   'nav_home': '首頁',
@@ -3793,8 +4652,6 @@ const _zhTW = <String, String>{
   'home_image_library_desc': '瀏覽 Windows 映像並取得下載連結',
   'home_bootable_usb': '安裝盤建立工具',
   'home_bootable_usb_desc': '從 ISO 建立 Windows 或 Linux 安裝 USB 隨身碟',
-  'home_font_pack': '下載字型套件',
-  'home_font_pack_desc': '適用於精簡版 Windows ISO 的 CJK 字型',
   'home_wtg': 'To Go 工作空間',
   'home_wtg_desc': '建立攜帶式 Windows 與 Linux 隨身工作環境',
   'home_local_iso': '本機 ISO 匯入',
@@ -3829,7 +4686,6 @@ const _zhTW = <String, String>{
   'detail_cancel': '取消',
   'detail_continue': '繼續',
   'detail_link_copied': '連結已複製',
-  'detail_sha256_copied': 'SHA256 已複製',
   'detail_open_failed': '無法開啟連結',
   'images_error': '未知錯誤',
   'mirror_not_found': '未找到映像項目',
@@ -3837,13 +4693,13 @@ const _zhTW = <String, String>{
   'cancel_parse_desc': '取消 ISO 解析？已掛載的映像將被卸載。',
   'cancel_confirm': '確認取消',
   'cancel_create_desc': '取消 Windows 安裝盤建立？此操作無法復原。',
-  'fontpack_warning': '此系統可能缺少中文字型',
-  'fontpack_recommend': '建議下載並安裝中文字型套件',
+  'fontpack_warning': '此映像可能缺少 CJK 字型',
+  'fontpack_recommend': '建議下載並安裝 CJK 字型套件，以完整顯示中日韓文字',
   'fontpack_download': '下載字型套件',
-  'fontpack_desc': '適用於精簡版 Windows ISO 的中文字型補充套件。包含常用 CJK 字型，確保中文內容正常顯示。',
-  'fontpack_feature_1': '包含 HarmonyOS Sans SC 等中文字型',
-  'fontpack_feature_2': '支援 Windows 10/11',
-  'fontpack_feature_3': '一鍵安裝，適用於所有使用者',
+  'fontpack_desc': '適用於 Tiny10、Tiny11 與 Windows X-Lite 的 CJK 字型補充套件。',
+  'fontpack_feature_1': '包含 HarmonyOS Sans SC 等 CJK 字型',
+  'fontpack_feature_2': '支援 Windows 10 與 Windows 11',
+  'fontpack_feature_3': '可為所有使用者安裝',
   'iso_step_mount': '正在掛載 ISO...',
   'iso_step_detect': '正在偵測安裝程式...',
   'iso_step_info': '正在讀取映像資訊...',
@@ -4051,20 +4907,20 @@ const _zhTW = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Linux To Go 建立工具',
-  'wtg_linux_subtitle': '建立可隨身啟動的 Linux Live 工作環境',
+  'wtg_linux_subtitle': '建立可隨身啟動並儲存變更的 Ubuntu/casper Live 工作環境',
   'wtg_linux_select_iso': '選擇 Linux ISO',
   'wtg_linux_select_iso_desc':
-      '選擇 Linux ISOHybrid Live 映像。持久化能力取決於發行版，本模式不會修改啟動設定。',
+      '選擇 x64 Ubuntu 或相容的 casper Live ISO。WinDeploy Studio 將建立並啟用持久化儲存。',
   'wtg_linux_step1_title': '步驟 1：選擇 Linux ISO',
-  'wtg_linux_step1_desc': '選擇 Linux Live ISOHybrid 映像來建立 Linux To Go',
+  'wtg_linux_step1_desc': '選擇 x64 Ubuntu 或相容的 casper Live ISO',
   'wtg_linux_step4_title': '步驟 2：選擇目標磁碟',
   'wtg_linux_step4_desc': '選擇用於 Linux To Go 的外接磁碟',
   'wtg_linux_confirm_title': '步驟 3：確認 Linux To Go',
-  'wtg_linux_confirm_desc': '寫入前確認 ISO、磁碟和 Live 工作環境模式',
+  'wtg_linux_confirm_desc': '寫入前確認支援的 casper ISO、目標磁碟和持久化工作環境',
   'wtg_linux_workspace_type': '工作環境類型',
-  'wtg_linux_live_workspace': '可開機 Linux Live 工作環境',
+  'wtg_linux_live_workspace': '持久化 Ubuntu/casper Live 工作環境',
   'wtg_linux_persistence': '持久化',
-  'wtg_linux_persistence_note': '取決於發行版；不會修改啟動設定',
+  'wtg_linux_persistence_note': '透過 ext4 writable 映像啟用（最大約 4 GB）',
   'wtg_linux_step6_title': '步驟 4：正在建立 Linux To Go',
   'wtg_linux_step6_desc': '正在將 Linux ISO 映像寫入目標磁碟，請稍候',
   'wtg_linux_step_complete_title': '步驟 5：完成',
@@ -4126,15 +4982,17 @@ const _zhTW = <String, String>{
   'update_release_notes': '更新內容',
   'update_now': '立即更新',
   'update_open_browser': '在瀏覽器中開啟',
+  'update_install_verification_failed': '安裝程式未通過完整性或發行者驗證，請改用瀏覽器下載。',
   'update_later': '稍後提醒',
   'update_ignore': '忽略此版本',
   'update_downloading': '正在下載更新',
   'update_progress': '進度',
   'update_speed': '速度',
-  'update_install': '安裝並重新啟動',
-  'update_install_desc': '更新已下載完成。是否立即安裝？',
+  'update_install': '安裝更新',
+  'update_install_desc': '更新已準備完成。繼續後 WinDeploy Studio 將關閉並啟動安裝程式。',
   'update_up_to_date': '已是最新版本',
   'update_checking': '正在檢查更新...',
+  'update_installing': '正在驗證並啟動安裝程式...',
   'update_check_failed': '檢查更新失敗',
   'update_channel': '更新通道',
   'update_channel_stable': '穩定版',
@@ -4459,9 +5317,153 @@ const _zhTW = <String, String>{
   'mirror_global_tag': '國際',
   'mirror_default_title': '下載',
   'mirror_default_desc': '直接下載連結',
+  'nav_benchmark': '磁碟測試',
+  'home_benchmark': '磁碟效能測試',
+  'home_benchmark_desc': '部署前檢查 To Go 目標磁碟的真實效能',
+  'logs_cat_benchmark': '磁碟測試記錄',
+  'bench_title': '磁碟效能測試',
+  'bench_subtitle':
+      '面向 Windows To Go 與 Linux To Go 的真實寫入測試，涵蓋循序寫入、4K 隨機、多執行緒擴展與長時間寫入穩定性。',
+  'bench_refresh': '重新整理',
+  'bench_target_disk': '目標磁碟',
+  'bench_detecting': '正在偵測可移動磁碟...',
+  'bench_no_disk': '找不到可移動磁碟',
+  'bench_no_disk_desc': '請連接 USB 隨身碟或外接 SSD，然後重新整理。',
+  'bench_no_drive_letter': '無磁碟機代號',
+  'bench_test_mode': '測試模式',
+  'bench_mode_quick': '快速',
+  'bench_mode_standard': '標準',
+  'bench_mode_extreme': '極限',
+  'bench_mode_full_write': '全碟寫入',
+  'bench_mode_quick_desc': '快速判斷是否基本適合 To Go 的短測試。',
+  'bench_mode_standard_desc': '涵蓋日常 Windows To Go 與 Linux To Go 使用情境，耗時適中。',
+  'bench_mode_extreme_desc': '延長 4K 與多執行緒測試時間，判斷更嚴格。',
+  'bench_mode_full_write_desc': '額外執行接近全碟的循序寫入，用來觀察快取掉速。',
+  'bench_full_warning': '全碟寫入模式會寫入大部分可用空間，可能需要較長時間。測試不會主動刪除既有檔案，但會讓磁碟承受較高負載。',
+  'bench_start': '開始測試',
+  'bench_stop': '停止',
+  'bench_open_togo': '開啟 To Go',
+  'bench_full_confirm_title': '全碟寫入測試',
+  'bench_full_confirm_desc':
+      '此模式會建立大型暫存檔，持續寫入到磁碟接近寫滿後再刪除。請確認磁碟有足夠空間，且可以等待測試完成。',
+  'bench_full_confirm_start': '開始全碟寫入',
+  'bench_phase_idle': '就緒',
+  'bench_phase_preparing': '準備中',
+  'bench_phase_sequential': '循序寫入',
+  'bench_phase_random4k': '4K 隨機寫入',
+  'bench_phase_multithread': '多執行緒擴展',
+  'bench_phase_full': '全碟寫入穩定性',
+  'bench_phase_finalizing': '收尾中',
+  'bench_phase_complete': '完成',
+  'bench_phase_cancelled': '已取消',
+  'bench_phase_failed': '失敗',
+  'bench_msg_ready': '選擇磁碟後即可開始測試。',
+  'bench_msg_preparing': '正在建立暫存測試檔。',
+  'bench_msg_sequential': '正在測量持續循序寫入速度。',
+  'bench_msg_random4k': '正在測量小區塊隨機寫入，這是 To Go 反應速度的關鍵指標。',
+  'bench_msg_multithread': '正在檢查平行 I/O 下的磁碟表現。',
+  'bench_msg_full': '正在寫入可用空間，觀察長時間寫入穩定性。',
+  'bench_msg_finalizing': '正在清理暫存檔並計算評分。',
+  'bench_msg_complete': '測試完成，可檢視圖表與評分。',
+  'bench_msg_cancelled': '測試已由使用者停止。',
+  'bench_msg_failed': '測試失敗，請檢查磁碟後重試。',
+  'bench_elapsed': '已用時間',
+  'bench_current_speed': '目前速度',
+  'bench_progress': '進度',
+  'bench_rating_excellent': 'To Go 優選',
+  'bench_rating_good': '表現良好',
+  'bench_rating_usable': '可以使用',
+  'bench_rating_limited': '體驗受限',
+  'bench_rating_not_recommended': '不建議使用',
+  'bench_rating_unmeasured': '未測量',
+  'bench_rating_excellent_desc': '4K 與持續寫入表現都很強，適合較高負載的 To Go 使用。',
+  'bench_rating_good_desc': '整體表現良好，日常便攜系統體驗通常會比較順暢。',
+  'bench_rating_usable_desc': '適合輕度使用，但系統更新或多工時可能會變慢。',
+  'bench_rating_limited_desc': '可以完成簡單任務，但作為 To Go 系統大多會有明顯卡頓。',
+  'bench_rating_not_recommended_desc': '速度或穩定性不足，不適合作為可靠的 To Go 系統。',
+  'bench_rating_unmeasured_desc': '執行一次測試後即可得到適用性結果。',
+  'bench_result_overall': '綜合評級',
+  'bench_result_recommendation': '建議',
+  'bench_result_reasons': '關鍵原因',
+  'bench_result_notes': '注意',
+  'bench_recommend_excellent': '推薦用於 Windows To Go / Linux To Go，也適合較高負載的日常使用。',
+  'bench_recommend_good': '推薦用於 Windows To Go / Linux To Go。',
+  'bench_recommend_usable': '可用於輕度 To Go 場景，建議避免重負載更新和多工。',
+  'bench_recommend_limited': '僅建議應急或輕量 To Go 使用，體驗可能受限。',
+  'bench_recommend_not_recommended': '不推薦用於 Windows To Go / Linux To Go。',
+  'bench_recommend_unmeasured': '執行測試後會產生建議。',
+  'bench_reason_4k_strong': '4K 隨機寫入表現很強。',
+  'bench_reason_4k_stable': '4K 隨機寫入穩定。',
+  'bench_reason_4k_limited': '4K 隨機寫入偏弱。',
+  'bench_reason_4k_weak': '4K 隨機寫入不足，難以保證流暢的便攜系統體驗。',
+  'bench_reason_thread_good': '多執行緒壓力下沒有嚴重掉速。',
+  'bench_reason_thread_limited': '多執行緒壓力下掉速明顯。',
+  'bench_reason_seq_good': '順序寫入速度充足。',
+  'bench_reason_seq_acceptable': '順序寫入後段速度仍可接受。',
+  'bench_reason_seq_slow': '順序寫入速度偏低。',
+  'bench_reason_full_stable': '全盤寫入穩定，未發現明顯快取崩塌。',
+  'bench_reason_full_drop': '全盤寫入後段掉速明顯，可能受 SLC 快取耗盡影響。',
+  'bench_note_full_not_run': '全盤寫入測試未執行，因此未評估 SLC 快取耗盡後的表現。',
+  'bench_note_full_skipped_low_space': '全盤寫入測試未產生取樣，通常是可用空間不足或測試提前結束。',
+  'bench_note_full_ran': '已執行全盤寫入測試，已納入長時間寫入穩定性判斷。',
+  'bench_report_copied': '報告已複製',
+  'bench_copy_report': '複製報告',
+  'bench_score': '評分',
+  'bench_4k_adjusted': '4K 修正值',
+  'bench_seq_write': '循序寫入',
+  'bench_duration': '耗時',
+  'bench_chart_sequential': '循序寫入',
+  'bench_chart_sequential_desc': '大區塊連續寫入速度隨時間變化',
+  'bench_chart_4k': '4K 隨機穩定性',
+  'bench_chart_4k_desc': '小區塊寫入一致性，重點反映 To Go 反應速度',
+  'bench_chart_threads': '多執行緒擴展',
+  'bench_chart_threads_desc': '不同並行數量下的 4K 寫入表現',
+  'bench_chart_full': '全碟寫入曲線',
+  'bench_chart_full_desc': '全碟寫入模式下的長時間寫入與快取掉速',
+  'bench_chart_waiting': '測試過程中會產生圖表',
+  'bench_chart_full_skip': '使用全碟寫入模式後會產生此曲線',
+  'bench_error_no_drive_letter': '此磁碟沒有可用磁碟機代號，請重新連接或在磁碟管理中指定代號。',
+  'bench_error_drive_not_ready': '所選磁碟尚未就緒，請重新連接後再試。',
+  'wtg_benchmark_tip_title': '建議在建立 To Go 前測試',
+  'wtg_benchmark_tip_desc': '如果想確認 4K 寫入、多執行緒擴展和長時間寫入穩定性，可以先執行磁碟測試。不測試也可以繼續建立。',
+  'wtg_benchmark_tip_button': '磁碟測試',
 };
 
 const _es = <String, String>{
+  'translation_missing':
+      'Este texto no está disponible en el idioma seleccionado.',
+  'safety_disk_missing': 'El disco seleccionado ya no está conectado.',
+  'safety_disk_changed':
+      'El disco de destino cambió después de seleccionarlo. Vuelve a conectarlo y selecciónalo de nuevo.',
+  'safety_disk_busy':
+      'Otra operación de WinDeploy Studio ya está usando este disco. Espera a que termine y vuelve a intentarlo.',
+  'safety_detection_failed':
+      'No se pudo verificar la seguridad del disco. La operación se detuvo.',
+  'safety_not_external': 'Solo se pueden borrar discos externos verificados.',
+  'safety_disk_offline':
+      'El disco seleccionado está sin conexión y no se puede usar.',
+  'linux_not_isohybrid':
+      'Este ISO no es una imagen ISOHybrid arrancable. El disco de destino no se modificó.',
+  'linux_togo_mount_preflight_failed':
+      'No se pudo inspeccionar la imagen de Linux. El disco de destino no se modificó.',
+  'linux_togo_unsupported_iso':
+      'Linux To Go persistente admite actualmente Ubuntu x64 e imágenes Live compatibles basadas en casper. Para otras distribuciones, usa el creador de medios de instalación.',
+  'linux_togo_mke2fs_missing':
+      'Falta el componente integrado de persistencia de Linux. Reinstala WinDeploy Studio. El disco de destino no se modificó.',
+  'linux_togo_boot_config_unsupported':
+      'Esta imagen casper no tiene una entrada de GRUB compatible para habilitar la persistencia. El disco de destino no se modificó.',
+  'linux_togo_boot_file_too_large':
+      'Esta imagen contiene un archivo de arranque necesario que supera el límite de un solo archivo de FAT32. El disco de destino no se modificó.',
+  'bench_error_helper_missing':
+      'Falta el componente nativo de pruebas. Vuelve a instalar la aplicación.',
+  'bench_error_cleanup_failed':
+      'No se pudieron eliminar algunos archivos de prueba. Cierra los programas que usen la unidad y elimina la carpeta .wds_benchmark.',
+  'bench_error_native_failed':
+      'No se pudo completar la prueba nativa del disco.',
+  'ai_privacy_title': 'Aviso de análisis remoto',
+  'ai_privacy_message':
+      'Este análisis envía fragmentos de registros, nombres de imágenes o datos del dispositivo al servicio de IA configurado. Solo se envían las vistas previas leídas por esta función; nunca los números de serie USB. ¿Continuar?',
+  'ai_privacy_continue': 'Continuar y enviar',
   'app_name': 'WinDeploy Studio',
   'app_subtitle':
       'Creador de medios de instalación y To Go para Windows y Linux',
@@ -4481,8 +5483,6 @@ const _es = <String, String>{
   'home_bootable_usb': 'Creador de medios de instalación',
   'home_bootable_usb_desc':
       'Crea USB de instalación de Windows o Linux desde archivos ISO',
-  'home_font_pack': 'Descargar paquete de fuentes',
-  'home_font_pack_desc': 'Fuentes CJK para ISOs ligeros de Windows',
   'home_wtg': 'Espacio de trabajo To Go',
   'home_wtg_desc': 'Cree espacios de trabajo portátiles Windows y Linux',
   'home_local_iso': 'Importar ISO local',
@@ -4518,7 +5518,6 @@ const _es = <String, String>{
   'detail_cancel': 'Cancelar',
   'detail_continue': 'Continuar',
   'detail_link_copied': 'Enlace copiado',
-  'detail_sha256_copied': 'SHA256 copiado',
   'detail_open_failed': 'No se pudo abrir el enlace',
   'images_error': 'Error desconocido',
   'mirror_not_found': 'Elemento de imagen no encontrado',
@@ -4528,15 +5527,15 @@ const _es = <String, String>{
   'cancel_confirm': 'Confirmar cancelación',
   'cancel_create_desc':
       '¿Cancelar la creación del medio de instalación de Windows? Esta acción no se puede deshacer.',
-  'fontpack_warning': 'Este sistema puede carecer de fuentes chinas',
+  'fontpack_warning': 'Esta imagen puede no incluir fuentes CJK',
   'fontpack_recommend':
-      'Se recomienda descargar e instalar el paquete de fuentes chinas',
+      'Descarga e instala el paquete de fuentes CJK para mostrar correctamente texto chino, japonés y coreano',
   'fontpack_download': 'Descargar paquete de fuentes',
   'fontpack_desc':
-      'Paquete de fuentes chinas para ISOs ligeros de Windows. Incluye fuentes CJK habituales para garantizar la correcta visualización del contenido en chino.',
-  'fontpack_feature_1': 'Incluye HarmonyOS Sans SC y otras fuentes chinas',
-  'fontpack_feature_2': 'Compatible con Windows 10/11',
-  'fontpack_feature_3': 'Instalación con un clic para todos los usuarios',
+      'Paquete complementario de fuentes CJK para Tiny10, Tiny11 y Windows X-Lite.',
+  'fontpack_feature_1': 'Incluye fuentes CJK como HarmonyOS Sans SC',
+  'fontpack_feature_2': 'Compatible con Windows 10 y Windows 11',
+  'fontpack_feature_3': 'Se puede instalar para todos los usuarios',
   'iso_step_mount': 'Montando ISO...',
   'iso_step_detect': 'Detectando instalador...',
   'iso_step_info': 'Leyendo información de la imagen...',
@@ -4760,23 +5759,24 @@ const _es = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Creador de Linux To Go',
-  'wtg_linux_subtitle': 'Crea un entorno Linux Live portátil y arrancable',
+  'wtg_linux_subtitle':
+      'Crea un entorno Ubuntu/casper Live portátil y persistente',
   'wtg_linux_select_iso': 'Seleccionar ISO de Linux',
   'wtg_linux_select_iso_desc':
-      'Elige una imagen Linux ISOHybrid Live. La persistencia depende de la distribución y no se modifica en este modo.',
+      'Elige una ISO de Ubuntu x64 o una imagen Live compatible basada en casper. WinDeploy Studio creará y activará el almacenamiento persistente.',
   'wtg_linux_step1_title': 'Paso 1: seleccionar ISO de Linux',
   'wtg_linux_step1_desc':
-      'Selecciona una imagen Linux Live ISOHybrid para crear Linux To Go',
+      'Selecciona una ISO de Ubuntu x64 o una imagen Live compatible basada en casper',
   'wtg_linux_step4_title': 'Paso 2: seleccionar disco de destino',
   'wtg_linux_step4_desc': 'Selecciona el disco externo para Linux To Go',
   'wtg_linux_confirm_title': 'Paso 3: confirmar Linux To Go',
   'wtg_linux_confirm_desc':
-      'Revisa la ISO, el disco y el modo Live antes de escribir',
+      'Antes de escribir, revisa la ISO casper compatible, el disco de destino y el entorno persistente',
   'wtg_linux_workspace_type': 'Tipo de entorno',
-  'wtg_linux_live_workspace': 'Entorno Linux Live arrancable',
+  'wtg_linux_live_workspace': 'Entorno Ubuntu/casper Live persistente',
   'wtg_linux_persistence': 'Persistencia',
   'wtg_linux_persistence_note':
-      'Depende de la distribución; la configuración de arranque no se modifica',
+      'Activada mediante una imagen ext4 writable (hasta unos 4 GB)',
   'wtg_linux_step6_title': 'Paso 4: creando Linux To Go',
   'wtg_linux_step6_desc':
       'Espera mientras la imagen ISO de Linux se escribe en el disco de destino',
@@ -4841,15 +5841,19 @@ const _es = <String, String>{
   'update_release_notes': 'Notas de la versión',
   'update_now': 'Actualizar ahora',
   'update_open_browser': 'Abrir en el navegador',
+  'update_install_verification_failed':
+      'El instalador no superó la verificación de integridad o del editor. Usa la descarga en el navegador.',
   'update_later': 'Recordar más tarde',
   'update_ignore': 'Ignorar esta versión',
   'update_downloading': 'Descargando actualización',
   'update_progress': 'Progreso',
   'update_speed': 'Velocidad',
-  'update_install': 'Instalar y reiniciar',
-  'update_install_desc': 'La actualización se ha descargado. ¿Instalar ahora?',
+  'update_install': 'Instalar actualización',
+  'update_install_desc':
+      'La actualización está lista. WinDeploy Studio se cerrará e iniciará el instalador. ¿Continuar?',
   'update_up_to_date': 'Estás actualizado',
   'update_checking': 'Buscando actualizaciones...',
+  'update_installing': 'Verificando e iniciando el instalador...',
   'update_check_failed': 'Error al buscar actualizaciones',
   'update_channel': 'Canal de actualización',
   'update_channel_stable': 'Estable',
@@ -5192,9 +6196,187 @@ const _es = <String, String>{
   'mirror_global_tag': 'Global',
   'mirror_default_title': 'Descargar',
   'mirror_default_desc': 'Enlace de descarga directa',
+  'nav_benchmark': 'Prueba de disco',
+  'home_benchmark': 'Benchmark de unidad',
+  'home_benchmark_desc': 'Compruebe el rendimiento real antes de To Go',
+  'logs_cat_benchmark': 'Registros de prueba de disco',
+  'bench_title': 'Benchmark de unidad',
+  'bench_subtitle':
+      'Mide la escritura real para Windows To Go y Linux To Go: secuencial, aleatoria 4K, escalado por hilos y estabilidad en escritura larga.',
+  'bench_refresh': 'Actualizar',
+  'bench_target_disk': 'Unidad de destino',
+  'bench_detecting': 'Detectando unidades extraíbles...',
+  'bench_no_disk': 'No se encontró unidad extraíble',
+  'bench_no_disk_desc': 'Conecte una unidad USB o SSD portátil y actualice.',
+  'bench_no_drive_letter': 'Sin letra de unidad',
+  'bench_test_mode': 'Modo de prueba',
+  'bench_mode_quick': 'Rápido',
+  'bench_mode_standard': 'Estándar',
+  'bench_mode_extreme': 'Extremo',
+  'bench_mode_full_write': 'Escritura completa',
+  'bench_mode_quick_desc':
+      'Comprobación breve para una idoneidad básica de To Go.',
+  'bench_mode_standard_desc':
+      'Cobertura equilibrada para uso diario de Windows To Go y Linux To Go.',
+  'bench_mode_extreme_desc':
+      'Pruebas 4K y multihilo más largas para un juicio más estricto.',
+  'bench_mode_full_write_desc':
+      'Añade una escritura casi completa para revelar caídas de caché.',
+  'bench_full_warning':
+      'El modo Escritura completa usa la mayor parte del espacio libre y puede tardar mucho. No borra archivos existentes intencionalmente, pero somete la unidad a carga intensa.',
+  'bench_start': 'Iniciar prueba',
+  'bench_stop': 'Detener',
+  'bench_open_togo': 'Abrir To Go',
+  'bench_full_confirm_title': 'Prueba de escritura completa',
+  'bench_full_confirm_desc':
+      'Este modo crea un archivo temporal grande, escribe hasta casi llenar la unidad y luego lo elimina. Continúe solo si tiene espacio y tiempo suficientes.',
+  'bench_full_confirm_start': 'Iniciar escritura completa',
+  'bench_phase_idle': 'Listo',
+  'bench_phase_preparing': 'Preparando',
+  'bench_phase_sequential': 'Escritura secuencial',
+  'bench_phase_random4k': 'Escritura aleatoria 4K',
+  'bench_phase_multithread': 'Escalado por hilos',
+  'bench_phase_full': 'Estabilidad de escritura completa',
+  'bench_phase_finalizing': 'Finalizando',
+  'bench_phase_complete': 'Completado',
+  'bench_phase_cancelled': 'Cancelado',
+  'bench_phase_failed': 'Error',
+  'bench_msg_ready': 'Elija una unidad e inicie la prueba.',
+  'bench_msg_preparing': 'Creando archivos temporales de benchmark.',
+  'bench_msg_sequential':
+      'Midiendo velocidad de escritura secuencial sostenida.',
+  'bench_msg_random4k':
+      'Midiendo escrituras aleatorias pequeñas, carga clave para To Go.',
+  'bench_msg_multithread': 'Comprobando el comportamiento con I/O paralelo.',
+  'bench_msg_full':
+      'Escribiendo en el espacio libre para observar estabilidad prolongada.',
+  'bench_msg_finalizing':
+      'Limpiando archivos temporales y calculando la puntuación.',
+  'bench_msg_complete': 'Benchmark finalizado. Revise gráficos y puntuación.',
+  'bench_msg_cancelled': 'Benchmark detenido por el usuario.',
+  'bench_msg_failed':
+      'El benchmark falló. Compruebe la unidad e inténtelo de nuevo.',
+  'bench_elapsed': 'Transcurrido',
+  'bench_current_speed': 'Velocidad actual',
+  'bench_progress': 'Progreso',
+  'bench_rating_excellent': 'Listo para To Go',
+  'bench_rating_good': 'Cómodo',
+  'bench_rating_usable': 'Utilizable',
+  'bench_rating_limited': 'Limitado',
+  'bench_rating_not_recommended': 'No recomendado',
+  'bench_rating_unmeasured': 'Sin medir',
+  'bench_rating_excellent_desc':
+      'Buen 4K y escritura sostenida. Adecuado para To Go exigente.',
+  'bench_rating_good_desc':
+      'Buen comportamiento general. Un sistema portátil normal debería ir fluido.',
+  'bench_rating_usable_desc':
+      'Utilizable para trabajo ligero, pero actualizaciones o multitarea pueden sentirse lentas.',
+  'bench_rating_limited_desc':
+      'Sirve para tareas simples, pero como To Go probablemente se notará lento.',
+  'bench_rating_not_recommended_desc':
+      'Demasiado lento o inestable para una experiencia To Go fiable.',
+  'bench_rating_unmeasured_desc':
+      'Ejecute un benchmark para obtener un resultado de idoneidad.',
+  'bench_result_overall': 'Evaluación general',
+  'bench_result_recommendation': 'Recomendación',
+  'bench_result_reasons': 'Motivos clave',
+  'bench_result_notes': 'Notas',
+  'bench_recommend_excellent':
+      'Recomendado para Windows To Go / Linux To Go, incluso con uso diario más exigente.',
+  'bench_recommend_good': 'Recomendado para Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'Utilizable para cargas To Go ligeras; evita actualizaciones pesadas y multitarea intensa.',
+  'bench_recommend_limited':
+      'Solo recomendable para emergencias o uso To Go ligero.',
+  'bench_recommend_not_recommended':
+      'No recomendado para Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured':
+      'Ejecuta una prueba para generar una recomendación.',
+  'bench_reason_4k_strong': 'La escritura aleatoria 4K es muy sólida.',
+  'bench_reason_4k_stable': 'La escritura aleatoria 4K es estable.',
+  'bench_reason_4k_limited': 'La escritura aleatoria 4K es limitada.',
+  'bench_reason_4k_weak':
+      'La escritura aleatoria 4K es demasiado débil para un sistema portátil fluido.',
+  'bench_reason_thread_good': 'No hay caída severa bajo presión multihilo.',
+  'bench_reason_thread_limited':
+      'Hay una caída notable bajo presión multihilo.',
+  'bench_reason_seq_good':
+      'La velocidad de escritura secuencial es suficiente.',
+  'bench_reason_seq_acceptable':
+      'La velocidad secuencial final sigue siendo aceptable.',
+  'bench_reason_seq_slow': 'La velocidad de escritura secuencial es baja.',
+  'bench_reason_full_stable':
+      'La escritura completa se mantuvo estable, sin colapso claro de caché.',
+  'bench_reason_full_drop':
+      'La escritura completa cayó notablemente al final, posiblemente por agotamiento de caché SLC.',
+  'bench_note_full_not_run':
+      'No se ejecutó la prueba de escritura completa, por lo que no se evaluó el comportamiento tras agotar la caché SLC.',
+  'bench_note_full_skipped_low_space':
+      'La prueba de escritura completa no generó muestras, normalmente por poco espacio libre o finalización temprana.',
+  'bench_note_full_ran':
+      'La prueba de escritura completa se incluyó en la evaluación de estabilidad prolongada.',
+  'bench_report_copied': 'Informe copiado',
+  'bench_copy_report': 'Copiar informe',
+  'bench_score': 'Puntuación',
+  'bench_4k_adjusted': '4K ajustado',
+  'bench_seq_write': 'Escritura sec.',
+  'bench_duration': 'Duración',
+  'bench_chart_sequential': 'Escritura secuencial',
+  'bench_chart_sequential_desc':
+      'Velocidad de escritura de bloques grandes con el tiempo',
+  'bench_chart_4k': 'Estabilidad aleatoria 4K',
+  'bench_chart_4k_desc':
+      'Consistencia de escrituras pequeñas para respuesta To Go',
+  'bench_chart_threads': 'Escalado por hilos',
+  'bench_chart_threads_desc': 'Escrituras 4K paralelas con más workers',
+  'bench_chart_full': 'Curva de escritura completa',
+  'bench_chart_full_desc':
+      'Escritura prolongada y caída de caché en modo completo',
+  'bench_chart_waiting': 'El gráfico aparecerá durante la prueba',
+  'bench_chart_full_skip': 'Use Escritura completa para recopilar esta curva',
+  'bench_error_no_drive_letter':
+      'Esta unidad no tiene una letra utilizable. Vuelva a conectarla o asigne una letra en Administración de discos.',
+  'bench_error_drive_not_ready':
+      'La unidad seleccionada no está lista. Vuelva a conectarla e inténtelo de nuevo.',
+  'wtg_benchmark_tip_title': 'Recomendado antes de crear To Go',
+  'wtg_benchmark_tip_desc':
+      'Ejecute la prueba de disco si quiere comprobar escritura 4K, hilos y estabilidad prolongada. También puede continuar sin probar.',
+  'wtg_benchmark_tip_button': 'Prueba de disco',
 };
 
 const _ar = <String, String>{
+  'translation_missing': 'هذا النص غير متاح باللغة المحددة.',
+  'safety_disk_missing': 'القرص المحدد لم يعد متصلاً.',
+  'safety_disk_changed':
+      'تغير القرص الهدف بعد تحديده. أعد توصيله وحدده مرة أخرى.',
+  'safety_disk_busy':
+      'تستخدم عملية أخرى في WinDeploy Studio هذا القرص حاليًا. انتظر حتى تنتهي ثم أعد المحاولة.',
+  'safety_detection_failed':
+      'تعذر التحقق من معلومات أمان القرص، لذلك أُوقفت العملية.',
+  'safety_not_external':
+      'لا يمكن مسح إلا الأقراص الخارجية التي تم التحقق منها.',
+  'safety_disk_offline': 'القرص المحدد غير متصل ولا يمكن استخدامه.',
+  'linux_not_isohybrid':
+      'ملف ISO هذا ليس صورة ISOHybrid قابلة للإقلاع. لم يتغير القرص الهدف.',
+  'linux_togo_mount_preflight_failed':
+      'تعذر فحص صورة Linux. لم يتغير القرص الهدف.',
+  'linux_togo_unsupported_iso':
+      'يدعم Linux To Go الدائم حالياً Ubuntu بمعمارية x64 وصور Live المتوافقة المبنية على casper. استخدم إنشاء وسيط التثبيت للتوزيعات الأخرى.',
+  'linux_togo_mke2fs_missing':
+      'مكوّن الاستمرارية المرفق لـ Linux مفقود. أعد تثبيت WinDeploy Studio. لم يتغير القرص الهدف.',
+  'linux_togo_boot_config_unsupported':
+      'لا تحتوي صورة casper هذه على إدخال GRUB مدعوم لتفعيل الاستمرارية. لم يتغير القرص الهدف.',
+  'linux_togo_boot_file_too_large':
+      'تتضمن هذه الصورة ملف إقلاع مطلوباً يتجاوز حد حجم الملف الواحد في FAT32. لم يتغير القرص الهدف.',
+  'bench_error_helper_missing':
+      'مكوّن اختبار القرص الأصلي مفقود. أعد تثبيت التطبيق.',
+  'bench_error_cleanup_failed':
+      'تعذر حذف بعض ملفات الاختبار. أغلق البرامج التي تستخدم القرص واحذف مجلد .wds_benchmark.',
+  'bench_error_native_failed': 'تعذر إكمال اختبار القرص الأصلي.',
+  'ai_privacy_title': 'تنبيه التحليل عن بُعد',
+  'ai_privacy_message':
+      'يرسل هذا التحليل مقتطفات محددة من السجلات أو أسماء الصور أو معلومات الجهاز إلى خدمة الذكاء الاصطناعي المضبوطة. تقتصر محتويات الملفات على المعاينة التي تقرؤها هذه الميزة، ولا تُرسل الأرقام التسلسلية لأجهزة USB. هل تريد المتابعة؟',
+  'ai_privacy_continue': 'المتابعة والإرسال',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'أداة إنشاء وسائط تثبيت وبيئات To Go لـ Windows وLinux',
   'nav_home': 'الرئيسية',
@@ -5210,8 +6392,6 @@ const _ar = <String, String>{
   'home_image_library_desc': 'تصفح صور Windows والحصول على روابط التنزيل',
   'home_bootable_usb': 'أداة إنشاء وسيط التثبيت',
   'home_bootable_usb_desc': 'إنشاء USB تثبيت Windows أو Linux من ملفات ISO',
-  'home_font_pack': 'تنزيل حزمة الخطوط',
-  'home_font_pack_desc': 'خطوط CJK لإصدارات Windows المخففة',
   'home_wtg': 'بيئة عمل To Go',
   'home_wtg_desc': 'إنشاء بيئات عمل محمولة لـ Windows وLinux',
   'home_local_iso': 'استيراد ISO محلي',
@@ -5247,7 +6427,6 @@ const _ar = <String, String>{
   'detail_cancel': 'إلغاء',
   'detail_continue': 'متابعة',
   'detail_link_copied': 'تم نسخ الرابط',
-  'detail_sha256_copied': 'تم نسخ SHA256',
   'detail_open_failed': 'تعذر فتح الرابط',
   'images_error': 'خطأ غير معروف',
   'mirror_not_found': 'لم يتم العثور على عنصر الصورة',
@@ -5256,14 +6435,14 @@ const _ar = <String, String>{
   'cancel_confirm': 'تأكيد الإلغاء',
   'cancel_create_desc':
       'هل تريد إلغاء إنشاء وسيط تثبيت Windows؟ لا يمكن التراجع عن هذا الإجراء.',
-  'fontpack_warning': 'قد يفتقر هذا النظام إلى الخطوط الصينية',
-  'fontpack_recommend': 'يُوصى بتنزيل وتثبيت حزمة الخطوط الصينية',
+  'fontpack_warning': 'قد تفتقد هذه الصورة خطوط CJK',
+  'fontpack_recommend':
+      'نزّل حزمة خطوط CJK وثبّتها لعرض النصوص الصينية واليابانية والكورية بشكل كامل',
   'fontpack_download': 'تنزيل حزمة الخطوط',
-  'fontpack_desc':
-      'حزمة خطوط صينية لإصدارات Windows المخففة. تتضمن خطوط CJK الشائعة لعرض المحتوى الصيني بشكل صحيح.',
-  'fontpack_feature_1': 'يتضمن HarmonyOS Sans SC وخطوطًا صينية أخرى',
-  'fontpack_feature_2': 'متوافق مع Windows 10/11',
-  'fontpack_feature_3': 'تثبيت بنقرة واحدة لجميع المستخدمين',
+  'fontpack_desc': 'حزمة خطوط CJK إضافية لـ Tiny10 وTiny11 وWindows X-Lite.',
+  'fontpack_feature_1': 'تتضمن خطوط CJK مثل HarmonyOS Sans SC',
+  'fontpack_feature_2': 'تدعم Windows 10 وWindows 11',
+  'fontpack_feature_3': 'يمكن تثبيتها لجميع المستخدمين',
   'iso_step_mount': 'جاري تركيب ISO...',
   'iso_step_detect': 'جاري الكشف عن المثبت...',
   'iso_step_info': 'جاري قراءة معلومات الصورة...',
@@ -5480,21 +6659,23 @@ const _ar = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'أداة إنشاء Linux To Go',
-  'wtg_linux_subtitle': 'إنشاء بيئة Linux Live محمولة وقابلة للإقلاع',
+  'wtg_linux_subtitle': 'إنشاء بيئة Ubuntu/casper Live محمولة مع حفظ التغييرات',
   'wtg_linux_select_iso': 'اختيار ISO Linux',
   'wtg_linux_select_iso_desc':
-      'اختر صورة Linux ISOHybrid Live. يعتمد الحفظ الدائم على التوزيعة ولا يتم تعديل إعدادات الإقلاع في هذا الوضع.',
+      'اختر ملف ISO لنظام Ubuntu x64 أو صورة Live متوافقة تعتمد على casper. سينشئ WinDeploy Studio التخزين الدائم ويفعّله.',
   'wtg_linux_step1_title': 'الخطوة 1: اختيار ISO Linux',
-  'wtg_linux_step1_desc': 'اختر صورة Linux Live ISOHybrid لإنشاء Linux To Go',
+  'wtg_linux_step1_desc':
+      'اختر ملف ISO لنظام Ubuntu x64 أو صورة Live متوافقة تعتمد على casper',
   'wtg_linux_step4_title': 'الخطوة 2: اختيار القرص الهدف',
   'wtg_linux_step4_desc': 'اختر القرص الخارجي لـ Linux To Go',
   'wtg_linux_confirm_title': 'الخطوة 3: تأكيد Linux To Go',
-  'wtg_linux_confirm_desc': 'راجع ملف ISO والقرص ووضع بيئة Live قبل الكتابة',
+  'wtg_linux_confirm_desc':
+      'راجع ملف casper ISO المدعوم والقرص الهدف والبيئة الدائمة قبل الكتابة',
   'wtg_linux_workspace_type': 'نوع البيئة',
-  'wtg_linux_live_workspace': 'بيئة Linux Live قابلة للإقلاع',
+  'wtg_linux_live_workspace': 'بيئة Ubuntu/casper Live دائمة',
   'wtg_linux_persistence': 'الحفظ الدائم',
   'wtg_linux_persistence_note':
-      'يعتمد على التوزيعة؛ لا يتم تعديل إعدادات الإقلاع',
+      'مفعّل عبر صورة ext4 باسم writable (حتى نحو 4 GB)',
   'wtg_linux_step6_title': 'الخطوة 4: جاري إنشاء Linux To Go',
   'wtg_linux_step6_desc':
       'يرجى الانتظار أثناء كتابة صورة ISO Linux إلى القرص الهدف',
@@ -5558,15 +6739,19 @@ const _ar = <String, String>{
   'update_release_notes': 'ملاحظات الإصدار',
   'update_now': 'تحديث الآن',
   'update_open_browser': 'فتح في المتصفح',
+  'update_install_verification_failed':
+      'فشل التحقق من سلامة برنامج التثبيت أو ناشره. استخدم خيار التنزيل عبر المتصفح.',
   'update_later': 'التذكير لاحقاً',
   'update_ignore': 'تجاهل هذا الإصدار',
   'update_downloading': 'تنزيل التحديث',
   'update_progress': 'التقدم',
   'update_speed': 'السرعة',
-  'update_install': 'تثبيت وإعادة التشغيل',
-  'update_install_desc': 'تم تنزيل التحديث. هل تريد التثبيت الآن؟',
+  'update_install': 'تثبيت التحديث',
+  'update_install_desc':
+      'التحديث جاهز. سيُغلق WinDeploy Studio ويبدأ برنامج التثبيت. هل تريد المتابعة؟',
   'update_up_to_date': 'أنت تستخدم أحدث إصدار',
   'update_checking': 'جاري التحقق من التحديثات...',
+  'update_installing': 'جارٍ التحقق من برنامج التثبيت وتشغيله...',
   'update_check_failed': 'فشل التحقق من التحديثات',
   'update_channel': 'قناة التحديث',
   'update_channel_stable': 'مستقر',
@@ -5905,9 +7090,177 @@ const _ar = <String, String>{
   'mirror_global_tag': 'عالمي',
   'mirror_default_title': 'تنزيل',
   'mirror_default_desc': 'رابط تنزيل مباشر',
+  'nav_benchmark': 'اختبار القرص',
+  'home_benchmark': 'اختبار أداء القرص',
+  'home_benchmark_desc': 'تحقق من الأداء الحقيقي قبل إنشاء To Go',
+  'logs_cat_benchmark': 'سجلات اختبار القرص',
+  'bench_title': 'اختبار أداء القرص',
+  'bench_subtitle':
+      'يقيس سلوك الكتابة الحقيقي لـ Windows To Go وLinux To Go: الكتابة المتتابعة، و4K العشوائية، وتوسع الخيوط، وثبات الكتابة الطويلة.',
+  'bench_refresh': 'تحديث',
+  'bench_target_disk': 'القرص الهدف',
+  'bench_detecting': 'جار اكتشاف الأقراص القابلة للإزالة...',
+  'bench_no_disk': 'لم يتم العثور على قرص قابل للإزالة',
+  'bench_no_disk_desc': 'صل محرك USB أو SSD محمولاً ثم حدّث القائمة.',
+  'bench_no_drive_letter': 'لا يوجد حرف محرك',
+  'bench_test_mode': 'وضع الاختبار',
+  'bench_mode_quick': 'سريع',
+  'bench_mode_standard': 'قياسي',
+  'bench_mode_extreme': 'صارم',
+  'bench_mode_full_write': 'كتابة كاملة',
+  'bench_mode_quick_desc': 'فحص قصير لمعرفة الملاءمة الأساسية لـ To Go.',
+  'bench_mode_standard_desc':
+      'تغطية متوازنة للاستخدام اليومي في Windows To Go وLinux To Go.',
+  'bench_mode_extreme_desc': 'اختبارات 4K ومتعددة الخيوط لمدة أطول لتقييم أدق.',
+  'bench_mode_full_write_desc':
+      'يضيف كتابة شبه كاملة لكشف هبوط أداء التخزين المؤقت.',
+  'bench_full_warning':
+      'وضع الكتابة الكاملة يكتب على معظم المساحة الحرة وقد يستغرق وقتاً طويلاً. لا يتم حذف الملفات الموجودة عمداً، لكن القرص سيتعرض لحمل عال.',
+  'bench_start': 'بدء الاختبار',
+  'bench_stop': 'إيقاف',
+  'bench_open_togo': 'فتح To Go',
+  'bench_full_confirm_title': 'اختبار الكتابة الكاملة',
+  'bench_full_confirm_desc':
+      'ينشئ هذا الوضع ملفاً مؤقتاً كبيراً ويكتب حتى يقترب القرص من الامتلاء، ثم يزيله. تابع فقط إذا توفرت مساحة ووقت كافيان.',
+  'bench_full_confirm_start': 'بدء الكتابة الكاملة',
+  'bench_phase_idle': 'جاهز',
+  'bench_phase_preparing': 'جار التحضير',
+  'bench_phase_sequential': 'كتابة متتابعة',
+  'bench_phase_random4k': 'كتابة 4K عشوائية',
+  'bench_phase_multithread': 'توسع الخيوط',
+  'bench_phase_full': 'ثبات الكتابة الكاملة',
+  'bench_phase_finalizing': 'جار الإنهاء',
+  'bench_phase_complete': 'اكتمل',
+  'bench_phase_cancelled': 'أُلغي',
+  'bench_phase_failed': 'فشل',
+  'bench_msg_ready': 'اختر قرصاً وابدأ الاختبار.',
+  'bench_msg_preparing': 'جار إنشاء ملفات اختبار مؤقتة.',
+  'bench_msg_sequential': 'جار قياس سرعة الكتابة المتتابعة المستمرة.',
+  'bench_msg_random4k':
+      'جار قياس الكتابات العشوائية الصغيرة، وهي حمل مهم لـ To Go.',
+  'bench_msg_multithread': 'جار فحص سلوك القرص مع I/O متوازية.',
+  'bench_msg_full': 'جار الكتابة على المساحة الحرة لمراقبة الثبات الطويل.',
+  'bench_msg_finalizing': 'جار تنظيف الملفات المؤقتة وحساب النتيجة.',
+  'bench_msg_complete': 'انتهى الاختبار. راجع الرسوم والنتيجة.',
+  'bench_msg_cancelled': 'أوقف المستخدم الاختبار.',
+  'bench_msg_failed': 'فشل الاختبار. افحص القرص ثم حاول مرة أخرى.',
+  'bench_elapsed': 'الوقت المنقضي',
+  'bench_current_speed': 'السرعة الحالية',
+  'bench_progress': 'التقدم',
+  'bench_rating_excellent': 'جاهز لـ To Go',
+  'bench_rating_good': 'مريح',
+  'bench_rating_usable': 'قابل للاستخدام',
+  'bench_rating_limited': 'محدود',
+  'bench_rating_not_recommended': 'غير موصى به',
+  'bench_rating_unmeasured': 'غير مقاس',
+  'bench_rating_excellent_desc':
+      'أداء 4K والكتابة المستمرة قويان. مناسب لاستخدام To Go المكثف.',
+  'bench_rating_good_desc':
+      'الأداء العام جيد، وينبغي أن تكون تجربة النظام المحمول سلسة عادة.',
+  'bench_rating_usable_desc':
+      'مناسب للعمل الخفيف، لكن التحديثات أو تعدد المهام قد تكون أبطأ.',
+  'bench_rating_limited_desc':
+      'يناسب المهام البسيطة، لكنه غالباً سيكون بطيئاً كنظام To Go.',
+  'bench_rating_not_recommended_desc':
+      'بطيء أو غير مستقر بما يكفي لتجربة To Go موثوقة.',
+  'bench_rating_unmeasured_desc': 'شغّل اختباراً للحصول على نتيجة الملاءمة.',
+  'bench_result_overall': 'التقييم العام',
+  'bench_result_recommendation': 'التوصية',
+  'bench_result_reasons': 'الأسباب الرئيسية',
+  'bench_result_notes': 'ملاحظات',
+  'bench_recommend_excellent':
+      'موصى به لـ Windows To Go / Linux To Go، بما في ذلك الاستخدام اليومي الأثقل.',
+  'bench_recommend_good': 'موصى به لـ Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'مناسب لأحمال To Go الخفيفة؛ تجنب التحديثات الثقيلة وتعدد المهام المكثف.',
+  'bench_recommend_limited': 'مناسب فقط للطوارئ أو استخدام To Go الخفيف.',
+  'bench_recommend_not_recommended':
+      'غير موصى به لـ Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured': 'شغّل الاختبار لإنشاء توصية.',
+  'bench_reason_4k_strong': 'كتابة 4K العشوائية قوية جدًا.',
+  'bench_reason_4k_stable': 'كتابة 4K العشوائية مستقرة.',
+  'bench_reason_4k_limited': 'كتابة 4K العشوائية محدودة.',
+  'bench_reason_4k_weak':
+      'كتابة 4K العشوائية ضعيفة جدًا لتجربة نظام محمول سلسة.',
+  'bench_reason_thread_good': 'لا يوجد هبوط شديد تحت ضغط تعدد الخيوط.',
+  'bench_reason_thread_limited': 'يوجد هبوط ملحوظ تحت ضغط تعدد الخيوط.',
+  'bench_reason_seq_good': 'سرعة الكتابة المتسلسلة كافية.',
+  'bench_reason_seq_acceptable':
+      'سرعة الكتابة المتسلسلة في النهاية لا تزال مقبولة.',
+  'bench_reason_seq_slow': 'سرعة الكتابة المتسلسلة منخفضة.',
+  'bench_reason_full_stable':
+      'بقيت الكتابة الكاملة مستقرة دون انهيار واضح في الذاكرة المؤقتة.',
+  'bench_reason_full_drop':
+      'انخفضت سرعة الكتابة الكاملة بوضوح في المرحلة الأخيرة، ربما بسبب نفاد ذاكرة SLC المؤقتة.',
+  'bench_note_full_not_run':
+      'لم يتم تشغيل اختبار الكتابة الكاملة، لذلك لم يتم تقييم السلوك بعد نفاد ذاكرة SLC المؤقتة.',
+  'bench_note_full_skipped_low_space':
+      'لم ينتج اختبار الكتابة الكاملة عينات، غالبًا بسبب قلة المساحة أو انتهاء الاختبار مبكرًا.',
+  'bench_note_full_ran':
+      'تم تضمين اختبار الكتابة الكاملة في تقييم ثبات الكتابة الطويلة.',
+  'bench_report_copied': 'تم نسخ التقرير',
+  'bench_copy_report': 'نسخ التقرير',
+  'bench_score': 'النتيجة',
+  'bench_4k_adjusted': '4K المعدل',
+  'bench_seq_write': 'كتابة متتابعة',
+  'bench_duration': 'المدة',
+  'bench_chart_sequential': 'الكتابة المتتابعة',
+  'bench_chart_sequential_desc': 'سرعة كتابة الكتل الكبيرة مع مرور الوقت',
+  'bench_chart_4k': 'ثبات 4K العشوائي',
+  'bench_chart_4k_desc': 'اتساق الكتابات الصغيرة وتأثيرها على استجابة To Go',
+  'bench_chart_threads': 'توسع الخيوط',
+  'bench_chart_threads_desc': 'كتابات 4K متوازية مع زيادة عدد العمال',
+  'bench_chart_full': 'منحنى الكتابة الكاملة',
+  'bench_chart_full_desc':
+      'الكتابة الطويلة وهبوط التخزين المؤقت في وضع الكتابة الكاملة',
+  'bench_chart_waiting': 'سيظهر الرسم أثناء الاختبار',
+  'bench_chart_full_skip': 'استخدم وضع الكتابة الكاملة لجمع هذا المنحنى',
+  'bench_error_no_drive_letter':
+      'لا يحتوي هذا القرص على حرف محرك قابل للاستخدام. أعد توصيله أو عيّن حرفاً من إدارة الأقراص.',
+  'bench_error_drive_not_ready':
+      'القرص المحدد غير جاهز. أعد توصيله ثم حاول مرة أخرى.',
+  'wtg_benchmark_tip_title': 'يوصى به قبل إنشاء To Go',
+  'wtg_benchmark_tip_desc':
+      'شغّل اختبار القرص إذا أردت فحص كتابة 4K وتوسع الخيوط والثبات الطويل. يمكنك المتابعة من دون اختبار.',
+  'wtg_benchmark_tip_button': 'اختبار القرص',
 };
 
 const _pt = <String, String>{
+  'translation_missing':
+      'Este texto não está disponível no idioma selecionado.',
+  'safety_disk_missing': 'O disco selecionado não está mais conectado.',
+  'safety_disk_changed':
+      'O disco de destino mudou após a seleção. Reconecte-o e selecione-o novamente.',
+  'safety_disk_busy':
+      'Outra operação do WinDeploy Studio já está usando este disco. Aguarde a conclusão e tente novamente.',
+  'safety_detection_failed':
+      'Não foi possível verificar a segurança do disco. A operação foi interrompida.',
+  'safety_not_external':
+      'Somente discos externos verificados podem ser apagados.',
+  'safety_disk_offline':
+      'O disco selecionado está offline e não pode ser usado.',
+  'linux_not_isohybrid':
+      'Este ISO não é uma imagem ISOHybrid inicializável. O disco de destino não foi alterado.',
+  'linux_togo_mount_preflight_failed':
+      'Não foi possível inspecionar a imagem do Linux. O disco de destino não foi alterado.',
+  'linux_togo_unsupported_iso':
+      'O Linux To Go persistente atualmente oferece suporte ao Ubuntu x64 e a imagens Live compatíveis baseadas em casper. Para outras distribuições, use o criador de mídia de instalação.',
+  'linux_togo_mke2fs_missing':
+      'O componente integrado de persistência do Linux está ausente. Reinstale o WinDeploy Studio. O disco de destino não foi alterado.',
+  'linux_togo_boot_config_unsupported':
+      'Esta imagem casper não possui uma entrada GRUB compatível para ativar a persistência. O disco de destino não foi alterado.',
+  'linux_togo_boot_file_too_large':
+      'Esta imagem contém um arquivo de inicialização necessário maior que o limite de arquivo único do FAT32. O disco de destino não foi alterado.',
+  'bench_error_helper_missing':
+      'O componente nativo de teste está ausente. Reinstale o aplicativo.',
+  'bench_error_cleanup_failed':
+      'Alguns arquivos de teste não puderam ser removidos. Feche os programas que usam a unidade e exclua a pasta .wds_benchmark.',
+  'bench_error_native_failed':
+      'Não foi possível concluir o teste nativo do disco.',
+  'ai_privacy_title': 'Aviso de análise remota',
+  'ai_privacy_message':
+      'Esta análise envia trechos de logs, nomes de imagens ou dados do dispositivo ao serviço de IA configurado. Somente as prévias lidas por este recurso são enviadas; números de série USB não são enviados. Continuar?',
+  'ai_privacy_continue': 'Continuar e enviar',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Criador de mídia de instalação e To Go para Windows e Linux',
   'nav_home': 'Início',
@@ -5926,8 +7279,6 @@ const _pt = <String, String>{
   'home_bootable_usb': 'Criador de mídia de instalação',
   'home_bootable_usb_desc':
       'Crie USBs de instalação do Windows ou Linux a partir de arquivos ISO',
-  'home_font_pack': 'Baixar pacote de fontes',
-  'home_font_pack_desc': 'Fontes CJK para ISOs leves do Windows',
   'home_wtg': 'Ambiente To Go',
   'home_wtg_desc': 'Crie ambientes de trabalho portáteis Windows e Linux',
   'home_local_iso': 'Importar ISO local',
@@ -5963,7 +7314,6 @@ const _pt = <String, String>{
   'detail_cancel': 'Cancelar',
   'detail_continue': 'Continuar',
   'detail_link_copied': 'Link copiado',
-  'detail_sha256_copied': 'SHA256 copiado',
   'detail_open_failed': 'Não foi possível abrir o link',
   'images_error': 'Erro desconhecido',
   'mirror_not_found': 'Item de imagem não encontrado',
@@ -5973,15 +7323,15 @@ const _pt = <String, String>{
   'cancel_confirm': 'Confirmar cancelamento',
   'cancel_create_desc':
       'Cancelar a criação da mídia de instalação do Windows? Esta ação não pode ser desfeita.',
-  'fontpack_warning': 'Este sistema pode não ter fontes chinesas',
+  'fontpack_warning': 'Esta imagem pode não incluir fontes CJK',
   'fontpack_recommend':
-      'Recomenda-se baixar e instalar o pacote de fontes chinesas',
+      'Baixe e instale o pacote de fontes CJK para exibir completamente textos em chinês, japonês e coreano',
   'fontpack_download': 'Baixar pacote de fontes',
   'fontpack_desc':
-      'Pacote de fontes chinesas para ISOs leves do Windows. Inclui fontes CJK comuns para garantir a exibição correta do conteúdo em chinês.',
-  'fontpack_feature_1': 'Inclui HarmonyOS Sans SC e outras fontes chinesas',
-  'fontpack_feature_2': 'Compatível com Windows 10/11',
-  'fontpack_feature_3': 'Instalação com um clique para todos os usuários',
+      'Pacote complementar de fontes CJK para Tiny10, Tiny11 e Windows X-Lite.',
+  'fontpack_feature_1': 'Inclui fontes CJK como HarmonyOS Sans SC',
+  'fontpack_feature_2': 'Compatível com Windows 10 e Windows 11',
+  'fontpack_feature_3': 'Pode ser instalado para todos os usuários',
   'iso_step_mount': 'Montando ISO...',
   'iso_step_detect': 'Detectando instalador...',
   'iso_step_info': 'Lendo informações da imagem...',
@@ -6207,23 +7557,24 @@ const _pt = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Criador de Linux To Go',
-  'wtg_linux_subtitle': 'Crie um ambiente Linux Live portátil e inicializável',
+  'wtg_linux_subtitle':
+      'Crie um ambiente Ubuntu/casper Live portátil e persistente',
   'wtg_linux_select_iso': 'Selecionar ISO do Linux',
   'wtg_linux_select_iso_desc':
-      'Escolha uma imagem Linux ISOHybrid Live. A persistência depende da distribuição e não é modificada neste modo.',
+      'Escolha uma ISO do Ubuntu x64 ou uma imagem Live compatível baseada em casper. O WinDeploy Studio criará e ativará o armazenamento persistente.',
   'wtg_linux_step1_title': 'Etapa 1: selecionar ISO do Linux',
   'wtg_linux_step1_desc':
-      'Selecione uma imagem Linux Live ISOHybrid para criar Linux To Go',
+      'Selecione uma ISO do Ubuntu x64 ou uma imagem Live compatível baseada em casper',
   'wtg_linux_step4_title': 'Etapa 2: selecionar disco de destino',
   'wtg_linux_step4_desc': 'Selecione o disco externo para Linux To Go',
   'wtg_linux_confirm_title': 'Etapa 3: confirmar Linux To Go',
   'wtg_linux_confirm_desc':
-      'Revise a ISO, o disco e o modo Live antes de gravar',
+      'Antes de gravar, revise a ISO casper compatível, o disco de destino e o ambiente persistente',
   'wtg_linux_workspace_type': 'Tipo de ambiente',
-  'wtg_linux_live_workspace': 'Ambiente Linux Live inicializável',
+  'wtg_linux_live_workspace': 'Ambiente Ubuntu/casper Live persistente',
   'wtg_linux_persistence': 'Persistência',
   'wtg_linux_persistence_note':
-      'Depende da distribuição; a configuração de inicialização não é modificada',
+      'Ativada com uma imagem ext4 writable (até cerca de 4 GB)',
   'wtg_linux_step6_title': 'Etapa 4: criando Linux To Go',
   'wtg_linux_step6_desc':
       'Aguarde enquanto a imagem ISO do Linux é gravada no disco de destino',
@@ -6288,15 +7639,19 @@ const _pt = <String, String>{
   'update_release_notes': 'Notas da versão',
   'update_now': 'Atualizar agora',
   'update_open_browser': 'Abrir no navegador',
+  'update_install_verification_failed':
+      'O instalador não passou na verificação de integridade ou do editor. Use a opção de download no navegador.',
   'update_later': 'Lembrar mais tarde',
   'update_ignore': 'Ignorar esta versão',
   'update_downloading': 'Baixando atualização',
   'update_progress': 'Progresso',
   'update_speed': 'Velocidade',
-  'update_install': 'Instalar e reiniciar',
-  'update_install_desc': 'A atualização foi baixada. Instalar agora?',
+  'update_install': 'Instalar atualização',
+  'update_install_desc':
+      'A atualização está pronta. O WinDeploy Studio será fechado e iniciará o instalador. Continuar?',
   'update_up_to_date': 'Você está atualizado',
   'update_checking': 'Verificando atualizações...',
+  'update_installing': 'Verificando e iniciando o instalador...',
   'update_check_failed': 'Falha ao verificar atualizações',
   'update_channel': 'Canal de atualização',
   'update_channel_stable': 'Estável',
@@ -6639,9 +7994,187 @@ const _pt = <String, String>{
   'mirror_global_tag': 'Global',
   'mirror_default_title': 'Baixar',
   'mirror_default_desc': 'Link de download direto',
+  'nav_benchmark': 'Teste de disco',
+  'home_benchmark': 'Benchmark da unidade',
+  'home_benchmark_desc': 'Verifique o desempenho real antes do To Go',
+  'logs_cat_benchmark': 'Registros de teste de disco',
+  'bench_title': 'Benchmark da unidade',
+  'bench_subtitle':
+      'Mede a escrita real para Windows To Go e Linux To Go: sequencial, aleatória 4K, escala por threads e estabilidade em escrita longa.',
+  'bench_refresh': 'Atualizar',
+  'bench_target_disk': 'Unidade de destino',
+  'bench_detecting': 'Detectando unidades removíveis...',
+  'bench_no_disk': 'Nenhuma unidade removível encontrada',
+  'bench_no_disk_desc': 'Conecte um pendrive ou SSD portátil e atualize.',
+  'bench_no_drive_letter': 'Sem letra de unidade',
+  'bench_test_mode': 'Modo de teste',
+  'bench_mode_quick': 'Rápido',
+  'bench_mode_standard': 'Padrão',
+  'bench_mode_extreme': 'Extremo',
+  'bench_mode_full_write': 'Escrita completa',
+  'bench_mode_quick_desc': 'Verificação curta de adequação básica para To Go.',
+  'bench_mode_standard_desc':
+      'Cobertura equilibrada para uso diário de Windows To Go e Linux To Go.',
+  'bench_mode_extreme_desc':
+      'Testes 4K e multithread mais longos para uma avaliação mais rigorosa.',
+  'bench_mode_full_write_desc':
+      'Adiciona escrita quase completa para revelar queda de cache.',
+  'bench_full_warning':
+      'O modo Escrita completa usa a maior parte do espaço livre e pode demorar. Arquivos existentes não são apagados de propósito, mas a unidade será muito exigida.',
+  'bench_start': 'Iniciar teste',
+  'bench_stop': 'Parar',
+  'bench_open_togo': 'Abrir To Go',
+  'bench_full_confirm_title': 'Teste de escrita completa',
+  'bench_full_confirm_desc':
+      'Este modo cria um arquivo temporário grande, escreve até quase encher a unidade e depois o remove. Continue apenas se houver espaço e tempo suficientes.',
+  'bench_full_confirm_start': 'Iniciar escrita completa',
+  'bench_phase_idle': 'Pronto',
+  'bench_phase_preparing': 'Preparando',
+  'bench_phase_sequential': 'Escrita sequencial',
+  'bench_phase_random4k': 'Escrita aleatória 4K',
+  'bench_phase_multithread': 'Escala por threads',
+  'bench_phase_full': 'Estabilidade de escrita completa',
+  'bench_phase_finalizing': 'Finalizando',
+  'bench_phase_complete': 'Concluído',
+  'bench_phase_cancelled': 'Cancelado',
+  'bench_phase_failed': 'Falhou',
+  'bench_msg_ready': 'Escolha uma unidade e inicie o teste.',
+  'bench_msg_preparing': 'Criando arquivos temporários do benchmark.',
+  'bench_msg_sequential':
+      'Medindo velocidade de escrita sequencial sustentada.',
+  'bench_msg_random4k':
+      'Medindo pequenas escritas aleatórias, carga essencial para To Go.',
+  'bench_msg_multithread': 'Verificando comportamento com I/O paralelo.',
+  'bench_msg_full':
+      'Escrevendo no espaço livre para observar estabilidade prolongada.',
+  'bench_msg_finalizing':
+      'Limpando arquivos temporários e calculando a pontuação.',
+  'bench_msg_complete': 'Benchmark concluído. Veja gráficos e pontuação.',
+  'bench_msg_cancelled': 'Benchmark parado pelo usuário.',
+  'bench_msg_failed':
+      'Benchmark falhou. Verifique a unidade e tente novamente.',
+  'bench_elapsed': 'Decorrido',
+  'bench_current_speed': 'Velocidade atual',
+  'bench_progress': 'Progresso',
+  'bench_rating_excellent': 'Pronto para To Go',
+  'bench_rating_good': 'Confortável',
+  'bench_rating_usable': 'Utilizável',
+  'bench_rating_limited': 'Limitado',
+  'bench_rating_not_recommended': 'Não recomendado',
+  'bench_rating_unmeasured': 'Não medido',
+  'bench_rating_excellent_desc':
+      'Ótimo 4K e escrita sustentada. Adequado para To Go exigente.',
+  'bench_rating_good_desc':
+      'Bom comportamento geral. Um sistema portátil comum deve ficar fluido.',
+  'bench_rating_usable_desc':
+      'Serve para uso leve, mas atualizações ou multitarefa podem ficar lentas.',
+  'bench_rating_limited_desc':
+      'Serve para tarefas simples, mas como To Go provavelmente parecerá lento.',
+  'bench_rating_not_recommended_desc':
+      'Lento ou instável demais para uma experiência To Go confiável.',
+  'bench_rating_unmeasured_desc':
+      'Execute um benchmark para obter o resultado de adequação.',
+  'bench_result_overall': 'Avaliação geral',
+  'bench_result_recommendation': 'Recomendação',
+  'bench_result_reasons': 'Motivos principais',
+  'bench_result_notes': 'Notas',
+  'bench_recommend_excellent':
+      'Recomendado para Windows To Go / Linux To Go, inclusive para uso diário mais pesado.',
+  'bench_recommend_good': 'Recomendado para Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'Utilizável para cargas To Go leves; evite atualizações pesadas e multitarefa intensa.',
+  'bench_recommend_limited':
+      'Recomendado apenas para emergência ou uso To Go leve.',
+  'bench_recommend_not_recommended':
+      'Não recomendado para Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured': 'Execute um teste para gerar uma recomendação.',
+  'bench_reason_4k_strong': 'A escrita aleatória 4K é muito forte.',
+  'bench_reason_4k_stable': 'A escrita aleatória 4K é estável.',
+  'bench_reason_4k_limited': 'A escrita aleatória 4K é limitada.',
+  'bench_reason_4k_weak':
+      'A escrita aleatória 4K é fraca demais para um sistema portátil fluido.',
+  'bench_reason_thread_good': 'Não há queda severa sob pressão multithread.',
+  'bench_reason_thread_limited':
+      'Há queda perceptível sob pressão multithread.',
+  'bench_reason_seq_good': 'A velocidade de escrita sequencial é suficiente.',
+  'bench_reason_seq_acceptable':
+      'A velocidade sequencial final ainda é aceitável.',
+  'bench_reason_seq_slow': 'A velocidade de escrita sequencial é baixa.',
+  'bench_reason_full_stable':
+      'A escrita completa permaneceu estável, sem colapso claro de cache.',
+  'bench_reason_full_drop':
+      'A escrita completa caiu bastante no fim, possivelmente por esgotamento do cache SLC.',
+  'bench_note_full_not_run':
+      'O teste de escrita completa não foi executado, então o comportamento após esgotar o cache SLC não foi avaliado.',
+  'bench_note_full_skipped_low_space':
+      'O teste de escrita completa não gerou amostras, normalmente por pouco espaço livre ou término antecipado.',
+  'bench_note_full_ran':
+      'O teste de escrita completa foi incluído na avaliação de estabilidade prolongada.',
+  'bench_report_copied': 'Relatório copiado',
+  'bench_copy_report': 'Copiar relatório',
+  'bench_score': 'Pontuação',
+  'bench_4k_adjusted': '4K ajustado',
+  'bench_seq_write': 'Escrita seq.',
+  'bench_duration': 'Duração',
+  'bench_chart_sequential': 'Escrita sequencial',
+  'bench_chart_sequential_desc':
+      'Velocidade de escrita em blocos grandes ao longo do tempo',
+  'bench_chart_4k': 'Estabilidade aleatória 4K',
+  'bench_chart_4k_desc':
+      'Consistência de pequenas escritas para resposta do To Go',
+  'bench_chart_threads': 'Escala por threads',
+  'bench_chart_threads_desc': 'Escritas 4K paralelas com mais workers',
+  'bench_chart_full': 'Curva de escrita completa',
+  'bench_chart_full_desc': 'Escrita longa e queda de cache no modo completo',
+  'bench_chart_waiting': 'O gráfico aparecerá durante o teste',
+  'bench_chart_full_skip': 'Use Escrita completa para coletar esta curva',
+  'bench_error_no_drive_letter':
+      'Esta unidade não tem uma letra utilizável. Reconecte ou atribua uma letra no Gerenciamento de Disco.',
+  'bench_error_drive_not_ready':
+      'A unidade selecionada não está pronta. Reconecte e tente novamente.',
+  'wtg_benchmark_tip_title': 'Recomendado antes de criar To Go',
+  'wtg_benchmark_tip_desc':
+      'Execute o teste de disco para verificar escrita 4K, threads e estabilidade prolongada. Você também pode continuar sem testar.',
+  'wtg_benchmark_tip_button': 'Teste de disco',
 };
 
 const _de = <String, String>{
+  'translation_missing':
+      'Dieser Text ist in der ausgewählten Sprache nicht verfügbar.',
+  'safety_disk_missing':
+      'Der ausgewählte Datenträger ist nicht mehr verbunden.',
+  'safety_disk_changed':
+      'Der Zieldatenträger hat sich nach der Auswahl geändert. Schließen Sie ihn erneut an und wählen Sie ihn noch einmal aus.',
+  'safety_disk_busy':
+      'Dieser Datenträger wird bereits von einem anderen Vorgang in WinDeploy Studio verwendet. Warten Sie, bis er abgeschlossen ist, und versuchen Sie es erneut.',
+  'safety_detection_failed':
+      'Die Sicherheitsinformationen des Datenträgers konnten nicht geprüft werden. Der Vorgang wurde beendet.',
+  'safety_not_external':
+      'Nur geprüfte externe Datenträger können gelöscht werden.',
+  'safety_disk_offline':
+      'Der ausgewählte Datenträger ist offline und kann nicht verwendet werden.',
+  'linux_not_isohybrid':
+      'Diese ISO-Datei ist kein startfähiges ISOHybrid-Abbild. Der Zieldatenträger wurde nicht verändert.',
+  'linux_togo_mount_preflight_failed':
+      'Das Linux-Abbild konnte nicht geprüft werden. Der Zieldatenträger wurde nicht verändert.',
+  'linux_togo_unsupported_iso':
+      'Linux To Go mit Persistenz unterstützt derzeit Ubuntu x64 und kompatible casper-basierte Live-Abbilder. Verwenden Sie für andere Distributionen den Installationsmedien-Ersteller.',
+  'linux_togo_mke2fs_missing':
+      'Die mitgelieferte Linux-Persistenzkomponente fehlt. Installieren Sie WinDeploy Studio erneut. Der Zieldatenträger wurde nicht verändert.',
+  'linux_togo_boot_config_unsupported':
+      'Dieses casper-Abbild enthält keinen unterstützten GRUB-Eintrag zum Aktivieren der Persistenz. Der Zieldatenträger wurde nicht verändert.',
+  'linux_togo_boot_file_too_large':
+      'Dieses Abbild enthält eine erforderliche Startdatei, die das Einzeldatelimit von FAT32 überschreitet. Der Zieldatenträger wurde nicht verändert.',
+  'bench_error_helper_missing':
+      'Die native Testkomponente fehlt. Installieren Sie die Anwendung erneut.',
+  'bench_error_cleanup_failed':
+      'Einige Testdateien konnten nicht entfernt werden. Schließen Sie Programme, die das Laufwerk verwenden, und löschen Sie den Ordner .wds_benchmark.',
+  'bench_error_native_failed':
+      'Der native Datenträgertest konnte nicht abgeschlossen werden.',
+  'ai_privacy_title': 'Hinweis zur Remote-Analyse',
+  'ai_privacy_message':
+      'Diese Analyse sendet ausgewählte Protokollauszüge, Abbildnamen oder Geräteinformationen an den konfigurierten KI-Dienst. Übertragen werden nur die von dieser Funktion gelesenen Vorschauen, keine USB-Seriennummern. Fortfahren?',
+  'ai_privacy_continue': 'Fortfahren und senden',
   'app_name': 'WinDeploy Studio',
   'app_subtitle':
       'Ersteller für Windows- und Linux-Installationsmedien und To Go',
@@ -6661,8 +8194,6 @@ const _de = <String, String>{
   'home_bootable_usb': 'Installationsmedium erstellen',
   'home_bootable_usb_desc':
       'Windows- oder Linux-Installations-USBs aus ISO-Dateien erstellen',
-  'home_font_pack': 'Schriftpaket herunterladen',
-  'home_font_pack_desc': 'CJK-Schriften für schlanke Windows-ISOs',
   'home_wtg': 'To Go-Arbeitsbereich',
   'home_wtg_desc': 'Portable Windows- und Linux-Arbeitsumgebungen erstellen',
   'home_local_iso': 'Lokales ISO importieren',
@@ -6698,7 +8229,6 @@ const _de = <String, String>{
   'detail_cancel': 'Abbrechen',
   'detail_continue': 'Weiter',
   'detail_link_copied': 'Link kopiert',
-  'detail_sha256_copied': 'SHA256 kopiert',
   'detail_open_failed': 'Link konnte nicht geöffnet werden',
   'images_error': 'Unbekannter Fehler',
   'mirror_not_found': 'Abbild-Eintrag nicht gefunden',
@@ -6709,16 +8239,15 @@ const _de = <String, String>{
   'cancel_create_desc':
       'Erstellung des Windows-Installationsmediums abbrechen? Dies kann nicht rückgängig gemacht werden.',
   'fontpack_warning':
-      'Auf diesem System fehlen möglicherweise chinesische Schriftarten',
+      'Dieses Abbild enthält möglicherweise keine CJK-Schriftarten',
   'fontpack_recommend':
-      'Es wird empfohlen, das chinesische Schriftpaket herunterzuladen und zu installieren',
-  'fontpack_download': 'Schriftpaket herunterladen',
+      'Laden Sie das CJK-Schriftartenpaket herunter und installieren Sie es, um chinesische, japanische und koreanische Texte vollständig darzustellen',
+  'fontpack_download': 'Schriftartenpaket herunterladen',
   'fontpack_desc':
-      'Chinesisches Schriftpaket für schlanke Windows-ISOs. Enthält gängige CJK-Schriften für korrekte Darstellung chinesischer Inhalte.',
-  'fontpack_feature_1':
-      'Enthält HarmonyOS Sans SC und weitere chinesische Schriftarten',
-  'fontpack_feature_2': 'Kompatibel mit Windows 10/11',
-  'fontpack_feature_3': 'Ein-Klick-Installation für alle Benutzer',
+      'Ergänzendes CJK-Schriftartenpaket für Tiny10, Tiny11 und Windows X-Lite.',
+  'fontpack_feature_1': 'Enthält CJK-Schriftarten wie HarmonyOS Sans SC',
+  'fontpack_feature_2': 'Unterstützt Windows 10 und Windows 11',
+  'fontpack_feature_3': 'Kann für alle Benutzer installiert werden',
   'iso_step_mount': 'ISO wird eingehängt...',
   'iso_step_detect': 'Installationsprogramm wird erkannt...',
   'iso_step_info': 'Abbildinformationen werden gelesen...',
@@ -6945,23 +8474,23 @@ const _de = <String, String>{
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Linux To Go erstellen',
   'wtg_linux_subtitle':
-      'Eine portable, bootfähige Linux Live-Arbeitsumgebung erstellen',
+      'Eine portable, persistente Ubuntu/casper Live-Umgebung erstellen',
   'wtg_linux_select_iso': 'Linux-ISO auswählen',
   'wtg_linux_select_iso_desc':
-      'Wählen Sie ein Linux ISOHybrid Live-Abbild. Persistenz hängt von der Distribution ab und wird in diesem Modus nicht angepasst.',
+      'Wählen Sie eine x64-Ubuntu-ISO oder ein kompatibles casper-basiertes Live-Abbild. WinDeploy Studio erstellt und aktiviert den persistenten Speicher.',
   'wtg_linux_step1_title': 'Schritt 1: Linux-ISO auswählen',
   'wtg_linux_step1_desc':
-      'Wählen Sie ein Linux Live ISOHybrid-Abbild, um Linux To Go zu erstellen',
+      'Wählen Sie eine x64-Ubuntu-ISO oder ein kompatibles casper-basiertes Live-Abbild',
   'wtg_linux_step4_title': 'Schritt 2: Zieldatenträger auswählen',
   'wtg_linux_step4_desc': 'Wählen Sie den externen Datenträger für Linux To Go',
   'wtg_linux_confirm_title': 'Schritt 3: Linux To Go bestätigen',
   'wtg_linux_confirm_desc':
-      'Prüfen Sie ISO, Datenträger und Live-Modus vor dem Schreiben',
+      'Prüfen Sie vor dem Schreiben das unterstützte casper-ISO, den Zieldatenträger und die persistente Umgebung',
   'wtg_linux_workspace_type': 'Arbeitsumgebungstyp',
-  'wtg_linux_live_workspace': 'Bootfähige Linux Live-Arbeitsumgebung',
+  'wtg_linux_live_workspace': 'Persistente Ubuntu/casper Live-Umgebung',
   'wtg_linux_persistence': 'Persistenz',
   'wtg_linux_persistence_note':
-      'Hängt von der Distribution ab; die Boot-Konfiguration wird nicht verändert',
+      'Mit einem ext4-writable-Abbild aktiviert (bis etwa 4 GB)',
   'wtg_linux_step6_title': 'Schritt 4: Linux To Go wird erstellt',
   'wtg_linux_step6_desc':
       'Bitte warten Sie, während das Linux-ISO-Abbild auf den Zieldatenträger geschrieben wird',
@@ -7027,16 +8556,19 @@ const _de = <String, String>{
   'update_release_notes': 'Versionshinweise',
   'update_now': 'Jetzt aktualisieren',
   'update_open_browser': 'Im Browser öffnen',
+  'update_install_verification_failed':
+      'Die Integritäts- oder Herausgeberprüfung des Installationsprogramms ist fehlgeschlagen. Verwenden Sie stattdessen den Browser-Download.',
   'update_later': 'Später erinnern',
   'update_ignore': 'Diese Version ignorieren',
   'update_downloading': 'Update wird heruntergeladen',
   'update_progress': 'Fortschritt',
   'update_speed': 'Geschwindigkeit',
-  'update_install': 'Installieren und neu starten',
+  'update_install': 'Update installieren',
   'update_install_desc':
-      'Das Update wurde heruntergeladen. Jetzt installieren?',
+      'Das Update ist bereit. WinDeploy Studio wird geschlossen und startet das Installationsprogramm. Fortfahren?',
   'update_up_to_date': 'Sie sind auf dem neuesten Stand',
   'update_checking': 'Suche nach Updates...',
+  'update_installing': 'Installationsprogramm wird geprüft und gestartet...',
   'update_check_failed': 'Suche nach Updates fehlgeschlagen',
   'update_channel': 'Update-Kanal',
   'update_channel_stable': 'Stabil',
@@ -7390,9 +8922,187 @@ const _de = <String, String>{
   'mirror_global_tag': 'Global',
   'mirror_default_title': 'Herunterladen',
   'mirror_default_desc': 'Direkter Download-Link',
+  'nav_benchmark': 'Datenträger-Test',
+  'home_benchmark': 'Laufwerks-Benchmark',
+  'home_benchmark_desc': 'Reale To Go-Leistung vor der Bereitstellung prüfen',
+  'logs_cat_benchmark': 'Datenträger-Testprotokolle',
+  'bench_title': 'Laufwerks-Benchmark',
+  'bench_subtitle':
+      'Misst reales Schreibverhalten für Windows To Go und Linux To Go: sequenziell, zufälliges 4K, Thread-Skalierung und lange Schreibstabilität.',
+  'bench_refresh': 'Aktualisieren',
+  'bench_target_disk': 'Ziellaufwerk',
+  'bench_detecting': 'Wechseldatenträger werden erkannt...',
+  'bench_no_disk': 'Kein Wechseldatenträger gefunden',
+  'bench_no_disk_desc':
+      'USB-Laufwerk oder portable SSD anschließen und aktualisieren.',
+  'bench_no_drive_letter': 'Kein Laufwerksbuchstabe',
+  'bench_test_mode': 'Testmodus',
+  'bench_mode_quick': 'Schnell',
+  'bench_mode_standard': 'Standard',
+  'bench_mode_extreme': 'Extrem',
+  'bench_mode_full_write': 'Vollschreiben',
+  'bench_mode_quick_desc':
+      'Kurzer Sicherheitscheck für grundlegende To Go-Eignung.',
+  'bench_mode_standard_desc':
+      'Ausgewogene Prüfung für normales Windows To Go und Linux To Go.',
+  'bench_mode_extreme_desc':
+      'Längere 4K- und Multithread-Tests für ein strengeres Urteil.',
+  'bench_mode_full_write_desc':
+      'Schreibt zusätzlich fast den ganzen freien Bereich, um Cache-Einbrüche zu zeigen.',
+  'bench_full_warning':
+      'Der Vollschreibmodus nutzt den Großteil des freien Speicherplatzes und kann lange dauern. Vorhandene Dateien werden nicht absichtlich gelöscht, das Laufwerk wird aber stark belastet.',
+  'bench_start': 'Test starten',
+  'bench_stop': 'Stoppen',
+  'bench_open_togo': 'To Go öffnen',
+  'bench_full_confirm_title': 'Vollschreibtest',
+  'bench_full_confirm_desc':
+      'Dieser Modus erstellt eine große temporäre Datei, schreibt fast bis das Laufwerk voll ist und entfernt sie danach. Nur fortfahren, wenn genug Platz und Zeit vorhanden sind.',
+  'bench_full_confirm_start': 'Vollschreiben starten',
+  'bench_phase_idle': 'Bereit',
+  'bench_phase_preparing': 'Vorbereitung',
+  'bench_phase_sequential': 'Sequenzielles Schreiben',
+  'bench_phase_random4k': 'Zufälliges 4K-Schreiben',
+  'bench_phase_multithread': 'Thread-Skalierung',
+  'bench_phase_full': 'Vollschreib-Stabilität',
+  'bench_phase_finalizing': 'Abschluss',
+  'bench_phase_complete': 'Fertig',
+  'bench_phase_cancelled': 'Abgebrochen',
+  'bench_phase_failed': 'Fehlgeschlagen',
+  'bench_msg_ready': 'Laufwerk wählen und Test starten.',
+  'bench_msg_preparing': 'Temporäre Benchmark-Dateien werden erstellt.',
+  'bench_msg_sequential':
+      'Anhaltende sequenzielle Schreibgeschwindigkeit wird gemessen.',
+  'bench_msg_random4k':
+      'Kleine zufällige Schreibzugriffe werden gemessen, die Kernlast für To Go.',
+  'bench_msg_multithread': 'Verhalten bei parallelem I/O wird geprüft.',
+  'bench_msg_full':
+      'Freier Speicher wird beschrieben, um Langzeitstabilität zu beobachten.',
+  'bench_msg_finalizing':
+      'Temporäre Dateien werden entfernt und die Bewertung berechnet.',
+  'bench_msg_complete':
+      'Benchmark abgeschlossen. Diagramme und Bewertung prüfen.',
+  'bench_msg_cancelled': 'Benchmark vom Benutzer gestoppt.',
+  'bench_msg_failed':
+      'Benchmark fehlgeschlagen. Laufwerk prüfen und erneut versuchen.',
+  'bench_elapsed': 'Verstrichen',
+  'bench_current_speed': 'Aktuelle Geschwindigkeit',
+  'bench_progress': 'Fortschritt',
+  'bench_rating_excellent': 'To Go-bereit',
+  'bench_rating_good': 'Angenehm',
+  'bench_rating_usable': 'Nutzbar',
+  'bench_rating_limited': 'Eingeschränkt',
+  'bench_rating_not_recommended': 'Nicht empfohlen',
+  'bench_rating_unmeasured': 'Nicht gemessen',
+  'bench_rating_excellent_desc':
+      'Starkes 4K- und Dauer-Schreibverhalten. Geeignet für anspruchsvolles To Go.',
+  'bench_rating_good_desc':
+      'Gutes Gesamtverhalten. Normale portable Systeme sollten flüssig laufen.',
+  'bench_rating_usable_desc':
+      'Für leichte Arbeit nutzbar, aber Updates oder Multitasking können langsamer wirken.',
+  'bench_rating_limited_desc':
+      'Für einfache Aufgaben möglich, als To Go-System aber wahrscheinlich träge.',
+  'bench_rating_not_recommended_desc':
+      'Zu langsam oder instabil für eine zuverlässige To Go-Erfahrung.',
+  'bench_rating_unmeasured_desc':
+      'Benchmark ausführen, um eine Eignung zu erhalten.',
+  'bench_result_overall': 'Gesamtbewertung',
+  'bench_result_recommendation': 'Empfehlung',
+  'bench_result_reasons': 'Wichtige Gründe',
+  'bench_result_notes': 'Hinweise',
+  'bench_recommend_excellent':
+      'Empfohlen für Windows To Go / Linux To Go, auch bei anspruchsvollerer täglicher Nutzung.',
+  'bench_recommend_good': 'Empfohlen für Windows To Go / Linux To Go.',
+  'bench_recommend_usable':
+      'Für leichte To Go-Lasten nutzbar; schwere Updates und intensives Multitasking besser vermeiden.',
+  'bench_recommend_limited':
+      'Nur für Notfälle oder leichte To Go-Nutzung geeignet.',
+  'bench_recommend_not_recommended':
+      'Nicht empfohlen für Windows To Go / Linux To Go.',
+  'bench_recommend_unmeasured':
+      'Führen Sie einen Test aus, um eine Empfehlung zu erhalten.',
+  'bench_reason_4k_strong': 'Die zufällige 4K-Schreibleistung ist sehr stark.',
+  'bench_reason_4k_stable': 'Die zufällige 4K-Schreibleistung ist stabil.',
+  'bench_reason_4k_limited': 'Die zufällige 4K-Schreibleistung ist begrenzt.',
+  'bench_reason_4k_weak':
+      'Die zufällige 4K-Schreibleistung ist zu schwach für ein flüssiges portables OS.',
+  'bench_reason_thread_good':
+      'Unter Multithread-Last gibt es keinen starken Einbruch.',
+  'bench_reason_thread_limited':
+      'Unter Multithread-Last fällt die Leistung deutlich ab.',
+  'bench_reason_seq_good': 'Die sequenzielle Schreibleistung ist ausreichend.',
+  'bench_reason_seq_acceptable':
+      'Die spätere sequenzielle Schreibleistung bleibt akzeptabel.',
+  'bench_reason_seq_slow': 'Die sequenzielle Schreibleistung ist niedrig.',
+  'bench_reason_full_stable':
+      'Die vollständige Schreibphase blieb stabil, ohne klaren Cache-Einbruch.',
+  'bench_reason_full_drop':
+      'Die vollständige Schreibphase wurde gegen Ende deutlich langsamer, möglicherweise durch erschöpften SLC-Cache.',
+  'bench_note_full_not_run':
+      'Der vollständige Schreibtest wurde nicht ausgeführt; Verhalten nach erschöpftem SLC-Cache wurde daher nicht bewertet.',
+  'bench_note_full_skipped_low_space':
+      'Der vollständige Schreibtest lieferte keine Messwerte, meist wegen zu wenig freiem Speicher oder frühem Ende.',
+  'bench_note_full_ran':
+      'Der vollständige Schreibtest wurde in die Bewertung der Langzeitschreibstabilität einbezogen.',
+  'bench_report_copied': 'Bericht kopiert',
+  'bench_copy_report': 'Bericht kopieren',
+  'bench_score': 'Wertung',
+  'bench_4k_adjusted': '4K korrigiert',
+  'bench_seq_write': 'Seq. Schreiben',
+  'bench_duration': 'Dauer',
+  'bench_chart_sequential': 'Sequenzielles Schreiben',
+  'bench_chart_sequential_desc':
+      'Großblock-Schreibgeschwindigkeit über die Zeit',
+  'bench_chart_4k': '4K-Zufallsstabilität',
+  'bench_chart_4k_desc':
+      'Konstanz kleiner Schreibzugriffe für To Go-Reaktionszeit',
+  'bench_chart_threads': 'Thread-Skalierung',
+  'bench_chart_threads_desc':
+      'Parallele 4K-Schreibzugriffe mit steigender Worker-Zahl',
+  'bench_chart_full': 'Vollschreibkurve',
+  'bench_chart_full_desc':
+      'Langes Schreiben und Cache-Einbruch im Vollschreibmodus',
+  'bench_chart_waiting': 'Diagramm erscheint während des Tests',
+  'bench_chart_full_skip':
+      'Vollschreibmodus verwenden, um diese Kurve zu erfassen',
+  'bench_error_no_drive_letter':
+      'Dieses Laufwerk hat keinen nutzbaren Laufwerksbuchstaben. Neu verbinden oder in der Datenträgerverwaltung zuweisen.',
+  'bench_error_drive_not_ready':
+      'Das gewählte Laufwerk ist nicht bereit. Neu verbinden und erneut versuchen.',
+  'wtg_benchmark_tip_title': 'Vor To Go-Erstellung empfohlen',
+  'wtg_benchmark_tip_desc':
+      'Führen Sie den Datenträger-Test aus, um 4K-Schreiben, Thread-Skalierung und Langzeitstabilität zu prüfen. Sie können auch ohne Test fortfahren.',
+  'wtg_benchmark_tip_button': 'Datenträger-Test',
 };
 
 const _ko = <String, String>{
+  'translation_missing': '선택한 언어에서는 이 문구를 사용할 수 없습니다.',
+  'safety_disk_missing': '선택한 디스크의 연결이 끊어졌습니다.',
+  'safety_disk_changed': '선택 후 대상 디스크가 변경되었습니다. 다시 연결한 뒤 선택해 주세요.',
+  'safety_disk_busy':
+      '다른 WinDeploy Studio 작업에서 이 디스크를 사용 중입니다. 작업이 끝난 뒤 다시 시도해 주세요.',
+  'safety_detection_failed': '디스크 안전 정보를 확인할 수 없어 작업을 중단했습니다.',
+  'safety_not_external': '확인된 외장 디스크만 지울 수 있습니다.',
+  'safety_disk_offline': '선택한 디스크가 오프라인 상태여서 사용할 수 없습니다.',
+  'linux_not_isohybrid':
+      '이 ISO는 부팅 가능한 ISOHybrid 이미지가 아닙니다. 대상 디스크는 변경되지 않았습니다.',
+  'linux_togo_mount_preflight_failed':
+      'Linux 이미지를 검사할 수 없습니다. 대상 디스크는 변경되지 않았습니다.',
+  'linux_togo_unsupported_iso':
+      '영구 저장 Linux To Go는 현재 x64 Ubuntu 및 호환되는 casper 기반 Live 이미지를 지원합니다. 다른 배포판은 설치 미디어 만들기를 사용하세요.',
+  'linux_togo_mke2fs_missing':
+      '내장 Linux 영구 저장 구성 요소가 없습니다. WinDeploy Studio를 다시 설치하세요. 대상 디스크는 변경되지 않았습니다.',
+  'linux_togo_boot_config_unsupported':
+      '이 casper 이미지에는 영구 저장을 활성화할 수 있는 지원되는 GRUB 항목이 없습니다. 대상 디스크는 변경되지 않았습니다.',
+  'linux_togo_boot_file_too_large':
+      '이 이미지에는 FAT32의 단일 파일 제한을 초과하는 필수 부팅 파일이 있습니다. 대상 디스크는 변경되지 않았습니다.',
+  'bench_error_helper_missing': '네이티브 디스크 테스트 구성 요소가 없습니다. 앱을 다시 설치하세요.',
+  'bench_error_cleanup_failed':
+      '일부 테스트 파일을 삭제하지 못했습니다. 드라이브를 사용하는 프로그램을 닫고 .wds_benchmark 폴더를 삭제하세요.',
+  'bench_error_native_failed': '네이티브 디스크 테스트를 완료하지 못했습니다.',
+  'ai_privacy_title': '원격 분석 안내',
+  'ai_privacy_message':
+      '이 분석은 선택한 로그 일부, 이미지 이름 또는 장치 정보를 설정된 AI 서비스로 전송합니다. 파일 내용은 이 기능이 읽는 미리보기로 제한되며 USB 일련번호는 전송하지 않습니다. 계속하시겠습니까?',
+  'ai_privacy_continue': '계속해서 전송',
   'app_name': 'WinDeploy Studio',
   'app_subtitle': 'Windows 및 Linux 설치 미디어와 To Go 생성 도구',
   'nav_home': '홈',
@@ -7408,8 +9118,6 @@ const _ko = <String, String>{
   'home_image_library_desc': 'Windows 이미지 탐색 및 다운로드 링크 확인',
   'home_bootable_usb': '설치 미디어 생성 도구',
   'home_bootable_usb_desc': 'ISO 파일에서 Windows 또는 Linux 설치 USB 만들기',
-  'home_font_pack': '폰트 패키지 다운로드',
-  'home_font_pack_desc': '경량 Windows ISO용 CJK 폰트',
   'home_wtg': 'To Go 작업 공간',
   'home_wtg_desc': '휴대용 Windows 및 Linux 작업 환경 만들기',
   'home_local_iso': '로컬 ISO 가져오기',
@@ -7444,7 +9152,6 @@ const _ko = <String, String>{
   'detail_cancel': '취소',
   'detail_continue': '계속',
   'detail_link_copied': '링크 복사됨',
-  'detail_sha256_copied': 'SHA256 복사됨',
   'detail_open_failed': '링크를 열 수 없습니다',
   'images_error': '알 수 없는 오류',
   'mirror_not_found': '이미지 항목을 찾을 수 없습니다',
@@ -7452,14 +9159,13 @@ const _ko = <String, String>{
   'cancel_parse_desc': 'ISO 분석을 취소하시겠습니까? 마운트된 이미지가 해제됩니다.',
   'cancel_confirm': '취소 확인',
   'cancel_create_desc': 'Windows 설치 미디어 생성을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
-  'fontpack_warning': '이 시스템에 중국어 폰트가 없을 수 있습니다',
-  'fontpack_recommend': '중국어 폰트 패키지를 다운로드하여 설치하는 것을 권장합니다',
-  'fontpack_download': '폰트 패키지 다운로드',
-  'fontpack_desc':
-      '경량 Windows ISO용 중국어 폰트 패키지. 중국어 콘텐츠가 올바르게 표시되도록 일반 CJK 폰트가 포함되어 있습니다.',
-  'fontpack_feature_1': 'HarmonyOS Sans SC 등 중국어 폰트 포함',
-  'fontpack_feature_2': 'Windows 10/11 지원',
-  'fontpack_feature_3': '모든 사용자를 위한 원클릭 설치',
+  'fontpack_warning': '이 이미지에는 CJK 글꼴이 없을 수 있습니다',
+  'fontpack_recommend': '중국어, 일본어, 한국어 텍스트를 완전히 표시하려면 CJK 글꼴 팩을 다운로드하여 설치하세요',
+  'fontpack_download': '글꼴 팩 다운로드',
+  'fontpack_desc': 'Tiny10, Tiny11 및 Windows X-Lite용 CJK 글꼴 보완 팩입니다.',
+  'fontpack_feature_1': 'HarmonyOS Sans SC와 같은 CJK 글꼴 포함',
+  'fontpack_feature_2': 'Windows 10 및 Windows 11 지원',
+  'fontpack_feature_3': '모든 사용자에 대해 설치 가능',
   'iso_step_mount': 'ISO 마운트 중...',
   'iso_step_detect': '설치 프로그램 감지 중...',
   'iso_step_info': '이미지 정보 읽기 중...',
@@ -7670,20 +9376,20 @@ const _ko = <String, String>{
   'wtg_platform_windows': 'Windows To Go',
   'wtg_platform_linux': 'Linux To Go',
   'wtg_linux_title': 'Linux To Go 생성 도구',
-  'wtg_linux_subtitle': '휴대용 부팅 Linux Live 작업 환경 만들기',
+  'wtg_linux_subtitle': '변경 사항을 저장하는 휴대용 Ubuntu/casper Live 환경 만들기',
   'wtg_linux_select_iso': 'Linux ISO 선택',
   'wtg_linux_select_iso_desc':
-      'Linux ISOHybrid Live 이미지를 선택하세요. 지속성은 배포판에 따라 달라지며 이 모드에서는 부팅 구성을 수정하지 않습니다.',
+      'x64 Ubuntu 또는 호환되는 casper 기반 Live ISO를 선택하세요. WinDeploy Studio가 영구 저장소를 만들고 활성화합니다.',
   'wtg_linux_step1_title': '1단계: Linux ISO 선택',
-  'wtg_linux_step1_desc': 'Linux To Go를 만들 Linux Live ISOHybrid 이미지를 선택하세요',
+  'wtg_linux_step1_desc': 'x64 Ubuntu 또는 호환되는 casper 기반 Live ISO를 선택하세요',
   'wtg_linux_step4_title': '2단계: 대상 디스크 선택',
   'wtg_linux_step4_desc': 'Linux To Go에 사용할 외장 디스크를 선택하세요',
   'wtg_linux_confirm_title': '3단계: Linux To Go 확인',
-  'wtg_linux_confirm_desc': '쓰기 전에 ISO, 디스크, Live 작업 환경 모드를 확인하세요',
+  'wtg_linux_confirm_desc': '쓰기 전에 지원되는 casper ISO, 대상 디스크 및 영구 환경을 확인하세요',
   'wtg_linux_workspace_type': '작업 환경 유형',
-  'wtg_linux_live_workspace': '부팅 가능한 Linux Live 작업 환경',
+  'wtg_linux_live_workspace': '영구 Ubuntu/casper Live 환경',
   'wtg_linux_persistence': '지속성',
-  'wtg_linux_persistence_note': '배포판에 따라 다르며 부팅 구성은 수정하지 않습니다',
+  'wtg_linux_persistence_note': 'ext4 writable 이미지로 활성화(최대 약 4 GB)',
   'wtg_linux_step6_title': '4단계: Linux To Go 생성 중',
   'wtg_linux_step6_desc': 'Linux ISO 이미지를 대상 디스크에 쓰는 동안 기다려 주세요',
   'wtg_linux_step_complete_title': '5단계: 완료',
@@ -7745,15 +9451,19 @@ const _ko = <String, String>{
   'update_release_notes': '릴리스 노트',
   'update_now': '지금 업데이트',
   'update_open_browser': '브라우저에서 열기',
+  'update_install_verification_failed':
+      '설치 프로그램의 무결성 또는 게시자 확인에 실패했습니다. 브라우저 다운로드를 이용해 주세요.',
   'update_later': '나중에 알림',
   'update_ignore': '이 버전 무시',
   'update_downloading': '업데이트 다운로드 중',
   'update_progress': '진행률',
   'update_speed': '속도',
-  'update_install': '설치 및 재시작',
-  'update_install_desc': '업데이트가 다운로드되었습니다. 지금 설치하시겠습니까?',
+  'update_install': '업데이트 설치',
+  'update_install_desc':
+      '업데이트가 준비되었습니다. WinDeploy Studio가 종료되고 설치 프로그램이 시작됩니다. 계속하시겠습니까?',
   'update_up_to_date': '최신 버전입니다',
   'update_checking': '업데이트 확인 중...',
+  'update_installing': '설치 프로그램을 확인하고 시작하는 중...',
   'update_check_failed': '업데이트 확인 실패',
   'update_channel': '업데이트 채널',
   'update_channel_stable': '안정版',
@@ -8084,4 +9794,121 @@ const _ko = <String, String>{
   'mirror_global_tag': '글로벌',
   'mirror_default_title': '다운로드',
   'mirror_default_desc': '직접 다운로드 링크',
+  'nav_benchmark': '디스크 테스트',
+  'home_benchmark': '드라이브 벤치마크',
+  'home_benchmark_desc': 'To Go 배포 전 실제 성능 확인',
+  'logs_cat_benchmark': '디스크 테스트 로그',
+  'bench_title': '드라이브 벤치마크',
+  'bench_subtitle':
+      'Windows To Go와 Linux To Go를 위해 순차 쓰기, 4K 랜덤 쓰기, 스레드 확장, 장시간 쓰기 안정성을 측정합니다.',
+  'bench_refresh': '새로 고침',
+  'bench_target_disk': '대상 드라이브',
+  'bench_detecting': '이동식 드라이브 감지 중...',
+  'bench_no_disk': '이동식 드라이브를 찾을 수 없음',
+  'bench_no_disk_desc': 'USB 드라이브나 휴대용 SSD를 연결한 뒤 새로 고침하세요.',
+  'bench_no_drive_letter': '드라이브 문자 없음',
+  'bench_test_mode': '테스트 모드',
+  'bench_mode_quick': '빠른',
+  'bench_mode_standard': '표준',
+  'bench_mode_extreme': '극한',
+  'bench_mode_full_write': '전체 쓰기',
+  'bench_mode_quick_desc': 'To Go 기본 적합성을 짧게 확인합니다.',
+  'bench_mode_standard_desc':
+      '일상적인 Windows To Go와 Linux To Go 사용에 맞춘 균형 테스트입니다.',
+  'bench_mode_extreme_desc': '4K와 멀티스레드 테스트를 더 오래 실행해 더 엄격하게 판단합니다.',
+  'bench_mode_full_write_desc': '거의 전체 공간을 순차 쓰기해 캐시 하락을 확인합니다.',
+  'bench_full_warning':
+      '전체 쓰기 모드는 여유 공간 대부분에 쓰기 작업을 수행하며 오래 걸릴 수 있습니다. 기존 파일을 의도적으로 삭제하지는 않지만 드라이브에 큰 부하가 걸립니다.',
+  'bench_start': '테스트 시작',
+  'bench_stop': '중지',
+  'bench_open_togo': 'To Go 열기',
+  'bench_full_confirm_title': '전체 쓰기 테스트',
+  'bench_full_confirm_desc':
+      '이 모드는 큰 임시 파일을 만들고 드라이브가 거의 찰 때까지 쓴 뒤 삭제합니다. 충분한 공간과 시간이 있을 때만 계속하세요.',
+  'bench_full_confirm_start': '전체 쓰기 시작',
+  'bench_phase_idle': '준비됨',
+  'bench_phase_preparing': '준비 중',
+  'bench_phase_sequential': '순차 쓰기',
+  'bench_phase_random4k': '4K 랜덤 쓰기',
+  'bench_phase_multithread': '스레드 확장',
+  'bench_phase_full': '전체 쓰기 안정성',
+  'bench_phase_finalizing': '마무리 중',
+  'bench_phase_complete': '완료',
+  'bench_phase_cancelled': '취소됨',
+  'bench_phase_failed': '실패',
+  'bench_msg_ready': '드라이브를 선택하고 테스트를 시작하세요.',
+  'bench_msg_preparing': '임시 벤치마크 파일을 만드는 중입니다.',
+  'bench_msg_sequential': '지속 순차 쓰기 속도를 측정하는 중입니다.',
+  'bench_msg_random4k': 'To Go 반응성의 핵심인 작은 랜덤 쓰기를 측정하는 중입니다.',
+  'bench_msg_multithread': '병렬 I/O에서 드라이브 동작을 확인하는 중입니다.',
+  'bench_msg_full': '여유 공간에 쓰기 작업을 수행해 장시간 안정성을 확인하는 중입니다.',
+  'bench_msg_finalizing': '임시 파일을 정리하고 점수를 계산하는 중입니다.',
+  'bench_msg_complete': '벤치마크가 끝났습니다. 차트와 점수를 확인하세요.',
+  'bench_msg_cancelled': '사용자가 테스트를 중지했습니다.',
+  'bench_msg_failed': '벤치마크에 실패했습니다. 드라이브를 확인하고 다시 시도하세요.',
+  'bench_elapsed': '경과 시간',
+  'bench_current_speed': '현재 속도',
+  'bench_progress': '진행률',
+  'bench_rating_excellent': 'To Go 적합',
+  'bench_rating_good': '쾌적함',
+  'bench_rating_usable': '사용 가능',
+  'bench_rating_limited': '제한적',
+  'bench_rating_not_recommended': '권장하지 않음',
+  'bench_rating_unmeasured': '측정 안 됨',
+  'bench_rating_excellent_desc': '4K와 지속 쓰기 성능이 강해 높은 부하의 To Go 사용에 적합합니다.',
+  'bench_rating_good_desc': '전반적으로 좋으며 일반 휴대용 시스템은 부드럽게 사용할 수 있습니다.',
+  'bench_rating_usable_desc': '가벼운 작업에는 사용할 수 있지만 업데이트나 멀티태스킹은 느릴 수 있습니다.',
+  'bench_rating_limited_desc': '간단한 작업은 가능하지만 To Go 시스템으로는 답답할 가능성이 큽니다.',
+  'bench_rating_not_recommended_desc': '안정적인 To Go 경험에는 속도나 안정성이 부족합니다.',
+  'bench_rating_unmeasured_desc': '벤치마크를 실행하면 적합성 결과가 표시됩니다.',
+  'bench_result_overall': '종합 평가',
+  'bench_result_recommendation': '권장 사항',
+  'bench_result_reasons': '주요 이유',
+  'bench_result_notes': '참고',
+  'bench_recommend_excellent':
+      'Windows To Go / Linux To Go에 권장되며, 비교적 무거운 일상 사용에도 적합합니다.',
+  'bench_recommend_good': 'Windows To Go / Linux To Go에 권장됩니다.',
+  'bench_recommend_usable':
+      '가벼운 To Go 작업에 사용할 수 있으며, 무거운 업데이트와 멀티태스킹은 피하는 것이 좋습니다.',
+  'bench_recommend_limited': '긴급용 또는 가벼운 To Go 사용에만 권장됩니다.',
+  'bench_recommend_not_recommended': 'Windows To Go / Linux To Go에는 권장하지 않습니다.',
+  'bench_recommend_unmeasured': '테스트를 실행하면 권장 사항이 생성됩니다.',
+  'bench_reason_4k_strong': '4K 랜덤 쓰기 성능이 매우 강합니다.',
+  'bench_reason_4k_stable': '4K 랜덤 쓰기가 안정적입니다.',
+  'bench_reason_4k_limited': '4K 랜덤 쓰기 성능이 제한적입니다.',
+  'bench_reason_4k_weak': '4K 랜덤 쓰기가 약해 부드러운 휴대용 OS 경험을 보장하기 어렵습니다.',
+  'bench_reason_thread_good': '멀티스레드 부하에서도 심한 속도 저하가 없습니다.',
+  'bench_reason_thread_limited': '멀티스레드 부하에서 눈에 띄는 속도 저하가 있습니다.',
+  'bench_reason_seq_good': '순차 쓰기 속도가 충분합니다.',
+  'bench_reason_seq_acceptable': '후반 순차 쓰기 속도도 아직 허용 범위입니다.',
+  'bench_reason_seq_slow': '순차 쓰기 속도가 낮습니다.',
+  'bench_reason_full_stable': '전체 쓰기가 안정적이며 뚜렷한 캐시 붕괴가 보이지 않았습니다.',
+  'bench_reason_full_drop': '전체 쓰기 후반에 속도 저하가 뚜렷하며 SLC 캐시 소진 영향일 수 있습니다.',
+  'bench_note_full_not_run': '전체 쓰기 테스트를 실행하지 않아 SLC 캐시 소진 후 동작은 평가하지 않았습니다.',
+  'bench_note_full_skipped_low_space':
+      '전체 쓰기 테스트 샘플이 생성되지 않았습니다. 보통 여유 공간 부족이나 조기 종료 때문입니다.',
+  'bench_note_full_ran': '전체 쓰기 테스트가 장시간 쓰기 안정성 판단에 포함되었습니다.',
+  'bench_report_copied': '보고서가 복사됨',
+  'bench_copy_report': '보고서 복사',
+  'bench_score': '점수',
+  'bench_4k_adjusted': '4K 보정값',
+  'bench_seq_write': '순차 쓰기',
+  'bench_duration': '소요 시간',
+  'bench_chart_sequential': '순차 쓰기',
+  'bench_chart_sequential_desc': '대용량 블록 쓰기 속도의 시간별 변화',
+  'bench_chart_4k': '4K 랜덤 안정성',
+  'bench_chart_4k_desc': 'To Go 반응성을 보여주는 작은 쓰기의 일관성',
+  'bench_chart_threads': '스레드 확장',
+  'bench_chart_threads_desc': '작업자 수 증가에 따른 병렬 4K 쓰기',
+  'bench_chart_full': '전체 쓰기 곡선',
+  'bench_chart_full_desc': '전체 쓰기 모드의 장시간 쓰기와 캐시 하락',
+  'bench_chart_waiting': '테스트 중 차트가 표시됩니다',
+  'bench_chart_full_skip': '전체 쓰기 모드에서 이 곡선을 수집할 수 있습니다',
+  'bench_error_no_drive_letter':
+      '이 드라이브에는 사용할 수 있는 드라이브 문자가 없습니다. 다시 연결하거나 디스크 관리에서 문자를 할당하세요.',
+  'bench_error_drive_not_ready': '선택한 드라이브가 준비되지 않았습니다. 다시 연결한 뒤 시도하세요.',
+  'wtg_benchmark_tip_title': 'To Go 만들기 전 테스트 권장',
+  'wtg_benchmark_tip_desc':
+      '4K 쓰기, 스레드 확장, 장시간 안정성을 확인하려면 먼저 디스크 테스트를 실행하세요. 테스트 없이 계속할 수도 있습니다.',
+  'wtg_benchmark_tip_button': '디스크 테스트',
 };

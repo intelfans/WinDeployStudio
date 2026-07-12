@@ -21,7 +21,11 @@ class WebviewHelper {
     }
   }
 
-  static Future<void> openUrl(BuildContext context, String url, {String? title}) async {
+  static Future<void> openUrl(
+    BuildContext context,
+    String url, {
+    String? title,
+  }) async {
     if (!context.mounted) return;
 
     final available = await isAvailable();
@@ -39,7 +43,8 @@ class WebviewHelper {
   }
 
   static void showDownloadDialog(BuildContext context, String url) {
-    final downloadUrl = 'https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/?form=MA13LH#download';
+    final downloadUrl =
+        'https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/?form=MA13LH#download';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

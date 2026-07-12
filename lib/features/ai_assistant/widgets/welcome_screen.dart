@@ -4,8 +4,13 @@ import '../../../core/localization/strings.dart';
 
 class WelcomeScreen extends StatelessWidget {
   final void Function(String) onSendPrompt;
+  final VoidCallback onAnalyzeUsbQuestion;
 
-  const WelcomeScreen({super.key, required this.onSendPrompt});
+  const WelcomeScreen({
+    super.key,
+    required this.onSendPrompt,
+    required this.onAnalyzeUsbQuestion,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +20,10 @@ class WelcomeScreen extends StatelessWidget {
 
     return Center(
       child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: isNarrow ? 24 : 64, vertical: 32),
+        padding: EdgeInsets.symmetric(
+          horizontal: isNarrow ? 24 : 64,
+          vertical: 32,
+        ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: Column(
@@ -28,15 +36,23 @@ class WelcomeScreen extends StatelessWidget {
                   color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Icon(Icons.auto_awesome_rounded, size: 36, color: colorScheme.onPrimaryContainer),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 36,
+                  color: colorScheme.onPrimaryContainer,
+                ),
               ),
               const SizedBox(height: 24),
-              Text(tr(context, 'ai_welcome_title'),
-                  style: AppTypography.sectionTitleWith(colorScheme.onSurface)),
+              Text(
+                tr(context, 'ai_welcome_title'),
+                style: AppTypography.sectionTitleWith(colorScheme.onSurface),
+              ),
               const SizedBox(height: 12),
-              Text(tr(context, 'ai_welcome_desc'),
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodyWith(colorScheme.onSurfaceVariant)),
+              Text(
+                tr(context, 'ai_welcome_desc'),
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyWith(colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 32),
               Wrap(
                 spacing: 8,
@@ -54,8 +70,10 @@ class WelcomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 32),
-              Text(tr(context, 'ai_example_questions'),
-                  style: AppTypography.captionWith(colorScheme.onSurfaceVariant)),
+              Text(
+                tr(context, 'ai_example_questions'),
+                style: AppTypography.captionWith(colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 12),
               _ExampleQuestion(
                 question: tr(context, 'ai_example_q1'),
@@ -69,7 +87,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 8),
               _ExampleQuestion(
                 question: tr(context, 'ai_example_q3'),
-                onTap: () => onSendPrompt(tr(context, 'ai_example_q3')),
+                onTap: onAnalyzeUsbQuestion,
               ),
             ],
           ),
@@ -112,9 +130,16 @@ class _ExampleQuestion extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(question, style: AppTypography.bodyWith(colorScheme.onSurface)),
+                child: Text(
+                  question,
+                  style: AppTypography.bodyWith(colorScheme.onSurface),
+                ),
               ),
-              Icon(Icons.arrow_forward_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 16,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),

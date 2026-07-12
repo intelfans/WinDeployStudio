@@ -12,6 +12,7 @@ import '../logs/services/log_center_service.dart';
 import '../update/models/update_models.dart';
 import '../update/providers/update_provider.dart';
 import '../update/screens/update_dialog.dart';
+import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/special_thanks_section.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -77,7 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const _IntelMuseumDialog(),
+        builder: (context) => const IntelMuseumDialog(),
       );
       return;
     }
@@ -89,8 +90,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final themeMode = ref.watch(themeModeProvider);
+    final tokens = AppVisualTokens.of(context);
 
     ref.listen<UpdateState>(updateProvider, (prev, next) {
       if (next.status == UpdateStatus.available && next.info != null) {
@@ -115,284 +116,304 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
 
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tr(context, 'settings_title'),
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: EdgeInsets.all(
+            constraints.maxWidth < 600 ? 16 : tokens.pagePadding,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppPageHeader(
+                icon: Icons.settings_outlined,
+                title: tr(context, 'settings_title'),
               ),
-            ),
-            const SizedBox(height: 24),
-            _SettingsSection(
-              title: tr(context, 'settings_appearance'),
-              children: [
-                _SettingsTile(
-                  icon: Icons.palette_outlined,
-                  title: tr(context, 'settings_theme'),
-                  subtitle: _themeModeName(themeMode),
-                  trailing: DropdownButton<ThemeMode>(
-                    value: themeMode,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(
-                        value: ThemeMode.system,
-                        child: Text(tr(context, 'settings_theme_system')),
-                      ),
-                      DropdownMenuItem(
-                        value: ThemeMode.light,
-                        child: Text(tr(context, 'settings_theme_light')),
-                      ),
-                      DropdownMenuItem(
-                        value: ThemeMode.dark,
-                        child: Text(tr(context, 'settings_theme_dark')),
-                      ),
-                    ],
-                    onChanged: (mode) {
-                      if (mode != null) {
-                        ref.read(themeModeProvider.notifier).state = mode;
-                        LogCenterService().logSystem('主题模式已切换为: ${mode.name}');
-                      }
-                    },
-                  ),
-                ),
-                _SettingsTile(
-                  icon: Icons.language,
-                  title: tr(context, 'settings_language'),
-                  subtitle: tr(context, 'settings_language_desc'),
-                  trailing: DropdownButton<Locale>(
-                    value: ref.watch(localeProvider),
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(
-                        value: Locale('zh'),
-                        child: Text('简体中文'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('zh', 'TW'),
-                        child: Text('繁體中文'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('en'),
-                        child: Text('English'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('fr'),
-                        child: Text('Français'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('de'),
-                        child: Text('Deutsch'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('es'),
-                        child: Text('Español'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('pt'),
-                        child: Text('Português'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('ru'),
-                        child: Text('Русский'),
-                      ),
-                      DropdownMenuItem(
-                        value: Locale('ar'),
-                        child: Text('العربية'),
-                      ),
-                      DropdownMenuItem(value: Locale('ko'), child: Text('한국어')),
-                      DropdownMenuItem(value: Locale('ja'), child: Text('日本語')),
-                    ],
-                    onChanged: (locale) {
-                      if (locale != null) {
-                        ref.read(localeProvider.notifier).setLocale(locale);
-                        LogCenterService().logSystem(
-                          '语言已切换为: ${locale.languageCode}',
-                        );
-                      }
-                    },
-                  ),
-                ),
-                _SettingsTile(
-                  icon: Icons.font_download_outlined,
-                  title: tr(context, 'settings_font'),
-                  subtitle: _fontFamilyName(ref.watch(fontFamilyProvider)),
-                  trailing: DropdownButton<String>(
-                    value: ref.watch(fontFamilyProvider),
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'HarmonyOSSans',
-                        child: Text('HarmonyOS Sans'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Microsoft YaHei UI',
-                        child: Text('Microsoft YaHei UI'),
-                      ),
-                      DropdownMenuItem(value: 'MiSans', child: Text('MiSans')),
-                    ],
-                    onChanged: (font) {
-                      if (font != null) {
-                        ref.read(fontFamilyProvider.notifier).setFont(font);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SettingsSection(
-              title: tr(context, 'settings_theme_color'),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      for (final colorValue in AppTheme.presetColors)
-                        _ColorSwatch(
-                          color: Color(colorValue),
-                          selected:
-                              ref.watch(seedColorProvider).toARGB32() ==
-                              colorValue,
-                          onTap: () => ref
-                              .read(seedColorProvider.notifier)
-                              .setColor(Color(colorValue)),
+              SizedBox(height: tokens.sectionSpacing),
+              _SettingsSection(
+                title: tr(context, 'settings_appearance'),
+                children: [
+                  _SettingsTile(
+                    icon: Icons.palette_outlined,
+                    title: tr(context, 'settings_theme'),
+                    subtitle: _themeModeName(themeMode),
+                    trailing: DropdownButton<ThemeMode>(
+                      value: themeMode,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        DropdownMenuItem(
+                          value: ThemeMode.system,
+                          child: Text(tr(context, 'settings_theme_system')),
                         ),
-                    ],
+                        DropdownMenuItem(
+                          value: ThemeMode.light,
+                          child: Text(tr(context, 'settings_theme_light')),
+                        ),
+                        DropdownMenuItem(
+                          value: ThemeMode.dark,
+                          child: Text(tr(context, 'settings_theme_dark')),
+                        ),
+                      ],
+                      onChanged: (mode) {
+                        if (mode != null) {
+                          ref.read(themeModeProvider.notifier).setMode(mode);
+                          LogCenterService().logSystem(
+                            '[Settings] Theme=${mode.name}',
+                          );
+                        }
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SettingsSection(
-              title: tr(context, 'ai_settings_section'),
-              children: [
-                _SettingsTile(
-                  icon: Icons.smart_toy_outlined,
-                  title: tr(context, 'ai_proxy_url'),
-                  subtitle: _aiProxyUrl ?? tr(context, 'ai_proxy_url_loading'),
-                  trailing: FilledButton.tonal(
-                    onPressed: _showAiProxyDialog,
-                    child: Text(tr(context, 'settings_edit')),
+                  _SettingsTile(
+                    icon: Icons.language,
+                    title: tr(context, 'settings_language'),
+                    subtitle: tr(context, 'settings_language_desc'),
+                    trailing: DropdownButton<Locale>(
+                      value: ref.watch(localeProvider),
+                      underline: const SizedBox.shrink(),
+                      items: const [
+                        DropdownMenuItem(
+                          value: Locale('zh'),
+                          child: Text('简体中文'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('zh', 'TW'),
+                          child: Text('繁體中文'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('en'),
+                          child: Text('English'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('fr'),
+                          child: Text('Français'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('de'),
+                          child: Text('Deutsch'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('es'),
+                          child: Text('Español'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('pt'),
+                          child: Text('Português'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('ru'),
+                          child: Text('Русский'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('ar'),
+                          child: Text('العربية'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('ko'),
+                          child: Text('한국어'),
+                        ),
+                        DropdownMenuItem(
+                          value: Locale('ja'),
+                          child: Text('日本語'),
+                        ),
+                      ],
+                      onChanged: (locale) {
+                        if (locale != null) {
+                          ref.read(localeProvider.notifier).setLocale(locale);
+                          LogCenterService().logSystem(
+                            '[Settings] Language=${localeCodeFromLocale(locale)}',
+                          );
+                        }
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SettingsSection(
-              title: tr(context, 'update_section'),
-              children: [
-                _SettingsTile(
-                  icon: Icons.update_outlined,
-                  title: tr(context, 'update_current_version'),
-                  subtitle: AppConstants.appVersion,
-                  trailing: const SizedBox.shrink(),
-                ),
-                _SettingsTile(
-                  icon: Icons.cloud_outlined,
-                  title: tr(context, 'update_channel'),
-                  subtitle: tr(context, 'update_channel_stable'),
-                  trailing: DropdownButton<UpdateChannel>(
-                    value: ref.watch(updateProvider).channel,
-                    underline: const SizedBox.shrink(),
-                    items: [
-                      DropdownMenuItem(
-                        value: UpdateChannel.stable,
-                        child: Text(tr(context, 'update_channel_stable')),
-                      ),
-                      DropdownMenuItem(
-                        value: UpdateChannel.beta,
-                        child: Text(tr(context, 'update_channel_beta')),
-                      ),
-                      DropdownMenuItem(
-                        value: UpdateChannel.nightly,
-                        child: Text(tr(context, 'update_channel_nightly')),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        ref.read(updateProvider.notifier).setChannel(v);
-                      }
-                    },
+                  _SettingsTile(
+                    icon: Icons.font_download_outlined,
+                    title: tr(context, 'settings_font'),
+                    subtitle: _fontFamilyName(ref.watch(fontFamilyProvider)),
+                    trailing: DropdownButton<String>(
+                      value: ref.watch(fontFamilyProvider),
+                      underline: const SizedBox.shrink(),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'HarmonyOSSans',
+                          child: Text('HarmonyOS Sans'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Microsoft YaHei UI',
+                          child: Text('Microsoft YaHei UI'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'MiSans',
+                          child: Text('MiSans'),
+                        ),
+                      ],
+                      onChanged: (font) {
+                        if (font != null) {
+                          ref.read(fontFamilyProvider.notifier).setFont(font);
+                        }
+                      },
+                    ),
                   ),
-                ),
-                _SettingsTile(
-                  icon: Icons.sync_outlined,
-                  title: tr(context, 'update_auto_check'),
-                  subtitle: '',
-                  trailing: Switch(
-                    value: ref.watch(updateProvider).autoCheckEnabled,
-                    onChanged: (v) {
-                      ref.read(updateProvider.notifier).setAutoCheck(v);
-                    },
+                ],
+              ),
+              const SizedBox(height: 16),
+              _SettingsSection(
+                title: tr(context, 'settings_theme_color'),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final colorValue in AppTheme.presetColors)
+                          _ColorSwatch(
+                            color: Color(colorValue),
+                            selected:
+                                ref.watch(seedColorProvider).toARGB32() ==
+                                colorValue,
+                            onTap: () => ref
+                                .read(seedColorProvider.notifier)
+                                .setColor(Color(colorValue)),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                _SettingsTile(
-                  icon: Icons.search_outlined,
-                  title: tr(context, 'update_check_now'),
-                  subtitle:
-                      ref.watch(updateProvider.notifier).lastCheckFormatted ??
-                      tr(context, 'update_never'),
-                  trailing: FilledButton.tonal(
-                    onPressed: () {
-                      ref
-                          .read(updateProvider.notifier)
-                          .checkForUpdate(forceRefresh: true);
-                    },
-                    child: Text(tr(context, 'update_check_now')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _SettingsSection(
+                title: tr(context, 'ai_settings_section'),
+                children: [
+                  _SettingsTile(
+                    icon: Icons.smart_toy_outlined,
+                    title: tr(context, 'ai_proxy_url'),
+                    subtitle:
+                        _aiProxyUrl ?? tr(context, 'ai_proxy_url_loading'),
+                    trailing: FilledButton.tonal(
+                      onPressed: _showAiProxyDialog,
+                      child: Text(tr(context, 'settings_edit')),
+                    ),
                   ),
-                ),
-                _SettingsTile(
-                  icon: Icons.open_in_new_outlined,
-                  title: tr(context, 'update_view_release'),
-                  subtitle: '',
-                  trailing: IconButton(
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    onPressed: () {
-                      final url = ref
-                          .read(updateProvider.notifier)
-                          .releasePageUrl;
-                      _launchUrl(url);
-                    },
+                ],
+              ),
+              const SizedBox(height: 16),
+              _SettingsSection(
+                title: tr(context, 'update_section'),
+                children: [
+                  _SettingsTile(
+                    icon: Icons.update_outlined,
+                    title: tr(context, 'update_current_version'),
+                    subtitle: AppConstants.appVersion,
+                    trailing: const SizedBox.shrink(),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SettingsSection(
-              title: tr(context, 'settings_about'),
-              children: [
-                _SettingsTile(
-                  icon: Icons.info_outline,
-                  title: tr(context, 'settings_version'),
-                  subtitle: AppConstants.appVersion,
-                  trailing: const SizedBox.shrink(),
-                ),
-                _SettingsTile(
-                  icon: Icons.description_outlined,
-                  title: tr(context, 'settings_license'),
-                  subtitle: AppConstants.licenseName,
-                  trailing: const SizedBox.shrink(),
-                ),
-                _SettingsTile(
-                  icon: Icons.code_outlined,
-                  title: tr(context, 'about_github_repository'),
-                  subtitle: AppConstants.githubRepository,
-                  trailing: IconButton(
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    onPressed: () => _launchUrl(AppConstants.githubRepository),
+                  _SettingsTile(
+                    icon: Icons.cloud_outlined,
+                    title: tr(context, 'update_channel'),
+                    subtitle: tr(context, 'update_channel_stable'),
+                    trailing: DropdownButton<UpdateChannel>(
+                      value: ref.watch(updateProvider).channel,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        DropdownMenuItem(
+                          value: UpdateChannel.stable,
+                          child: Text(tr(context, 'update_channel_stable')),
+                        ),
+                        DropdownMenuItem(
+                          value: UpdateChannel.beta,
+                          child: Text(tr(context, 'update_channel_beta')),
+                        ),
+                        DropdownMenuItem(
+                          value: UpdateChannel.nightly,
+                          child: Text(tr(context, 'update_channel_nightly')),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) {
+                          ref.read(updateProvider.notifier).setChannel(v);
+                        }
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildAboutCard(context),
-          ],
+                  _SettingsTile(
+                    icon: Icons.sync_outlined,
+                    title: tr(context, 'update_auto_check'),
+                    subtitle: '',
+                    trailing: Switch(
+                      value: ref.watch(updateProvider).autoCheckEnabled,
+                      onChanged: (v) {
+                        ref.read(updateProvider.notifier).setAutoCheck(v);
+                      },
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.search_outlined,
+                    title: tr(context, 'update_check_now'),
+                    subtitle:
+                        ref.watch(updateProvider.notifier).lastCheckFormatted ??
+                        tr(context, 'update_never'),
+                    trailing: FilledButton.tonal(
+                      onPressed: () {
+                        ref
+                            .read(updateProvider.notifier)
+                            .checkForUpdate(forceRefresh: true);
+                      },
+                      child: Text(tr(context, 'update_check_now')),
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.open_in_new_outlined,
+                    title: tr(context, 'update_view_release'),
+                    subtitle: '',
+                    trailing: IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      onPressed: () {
+                        final url = ref
+                            .read(updateProvider.notifier)
+                            .releasePageUrl;
+                        _launchUrl(url);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _SettingsSection(
+                title: tr(context, 'settings_about'),
+                children: [
+                  GestureDetector(
+                    key: const Key('settings-version-easter-egg'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _handleEasterEggTap,
+                    child: _SettingsTile(
+                      icon: Icons.info_outline,
+                      title: tr(context, 'settings_version'),
+                      subtitle: AppConstants.appVersion,
+                      trailing: const SizedBox.shrink(),
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.description_outlined,
+                    title: tr(context, 'settings_license'),
+                    subtitle: AppConstants.licenseName,
+                    trailing: const SizedBox.shrink(),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.code_outlined,
+                    title: tr(context, 'about_github_repository'),
+                    subtitle: AppConstants.githubRepository,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      onPressed: () =>
+                          _launchUrl(AppConstants.githubRepository),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildAboutCard(context),
+            ],
+          ),
         ),
       ),
     );
@@ -435,6 +456,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 // Intel Logo with easter egg
                 GestureDetector(
+                  key: const Key('settings-intel-easter-egg'),
                   onTap: _handleIntelLogoTap,
                   child: Container(
                     width: 64,
@@ -492,7 +514,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'Material 3',
     'Riverpod',
     'GoRouter',
-    'SQLite',
   ];
 
   String _themeModeName(ThemeMode mode) {
@@ -558,27 +579,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             return AlertDialog(
               title: Text(tr(context, 'ai_proxy_url')),
-              content: SizedBox(
-                width: 520,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(tr(context, 'ai_proxy_url_desc')),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'ai_proxy_url'),
-                        hintText: AiConfig.defaultProxyUrl,
-                        errorText: errorText.isEmpty ? null : errorText,
-                        border: const OutlineInputBorder(),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tr(context, 'ai_proxy_url_desc')),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: controller,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'ai_proxy_url'),
+                          hintText: AiConfig.defaultProxyUrl,
+                          errorText: errorText.isEmpty ? null : errorText,
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.url,
+                        onSubmitted: (_) => save(),
                       ),
-                      keyboardType: TextInputType.url,
-                      onSubmitted: (_) => save(),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -666,11 +689,84 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: trailing,
+    final theme = Theme.of(context);
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title, style: theme.textTheme.bodyMedium),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+    final sizedTrailing = trailing is SizedBox ? trailing as SizedBox : null;
+    final hasTrailing =
+        sizedTrailing == null ||
+        sizedTrailing.child != null ||
+        sizedTrailing.width != 0 ||
+        sizedTrailing.height != 0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 640;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon),
+                        const SizedBox(width: 12),
+                        Expanded(child: text),
+                      ],
+                    ),
+                    if (hasTrailing) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 36),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: (constraints.maxWidth - 64)
+                                  .clamp(0.0, 320.0)
+                                  .toDouble(),
+                            ),
+                            child: trailing,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(icon),
+                    const SizedBox(width: 12),
+                    Expanded(child: text),
+                    if (hasTrailing) ...[
+                      const SizedBox(width: 16),
+                      Flexible(
+                        child: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: trailing,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+        );
+      },
     );
   }
 }
@@ -772,9 +868,9 @@ class _EasterEggDialog extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Positioned(
+                  PositionedDirectional(
                     top: 16,
-                    right: 16,
+                    end: 16,
                     child: IconButton.filledTonal(
                       tooltip: tr(context, 'close'),
                       onPressed: () => Navigator.of(context).maybePop(),
@@ -791,14 +887,16 @@ class _EasterEggDialog extends StatelessWidget {
   }
 }
 
-class _IntelMuseumDialog extends StatefulWidget {
-  const _IntelMuseumDialog();
+class IntelMuseumDialog extends StatefulWidget {
+  const IntelMuseumDialog({super.key, this.loadSystemInfo = true});
+
+  final bool loadSystemInfo;
 
   @override
-  State<_IntelMuseumDialog> createState() => _IntelMuseumDialogState();
+  State<IntelMuseumDialog> createState() => _IntelMuseumDialogState();
 }
 
-class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
+class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
   String _cpuInfo = '';
   String _gpuInfo = '';
   String _memoryInfo = '';
@@ -807,7 +905,7 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
   @override
   void initState() {
     super.initState();
-    _loadSystemInfo();
+    if (widget.loadSystemInfo) _loadSystemInfo();
   }
 
   Future<void> _loadSystemInfo() async {
@@ -834,98 +932,134 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loadingText = tr(context, 'intel_loading');
-
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.memory, color: colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(tr(context, 'intel_museum_title')),
-        ],
+    final size = MediaQuery.sizeOf(context);
+    final compactHeight = size.height < 520;
+    final dialogWidth = (size.width - 32).clamp(0.0, 720.0).toDouble();
+    final infoRows = <({String label, String value})>[
+      (
+        label: tr(context, 'intel_cpu'),
+        value: _cpuInfo.isEmpty ? loadingText : _cpuInfo,
       ),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              tr(context, 'intel_museum_desc'),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildInfoRow(
-              context,
-              tr(context, 'intel_cpu'),
-              _cpuInfo.isEmpty ? loadingText : _cpuInfo,
-            ),
-            _buildInfoRow(
-              context,
-              tr(context, 'intel_gpu'),
-              _gpuInfo.isEmpty ? loadingText : _gpuInfo,
-            ),
-            _buildInfoRow(
-              context,
-              tr(context, 'intel_memory'),
-              _memoryInfo.isEmpty ? loadingText : _memoryInfo,
-            ),
-            _buildInfoRow(
-              context,
-              'Windows',
-              _windowsVersion.isEmpty ? loadingText : _windowsVersion,
-            ),
-            _buildInfoRow(context, 'Flutter', '3.44.0'),
-            _buildInfoRow(
-              context,
-              tr(context, 'intel_build_time'),
-              DateTime.now().toString().split('.')[0],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Intel® is a trademark of Intel Corporation.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            Text(
-              'This project is not affiliated with Intel.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+      (
+        label: tr(context, 'intel_gpu'),
+        value: _gpuInfo.isEmpty ? loadingText : _gpuInfo,
       ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.of(context).maybePop(),
-          child: Text(tr(context, 'close')),
-        ),
-      ],
-    );
-  }
+      (
+        label: tr(context, 'intel_memory'),
+        value: _memoryInfo.isEmpty ? loadingText : _memoryInfo,
+      ),
+      (
+        label: 'Windows',
+        value: _windowsVersion.isEmpty ? loadingText : _windowsVersion,
+      ),
+      (label: 'Flutter', value: '3.44.0'),
+      (
+        label: tr(context, 'intel_build_time'),
+        value: DateTime.now().toString().split('.')[0],
+      ),
+    ];
 
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
+    return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: compactHeight ? 8 : 24,
+      ),
+      child: SizedBox(
+        width: dialogWidth,
+        child: Padding(
+          padding: EdgeInsets.all(compactHeight ? 12 : 20),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final useGrid = constraints.maxWidth >= 560;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.memory, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          tr(context, 'intel_museum_title'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: tr(context, 'close'),
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: compactHeight ? 4 : 8),
+                  Text(
+                    tr(context, 'intel_museum_desc'),
+                    maxLines: compactHeight ? 1 : 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  SizedBox(height: compactHeight ? 8 : 16),
+                  if (useGrid)
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        for (final info in infoRows)
+                          SizedBox(
+                            width: (constraints.maxWidth - 12) / 2,
+                            child: _IntelInfoCard(
+                              label: info.label,
+                              value: info.value,
+                            ),
+                          ),
+                      ],
+                    )
+                  else
+                    Column(
+                      children: [
+                        for (final info in infoRows)
+                          _IntelInfoRow(
+                            label: info.label,
+                            value: info.value,
+                            compact: compactHeight,
+                          ),
+                      ],
+                    ),
+                  SizedBox(height: compactHeight ? 8 : 16),
+                  Text(
+                    'Intel® is a trademark of Intel Corporation.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    'This project is not affiliated with Intel.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  SizedBox(height: compactHeight ? 8 : 16),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: Text(tr(context, 'close')),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
-          Expanded(
-            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1032,5 +1166,85 @@ class _IntelMuseumDialogState extends State<_IntelMuseumDialog> {
         lower.contains('remote') ||
         lower.contains('basic display') ||
         lower.contains('microsoft basic');
+  }
+}
+
+class _IntelInfoCard extends StatelessWidget {
+  const _IntelInfoCard({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+}
+
+class _IntelInfoRow extends StatelessWidget {
+  const _IntelInfoRow({
+    required this.label,
+    required this.value,
+    required this.compact,
+  });
+
+  final String label;
+  final String value;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: compact ? 2 : 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: compact ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

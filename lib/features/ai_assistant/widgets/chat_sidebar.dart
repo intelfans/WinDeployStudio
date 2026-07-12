@@ -1,23 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../app/theme.dart';
 import '../../../app/typography.dart';
 import '../../../core/localization/strings.dart';
 import '../providers/chat_provider.dart';
 
 class ChatSidebar extends ConsumerWidget {
-  const ChatSidebar({super.key});
+  const ChatSidebar({super.key, this.width = 260});
+
+  final double width;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final chatState = ref.watch(chatProvider);
     final colorScheme = Theme.of(context).colorScheme;
+    final tokens = AppVisualTokens.of(context);
 
     return Container(
-      width: 260,
+      width: width,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        border: Border(
-          right: BorderSide(color: colorScheme.outlineVariant),
+        color: tokens.style == VisualStyle.win10
+            ? colorScheme.surface
+            : colorScheme.surfaceContainerLow,
+        border: BorderDirectional(
+          end: BorderSide(
+            color: colorScheme.outlineVariant,
+            width: tokens.borderWidth,
+          ),
         ),
       ),
       child: Column(
@@ -27,7 +36,8 @@ class ChatSidebar extends ConsumerWidget {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => ref.read(chatProvider.notifier).createNewSession(),
+                onPressed: () =>
+                    ref.read(chatProvider.notifier).createNewSession(),
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: Text(tr(context, 'ai_new_chat')),
               ),
@@ -39,7 +49,9 @@ class ChatSidebar extends ConsumerWidget {
                 ? Center(
                     child: Text(
                       tr(context, 'ai_no_history'),
-                      style: AppTypography.captionWith(colorScheme.onSurfaceVariant),
+                      style: AppTypography.captionWith(
+                        colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -51,8 +63,12 @@ class ChatSidebar extends ConsumerWidget {
                       return _SessionTile(
                         title: session.title,
                         isActive: isActive,
-                        onTap: () => ref.read(chatProvider.notifier).selectSession(session.id),
-                        onDelete: () => ref.read(chatProvider.notifier).deleteSession(session.id),
+                        onTap: () => ref
+                            .read(chatProvider.notifier)
+                            .selectSession(session.id),
+                        onDelete: () => ref
+                            .read(chatProvider.notifier)
+                            .deleteSession(session.id),
                       );
                     },
                   ),
@@ -79,20 +95,26 @@ class _SessionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tokens = AppVisualTokens.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
         color: isActive ? colorScheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(tokens.controlRadius),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(tokens.controlRadius),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                Icon(Icons.chat_outlined, size: 16,
-                    color: isActive ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant),
+                Icon(
+                  Icons.chat_outlined,
+                  size: 16,
+                  color: isActive
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -100,14 +122,20 @@ class _SessionTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.captionWith(
-                      isActive ? colorScheme.onPrimaryContainer : colorScheme.onSurfaceVariant,
+                      isActive
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
                 if (!isActive)
                   GestureDetector(
                     onTap: onDelete,
-                    child: Icon(Icons.close_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 14,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),

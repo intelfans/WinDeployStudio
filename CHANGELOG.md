@@ -2,11 +2,45 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
-## v1.2.0
+## v2.0.0
+
+### New Features
+
+- Added a unified deployment plan and a five-step Windows To Go workflow covering image, disk, deployment method, advanced options, and a complete preflight summary.
+- Added explicit UEFI + GPT, UEFI + MBR, and Legacy BIOS selection for Windows installation media and To Go, together with preferred partition drive letters and custom volume labels/icons.
+- Added direct, dynamic/fixed VHD, and dynamic/fixed VHDX Windows To Go deployment with compatibility checks, virtual-disk BCD binding, and optional stale drive-letter repair.
+- Made Windows To Go policies configurable: local-disk SAN policy, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, and .NET Framework 3.5. UEFI deployments automatically use NTFS Windows storage backed by a separate FAT32 EFI partition.
+- Added verified offline Windows INF injection and optional first-boot staging of vetted Linux packages, matching kernel modules, and explicit scripts for supported x64 Ubuntu/casper Linux To Go images. This does not add arbitrary-distribution Linux To Go support.
+- Added one consistent Windows 11-inspired interface with aligned native title-bar styling and responsive deployment navigation.
+- Added a top-level Disk Tools workspace with read-only Windows/NVMe diagnostics and guarded external-disk UEFI/BIOS boot repair with preflight, typed confirmation, BCD backup, and post-repair verification.
+- Added automatic benchmark history, detail views, date filtering, two-result comparison, deletion controls, and CSV/JSON export.
+
+### Improvements
+
+- Expanded the native benchmark protocol with sequential and 4K random reads, mixed read/write scenarios, IOPS, latency percentiles, and cache-behavior analysis while retaining unbuffered, write-through I/O.
+- Added compatibility blockers for unsupported deployment combinations, including Windows 7 VHDX, Windows 7 native VHD outside Enterprise/Ultimate, x86 Windows 7 UEFI, WIMBoot outside direct Windows 8.1 deployment, CompactOS outside Windows 10/11, and virtual disks below 32 GB.
+- Added a dedicated responsive deployment shell and clearer top-level navigation for advanced deployment and disk-management workflows.
+- Made the Windows To Go / Linux To Go mode selector more prominent and placed it directly in the workflow path.
+
+### Fixes
+
+- Fixed Linux To Go creation failing when a modern Ubuntu ISO contains a squashfs file larger than the FAT32 single-file limit.
+- Replaced the single FAT32 LTG layout with a dedicated FAT32 boot/persistence partition and an NTFS Live-data partition.
+- Added pre-erase validation for the bundled `mke2fs.exe`, patchable casper GRUB entries, FAT32 boot-file limits, and target capacity.
+- Added partition-identity checks and per-file copy verification for both LTG partitions.
+- Added fail-closed physical disk identity checks using serial number, device path, and UniqueId fallbacks, plus per-disk operation locks.
+- Added language-independent partition-layout postconditions before Windows/Linux media deployment continues.
+- Changed Linux ISOHybrid verification from sampled blocks to a full byte-for-byte comparison of the written image.
+- Hardened WebView downloads with validator-aware resume, strict length checks, and fixed user-selected paths.
+- Required both the GitHub Release asset digest and valid Authenticode publisher verification before an update installer can run.
+- Enforced HTTPS-only AI proxy settings and protected local chat history directly with Windows DPAPI.
+- Replaced the unclear localized-text-unavailable error shown for a mismatched To Go ISO with a direct, actionable format prompt.
+- Unified the CJK font-pack card and detail-page icon as a wrench/tool symbol.
 
 ### Maintenance
 
-- Updated app, Windows metadata, installer, scripts, README, and handover notes to version 1.2.0.
+- Removed the unused Windows 10, Windows 7, automatic-style selection paths and their settings/localization code.
+- Updated app, Windows metadata, installer, scripts, README, and handover notes to version 2.0.0.
 
 ## v1.1.2
 

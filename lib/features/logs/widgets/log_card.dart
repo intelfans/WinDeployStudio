@@ -24,7 +24,10 @@ class LogCategoryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isError = category == LogCategory.errors;
     final hasFiles = fileCount > 0;
-    final filesText = tr(context, 'logs_files').replaceAll('{count}', '$fileCount');
+    final filesText = tr(
+      context,
+      'logs_files',
+    ).replaceAll('{count}', '$fileCount');
     final noErrorsText = tr(context, 'logs_no_errors');
     final lastUpdateLabel = tr(context, 'logs_last_update');
 
@@ -33,15 +36,15 @@ class LogCategoryCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: category.color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -51,7 +54,10 @@ class LogCategoryCard extends StatelessWidget {
                   const Spacer(),
                   if (isError && hasFiles)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(10),
@@ -67,10 +73,12 @@ class LogCategoryCard extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 categoryDisplayName,
                 style: AppTypography.cardTitleWith(theme.colorScheme.onSurface),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(
@@ -82,16 +90,26 @@ class LogCategoryCard extends StatelessWidget {
                       ? (hasFiles ? Colors.red : Colors.green)
                       : theme.colorScheme.onSurfaceVariant,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               if (lastUpdate != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   lastUpdateLabel,
-                  style: AppTypography.captionWith(theme.colorScheme.onSurfaceVariant),
+                  style: AppTypography.captionWith(
+                    theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   _formatDateTime(lastUpdate!),
-                  style: AppTypography.captionWith(theme.colorScheme.onSurfaceVariant),
+                  style: AppTypography.captionWith(
+                    theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ],

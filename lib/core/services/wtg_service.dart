@@ -1,12 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import '../constants/app_constants.dart';
-import 'file_logger_service.dart';
+
+import '../../features/deployment/models/deployment_plan.dart';
+import '../../features/deployment/services/windows_deployment_service.dart';
 import '../../features/logs/services/log_center_service.dart';
+import '../constants/app_constants.dart';
+import 'disk_safety_service.dart';
+import 'file_logger_service.dart';
+import 'wim_info_service.dart';
 
 enum WtgStep {
   preparing,
@@ -19,28 +27,45 @@ enum WtgStep {
   failed,
 }
 
-enum WtgBootLayout { gptUefi, mbrHybrid }
+enum WtgBootLayout { uefiGpt, uefiMbr, legacyBios }
 
-class _WtgDriveLetters {
-  final String efiLetter;
-  final String windowsLetter;
+class WtgBootContract {
+  const WtgBootContract._();
 
-  const _WtgDriveLetters({
-    required this.efiLetter,
-    required this.windowsLetter,
-  });
-}
+  static String expectedDevice({
+    required String windowsDrive,
+    required String storageDrive,
+    String virtualDiskFileName = '',
+  }) {
+    final windows = _driveSpec(windowsDrive);
+    if (virtualDiskFileName.isEmpty) return 'partition=$windows';
+    return 'vhd=[${_driveSpec(storageDrive)}]\\$virtualDiskFileName';
+  }
 
-class _WtgPartitionLayout {
-  final WtgBootLayout bootLayout;
-  final String efiDrive;
-  final String windowsDrive;
+  static bool listingMatches(String listing, String expectedDevice) {
+    final expected = expectedDevice.toLowerCase().replaceAll('/', r'\');
+    final deviceLines = const LineSplitter()
+        .convert(listing)
+        .map((line) => line.trim().toLowerCase().replaceAll('/', r'\'))
+        .where((line) => line.contains('partition=') || line.contains('vhd=['))
+        .toList(growable: false);
+    final exactLines = deviceLines
+        .where((line) => line.endsWith(expected))
+        .toList(growable: false);
+    if (deviceLines.length != 2 || exactLines.length != 2) return false;
+    final labels = exactLines
+        .map((line) => line.substring(0, line.length - expected.length).trim())
+        .where((label) => label.isNotEmpty)
+        .toSet();
+    return labels.length == 2 &&
+        labels.contains('device') &&
+        labels.contains('osdevice');
+  }
 
-  const _WtgPartitionLayout({
-    required this.bootLayout,
-    required this.efiDrive,
-    required this.windowsDrive,
-  });
+  static String _driveSpec(String value) {
+    final match = RegExp(r'[A-Za-z]').firstMatch(value.trim());
+    return '${match?.group(0)?.toUpperCase() ?? ''}:';
+  }
 }
 
 class WtgProgress {
@@ -56,7 +81,7 @@ class WtgProgress {
 
   const WtgProgress({
     required this.step,
-    this.progress = 0.0,
+    this.progress = 0,
     this.message = '',
     this.error,
     this.currentFile,
@@ -69,1759 +94,2139 @@ class WtgProgress {
   int get remainingBytes =>
       totalBytes > writtenBytes ? totalBytes - writtenBytes : 0;
 
-  String get formattedWritten {
-    if (writtenBytes <= 0) {
-      return '0 B';
-    }
-    if (writtenBytes < 1024 * 1024) {
-      return '${(writtenBytes / 1024).toStringAsFixed(1)} KB';
-    }
-    if (writtenBytes < 1024 * 1024 * 1024) {
-      return '${(writtenBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(writtenBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-
-  String get formattedTotal {
-    if (totalBytes <= 0) {
-      return '--';
-    }
-    if (totalBytes < 1024 * 1024) {
-      return '${(totalBytes / 1024).toStringAsFixed(1)} KB';
-    }
-    if (totalBytes < 1024 * 1024 * 1024) {
-      return '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-
-  String get formattedRemaining {
-    final rem = remainingBytes;
-    if (rem <= 0) {
-      return '0 B';
-    }
-    if (rem < 1024 * 1024) {
-      return '${(rem / 1024).toStringAsFixed(1)} KB';
-    }
-    if (rem < 1024 * 1024 * 1024) {
-      return '${(rem / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(rem / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
+  String get formattedWritten => _formatBytes(writtenBytes, zero: '0 B');
+  String get formattedTotal => _formatBytes(totalBytes);
+  String get formattedRemaining => _formatBytes(remainingBytes, zero: '0 B');
 
   String get formattedSpeed {
-    if (currentSpeedBytes <= 0) {
-      return '--';
-    }
-    if (currentSpeedBytes < 1024 * 1024) {
-      return '${(currentSpeedBytes / 1024).toStringAsFixed(1)} KB/s';
-    }
-    if (currentSpeedBytes < 1024 * 1024 * 1024) {
-      return '${(currentSpeedBytes / (1024 * 1024)).toStringAsFixed(1)} MB/s';
-    }
-    return '${(currentSpeedBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB/s';
+    if (currentSpeedBytes <= 0) return '--';
+    return '${_formatBytes(currentSpeedBytes)}/s';
   }
 
   String get formattedElapsed {
-    if (elapsedTime == null) {
-      return '00:00:00';
+    final elapsed = elapsedTime ?? Duration.zero;
+    final hours = elapsed.inHours.toString().padLeft(2, '0');
+    final minutes = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  static String _formatBytes(int bytes, {String zero = '--'}) {
+    if (bytes <= 0) return zero;
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
     }
-    final h = elapsedTime!.inHours.toString().padLeft(2, '0');
-    final m = (elapsedTime!.inMinutes % 60).toString().padLeft(2, '0');
-    final s = (elapsedTime!.inSeconds % 60).toString().padLeft(2, '0');
-    return '$h:$m:$s';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
 
 typedef WtgProgressCallback = void Function(WtgProgress progress);
 
-final wtgServiceProvider = Provider<WtgService>((ref) {
-  return WtgService(ref);
-});
+final wtgServiceProvider = Provider<WtgService>(WtgService.new);
+
+class _WtgFailure implements Exception {
+  final String messageKey;
+  final String detail;
+
+  const _WtgFailure(this.messageKey, this.detail);
+
+  @override
+  String toString() => detail;
+}
+
+class _WtgImageSource {
+  final String imagePath;
+  final WimImageInfo image;
+  final DeploymentPlan plan;
+  final String architecture;
+  final String? netFx3Source;
+
+  const _WtgImageSource({
+    required this.imagePath,
+    required this.image,
+    required this.plan,
+    required this.architecture,
+    required this.netFx3Source,
+  });
+}
+
+class _WtgDriveLetters {
+  final String boot;
+  final String storage;
+  final String image;
+
+  const _WtgDriveLetters({
+    required this.boot,
+    required this.storage,
+    required this.image,
+  });
+}
+
+class _WtgPartitionLayout {
+  final WtgBootLayout bootLayout;
+  final String bootDrive;
+  final String storageDrive;
+  final String bootLabel;
+  final String storageLabel;
+
+  const _WtgPartitionLayout({
+    required this.bootLayout,
+    required this.bootDrive,
+    required this.storageDrive,
+    required this.bootLabel,
+    required this.storageLabel,
+  });
+}
+
+class _WtgVirtualDisk {
+  final String filePath;
+  final String fileName;
+  final String imageDrive;
+  final int diskNumber;
+
+  const _WtgVirtualDisk({
+    required this.filePath,
+    required this.fileName,
+    required this.imageDrive,
+    required this.diskNumber,
+  });
+}
+
+class _DriverManifestEntry {
+  final String path;
+  final String resolvedPath;
+  final int size;
+  final DateTime modified;
+  final String digest;
+  final bool isInf;
+
+  const _DriverManifestEntry({
+    required this.path,
+    required this.resolvedPath,
+    required this.size,
+    required this.modified,
+    required this.digest,
+    required this.isInf,
+  });
+}
+
+class _DriverManifest {
+  final String rootPath;
+  final String resolvedRootPath;
+  final int sourceDiskNumber;
+  final List<_DriverManifestEntry> entries;
+
+  const _DriverManifest({
+    required this.rootPath,
+    required this.resolvedRootPath,
+    required this.sourceDiskNumber,
+    required this.entries,
+  });
+
+  static const empty = _DriverManifest(
+    rootPath: '',
+    resolvedRootPath: '',
+    sourceDiskNumber: -1,
+    entries: [],
+  );
+
+  List<String> get infPaths => entries
+      .where((entry) => entry.isInf)
+      .map((entry) => entry.path)
+      .toList(growable: false);
+}
 
 class WtgService {
   final Ref ref;
   final List<String> _log = [];
+  final List<String> _debugLogs = [];
   bool _cancelled = false;
   Process? _currentProcess;
   String? _currentIsoPath;
 
   WtgService(this.ref) {
-    // Kill process and eject ISO when provider is disposed (app exit)
     ref.onDispose(() {
-      _killCurrentProcess();
-      // Eject ISO synchronously
-      if (_currentIsoPath != null) {
-        try {
-          final escapedPath = _currentIsoPath!.replaceAll("'", "''");
-          Process.run('powershell', [
-            '-NoProfile',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-Command',
-            "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue",
-          ]);
-        } catch (_) {}
-      }
+      final isoPath = _currentIsoPath;
+      unawaited(() async {
+        await _stopCurrentProcess();
+        if (isoPath != null) await _unmountIso(isoPath);
+      }());
     });
   }
 
-  void _logLine(String msg) {
-    final line = '[${DateTime.now().toIso8601String()}] $msg';
-    _log.add(line);
-    debugPrint(line);
-
-    // 实时写入文件 - 同步执行确保日志不丢失
-    _writeLogToFileSync(line);
-  }
-
-  void _writeLogToFileSync(String line) {
-    try {
-      final dir = Directory(
-        p.join(AppConstants.appDataPath, 'WinDeployStudio', 'logs'),
-      );
-      if (!dir.existsSync()) {
-        dir.createSync(recursive: true);
-      }
-      final logFile = File(p.join(dir.path, 'wtg_detail.log'));
-      logFile.writeAsStringSync('$line\n', mode: FileMode.append);
-    } catch (e) {
-      debugPrint('Log write error: $e');
-    }
-  }
-
+  List<String> get debugLogs => List.unmodifiable(_debugLogs);
   String get logText => _log.join('\n');
-
-  String _driveRoot(String drive) {
-    final value = drive.trim();
-    if (value.endsWith('\\')) return value;
-    if (value.endsWith(':')) return '$value\\';
-    if (value.length == 1) return '$value:\\';
-    return value;
-  }
-
-  String _driveSpec(String drive) {
-    final value = drive.trim().replaceAll('\\', '');
-    if (value.endsWith(':')) return value;
-    if (value.length == 1) return '$value:';
-    return value;
-  }
-
-  String _drivePath(String drive, String relativePath) {
-    final cleanRelative = relativePath.replaceFirst(RegExp(r'^\\+'), '');
-    return '${_driveRoot(drive)}$cleanRelative';
-  }
-
-  String _driveFromLetter(String letter) {
-    return '${letter.toUpperCase()}:\\';
-  }
-
-  void _killCurrentProcess() {
-    if (_currentProcess == null) return;
-    try {
-      // Kill the process tree (including child processes like DISM)
-      Process.run('taskkill', ['/F', '/T', '/PID', '${_currentProcess!.pid}']);
-      _currentProcess?.kill(ProcessSignal.sigkill);
-      _currentProcess = null;
-      debugPrint('[ToGo] Killed DISM process tree');
-    } catch (e) {
-      debugPrint('[ToGo] Failed to kill process: $e');
-    }
-  }
-
-  Future<void> _ejectIso(String isoPath) async {
-    try {
-      _logLine('Ejecting ISO: $isoPath');
-      final escapedPath = isoPath.replaceAll("'", "''");
-      await Process.run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue",
-      ]).timeout(const Duration(seconds: 15));
-      _logLine('ISO ejected OK');
-    } catch (e) {
-      _logLine('ISO eject error (non-fatal): $e');
-    }
-  }
+  bool get isCancelled => _cancelled;
 
   void cancel() {
     _cancelled = true;
-    _logLine('=== Windows To Go Creation Cancelled ===');
+    _logLine('Cancellation requested.');
     _killCurrentProcess();
-    if (_currentIsoPath != null) {
-      _ejectIso(_currentIsoPath!);
-    }
-    _logLine('Killed DISM process and ejected ISO');
-  }
-
-  Future<String> saveLogToFile() async {
-    try {
-      final dir = await getApplicationSupportDirectory();
-      final logFile = File(
-        p.join(dir.path, 'logs', 'last_wtg_creation_log.txt'),
-      );
-      await logFile.parent.create(recursive: true);
-      await logFile.writeAsString(logText);
-      return logFile.path;
-    } catch (e) {
-      return 'Failed to save log: $e';
-    }
-  }
-
-  void _notify(WtgProgressCallback? callback, WtgProgress progress) {
-    if (!_cancelled) {
-      callback?.call(progress);
-    }
   }
 
   Future<List<Map<String, dynamic>>> getWimImages(String isoPath) async {
-    _logLine('Getting WIM images from: $isoPath');
     _debugLogs.clear();
-    _addDebug('ISO Path: $isoPath');
-
-    // Mount ISO
-    _addDebug('Mounting ISO...');
-    final mountPoint = await _mountIso(isoPath);
-    if (mountPoint == null) {
-      _addDebug('ERROR: Failed to mount ISO');
-      _logLine('Failed to mount ISO');
-      return [];
-    }
-    _addDebug('Mounted Drive: $mountPoint');
-    _logLine('ISO mounted at: $mountPoint');
-
+    _cancelled = false;
+    String? mountPoint;
     try {
-      // Check sources directory
-      final sourcesDir = '${mountPoint}sources';
-      _addDebug('Checking directory: $sourcesDir');
-
-      final sourcesDirEntity = Directory(sourcesDir);
-      if (!await sourcesDirEntity.exists()) {
-        _addDebug('ERROR: sources directory does not exist');
-        _logLine('Sources directory does not exist');
-        return [];
-      }
-      _addDebug('sources directory exists: YES');
-
-      // List all files in sources directory
-      _addDebug('Files in $sourcesDir:');
-      try {
-        final files = await sourcesDirEntity.list().toList();
-        for (final file in files) {
-          final name = file.path.split('\\').last;
-          _addDebug('  - $name');
-        }
-      } catch (e) {
-        _addDebug('Error listing directory: $e');
-      }
-
-      // Find install.wim or install.esd
-      final wimPath = '${mountPoint}sources\\install.wim';
-      final esdPath = '${mountPoint}sources\\install.esd';
-
-      final hasWim = await File(wimPath).exists();
-      final hasEsd = await File(esdPath).exists();
-
-      _addDebug('Found install.wim = $hasWim');
-      _addDebug('Found install.esd = $hasEsd');
-
-      String? sourcePath;
-      if (hasWim) {
-        sourcePath = wimPath;
-        _addDebug('Using install.wim');
-      } else if (hasEsd) {
-        sourcePath = esdPath;
-        _addDebug('Using install.esd');
-      }
-
-      if (sourcePath == null) {
-        _addDebug('ERROR: No install.wim or install.esd found');
-        _logLine('No install.wim or install.esd found');
-        return [];
-      }
-
-      // Get image info using DISM
-      _addDebug('Running DISM /Get-ImageInfo...');
-      _logLine('Running DISM on: $sourcePath');
-      final result = await Process.run('dism', [
-        '/Get-ImageInfo',
-        '/ImageFile:$sourcePath',
-      ]).timeout(const Duration(seconds: 60));
-
-      _addDebug('DISM exit code: ${result.exitCode}');
-      _logLine('DISM exit code: ${result.exitCode}');
-
-      if (result.exitCode != 0) {
-        final stderr = result.stderr.toString();
-        final stdout = result.stdout.toString();
-        _addDebug('DISM stderr: $stderr');
-        _addDebug('DISM stdout: $stdout');
-        _logLine('DISM stderr: $stderr');
-        _logLine('DISM stdout: $stdout');
-        return [];
-      }
-
-      final output = result.stdout.toString();
-      _addDebug('DISM output length: ${output.length} characters');
-      _logLine('DISM output length: ${output.length} characters');
-
-      if (output.isEmpty) {
-        _addDebug('ERROR: DISM output is empty');
-        _logLine('DISM output is empty');
-        return [];
-      }
-
-      // Show first 500 chars of output for debugging
-      final preview = output.length > 500 ? output.substring(0, 500) : output;
-      _addDebug('DISM output preview:\n$preview');
-
-      final images = _parseDismImageInfo(output);
-      _addDebug('Parsed ${images.length} images');
-
-      return images;
-    } catch (e) {
-      _addDebug('EXCEPTION: $e');
-      _logLine('Error getting WIM images: $e');
-      return [];
+      mountPoint = await _mountIso(isoPath);
+      if (mountPoint == null) return const [];
+      final imagePath = await _findInstallImage(mountPoint);
+      if (imagePath == null) return const [];
+      final images = await WimInfoService.readImages(imagePath);
+      return images.map((image) => image.toMap()).toList(growable: false);
+    } catch (error) {
+      _debugLogs.add(error.toString());
+      _logLine('WIM metadata query failed: $error');
+      return const [];
     } finally {
-      await _unmountIso(isoPath);
+      if (mountPoint != null) await _unmountIso(isoPath);
     }
-  }
-
-  final List<String> _debugLogs = [];
-
-  List<String> get debugLogs => List.unmodifiable(_debugLogs);
-
-  void _addDebug(String message) {
-    _debugLogs.add(message);
-    debugPrint('[ToGo-DEBUG] $message');
-  }
-
-  List<Map<String, dynamic>> _parseDismImageInfo(String output) {
-    final images = <Map<String, dynamic>>[];
-    final lines = output.split('\n');
-    _addDebug('Total lines in DISM output: ${lines.length}');
-
-    // Regular expressions for matching DISM fields
-    // Support both English and Chinese, with flexible spacing around colon
-    final indexRegex = RegExp(r'^(Index|索引)\s*:\s*(\d+)$');
-    final nameRegex = RegExp(r'^(Name|名称)\s*:\s*(.+)$');
-    final descRegex = RegExp(r'^(Description|描述|说明)\s*:\s*(.+)$');
-    final sizeRegex = RegExp(r'^(Size|大小)\s*:\s*(.+)$');
-    final archRegex = RegExp(r'^(Architecture|体系结构)\s*:\s*(.+)$');
-    final editionRegex = RegExp(r'^(Edition|版本)\s*:\s*(.+)$');
-    final versionRegex = RegExp(r'^(Version|版本号)\s*:\s*(.+)$');
-    final installTypeRegex = RegExp(r'^(Installation Type|安装类型)\s*:\s*(.+)$');
-
-    Map<String, dynamic>? currentImage;
-    int matchedLines = 0;
-
-    for (int i = 0; i < lines.length; i++) {
-      final trimmed = lines[i].trim();
-      if (trimmed.isEmpty) continue;
-
-      // Try to match index (start of new image)
-      var match = indexRegex.firstMatch(trimmed);
-      if (match != null) {
-        // Save previous image if exists
-        if (currentImage != null) {
-          images.add(currentImage);
-        }
-        currentImage = {'index': int.tryParse(match.group(2)!) ?? 0};
-        matchedLines++;
-        _addDebug('Line $i: Found index ${currentImage['index']}');
-        continue;
-      }
-
-      // If we have a current image, try to match other fields
-      if (currentImage != null) {
-        match = nameRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['name'] = match.group(2)!.trim();
-          matchedLines++;
-          _addDebug('Line $i: Found name "${currentImage['name']}"');
-          continue;
-        }
-
-        match = descRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['description'] = match.group(2)!.trim();
-          matchedLines++;
-          continue;
-        }
-
-        match = sizeRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['size'] = match.group(2)!.trim();
-          matchedLines++;
-          continue;
-        }
-
-        match = archRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['architecture'] = match.group(2)!.trim();
-          matchedLines++;
-          continue;
-        }
-
-        match = editionRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['edition'] = match.group(2)!.trim();
-          matchedLines++;
-          continue;
-        }
-
-        match = versionRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['version'] = match.group(2)!.trim();
-          matchedLines++;
-          continue;
-        }
-
-        match = installTypeRegex.firstMatch(trimmed);
-        if (match != null) {
-          currentImage['installationType'] = match.group(2)!.trim();
-          matchedLines++;
-          continue;
-        }
-      }
-    }
-
-    // Add the last image
-    if (currentImage != null) {
-      images.add(currentImage);
-    }
-
-    _addDebug('Matched $matchedLines field lines');
-    _addDebug('Parsed ${images.length} images from DISM output');
-    for (final img in images) {
-      _addDebug('  Image ${img['index']}: ${img['name'] ?? 'Unknown'}');
-    }
-
-    // If no images found, show sample lines for debugging
-    if (images.isEmpty && lines.isNotEmpty) {
-      _addDebug('Sample lines from DISM output:');
-      for (int i = 0; i < lines.length && i < 30; i++) {
-        _addDebug('  [$i]: "${lines[i].trim()}"');
-      }
-    }
-
-    return images;
   }
 
   Future<bool> createWtg({
     required String isoPath,
     required int imageIndex,
-    required int diskNumber,
+    required DiskInfo disk,
     required String driveLetter,
+    DeploymentPlan? deploymentPlan,
     WtgProgressCallback? onProgress,
   }) async {
+    final plan =
+        deploymentPlan ??
+        DeploymentPlan(
+          platform: DeploymentPlatform.windows,
+          purpose: DeploymentPurpose.toGo,
+          imagePath: isoPath,
+          imageIndex: imageIndex,
+          bootMode: DeploymentBootMode.uefiGpt,
+          deploymentMode: DeploymentMode.direct,
+          preferredSystemLetter: _letterOnly(driveLetter),
+          blockLocalDisks: true,
+          disableWinRe: true,
+        );
+    final diskNumber = disk.diskNumber;
+    final logger = ref.read(fileLoggerServiceProvider);
+    final logCenter = LogCenterService();
+    String? mountPoint;
+    _WtgVirtualDisk? virtualDisk;
+    var driverManifest = _DriverManifest.empty;
+    String? driverStagingPath;
+    Uint8List? preparedIcon;
+
     _log.clear();
+    _debugLogs.clear();
     _cancelled = false;
     _currentIsoPath = isoPath;
-    _logLine('=== Windows To Go Creation Start ===');
-    _logLine('ISO: $isoPath');
-    _logLine('Image Index: $imageIndex');
-    _logLine('Disk: $diskNumber');
-    _logLine('Drive: $driveLetter');
-
-    final logCenter = LogCenterService();
-    await logCenter.logToGo(
-      'Windows To Go 创建开始 | 磁盘: $diskNumber | ISO: $isoPath | 镜像索引: $imageIndex',
-    );
-
-    final logger = ref.read(fileLoggerServiceProvider);
-    await logger.log(
-      action: 'Create Windows To Go',
-      target: 'Disk $diskNumber',
-      result: 'Starting - ISO: $isoPath, Index: $imageIndex',
-    );
+    _logLine('=== Windows To Go deployment start ===');
+    _logLine('Disk=$diskNumber Plan=${jsonEncode(plan.toJson())}');
 
     try {
-      // Step 1: Prepare
       _notify(
         onProgress,
         const WtgProgress(
           step: WtgStep.preparing,
           message: 'wtg_svc_preparing',
-          progress: 0.0,
         ),
       );
+      _validateTaskPlan(plan, isoPath, imageIndex);
+      await _requireSafeDisk(disk);
+      // Reject an ISO on the target before mounting it or preparing any target work.
+      await _validateIsoSourceBeforeErase(isoPath, diskNumber);
+      final sourceDriverManifest = await _prepareDriverManifest(
+        plan.driverDirectory,
+        diskNumber,
+      );
+      driverManifest = await _stageDriverManifest(
+        sourceDriverManifest,
+        diskNumber,
+      );
+      if (driverManifest.entries.isNotEmpty) {
+        driverStagingPath = driverManifest.rootPath;
+      }
+      preparedIcon = await _prepareCustomIcon(plan.customIconPath);
 
-      if (_cancelled) return false;
+      mountPoint = await _mountIso(isoPath);
+      if (mountPoint == null) {
+        throw const _WtgFailure('wtg_svc_mount_failed', 'ISO mount failed.');
+      }
+      final source = await _inspectImage(mountPoint, plan, imageIndex);
+      _throwIfCancelled();
+      _validateCapacity(disk, source);
+      await _validateIsoSourceBeforeErase(isoPath, diskNumber);
 
-      // Step 2: Partition disk
+      final letters = await _reserveDriveLetters(plan);
       _notify(
         onProgress,
         const WtgProgress(
           step: WtgStep.partitioningDisk,
           message: 'wtg_svc_partitioning',
-          progress: 0.05,
+          progress: 0.08,
         ),
       );
-
-      final partitionLayout = await _partitionDisk(diskNumber: diskNumber);
-      if (partitionLayout == null) {
-        _logLine('Partition FAILED');
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_partition_failed\n\nLog: $logPath',
-          ),
-        );
-        return false;
-      }
-      _logLine('Partition OK');
-      final bootLayout = partitionLayout.bootLayout;
-      final efiDrive = partitionLayout.efiDrive;
-      final windowsDrive = partitionLayout.windowsDrive;
-      _logLine('Prepared EFI partition: $efiDrive');
-      _logLine('Prepared Windows partition: $windowsDrive');
-
-      if (_cancelled) return false;
-
-      // Step 3: Mount ISO
-      _notify(
-        onProgress,
-        const WtgProgress(
-          step: WtgStep.mountingIso,
-          message: 'wtg_svc_mounting',
-          progress: 0.15,
-        ),
+      final layout = await _partitionDisk(
+        disk: disk,
+        plan: source.plan,
+        letters: letters,
       );
+      await _requireSafeDisk(disk);
+      _throwIfCancelled();
 
-      final mountPoint = await _mountIso(isoPath);
-      if (mountPoint == null) {
-        _logLine('Mount ISO FAILED');
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_mount_failed\n\nLog: $logPath',
-          ),
+      String windowsDrive = layout.storageDrive;
+      if (source.plan.usesVirtualDisk) {
+        virtualDisk = await _createVirtualDisk(
+          layout: layout,
+          plan: source.plan,
+          imageLetter: letters.image,
+          physicalDiskNumber: diskNumber,
         );
-        return false;
-      }
-      _logLine('Mounted at: $mountPoint');
-
-      if (_cancelled) {
-        await _unmountIso(isoPath);
-        return false;
+        windowsDrive = virtualDisk.imageDrive;
       }
 
-      // Step 4: Apply image using DISM
-      _notify(
-        onProgress,
-        const WtgProgress(
-          step: WtgStep.applyingImage,
-          message: 'wtg_svc_applying',
-          progress: 0.20,
-        ),
-      );
-
-      // Find install.wim or install.esd
-      final wimPath = '${mountPoint}sources\\install.wim';
-      final esdPath = '${mountPoint}sources\\install.esd';
-
-      String? sourcePath;
-      if (await File(wimPath).exists()) {
-        sourcePath = wimPath;
-      } else if (await File(esdPath).exists()) {
-        sourcePath = esdPath;
-      }
-
-      if (sourcePath == null) {
-        _logLine('No install.wim or install.esd found');
-        await _unmountIso(isoPath);
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_no_wim\n\nLog: $logPath',
-          ),
+      String applySource = source.imagePath;
+      if (source.plan.wimBoot) {
+        applySource = await _stageWimBootSource(
+          source.imagePath,
+          layout.storageDrive,
         );
-        return false;
       }
+      _throwIfCancelled();
 
-      final windowsDriveReady = await _waitForPartitionRoot(
-        drive: windowsDrive,
-        expectedLabel: 'WDS_TOGO',
-      );
-      if (!windowsDriveReady) {
-        _logLine('Windows partition is not accessible: $windowsDrive');
-        await _unmountIso(isoPath);
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_no_partition\n\nLog: $logPath',
-          ),
-        );
-        return false;
-      }
-
-      final applyResult = await _applyImage(
-        sourcePath: sourcePath,
+      final applied = await _applyImage(
+        sourcePath: applySource,
         imageIndex: imageIndex,
         targetDrive: windowsDrive,
+        compact: source.plan.compactOs,
+        wimBoot: source.plan.wimBoot,
         onProgress: onProgress,
       );
-
-      if (!applyResult) {
-        _logLine('Apply image FAILED');
-        await _unmountIso(isoPath);
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_apply_failed\n\nLog: $logPath',
-          ),
+      if (!applied) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'DISM image application failed.',
         );
-        return false;
-      }
-      _logLine('Apply image OK');
-
-      if (_cancelled) {
-        await _unmountIso(isoPath);
-        return false;
       }
 
-      final configResult = await _configureWtgImage(windowsDrive: windowsDrive);
-      if (!configResult) {
-        _logLine('Windows To Go offline configuration FAILED');
-        await _unmountIso(isoPath);
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_boot_failed\n\nLog: $logPath',
-          ),
+      await _verifyDriverManifest(driverManifest);
+      _throwIfCancelled();
+      final configuredPlan = driverManifest.entries.isEmpty
+          ? source.plan
+          : source.plan.copyWith(driverDirectory: driverManifest.rootPath);
+      final deploymentService = WindowsDeploymentService(
+        _logLine,
+        processRunner: _runTracked,
+      );
+      final configured = await deploymentService.configureOfflineImage(
+        windowsDrive: windowsDrive,
+        plan: configuredPlan,
+        architecture: source.architecture,
+        driverInfPaths: driverManifest.infPaths,
+        netFx3Source: source.netFx3Source,
+        compactApplied: source.plan.compactOs,
+        wimBootApplied: source.plan.wimBoot,
+      );
+      if (!configured) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'Offline Windows configuration failed verification.',
         );
-        return false;
       }
-      _logLine('Windows To Go offline configuration OK');
-
-      if (_cancelled) {
-        await _unmountIso(isoPath);
-        return false;
+      if (!await deploymentService.disableAndVerifyWinRe(
+        windowsDrive: windowsDrive,
+        requested: source.plan.disableWinRe,
+      )) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'WinRE configuration failed verification.',
+        );
       }
+      await _writeVolumeIdentity(
+        layout.storageDrive,
+        source.plan,
+        preparedIcon,
+      );
+      _throwIfCancelled();
 
-      // Step 5: Write boot files
       _notify(
         onProgress,
         const WtgProgress(
           step: WtgStep.writingBootFiles,
           message: 'wtg_svc_writing_boot',
-          progress: 0.70,
+          progress: 0.78,
         ),
       );
-
-      final efiDriveReady = await _waitForPartitionRoot(
-        drive: efiDrive,
-        expectedLabel: 'WDS_EFI',
-      );
-      if (!efiDriveReady) {
-        _logLine('EFI partition is not accessible: $efiDrive');
-        await _unmountIso(isoPath);
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_boot_failed\n\nLog: $logPath',
-          ),
-        );
-        return false;
-      }
-      _logLine('Using independent EFI partition: $efiDrive');
-
-      final bootResult = await _writeBootFiles(
+      await _revalidateTargetDisk(disk, layout);
+      if (!await _writeBootFiles(
+        disk: disk,
         windowsDrive: windowsDrive,
-        efiDrive: efiDrive,
-        bootLayout: bootLayout,
-      );
-
-      await _unmountIso(isoPath);
-
-      if (!bootResult) {
-        _logLine('Boot file write FAILED');
-        final logPath = await saveLogToFile();
-        _notify(
-          onProgress,
-          WtgProgress(
-            step: WtgStep.failed,
-            message: 'wtg_svc_boot_failed\n\nLog: $logPath',
-          ),
+        layout: layout,
+        virtualDisk: virtualDisk,
+        architecture: source.image.architecture,
+        legacyBootsectPath: p.join(mountPoint, 'boot', 'bootsect.exe'),
+      )) {
+        throw const _WtgFailure(
+          'wtg_svc_boot_failed',
+          'Boot-file creation failed verification.',
         );
-        return false;
       }
-      _logLine('Boot files OK');
+      _throwIfCancelled();
 
-      if (_cancelled) return false;
-
-      // Step 6: Verify
       _notify(
         onProgress,
         const WtgProgress(
           step: WtgStep.verifying,
           message: 'wtg_svc_verifying',
-          progress: 0.90,
+          progress: 0.9,
         ),
       );
-
-      final verifyResult = await _verifyWtg(
+      if (!await _verifyDeployment(
+        disk: disk,
+        layout: layout,
+        plan: source.plan,
         windowsDrive: windowsDrive,
-        efiDrive: efiDrive,
-        bootLayout: bootLayout,
-      );
-      _logLine('Verify: ${verifyResult ? "OK" : "FAILED"}');
-
-      _notify(
-        onProgress,
-        WtgProgress(
-          step: verifyResult ? WtgStep.complete : WtgStep.failed,
-          message: verifyResult ? 'wtg_svc_complete' : 'wtg_svc_verify_failed',
-          progress: verifyResult ? 1.0 : 0.0,
-        ),
-      );
-
-      await logger.log(
-        action: 'Create Windows To Go',
-        target: 'Disk $diskNumber',
-        result: verifyResult ? 'Success - Verified' : 'Failed - Verification',
-        level: verifyResult ? LogLevel.success : LogLevel.error,
-      );
-
-      final logPath = await saveLogToFile();
-      _logLine('Log saved to: $logPath');
-
-      if (verifyResult) {
-        await logCenter.logToGo('Windows To Go 创建成功 | 磁盘: $diskNumber');
-      } else {
-        await logCenter.logError('Windows To Go 验证失败 | 磁盘: $diskNumber');
+        virtualDisk: virtualDisk,
+        architecture: source.image.architecture,
+        preparedIcon: preparedIcon,
+      )) {
+        throw const _WtgFailure(
+          'wtg_svc_verify_failed',
+          'Final deployment postconditions failed.',
+        );
       }
+      _throwIfCancelled();
 
-      return verifyResult;
-    } on TimeoutException catch (e) {
-      _logLine('TIMEOUT: $e');
-      final logPath = await saveLogToFile();
-      await logCenter.logError('Windows To Go 创建超时 | 磁盘: $diskNumber | 错误: $e');
+      _notify(
+        onProgress,
+        const WtgProgress(
+          step: WtgStep.complete,
+          message: 'wtg_svc_complete',
+          progress: 1,
+        ),
+      );
+      _throwIfCancelled();
+      await logger.log(
+        action: 'Create Windows To Go',
+        target: 'Disk $diskNumber',
+        result:
+            'Success - ${source.plan.deploymentMode.name}/${source.plan.bootMode.name}',
+        level: LogLevel.success,
+      );
+      _throwIfCancelled();
+      await logCenter.logToGo(
+        '[Deployment] Product=WindowsToGo Disk=$diskNumber Status=Success',
+      );
+      _throwIfCancelled();
+      return true;
+    } on _WtgFailure catch (error) {
+      _logLine('${error.messageKey}: ${error.detail}');
       _notify(
         onProgress,
         WtgProgress(
           step: WtgStep.failed,
-          message: 'wtg_svc_timeout\n\nLog: $logPath',
+          message: '${error.messageKey}\n${error.detail}',
+          error: error.detail,
         ),
       );
       await logger.log(
         action: 'Create Windows To Go',
         target: 'Disk $diskNumber',
-        result: 'Timeout: $e',
+        result: 'Failed: ${error.detail}',
         level: LogLevel.error,
       );
+      await logCenter.logError(
+        '[Deployment] Product=WindowsToGo Disk=$diskNumber Status=Failed '
+        'Reason=${error.detail}',
+      );
       return false;
-    } catch (e) {
-      _logLine('EXCEPTION: $e');
-      final logPath = await saveLogToFile();
-      await logCenter.logError('Windows To Go 创建异常 | 磁盘: $diskNumber | 错误: $e');
+    } on TimeoutException catch (error) {
+      _logLine('Deployment timeout: $error');
+      _notify(
+        onProgress,
+        const WtgProgress(step: WtgStep.failed, message: 'wtg_svc_timeout'),
+      );
+      return false;
+    } catch (error, stackTrace) {
+      _logLine('Unexpected deployment error: $error\n$stackTrace');
       _notify(
         onProgress,
         WtgProgress(
           step: WtgStep.failed,
-          message: 'creator_error\n$e\n\nLog: $logPath',
+          message: 'creator_error\n$error',
+          error: error.toString(),
         ),
       );
-      await logger.log(
-        action: 'Create Windows To Go',
-        target: 'Disk $diskNumber',
-        result: 'Exception: $e',
-        level: LogLevel.error,
-      );
       return false;
+    } finally {
+      await _stopCurrentProcess();
+      if (virtualDisk != null) await _detachVirtualDisk(virtualDisk.filePath);
+      if (mountPoint != null) await _unmountIso(isoPath);
+      if (driverStagingPath != null) {
+        await _deleteDriverStaging(driverStagingPath);
+      }
+      _currentIsoPath = null;
+      final logPath = await saveLogToFile();
+      _logLine('Detailed log: $logPath');
     }
   }
 
-  Future<_WtgPartitionLayout?> _partitionDisk({required int diskNumber}) async {
-    final letters = await _reserveWtgDriveLetters();
-    if (letters == null) {
-      _logLine('Unable to reserve drive letters for Windows To Go partitions');
-      return null;
-    }
-
-    _logLine('Creating GPT/UEFI Windows To Go partition scheme...');
-    final gptResult = await _partitionDiskGpt(diskNumber, letters);
-
-    if (gptResult) {
-      _logLine('GPT/UEFI partition scheme succeeded');
-      return _WtgPartitionLayout(
-        bootLayout: WtgBootLayout.gptUefi,
-        efiDrive: _driveFromLetter(letters.efiLetter),
-        windowsDrive: _driveFromLetter(letters.windowsLetter),
+  void _validateTaskPlan(DeploymentPlan plan, String isoPath, int imageIndex) {
+    if (!plan.isWindows || !plan.isToGo) {
+      throw const _WtgFailure(
+        'deploy_compat_task_mismatch',
+        'The deployment plan is not a Windows To Go plan.',
       );
     }
-
-    _logLine('GPT/UEFI failed, trying MBR hybrid two-partition layout...');
-    final retryLetters = await _reserveWtgDriveLetters();
-    if (retryLetters == null) {
-      _logLine('Unable to reserve drive letters for MBR fallback');
-      return null;
-    }
-
-    final mbrResult = await _partitionDiskMbrHybrid(diskNumber, retryLetters);
-    if (mbrResult) {
-      _logLine('MBR hybrid partition scheme succeeded');
-      return _WtgPartitionLayout(
-        bootLayout: WtgBootLayout.mbrHybrid,
-        efiDrive: _driveFromLetter(retryLetters.efiLetter),
-        windowsDrive: _driveFromLetter(retryLetters.windowsLetter),
+    if (_normalizedPath(plan.imagePath) != _normalizedPath(isoPath)) {
+      throw const _WtgFailure(
+        'deploy_compat_image_mismatch',
+        'The ISO path changed across elevation.',
       );
     }
-
-    _logLine('All Windows To Go partition schemes failed');
-    return null;
+    if (plan.imageIndex != imageIndex) {
+      throw const _WtgFailure(
+        'deploy_compat_index_mismatch',
+        'The selected image index changed across elevation.',
+      );
+    }
+    final compatibility = DeploymentCompatibility.evaluate(plan);
+    if (!compatibility.canDeploy) {
+      throw _WtgFailure(
+        compatibility.errors.first.messageKey,
+        compatibility.errors.map((issue) => issue.code).join(', '),
+      );
+    }
   }
 
-  Future<bool> _partitionDiskGpt(
-    int diskNumber,
-    _WtgDriveLetters letters,
+  Future<_WtgImageSource> _inspectImage(
+    String mountPoint,
+    DeploymentPlan requestedPlan,
+    int imageIndex,
   ) async {
-    final script =
-        '''
-select disk $diskNumber
-clean
-exit
-''';
-    _logLine('GPT DiskPart - Step 1: Clean disk');
-    _logLine('DiskPart script:\n$script');
-
-    // Step 1: Clean the disk first
-    final cleanResult = await _runDiskpart(script);
-    _logLine('Clean exit: ${cleanResult.exitCode}');
-
-    if (!_diskpartSucceeded(cleanResult)) {
-      _logLine('Clean failed');
-      _logLine('Clean stderr: ${cleanResult.stderr}');
-      _logLine('Clean stdout: ${cleanResult.stdout}');
-      return false;
+    final imagePath = await _findInstallImage(mountPoint);
+    if (imagePath == null) {
+      throw const _WtgFailure(
+        'wtg_svc_no_wim',
+        'The ISO has no install.wim or install.esd.',
+      );
     }
-
-    // Wait for system to recognize the cleaned disk
-    _logLine('Waiting 3 seconds for disk recognition...');
-    await Future.delayed(const Duration(seconds: 3));
-
-    // Step 2: Convert to GPT and create partitions
-    final script2 =
-        '''
-select disk $diskNumber
-convert gpt
-create partition efi size=300
-format fs=fat32 label="WDS_EFI" quick
-assign letter=${letters.efiLetter}
-create partition msr size=16
-create partition primary
-format fs=ntfs label="WDS_TOGO" quick
-assign letter=${letters.windowsLetter}
-exit
-''';
-    _logLine('GPT DiskPart - Step 2: Create partitions');
-    _logLine('DiskPart script:\n$script2');
-
-    final result = await _runDiskpart(script2);
-    _logLine('GPT DiskPart exit: ${result.exitCode}');
-
-    if (!_diskpartSucceeded(result)) {
-      _logLine('GPT DiskPart stderr: ${result.stderr}');
-      _logLine('GPT DiskPart stdout: ${result.stdout}');
-      return false;
+    final images = await WimInfoService.readImages(imagePath);
+    final matches = images.where((image) => image.index == imageIndex);
+    if (matches.length != 1) {
+      throw const _WtgFailure(
+        'wtg_svc_no_wim',
+        'The selected Windows edition is not present in the image.',
+      );
     }
-
-    return true;
-  }
-
-  Future<bool> _partitionDiskMbrHybrid(
-    int diskNumber,
-    _WtgDriveLetters letters,
-  ) async {
-    final cleanScript =
-        '''
-select disk $diskNumber
-clean
-exit
-''';
-    _logLine('MBR Hybrid DiskPart - Step 1: Clean disk');
-
-    final cleanResult = await _runDiskpart(cleanScript);
-    _logLine('Clean exit: ${cleanResult.exitCode}');
-
-    if (!_diskpartSucceeded(cleanResult)) {
-      _logLine('Clean failed');
-      _logLine('Clean stderr: ${cleanResult.stderr}');
-      _logLine('Clean stdout: ${cleanResult.stdout}');
-      return false;
+    final image = matches.single;
+    final generation = DeploymentPlan.detectWindowsGeneration(
+      build: image.build,
+      version: '${image.name} ${image.version}',
+    );
+    final effectivePlan = requestedPlan.copyWith(
+      imageBuild: image.build,
+      imageName: image.name,
+      imageEdition: image.edition,
+      imageArchitecture: image.architecture,
+      windowsGeneration: generation,
+    );
+    final compatibility = DeploymentCompatibility.evaluate(effectivePlan);
+    if (!compatibility.canDeploy) {
+      throw _WtgFailure(
+        compatibility.errors.first.messageKey,
+        'Image metadata changed compatibility: '
+        '${compatibility.errors.map((issue) => issue.code).join(', ')}',
+      );
     }
-
-    _logLine('Waiting 3 seconds for disk recognition...');
-    await Future.delayed(const Duration(seconds: 3));
-
-    final script =
-        '''
-select disk $diskNumber
-convert mbr
-create partition primary size=350
-format fs=fat32 label="WDS_EFI" quick
-active
-assign letter=${letters.efiLetter}
-create partition primary
-format fs=ntfs label="WDS_TOGO" quick
-assign letter=${letters.windowsLetter}
-exit
-''';
+    if (effectivePlan.wimBoot &&
+        p.extension(imagePath).toLowerCase() != '.wim') {
+      throw const _WtgFailure(
+        'deploy_compat_wimboot_scope',
+        'WIMBoot requires install.wim; install.esd is not supported.',
+      );
+    }
+    if (effectivePlan.usesVirtualDisk &&
+        effectivePlan.virtualDiskSizeGb * 1024 * 1024 * 1024 <
+            image.sizeBytes + 4 * 1024 * 1024 * 1024) {
+      throw const _WtgFailure(
+        'deploy_compat_vhd_too_small',
+        'The virtual disk is too small for the selected Windows image.',
+      );
+    }
+    final sourceArchitecture = switch (image.architecture.toLowerCase()) {
+      'x64' || 'amd64' => 'amd64',
+      'arm64' => 'arm64',
+      _ => 'x86',
+    };
+    final sxs = p.join(mountPoint, 'sources', 'sxs');
+    final netFx3Source =
+        effectivePlan.enableNetFx3 && await Directory(sxs).exists()
+        ? sxs
+        : null;
+    if (effectivePlan.enableNetFx3 && netFx3Source == null) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The selected ISO does not contain a sources\\sxs payload for .NET Framework 3.5.',
+      );
+    }
     _logLine(
-      'MBR Hybrid DiskPart - Step 2: Create system and Windows partitions',
+      'Selected image: index=${image.index} name=${image.name} '
+      'build=${image.build} arch=${image.architecture}',
     );
-    _logLine('DiskPart script:\n$script');
+    return _WtgImageSource(
+      imagePath: imagePath,
+      image: image,
+      plan: effectivePlan,
+      architecture: sourceArchitecture,
+      netFx3Source: netFx3Source,
+    );
+  }
 
-    final result = await _runDiskpart(script);
-    _logLine('MBR Hybrid DiskPart exit: ${result.exitCode}');
+  void _validateCapacity(DiskInfo disk, _WtgImageSource source) {
+    final reserve = source.plan.usesVirtualDisk
+        ? source.plan.virtualDiskSizeGb * 1024 * 1024 * 1024
+        : source.image.sizeBytes + 6 * 1024 * 1024 * 1024;
+    if (disk.sizeBytes <= reserve + 512 * 1024 * 1024) {
+      throw const _WtgFailure(
+        'deploy_compat_vhd_too_small',
+        'The target disk does not have enough capacity for this deployment.',
+      );
+    }
+  }
 
-    if (!_diskpartSucceeded(result)) {
-      _logLine('MBR Hybrid DiskPart stderr: ${result.stderr}');
-      _logLine('MBR Hybrid DiskPart stdout: ${result.stdout}');
-      return false;
+  Future<void> _validateIsoSourceBeforeErase(
+    String isoPath,
+    int targetDiskNumber,
+  ) async {
+    final source = File(p.normalize(p.absolute(isoPath)));
+    if (await FileSystemEntity.type(source.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The Windows ISO source must be a regular file, not a link or directory.',
+      );
+    }
+    final resolvedPath = await source.resolveSymbolicLinks();
+    final sourceDiskNumber = await _pathDiskNumber(resolvedPath);
+    if (sourceDiskNumber == null) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The physical disk containing the Windows ISO could not be verified.',
+      );
+    }
+    if (sourceDiskNumber == targetDiskNumber) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The Windows ISO is stored on the target disk and would be erased.',
+      );
+    }
+    _logLine(
+      'ISO source preflight passed: source disk $sourceDiskNumber differs '
+      'from target disk $targetDiskNumber.',
+    );
+  }
+
+  Future<_DriverManifest> _prepareDriverManifest(
+    String directoryPath,
+    int targetDiskNumber,
+  ) async {
+    if (directoryPath.trim().isEmpty) return _DriverManifest.empty;
+    final directory = Directory(p.normalize(p.absolute(directoryPath)));
+    if (!await directory.exists()) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The selected Windows driver directory does not exist.',
+      );
+    }
+    if (await FileSystemEntity.type(directory.path, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The Windows driver directory cannot be a symbolic link or junction.',
+      );
+    }
+    final sourceDiskNumber = await _pathDiskNumber(directory.path);
+    if (sourceDiskNumber == null || sourceDiskNumber == targetDiskNumber) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The driver source disk could not be verified or is the target disk.',
+      );
+    }
+    final root = await directory.resolveSymbolicLinks();
+    final manifest = <_DriverManifestEntry>[];
+    await for (final entity in directory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      if (type == FileSystemEntityType.link) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'Driver staging cannot contain symbolic links or junctions.',
+        );
+      }
+      if (entity is! File) continue;
+      final resolved = await entity.resolveSymbolicLinks();
+      if (!p.isWithin(root, resolved)) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'A driver file resolves outside the selected directory.',
+        );
+      }
+      final file = File(entity.path);
+      manifest.add(
+        _DriverManifestEntry(
+          path: file.path,
+          resolvedPath: resolved,
+          size: await file.length(),
+          modified: await file.lastModified(),
+          digest: await _sha256File(file),
+          isInf: p.extension(file.path).toLowerCase() == '.inf',
+        ),
+      );
+    }
+    final infCount = manifest.where((entry) => entry.isInf).length;
+    if (infCount == 0) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The selected Windows driver directory contains no INF files.',
+      );
+    }
+    _logLine(
+      'Driver preflight hashed ${manifest.length} file(s), including '
+      '$infCount INF file(s).',
+    );
+    return _DriverManifest(
+      rootPath: directory.path,
+      resolvedRootPath: root,
+      sourceDiskNumber: sourceDiskNumber,
+      entries: List.unmodifiable(manifest),
+    );
+  }
+
+  Future<void> _verifyDriverManifest(_DriverManifest manifest) async {
+    if (manifest.entries.isEmpty) return;
+    final directory = Directory(manifest.rootPath);
+    if (!await directory.exists() ||
+        await FileSystemEntity.type(directory.path, followLinks: false) ==
+            FileSystemEntityType.link ||
+        await directory.resolveSymbolicLinks() != manifest.resolvedRootPath ||
+        await _pathDiskNumber(directory.path) !=
+            manifest.sourceDiskNumber) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The Windows driver source location changed after preflight.',
+      );
     }
 
-    return true;
+    final currentPaths = <String>{};
+    await for (final entity in directory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      if (type == FileSystemEntityType.link) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'The Windows driver source gained a symbolic link after preflight.',
+        );
+      }
+      if (type == FileSystemEntityType.file) {
+        currentPaths.add(_normalizedPath(entity.path));
+      }
+    }
+    final expectedPaths = manifest.entries
+        .map((entry) => _normalizedPath(entry.path))
+        .toSet();
+    if (currentPaths.length != expectedPaths.length ||
+        !currentPaths.containsAll(expectedPaths)) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The Windows driver source file set changed after preflight.',
+      );
+    }
+
+    for (final entry in manifest.entries) {
+      final file = File(entry.path);
+      if (await FileSystemEntity.type(file.path, followLinks: false) !=
+              FileSystemEntityType.file ||
+          await file.resolveSymbolicLinks() != entry.resolvedPath ||
+          await file.length() != entry.size ||
+          await file.lastModified() != entry.modified ||
+          await _sha256File(file) != entry.digest) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'The Windows driver source changed after preflight.',
+        );
+      }
+    }
+    _logLine('Driver source content digest verification passed.');
   }
 
-  bool _diskpartSucceeded(ProcessResult result) {
-    if (result.exitCode != 0) return false;
+  Future<String> _sha256File(File file) async =>
+      (await sha256.bind(file.openRead()).first).toString();
 
-    final combined = '${result.stdout}\n${result.stderr}'.toLowerCase();
-    const errors = [
-      'diskpart has encountered an error',
-      'virtual disk service error',
-      'the parameter is incorrect',
-      'access is denied',
-      'diskpart 遇到错误',
-      '虚拟磁盘服务错误',
-      '参数错误',
-      '拒绝访问',
-    ];
+  Future<_DriverManifest> _stageDriverManifest(
+    _DriverManifest source,
+    int targetDiskNumber,
+  ) async {
+    if (source.entries.isEmpty) return _DriverManifest.empty;
+    await _verifyDriverManifest(source);
 
-    return !errors.any(combined.contains);
-  }
+    final programData = Platform.environment['ProgramData'];
+    if (programData == null || programData.trim().isEmpty) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'A secure local driver staging location is unavailable.',
+      );
+    }
+    final secureRoot = Directory(
+      p.join(programData, 'WinDeployStudioSecureStaging'),
+    );
+    await secureRoot.create(recursive: true);
+    if (await FileSystemEntity.type(secureRoot.path, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The secure driver staging root cannot be a link or junction.',
+      );
+    }
+    await _lockDownDirectory(secureRoot.path);
+    await _cleanupStaleDriverStaging(secureRoot);
 
-  Future<_WtgDriveLetters?> _reserveWtgDriveLetters() async {
-    const preferredEfi = 'S';
-    const preferredWindows = 'W';
-    final usedLetters = await _getUsedDriveLetters();
+    final token = '${pid}_${DateTime.now().microsecondsSinceEpoch}';
+    final staging = Directory(p.join(secureRoot.path, 'wds_drivers_$token'));
+    await staging.create();
+    await _lockDownDirectory(staging.path);
 
-    String? pick(List<String> preferred, Set<String> blocked) {
-      for (final letter in preferred) {
-        final value = letter.toUpperCase();
-        if (!usedLetters.contains(value) && !blocked.contains(value)) {
-          return value;
+    try {
+      for (final entry in source.entries) {
+        _throwIfCancelled();
+        final relative = p.relative(entry.path, from: source.rootPath);
+        if (relative == '..' || relative.startsWith('..${p.separator}')) {
+          throw const _WtgFailure(
+            'wtg_svc_apply_failed',
+            'A driver staging path escaped the selected directory.',
+          );
+        }
+        final target = File(p.join(staging.path, relative));
+        await target.parent.create(recursive: true);
+        await File(entry.path).copy(target.path);
+        if (await _sha256File(target) != entry.digest) {
+          throw const _WtgFailure(
+            'wtg_svc_apply_failed',
+            'A driver file changed while it was copied to secure staging.',
+          );
         }
       }
+
+      final staged = await _prepareDriverManifest(
+        staging.path,
+        targetDiskNumber,
+      );
+      final sourceDigests = <String, String>{
+        for (final entry in source.entries)
+          _normalizedRelativePath(entry.path, source.rootPath): entry.digest,
+      };
+      final stagedDigests = <String, String>{
+        for (final entry in staged.entries)
+          _normalizedRelativePath(entry.path, staged.rootPath): entry.digest,
+      };
+      if (sourceDigests.length != stagedDigests.length ||
+          sourceDigests.entries.any(
+            (entry) => stagedDigests[entry.key] != entry.value,
+          )) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'Secure driver staging failed its content verification.',
+        );
+      }
+      _logLine(
+        'Driver files copied to ACL-restricted staging: ${staging.path}',
+      );
+      return staged;
+    } catch (_) {
+      await _deleteDriverStaging(staging.path);
+      rethrow;
+    }
+  }
+
+  Future<void> _lockDownDirectory(
+    String path, {
+    bool allowWhenCancelled = false,
+  }) async {
+    final result = await _runTracked(
+      'powershell',
+      const [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        r'''$ErrorActionPreference = 'Stop'
+$path = $env:WDS_SECURE_PATH
+$acl = [System.Security.AccessControl.DirectorySecurity]::new()
+$acl.SetAccessRuleProtection($true, $false)
+$inherit = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+$propagation = [System.Security.AccessControl.PropagationFlags]::None
+$allow = [System.Security.AccessControl.AccessControlType]::Allow
+$system = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+$administrators = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+$acl.SetOwner($administrators)
+$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($system, 'FullControl', $inherit, $propagation, $allow))
+$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($administrators, 'FullControl', $inherit, $propagation, $allow))
+Set-Acl -LiteralPath $path -AclObject $acl
+$allowed = @('S-1-5-18', 'S-1-5-32-544')
+$actual = @((Get-Acl -LiteralPath $path).Access | Where-Object AccessControlType -eq Allow | ForEach-Object { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique)
+if ($actual.Count -ne 2 -or @($actual | Where-Object { $_ -notin $allowed }).Count -ne 0) { throw 'Secure staging ACL verification failed.' }''',
+      ],
+      timeout: const Duration(seconds: 30),
+      allowWhenCancelled: allowWhenCancelled,
+      environment: {...Platform.environment, 'WDS_SECURE_PATH': path},
+    );
+    if (result.exitCode != 0) {
+      throw _WtgFailure(
+        'wtg_svc_apply_failed',
+        'Could not secure the driver staging directory: '
+            '${_trimOutput(result.stderr)}',
+      );
+    }
+  }
+
+  Future<void> _deleteDriverStaging(String path) async {
+    final programData = Platform.environment['ProgramData'];
+    if (programData == null || programData.trim().isEmpty) return;
+    final secureRoot = p.join(programData, 'WinDeployStudioSecureStaging');
+    final normalized = p.normalize(p.absolute(path));
+    if (!p.isWithin(secureRoot, normalized) ||
+        !p.basename(normalized).startsWith('wds_drivers_')) {
+      _logLine('Refused to delete an unexpected driver staging path: $path');
+      return;
+    }
+    try {
+      final directory = Directory(normalized);
+      if (await directory.exists()) await directory.delete(recursive: true);
+    } catch (error) {
+      _logLine('Driver staging cleanup warning: $error');
+    }
+  }
+
+  Future<void> _cleanupStaleDriverStaging(Directory secureRoot) async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 1));
+    try {
+      await for (final entity in secureRoot.list(followLinks: false)) {
+        if (entity is! Directory ||
+            !p.basename(entity.path).startsWith('wds_drivers_')) {
+          continue;
+        }
+        final modified = (await FileStat.stat(entity.path)).modified;
+        if (modified.isBefore(cutoff)) {
+          await _deleteDriverStaging(entity.path);
+        }
+      }
+    } catch (error) {
+      _logLine('Stale driver staging cleanup warning: $error');
+    }
+  }
+
+  String _normalizedRelativePath(String path, String root) =>
+      p.relative(path, from: root).replaceAll('/', r'\').toUpperCase();
+
+  Future<Uint8List?> _prepareCustomIcon(String iconPath) async {
+    if (iconPath.trim().isEmpty) return null;
+    final file = File(p.normalize(p.absolute(iconPath)));
+    if (p.extension(file.path).toLowerCase() != '.ico' ||
+        !await file.exists()) {
+      throw const _WtgFailure(
+        'deploy_compat_invalid_icon',
+        'The selected custom ICO file is unavailable.',
+      );
+    }
+    final length = await file.length();
+    if (length < 6 || length > 10 * 1024 * 1024) {
+      throw const _WtgFailure(
+        'deploy_compat_invalid_icon',
+        'The selected ICO file has an invalid size.',
+      );
+    }
+    final bytes = await file.readAsBytes();
+    if (bytes[0] != 0 || bytes[1] != 0 || bytes[2] != 1 || bytes[3] != 0) {
+      throw const _WtgFailure(
+        'deploy_compat_invalid_icon',
+        'The selected file does not have a valid ICO header.',
+      );
+    }
+    _logLine('Custom drive icon staged in memory before disk erasure.');
+    return bytes;
+  }
+
+  Future<int?> _pathDiskNumber(String path) async {
+    try {
+      final result = await _runTracked(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$item = Get-Item -LiteralPath $env:WDS_SOURCE_PATH -Force -ErrorAction Stop
+$volume = Get-Volume -FilePath $item.FullName -ErrorAction Stop
+$partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
+if ($partitions.Count -ne 1) {
+  throw "Source path did not resolve to exactly one physical partition."
+}
+[int]$partitions[0].DiskNumber''',
+        ],
+        environment: {
+          ...Platform.environment,
+          'WDS_SOURCE_PATH': p.normalize(p.absolute(path)),
+        },
+        timeout: const Duration(seconds: 10),
+      );
+      return result.exitCode == 0
+          ? int.tryParse(result.stdout.toString().trim())
+          : null;
+    } on _WtgFailure {
+      rethrow;
+    } catch (_) {
       return null;
     }
-
-    final efi = pick([
-      preferredEfi,
-      'R',
-      'T',
-      'U',
-      'V',
-      'X',
-      'Y',
-      'Z',
-    ], const {});
-    if (efi == null) return null;
-
-    final windows = pick(
-      [preferredWindows, 'V', 'U', 'T', 'R', 'X', 'Y', 'Z'],
-      {efi},
-    );
-    if (windows == null) return null;
-
-    _logLine('Reserved Windows To Go drive letters: EFI=$efi Windows=$windows');
-    return _WtgDriveLetters(efiLetter: efi, windowsLetter: windows);
   }
 
-  Future<Set<String>> _getUsedDriveLetters() async {
+  Future<_WtgDriveLetters> _reserveDriveLetters(DeploymentPlan plan) async {
+    final used = await _usedDriveLetters();
+    final boot = _pickDriveLetter(
+      requested: plan.preferredBootLetter,
+      preferences: const ['S', 'T', 'U', 'V', 'X', 'Y', 'Z'],
+      used: used,
+    );
+    used.add(boot);
+    final storage = _pickDriveLetter(
+      requested: plan.preferredSystemLetter,
+      preferences: const ['W', 'V', 'U', 'T', 'R', 'X', 'Y', 'Z'],
+      used: used,
+    );
+    used.add(storage);
+    final image = _pickDriveLetter(
+      requested: '',
+      preferences: const ['I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q'],
+      used: used,
+    );
+    return _WtgDriveLetters(boot: boot, storage: storage, image: image);
+  }
+
+  String _pickDriveLetter({
+    required String requested,
+    required List<String> preferences,
+    required Set<String> used,
+  }) {
+    final normalized = _letterOnly(requested);
+    if (normalized.isNotEmpty) {
+      if (used.contains(normalized)) {
+        throw const _WtgFailure(
+          'deploy_compat_invalid_letter',
+          'A requested drive letter is already in use.',
+        );
+      }
+      return normalized;
+    }
+    for (final candidate in preferences) {
+      if (!used.contains(candidate)) return candidate;
+    }
+    for (var code = 90; code >= 68; code--) {
+      final candidate = String.fromCharCode(code);
+      if (!used.contains(candidate)) return candidate;
+    }
+    throw const _WtgFailure(
+      'deploy_compat_invalid_letter',
+      'No unused drive letter is available.',
+    );
+  }
+
+  Future<Set<String>> _usedDriveLetters() async {
     try {
-      final result = await Process.run('powershell', [
+      final result = await _runTracked('powershell', const [
         '-NoProfile',
+        '-NonInteractive',
         '-ExecutionPolicy',
         'Bypass',
         '-Command',
-        r'''
-$letters = @()
-try {
-  $letters += Get-Volume -ErrorAction SilentlyContinue |
-    Where-Object { $_.DriveLetter } |
-    ForEach-Object { $_.DriveLetter.ToString() }
-} catch {}
-try {
-  $letters += Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -match '^[A-Za-z]$' } |
-    ForEach-Object { $_.Name }
-} catch {}
-$letters |
-  Where-Object { $_ } |
-  ForEach-Object { $_.ToString().TrimEnd(':').ToUpperInvariant() } |
-  Sort-Object -Unique
-''',
-      ]).timeout(const Duration(seconds: 10));
-
-      if (result.exitCode == 0) {
-        final letters = result.stdout
-            .toString()
-            .split(RegExp(r'\s+'))
-            .map((item) => item.trim().replaceAll(':', '').toUpperCase())
-            .where((item) => item.length == 1)
-            .toSet();
-        _logLine('Used drive letters: ${letters.toList()..sort()}');
-        return letters;
-      }
-
-      _logLine('Drive letter scan failed: ${result.stderr}');
-    } catch (e) {
-      _logLine('Drive letter scan error: $e');
-    }
-
-    return <String>{};
-  }
-
-  Future<bool> _waitForPartitionRoot({
-    required String drive,
-    required String expectedLabel,
-  }) async {
-    final root = _driveRoot(drive);
-    _logLine('Waiting for $expectedLabel partition at $root');
-
-    for (var attempt = 1; attempt <= 30; attempt++) {
-      if (_cancelled) return false;
-
-      final directory = Directory(root);
-      if (await directory.exists()) {
-        final probe = File(_drivePath(root, '.wds_probe'));
-        try {
-          await probe.writeAsString('ok');
-          await probe.delete().catchError((_) => probe);
-          _logLine(
-            '$expectedLabel partition ready at $root (attempt $attempt)',
-          );
-          return true;
-        } catch (e) {
-          _logLine(
-            '$expectedLabel partition exists but is not writable yet '
-            '(attempt $attempt): $e',
-          );
-        }
-      }
-
-      await Future.delayed(const Duration(seconds: 1));
-    }
-
-    _logLine('$expectedLabel partition did not become ready at $root');
-    return false;
-  }
-
-  Future<ProcessResult> _runDiskpart(String script) async {
-    final tempDir = await getTemporaryDirectory();
-    final scriptFile = File(p.join(tempDir.path, 'wtg_diskpart.txt'));
-    await scriptFile.writeAsString(script);
-
-    try {
-      final result = await Process.run('diskpart', [
-        '/s',
-        scriptFile.path,
-      ]).timeout(const Duration(seconds: 120));
-      return result;
-    } on TimeoutException {
-      _logLine('DiskPart timeout (120s) - disk may be locked or busy');
+        r'''@(
+  Get-Volume -ErrorAction SilentlyContinue | Where-Object DriveLetter | ForEach-Object { $_.DriveLetter }
+  Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+) | ForEach-Object { $_.ToString().ToUpperInvariant() } | Sort-Object -Unique''',
+      ], timeout: const Duration(seconds: 10));
+      if (result.exitCode != 0) throw StateError('${result.stderr}');
+      return const LineSplitter()
+          .convert(result.stdout.toString())
+          .map((value) => _letterOnly(value))
+          .where((value) => value.isNotEmpty)
+          .toSet();
+    } on _WtgFailure {
       rethrow;
-    } finally {
-      await scriptFile.delete().catchError((_) => scriptFile);
+    } catch (error) {
+      throw _WtgFailure(
+        'deploy_compat_invalid_letter',
+        'Drive-letter enumeration failed: $error',
+      );
     }
   }
 
-  Future<String?> _mountIso(String isoPath) async {
-    try {
-      _logLine('Mounting ISO: $isoPath');
-
-      // Check if file exists
-      final isoFile = File(isoPath);
-      if (!await isoFile.exists()) {
-        _logLine('ERROR: ISO file not found: $isoPath');
-        return null;
-      }
-      _logLine('ISO file exists: YES');
-      _logLine('ISO file size: ${await isoFile.length()} bytes');
-
-      final escapedPath = isoPath.replaceAll("'", "''");
-
-      // Clean up any stale mount
-      _logLine('Cleaning up stale mounts...');
-      try {
-        await Process.run('powershell', [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
-        ]).timeout(const Duration(seconds: 15));
-      } catch (e) {
-        _logLine('Cleanup warning (non-fatal): $e');
-      }
-
-      // Mount ISO with longer timeout
-      _logLine('Mounting disk image...');
-      ProcessResult mountResult;
-      try {
-        mountResult = await Process.run('powershell', [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          "Mount-DiskImage -ImagePath '$escapedPath' -PassThru",
-        ]).timeout(const Duration(seconds: 120));
-      } on TimeoutException {
-        _logLine('ERROR: Mount timed out after 120 seconds');
-        return null;
-      }
-
-      _logLine('Mount exit code: ${mountResult.exitCode}');
-      if (mountResult.exitCode != 0) {
-        _logLine('Mount stderr: ${mountResult.stderr}');
-        _logLine('Mount stdout: ${mountResult.stdout}');
-        return null;
-      }
-
-      // Get drive letter with retries
-      _logLine('Getting drive letter...');
-      for (int i = 0; i < 15; i++) {
-        if (_cancelled) {
-          _logLine('Cancelled during drive letter detection');
-          return null;
-        }
-
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        try {
-          final letterResult = await Process.run('powershell', [
-            '-NoProfile',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-Command',
-            "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
-          ]).timeout(const Duration(seconds: 5));
-
-          _logLine(
-            'Drive letter attempt ${i + 1}: exit=${letterResult.exitCode}, stdout="${letterResult.stdout.toString().trim()}"',
-          );
-
-          if (letterResult.exitCode == 0) {
-            final letter = letterResult.stdout.toString().trim();
-            if (letter.isNotEmpty && letter.length == 1 && letter != '0') {
-              final mountPoint = '$letter:\\';
-              _logLine('Mounted at: $mountPoint');
-              return mountPoint;
-            }
-          }
-        } catch (e) {
-          _logLine('Drive letter attempt ${i + 1} error: $e');
-        }
-      }
-
-      _logLine('Failed to get drive letter after 15 attempts');
-
-      // Try alternative method to get drive letter
-      _logLine('Trying alternative drive letter detection...');
-      try {
-        final altResult = await Process.run('powershell', [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          "(Get-DiskImage -ImagePath '$escapedPath' | Get-Volume).DriveLetter",
-        ]).timeout(const Duration(seconds: 10));
-
-        if (altResult.exitCode == 0) {
-          final letter = altResult.stdout.toString().trim();
-          if (letter.isNotEmpty && letter.length == 1 && letter != '0') {
-            final mountPoint = '$letter:\\';
-            _logLine('Mounted at (alt method): $mountPoint');
-            return mountPoint;
-          }
-        }
-      } catch (e) {
-        _logLine('Alternative method failed: $e');
-      }
-    } catch (e) {
-      _logLine('Mount exception: $e');
-    }
-    return null;
-  }
-
-  Future<void> _unmountIso(String isoPath) async {
-    try {
-      _logLine('Unmounting ISO: $isoPath');
-      final escapedPath = isoPath.replaceAll("'", "''");
-      await Process.run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue",
-      ]).timeout(const Duration(seconds: 30));
-      _logLine('Unmounted OK');
-    } catch (e) {
-      _logLine('Unmount error (non-fatal): $e');
-    }
-  }
-
-  Future<bool> _configureWtgImage({required String windowsDrive}) async {
-    const hiveName = 'WDS_TOGO_SYSTEM';
-    final systemHive = _drivePath(
-      windowsDrive,
-      'Windows\\System32\\config\\SYSTEM',
-    );
-
-    try {
-      _logLine('Configuring offline Windows To Go image: $windowsDrive');
-      if (!await File(systemHive).exists()) {
-        _logLine('SYSTEM hive not found: $systemHive');
-        return false;
-      }
-
-      final sanPolicyResult = await _applySanPolicyUnattend(windowsDrive);
-      if (!sanPolicyResult) {
-        return false;
-      }
-
-      final winReResult = await _writeWinReUnattend(windowsDrive);
-      if (!winReResult) {
-        return false;
-      }
-
-      await _unloadRegistryHive(hiveName);
-
-      final loadResult = await Process.run('reg', [
-        'load',
-        'HKLM\\$hiveName',
-        systemHive,
-      ]).timeout(const Duration(seconds: 30));
-      _logLine('reg load exit: ${loadResult.exitCode}');
-      _logLine('reg load stdout: ${loadResult.stdout}');
-      if (loadResult.exitCode != 0) {
-        _logLine('reg load stderr: ${loadResult.stderr}');
-        return false;
-      }
-
-      final commands = <List<String>>[
-        [
-          'add',
-          'HKLM\\$hiveName\\ControlSet001\\Control',
-          '/v',
-          'PortableOperatingSystem',
-          '/t',
-          'REG_DWORD',
-          '/d',
-          '1',
-          '/f',
-        ],
-        [
-          'add',
-          'HKLM\\$hiveName\\ControlSet001\\Services\\partmgr\\Parameters',
-          '/v',
-          'SanPolicy',
-          '/t',
-          'REG_DWORD',
-          '/d',
-          '4',
-          '/f',
-        ],
-      ];
-
-      for (final args in commands) {
-        final result = await Process.run(
-          'reg',
-          args,
-        ).timeout(const Duration(seconds: 30));
-        _logLine('reg ${args.join(' ')} exit: ${result.exitCode}');
-        if (result.exitCode != 0) {
-          _logLine('reg stderr: ${result.stderr}');
-          return false;
-        }
-      }
-
-      return true;
-    } catch (e) {
-      _logLine('Windows To Go offline configuration error: $e');
-      return false;
-    } finally {
-      await _unloadRegistryHive(hiveName);
-    }
-  }
-
-  Future<bool> _applySanPolicyUnattend(String windowsDrive) async {
-    final imageRoot = _driveRoot(windowsDrive);
-    final policyPath = _drivePath(windowsDrive, 'san_policy.xml');
-    const policyXml = '''
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<unattend xmlns="urn:schemas-microsoft-com:unattend">
-  <settings pass="offlineServicing">
-    <component name="Microsoft-Windows-PartitionManager" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <SanPolicy>4</SanPolicy>
-    </component>
-    <component name="Microsoft-Windows-PartitionManager" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <SanPolicy>4</SanPolicy>
-    </component>
-    <component name="Microsoft-Windows-PartitionManager" processorArchitecture="arm64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <SanPolicy>4</SanPolicy>
-    </component>
-  </settings>
-</unattend>
+  Future<_WtgPartitionLayout> _partitionDisk({
+    required DiskInfo disk,
+    required DeploymentPlan plan,
+    required _WtgDriveLetters letters,
+  }) async {
+    final bootLayout = switch (plan.bootMode) {
+      DeploymentBootMode.uefiGpt => WtgBootLayout.uefiGpt,
+      DeploymentBootMode.uefiMbr => WtgBootLayout.uefiMbr,
+      DeploymentBootMode.legacyBios => WtgBootLayout.legacyBios,
+    };
+    final bootLabel = bootLayout == WtgBootLayout.legacyBios
+        ? 'WDS_BOOT'
+        : 'WDS_EFI';
+    final storageLabel = plan.customVolumeLabel.trim().isEmpty
+        ? 'WDS_TOGO'
+        : plan.customVolumeLabel.trim();
+    final bootFileSystem = bootLayout == WtgBootLayout.legacyBios
+        ? 'ntfs'
+        : 'fat32';
+    final convert = bootLayout == WtgBootLayout.uefiGpt ? 'gpt' : 'mbr';
+    final efiKeyword = bootLayout == WtgBootLayout.uefiGpt
+        ? 'create partition efi size=300'
+        : 'create partition primary size=350';
+    final active = bootLayout == WtgBootLayout.uefiGpt ? '' : 'active';
+    final script =
+        '''
+select disk ${disk.diskNumber}
+clean
+convert $convert
+$efiKeyword
+format fs=$bootFileSystem label="$bootLabel" quick
+$active
+assign letter=${letters.boot}
+${bootLayout == WtgBootLayout.uefiGpt ? 'create partition msr size=16' : ''}
+create partition primary
+format fs=ntfs label="$storageLabel" quick
+assign letter=${letters.storage}
+exit
 ''';
+    final result = await ref
+        .read(diskSafetyServiceProvider)
+        .runGuardedDiskpart(disk, script, timeout: const Duration(minutes: 3));
+    if (!_diskpartSucceeded(result)) {
+      throw _WtgFailure(
+        'wtg_svc_partition_failed',
+        'DiskPart failed: ${_trimOutput(result.stderr)} '
+            '${_trimOutput(result.stdout)}',
+      );
+    }
+    final layout = _WtgPartitionLayout(
+      bootLayout: bootLayout,
+      bootDrive: '${letters.boot}:\\',
+      storageDrive: '${letters.storage}:\\',
+      bootLabel: bootLabel,
+      storageLabel: storageLabel,
+    );
+    if (!await _verifyPartitionLayout(disk.diskNumber, layout)) {
+      throw const _WtgFailure(
+        'wtg_svc_partition_failed',
+        'The target partition layout failed its postcondition check.',
+      );
+    }
+    return layout;
+  }
 
+  Future<bool> _verifyPartitionLayout(
+    int diskNumber,
+    _WtgPartitionLayout layout,
+  ) async {
+    final bootLetter = _letterOnly(layout.bootDrive);
+    final storageLetter = _letterOnly(layout.storageDrive);
     try {
-      await File(policyPath).writeAsString(policyXml);
-      _logLine('Applying SAN policy unattend: $policyPath');
-      final result = await Process.run('dism', [
-        '/Image:$imageRoot',
-        '/Apply-Unattend:$policyPath',
-      ]).timeout(const Duration(minutes: 5));
-
-      _logLine('DISM SAN policy exit: ${result.exitCode}');
-      _logLine('DISM SAN policy stdout: ${result.stdout}');
-      if (result.exitCode != 0) {
-        _logLine('DISM SAN policy stderr: ${result.stderr}');
-        return false;
+      final result = await _runTracked(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$boot = Get-Partition -DriveLetter $env:WDS_BOOT -ErrorAction Stop
+$storage = Get-Partition -DriveLetter $env:WDS_STORAGE -ErrorAction Stop
+$bootVolume = Get-Volume -DriveLetter $env:WDS_BOOT -ErrorAction Stop
+$storageVolume = Get-Volume -DriveLetter $env:WDS_STORAGE -ErrorAction Stop
+$disk = Get-Disk -Number $boot.DiskNumber -ErrorAction Stop
+[PSCustomObject]@{
+  BootDisk = $boot.DiskNumber
+  StorageDisk = $storage.DiskNumber
+  BootPartition = $boot.PartitionNumber
+  StoragePartition = $storage.PartitionNumber
+  Style = $disk.PartitionStyle.ToString()
+  BootFs = $bootVolume.FileSystem
+  StorageFs = $storageVolume.FileSystem
+  BootLabel = $bootVolume.FileSystemLabel
+  StorageLabel = $storageVolume.FileSystemLabel
+  BootGptType = if ($boot.GptType) { $boot.GptType.ToString() } else { '' }
+  BootActive = [bool]$boot.IsActive
+} | ConvertTo-Json -Compress''',
+        ],
+        environment: {
+          ...Platform.environment,
+          'WDS_BOOT': bootLetter,
+          'WDS_STORAGE': storageLetter,
+        },
+        timeout: const Duration(seconds: 20),
+      );
+      if (result.exitCode != 0) return false;
+      final decoded = jsonDecode(result.stdout.toString());
+      if (decoded is! Map) return false;
+      final style = decoded['Style'].toString().toUpperCase();
+      final bootFs = decoded['BootFs'].toString().toUpperCase();
+      final storageFs = decoded['StorageFs'].toString().toUpperCase();
+      final expectedStyle = layout.bootLayout == WtgBootLayout.uefiGpt
+          ? 'GPT'
+          : 'MBR';
+      final expectedBootFs = layout.bootLayout == WtgBootLayout.legacyBios
+          ? 'NTFS'
+          : 'FAT32';
+      final baseValid =
+          decoded['BootDisk'].toString() == '$diskNumber' &&
+          decoded['StorageDisk'].toString() == '$diskNumber' &&
+          decoded['BootPartition'].toString() !=
+              decoded['StoragePartition'].toString() &&
+          style == expectedStyle &&
+          bootFs == expectedBootFs &&
+          storageFs == 'NTFS' &&
+          decoded['BootLabel'].toString().toUpperCase() ==
+              layout.bootLabel.toUpperCase() &&
+          decoded['StorageLabel'].toString().toUpperCase() ==
+              layout.storageLabel.toUpperCase();
+      if (!baseValid) return false;
+      if (layout.bootLayout == WtgBootLayout.uefiGpt) {
+        return decoded['BootGptType'].toString().toUpperCase() ==
+            '{C12A7328-F81F-11D2-BA4B-00A0C93EC93B}';
       }
-
-      return true;
-    } catch (e) {
-      _logLine('SAN policy unattend error: $e');
+      return decoded['BootActive'] == true;
+    } on _WtgFailure {
+      rethrow;
+    } catch (error) {
+      _logLine('Partition verification error: $error');
       return false;
+    }
+  }
+
+  Future<_WtgVirtualDisk> _createVirtualDisk({
+    required _WtgPartitionLayout layout,
+    required DeploymentPlan plan,
+    required String imageLetter,
+    required int physicalDiskNumber,
+  }) async {
+    final filePath = p.join(
+      _driveRoot(layout.storageDrive),
+      plan.virtualDiskFileName,
+    );
+    final maximumMb = plan.virtualDiskSizeGb * 1024;
+    final type = plan.virtualDiskType == VirtualDiskType.fixed
+        ? 'fixed'
+        : 'expandable';
+    final script =
+        '''
+create vdisk file="$filePath" maximum=$maximumMb type=$type
+select vdisk file="$filePath"
+attach vdisk
+convert mbr
+create partition primary
+format fs=ntfs label="WDS_OS" quick
+assign letter=$imageLetter
+exit
+''';
+    final result = await _runDiskpartFile(script);
+    if (!_diskpartSucceeded(result)) {
+      throw _WtgFailure(
+        'wtg_svc_partition_failed',
+        'Virtual disk creation failed: ${_trimOutput(result.stderr)} '
+            '${_trimOutput(result.stdout)}',
+      );
+    }
+    final diskNumber = await _verifyVirtualDisk(
+      filePath: filePath,
+      imageLetter: imageLetter,
+      physicalDiskNumber: physicalDiskNumber,
+    );
+    if (diskNumber == null) {
+      await _detachVirtualDisk(filePath);
+      throw const _WtgFailure(
+        'wtg_svc_partition_failed',
+        'The virtual disk failed its identity postcondition check.',
+      );
+    }
+    _logLine('Virtual disk ready: $filePath at $imageLetter:');
+    return _WtgVirtualDisk(
+      filePath: filePath,
+      fileName: plan.virtualDiskFileName,
+      imageDrive: '$imageLetter:\\',
+      diskNumber: diskNumber,
+    );
+  }
+
+  Future<int?> _verifyVirtualDisk({
+    required String filePath,
+    required String imageLetter,
+    required int physicalDiskNumber,
+  }) async {
+    try {
+      final result = await _runTracked(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$ErrorActionPreference = 'Stop'
+$image = Get-DiskImage -ImagePath $env:WDS_VHD_PATH -ErrorAction Stop
+if (-not $image.Attached) { throw 'The selected virtual disk is not attached.' }
+$imageDisk = $image | Get-Disk -ErrorAction Stop
+$partition = Get-Partition -DriveLetter $env:WDS_IMAGE -ErrorAction Stop
+$disk = Get-Disk -Number $partition.DiskNumber -ErrorAction Stop
+$backingLetter = [System.IO.Path]::GetPathRoot($env:WDS_VHD_PATH).Substring(0, 1)
+$backingPartition = Get-Partition -DriveLetter $backingLetter -ErrorAction Stop
+$volume = Get-Volume -DriveLetter $env:WDS_IMAGE -ErrorAction Stop
+[PSCustomObject]@{
+  DiskNumber = $disk.Number
+  ImageDiskNumber = $imageDisk.Number
+  BackingDiskNumber = $backingPartition.DiskNumber
+  ImagePath = $image.ImagePath
+  Attached = [bool]$image.Attached
+  BusType = $disk.BusType.ToString()
+  Style = $disk.PartitionStyle.ToString()
+  Fs = $volume.FileSystem
+  Label = $volume.FileSystemLabel
+} | ConvertTo-Json -Compress''',
+        ],
+        environment: {
+          ...Platform.environment,
+          'WDS_IMAGE': imageLetter,
+          'WDS_VHD_PATH': filePath,
+          'WDS_PHYSICAL_DISK': '$physicalDiskNumber',
+        },
+        timeout: const Duration(seconds: 20),
+      );
+      if (result.exitCode != 0) return null;
+      final decoded = jsonDecode(result.stdout.toString());
+      if (decoded is! Map) return null;
+      final diskNumber = int.tryParse(decoded['DiskNumber'].toString());
+      final imageDiskNumber = int.tryParse(
+        decoded['ImageDiskNumber'].toString(),
+      );
+      final backingDiskNumber = int.tryParse(
+        decoded['BackingDiskNumber'].toString(),
+      );
+      final valid =
+          diskNumber != null &&
+          diskNumber != physicalDiskNumber &&
+          imageDiskNumber == diskNumber &&
+          backingDiskNumber == physicalDiskNumber &&
+          decoded['Attached'] == true &&
+          _normalizedPath(decoded['ImagePath'].toString()) ==
+              _normalizedPath(filePath) &&
+          decoded['BusType'].toString().toUpperCase().contains('FILE') &&
+          decoded['Style'].toString().toUpperCase() == 'MBR' &&
+          decoded['Fs'].toString().toUpperCase() == 'NTFS' &&
+          decoded['Label'].toString().toUpperCase() == 'WDS_OS';
+      return valid ? diskNumber : null;
+    } on _WtgFailure {
+      rethrow;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<ProcessResult> _runDiskpartFile(
+    String script, {
+    bool allowWhenCancelled = false,
+  }) async {
+    final programData = Platform.environment['ProgramData'];
+    if (programData == null || programData.trim().isEmpty) {
+      throw const _WtgFailure(
+        'wtg_svc_partition_failed',
+        'A secure DiskPart script location is unavailable.',
+      );
+    }
+    final root = Directory(p.join(programData, 'WinDeployStudioSecureScripts'));
+    await root.create(recursive: true);
+    if (await FileSystemEntity.type(root.path, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw const _WtgFailure(
+        'wtg_svc_partition_failed',
+        'The secure DiskPart script location is not trustworthy.',
+      );
+    }
+    await _lockDownDirectory(root.path, allowWhenCancelled: allowWhenCancelled);
+    final token = '${pid}_${DateTime.now().microsecondsSinceEpoch}';
+    final file = File(p.join(root.path, 'wds_vdisk_$token.txt'));
+    try {
+      await file.writeAsString(script, flush: true);
+      return await _runTracked(
+        'diskpart',
+        ['/s', file.path],
+        timeout: const Duration(minutes: 10),
+        allowWhenCancelled: allowWhenCancelled,
+      );
     } finally {
       try {
-        await File(policyPath).delete();
+        if (await file.exists()) await file.delete();
       } catch (_) {}
     }
   }
 
-  Future<bool> _writeWinReUnattend(String windowsDrive) async {
-    final sysprepDir = Directory(
-      _drivePath(windowsDrive, 'Windows\\System32\\Sysprep'),
-    );
-    final unattendPath = p.join(sysprepDir.path, 'unattend.xml');
-    const unattendXml = '''
-<?xml version="1.0" encoding="utf-8"?>
-<unattend xmlns="urn:schemas-microsoft-com:unattend">
-  <settings pass="oobeSystem">
-    <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="x86" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <UninstallWindowsRE>true</UninstallWindowsRE>
-    </component>
-    <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <UninstallWindowsRE>true</UninstallWindowsRE>
-    </component>
-    <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="arm64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <UninstallWindowsRE>true</UninstallWindowsRE>
-    </component>
-  </settings>
-</unattend>
+  Future<void> _detachVirtualDisk(String filePath) async {
+    final script =
+        '''
+select vdisk file="$filePath"
+detach vdisk
+exit
 ''';
-
     try {
-      if (!await sysprepDir.exists()) {
-        await sysprepDir.create(recursive: true);
-      }
-      await File(unattendPath).writeAsString(unattendXml);
-      _logLine('Wrote Windows To Go WinRE unattend: $unattendPath');
-      return true;
-    } catch (e) {
-      _logLine('Write WinRE unattend error: $e');
-      return false;
+      final result = await _runDiskpartFile(script, allowWhenCancelled: true);
+      _logLine('Virtual disk detach exit=${result.exitCode}: $filePath');
+    } catch (error) {
+      _logLine('Virtual disk detach warning: $error');
     }
   }
 
-  Future<void> _unloadRegistryHive(String hiveName) async {
-    for (int attempt = 0; attempt < 3; attempt++) {
-      try {
-        final result = await Process.run('reg', [
-          'unload',
-          'HKLM\\$hiveName',
-        ]).timeout(const Duration(seconds: 15));
-        _logLine('reg unload HKLM\\$hiveName exit: ${result.exitCode}');
-        if (result.exitCode == 0) return;
-      } catch (e) {
-        _logLine('reg unload warning: $e');
+  Future<String> _stageWimBootSource(
+    String sourcePath,
+    String storageDrive,
+  ) async {
+    final directory = Directory(p.join(_driveRoot(storageDrive), 'WIMBoot'));
+    await directory.create(recursive: true);
+    final target = File(p.join(directory.path, 'install.wim'));
+    final source = File(sourcePath);
+    RandomAccessFile? input;
+    RandomAccessFile? output;
+    try {
+      input = await source.open(mode: FileMode.read);
+      output = await target.open(mode: FileMode.write);
+      while (true) {
+        _throwIfCancelled();
+        final chunk = await input.read(4 * 1024 * 1024);
+        if (chunk.isEmpty) break;
+        await output.writeFrom(chunk);
       }
-      await Future.delayed(const Duration(milliseconds: 500));
+      await output.flush();
+      await input.close();
+      input = null;
+      await output.close();
+      output = null;
+      if (!await target.exists() ||
+          await target.length() != await source.length() ||
+          await _sha256File(target) != await _sha256File(source)) {
+        throw const _WtgFailure(
+          'wtg_svc_apply_failed',
+          'The persistent WIMBoot source copy failed verification.',
+        );
+      }
+    } catch (_) {
+      try {
+        if (await target.exists()) await target.delete();
+      } catch (_) {}
+      rethrow;
+    } finally {
+      await input?.close();
+      await output?.close();
     }
+    final attrib = await _runTracked('attrib', [
+      '+H',
+      '+S',
+      directory.path,
+    ], timeout: const Duration(seconds: 30));
+    if (attrib.exitCode != 0) {
+      throw const _WtgFailure(
+        'wtg_svc_apply_failed',
+        'The persistent WIMBoot source could not be protected.',
+      );
+    }
+    _logLine('WIMBoot source staged persistently at ${target.path}.');
+    return target.path;
   }
 
   Future<bool> _applyImage({
     required String sourcePath,
     required int imageIndex,
     required String targetDrive,
+    required bool compact,
+    required bool wimBoot,
     WtgProgressCallback? onProgress,
   }) async {
-    try {
-      _logLine('=== Apply Image ===');
-      _logLine('Source: $sourcePath');
-      _logLine('Index: $imageIndex');
-      final targetRoot = _driveRoot(targetDrive);
-      _logLine('Target: $targetRoot');
+    final sourceLength = await File(sourcePath).length();
+    final stopwatch = Stopwatch()..start();
+    final arguments = <String>[
+      '/English',
+      '/Apply-Image',
+      '/ImageFile:$sourcePath',
+      '/Index:$imageIndex',
+      '/ApplyDir:${_driveRoot(targetDrive)}',
+      if (compact) '/Compact',
+      if (wimBoot) '/WIMBoot',
+    ];
+    _logLine('Starting DISM ${arguments.join(' ')}');
+    final process = await Process.start('dism', arguments);
+    _currentProcess = process;
+    if (_cancelled) {
+      await _terminateProcess(process);
+      _throwIfCancelled();
+    }
+    var lastPercent = 0;
+    var lastBytes = 0;
+    var lastElapsedMs = 0;
 
-      // Get total image size from source file
-      final sourceFile = File(sourcePath);
-      final totalImageSize = await sourceFile.length();
-      _logLine(
-        'Total image size: $totalImageSize bytes (${(totalImageSize / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB)',
-      );
-
-      final stopwatch = Stopwatch()..start();
-
-      // Use Process.start for DISM
-      _logLine('Starting DISM...');
-      final process = await Process.start('dism', [
-        '/Apply-Image',
-        '/ImageFile:$sourcePath',
-        '/Index:$imageIndex',
-        '/ApplyDir:$targetRoot',
-      ]);
-
-      // Save process reference for cancellation
-      _currentProcess = process;
-      _logLine('DISM PID: ${process.pid}');
-
-      // Track progress from DISM output
-      int lastPercent = 0;
-      int lastWrittenBytes = 0;
-      int lastElapsedMs = 0;
-
-      // Listen to stdout
-      process.stdout.transform(const SystemEncoding().decoder).listen((data) {
-        final match = RegExp(r'(\d+)\s*%').firstMatch(data);
-        if (match != null) {
-          final percent = int.parse(match.group(1)!);
-          if (percent > lastPercent) {
-            lastPercent = percent;
-            final elapsed = stopwatch.elapsed;
-            final elapsedMs = elapsed.inMilliseconds;
-            final writtenBytes = (totalImageSize * percent / 100).round();
-
-            // Calculate speed: bytes per second
-            final elapsedDelta = elapsedMs - lastElapsedMs;
-            final writtenDelta = writtenBytes - lastWrittenBytes;
-            final speedBytes = elapsedDelta > 0
-                ? (writtenDelta * 1000 / elapsedDelta).round()
-                : 0;
-
-            lastWrittenBytes = writtenBytes;
-            lastElapsedMs = elapsedMs;
-
-            _logLine(
-              'DISM: $percent% | Written: ${(writtenBytes / (1024 * 1024)).toStringAsFixed(0)} MB | Speed: ${(speedBytes / (1024 * 1024)).toStringAsFixed(1)} MB/s',
-            );
-
-            _notify(
-              onProgress,
-              WtgProgress(
-                step: WtgStep.applyingImage,
-                message: 'wtg_svc_applying_percent',
-                progress: percent / 100.0,
-                writtenBytes: writtenBytes,
-                totalBytes: totalImageSize,
-                currentSpeedBytes: speedBytes,
-                elapsedTime: elapsed,
-              ),
-            );
-          }
-        }
-      });
-
-      // Listen to stderr
-      process.stderr.transform(const SystemEncoding().decoder).listen((data) {
-        if (data.trim().isNotEmpty) {
-          _logLine('DISM stderr: ${data.trim()}');
-          final match = RegExp(r'(\d+)\s*%').firstMatch(data);
-          if (match != null) {
-            final percent = int.parse(match.group(1)!);
-            if (percent > lastPercent) {
-              lastPercent = percent;
-              final elapsed = stopwatch.elapsed;
-              final writtenBytes = (totalImageSize * percent / 100).round();
-
-              _notify(
-                onProgress,
-                WtgProgress(
-                  step: WtgStep.applyingImage,
-                  message: 'wtg_svc_applying_percent',
-                  progress: percent / 100.0,
-                  writtenBytes: writtenBytes,
-                  totalBytes: totalImageSize,
-                  currentSpeedBytes: 0,
-                  elapsedTime: elapsed,
-                ),
-              );
-            }
-          }
-        }
-      });
-
-      // Wait for DISM to complete
-      int exitCode;
-      try {
-        exitCode = await process.exitCode.timeout(
-          const Duration(minutes: 30),
-          onTimeout: () {
-            _logLine('DISM timeout!');
-            _killCurrentProcess();
-            return -1;
-          },
-        );
-      } finally {
-        _currentProcess = null;
-      }
-
-      stopwatch.stop();
-      _logLine('DISM exit: $exitCode');
-      _logLine(
-        'Total: ${stopwatch.elapsed.inMinutes}m ${stopwatch.elapsed.inSeconds % 60}s',
-      );
-
-      if (exitCode != 0) {
-        _logLine('DISM FAILED');
-        return false;
-      }
-
+    void parse(String data) {
+      final matches = RegExp(r'(\d{1,3})(?:\.\d+)?\s*%').allMatches(data);
+      if (matches.isEmpty) return;
+      final percent = int.tryParse(matches.last.group(1) ?? '') ?? 0;
+      if (percent <= lastPercent || percent > 100) return;
+      lastPercent = percent;
+      final elapsedMs = stopwatch.elapsedMilliseconds;
+      final bytes = (sourceLength * percent / 100).round();
+      final deltaMs = elapsedMs - lastElapsedMs;
+      final speed = deltaMs > 0
+          ? ((bytes - lastBytes) * 1000 / deltaMs).round()
+          : 0;
+      lastBytes = bytes;
+      lastElapsedMs = elapsedMs;
       _notify(
         onProgress,
         WtgProgress(
           step: WtgStep.applyingImage,
-          message: 'wtg_svc_image_applied',
-          progress: 1.0,
-          writtenBytes: totalImageSize,
-          totalBytes: totalImageSize,
-          currentSpeedBytes: 0,
+          message: 'wtg_svc_applying_percent',
+          progress: 0.22 + percent / 100 * 0.48,
+          writtenBytes: bytes,
+          totalBytes: sourceLength,
+          currentSpeedBytes: speed,
           elapsedTime: stopwatch.elapsed,
         ),
       );
+    }
 
-      return true;
-    } catch (e) {
-      _logLine('ERROR: $e');
-      return false;
+    final stdoutDone = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .listen((data) {
+          _logLine('DISM: ${_trimOutput(data)}');
+          parse(data);
+        })
+        .asFuture<void>();
+    final stderrDone = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .listen((data) {
+          if (data.trim().isNotEmpty) {
+            _logLine('DISM stderr: ${_trimOutput(data)}');
+          }
+          parse(data);
+        })
+        .asFuture<void>();
+    try {
+      final exitCode = await process.exitCode.timeout(const Duration(hours: 2));
+      await stdoutDone;
+      await stderrDone;
+      stopwatch.stop();
+      _logLine('DISM exit=$exitCode elapsed=${stopwatch.elapsed}.');
+      _throwIfCancelled();
+      return exitCode == 0 &&
+          await Directory(p.join(_driveRoot(targetDrive), 'Windows')).exists();
+    } on TimeoutException {
+      await _terminateProcess(process);
+      rethrow;
+    } finally {
+      if (identical(_currentProcess, process)) _currentProcess = null;
     }
   }
 
   Future<bool> _writeBootFiles({
+    required DiskInfo disk,
     required String windowsDrive,
-    required String efiDrive,
-    required WtgBootLayout bootLayout,
+    required _WtgPartitionLayout layout,
+    required _WtgVirtualDisk? virtualDisk,
+    required String architecture,
+    required String legacyBootsectPath,
   }) async {
-    try {
-      _logLine('Writing boot files: windows=$windowsDrive efi=$efiDrive');
-
-      // Check admin rights first
-      final isAdmin = await _checkAdminRights();
-      if (!isAdmin) {
-        _logLine('ERROR: bcdboot requires administrator privileges');
-        _logLine('Please run the application as administrator');
-        return false;
-      }
-
-      // Run bcdboot against the independent FAT32 system partition. Never use
-      // the Windows NTFS partition as the boot target.
-      final windowsPath = _drivePath(windowsDrive, 'Windows');
-      final efiRoot = _driveRoot(efiDrive);
-      final targetBcdboot = _drivePath(
-        windowsDrive,
-        'Windows\\System32\\bcdboot.exe',
-      );
-      final bcdbootExe = await File(targetBcdboot).exists()
-          ? targetBcdboot
-          : 'bcdboot';
-      final firmware = bootLayout == WtgBootLayout.gptUefi ? 'UEFI' : 'ALL';
-      _logLine('Running $bcdbootExe $windowsPath /s $efiRoot /f $firmware');
-      final result = await Process.run(bcdbootExe, [
-        windowsPath,
-        '/s',
-        efiRoot,
-        '/f',
-        firmware,
-      ]).timeout(const Duration(seconds: 120));
-
-      _logLine('bcdboot exit: ${result.exitCode}');
-      _logLine('bcdboot stdout: ${result.stdout}');
-
-      if (result.exitCode != 0) {
-        _logLine('bcdboot stderr: ${result.stderr}');
-        _logLine('bcdboot FAILED with exit code ${result.exitCode}');
-        return false;
-      }
-
-      _logLine('bcdboot completed successfully');
-      final fallbackOk = await _ensureFallbackUefiBootFile(efiDrive: efiDrive);
-      if (!fallbackOk) return false;
-
-      return _hardenBcdStore(windowsDrive: windowsDrive, efiDrive: efiDrive);
-    } on TimeoutException {
-      _logLine('bcdboot timed out after 120 seconds');
-      return false;
-    } catch (e) {
-      _logLine('Boot file error: $e');
+    final windowsPath = p.join(_driveRoot(windowsDrive), 'Windows');
+    final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    final bcdboot = File(p.join(systemRoot, 'System32', 'bcdboot.exe'));
+    if (!await bcdboot.exists()) {
+      _logLine('Host BCDBoot is missing: ${bcdboot.path}');
       return false;
     }
+    final firmware = layout.bootLayout == WtgBootLayout.legacyBios
+        ? 'BIOS'
+        : 'UEFI';
+    final result = await _runTracked(bcdboot.path, [
+      windowsPath,
+      '/s',
+      _driveRoot(layout.bootDrive),
+      '/f',
+      firmware,
+      '/v',
+    ], timeout: const Duration(minutes: 3));
+    _logLine('bcdboot exit=${result.exitCode}: ${_trimOutput(result.stdout)}');
+    if (result.exitCode != 0) {
+      _logLine('bcdboot stderr: ${_trimOutput(result.stderr)}');
+      return false;
+    }
+    if (layout.bootLayout == WtgBootLayout.legacyBios &&
+        !await _writeLegacyBootCode(
+          disk: disk,
+          layout: layout,
+          bootDrive: layout.bootDrive,
+          bootsectPath: legacyBootsectPath,
+        )) {
+      return false;
+    }
+    if (layout.bootLayout != WtgBootLayout.legacyBios &&
+        !await _ensureFallbackUefiBootFile(
+          bootDrive: layout.bootDrive,
+          architecture: architecture,
+        )) {
+      return false;
+    }
+    await _revalidateTargetDisk(disk, layout);
+    return _configureBcd(
+      layout: layout,
+      windowsDrive: windowsDrive,
+      virtualDisk: virtualDisk,
+    );
   }
 
-  Future<bool> _hardenBcdStore({
-    required String windowsDrive,
-    required String efiDrive,
+  Future<bool> _writeLegacyBootCode({
+    required DiskInfo disk,
+    required _WtgPartitionLayout layout,
+    required String bootDrive,
+    required String bootsectPath,
   }) async {
-    final bcdPath = _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\BCD');
-    if (!await File(bcdPath).exists()) {
-      _logLine('BCD store not found for hardening: $bcdPath');
+    final executable = File(bootsectPath);
+    if (!await executable.exists()) {
+      _logLine('Legacy boot code failed: ISO bootsect.exe is missing.');
       return false;
     }
+    await _revalidateTargetDisk(disk, layout);
+    final result = await _runTracked(executable.path, [
+      '/nt60',
+      _driveSpec(bootDrive),
+      '/mbr',
+      '/force',
+    ], timeout: const Duration(minutes: 2));
+    _logLine('bootsect exit=${result.exitCode}: ${_trimOutput(result.stdout)}');
+    if (result.exitCode != 0) {
+      _logLine('bootsect stderr: ${_trimOutput(result.stderr)}');
+      return false;
+    }
+    return true;
+  }
 
-    final osDevice = 'partition=${_driveSpec(windowsDrive)}';
+  Future<bool> _configureBcd({
+    required _WtgPartitionLayout layout,
+    required String windowsDrive,
+    required _WtgVirtualDisk? virtualDisk,
+  }) async {
+    final bcdPath = _bcdPath(layout);
+    if (!await File(bcdPath).exists()) return false;
+    final device = _expectedBcdDevice(layout, windowsDrive, virtualDisk);
     final commands = <List<String>>[
-      ['/store', bcdPath, '/set', '{default}', 'device', osDevice],
-      ['/store', bcdPath, '/set', '{default}', 'osdevice', osDevice],
+      ['/store', bcdPath, '/set', '{default}', 'device', device],
+      ['/store', bcdPath, '/set', '{default}', 'osdevice', device],
       ['/store', bcdPath, '/set', '{default}', 'detecthal', 'yes'],
     ];
+    for (final arguments in commands) {
+      final result = await _runTracked(
+        'bcdedit',
+        arguments,
+        timeout: const Duration(seconds: 45),
+      );
+      _logLine('bcdedit ${arguments.join(' ')} exit=${result.exitCode}');
+      if (result.exitCode != 0) return false;
+    }
+    return _verifyBcdDevice(bcdPath, layout, virtualDisk, windowsDrive);
+  }
 
-    for (final args in commands) {
-      try {
-        final result = await Process.run(
-          'bcdedit',
-          args,
-        ).timeout(const Duration(seconds: 30));
-        _logLine('bcdedit ${args.join(' ')} exit: ${result.exitCode}');
-        if (result.exitCode != 0) {
-          _logLine('bcdedit stderr: ${result.stderr}');
-          return false;
-        }
-      } catch (e) {
-        _logLine('bcdedit error: $e');
+  Future<bool> _verifyBcdDevice(
+    String bcdPath,
+    _WtgPartitionLayout layout,
+    _WtgVirtualDisk? virtualDisk,
+    String windowsDrive,
+  ) async {
+    final result = await _runTracked('bcdedit', [
+      '/store',
+      bcdPath,
+      '/enum',
+      '{default}',
+      '/v',
+    ], timeout: const Duration(seconds: 45));
+    if (result.exitCode != 0) return false;
+    final expected = _expectedBcdDevice(layout, windowsDrive, virtualDisk);
+    return WtgBootContract.listingMatches(result.stdout.toString(), expected);
+  }
+
+  String _expectedBcdDevice(
+    _WtgPartitionLayout layout,
+    String windowsDrive,
+    _WtgVirtualDisk? virtualDisk,
+  ) => WtgBootContract.expectedDevice(
+    windowsDrive: windowsDrive,
+    storageDrive: layout.storageDrive,
+    virtualDiskFileName: virtualDisk?.fileName ?? '',
+  );
+
+  Future<bool> _ensureFallbackUefiBootFile({
+    required String bootDrive,
+    required String architecture,
+  }) async {
+    final suffix = switch (architecture.toLowerCase()) {
+      'arm64' => 'aa64',
+      'x86' => 'ia32',
+      _ => 'x64',
+    };
+    final targetDirectory = Directory(
+      p.join(_driveRoot(bootDrive), 'EFI', 'Boot'),
+    );
+    await targetDirectory.create(recursive: true);
+    final target = File(p.join(targetDirectory.path, 'boot$suffix.efi'));
+    final source = File(
+      p.join(_driveRoot(bootDrive), 'EFI', 'Microsoft', 'Boot', 'bootmgfw.efi'),
+    );
+    if (!await source.exists()) return false;
+    if (!await target.exists() ||
+        await _sha256File(target) != await _sha256File(source)) {
+      await source.copy(target.path);
+    }
+    return await target.exists() &&
+        await _sha256File(target) == await _sha256File(source);
+  }
+
+  Future<bool> _verifyDeployment({
+    required DiskInfo disk,
+    required _WtgPartitionLayout layout,
+    required DeploymentPlan plan,
+    required String windowsDrive,
+    required _WtgVirtualDisk? virtualDisk,
+    required String architecture,
+    required Uint8List? preparedIcon,
+  }) async {
+    await _revalidateTargetDisk(disk, layout);
+    final diskNumber = disk.diskNumber;
+    if (!await Directory(
+      p.join(_driveRoot(windowsDrive), 'Windows'),
+    ).exists()) {
+      return false;
+    }
+    final bcdPath = _bcdPath(layout);
+    if (!await File(bcdPath).exists() ||
+        !await _verifyBcdDevice(bcdPath, layout, virtualDisk, windowsDrive)) {
+      return false;
+    }
+    if (layout.bootLayout == WtgBootLayout.legacyBios) {
+      if (!await File(
+        p.join(_driveRoot(layout.bootDrive), 'bootmgr'),
+      ).exists()) {
+        return false;
+      }
+    } else {
+      final suffix = switch (architecture.toLowerCase()) {
+        'arm64' => 'aa64',
+        'x86' => 'ia32',
+        _ => 'x64',
+      };
+      final fallback = File(
+        p.join(_driveRoot(layout.bootDrive), 'EFI', 'Boot', 'boot$suffix.efi'),
+      );
+      final microsoftBootManager = File(
+        p.join(
+          _driveRoot(layout.bootDrive),
+          'EFI',
+          'Microsoft',
+          'Boot',
+          'bootmgfw.efi',
+        ),
+      );
+      if (!await fallback.exists() ||
+          !await microsoftBootManager.exists() ||
+          await _sha256File(fallback) !=
+              await _sha256File(microsoftBootManager)) {
         return false;
       }
     }
-
+    if (virtualDisk != null) {
+      if (!await File(virtualDisk.filePath).exists() ||
+          await _verifyVirtualDisk(
+                filePath: virtualDisk.filePath,
+                imageLetter: _letterOnly(virtualDisk.imageDrive),
+                physicalDiskNumber: diskNumber,
+              ) !=
+              virtualDisk.diskNumber) {
+        return false;
+      }
+    }
+    if (plan.usesNtfsUefiLayout) {
+      final uefiSafe =
+          layout.bootLayout != WtgBootLayout.legacyBios &&
+          layout.bootLabel == 'WDS_EFI';
+      if (!uefiSafe) return false;
+      _logLine(
+        'NTFS UEFI layout VERIFIED: NTFS system storage uses a separate FAT32 EFI partition.',
+      );
+    }
+    if (plan.customIconPath.isNotEmpty) {
+      final icon = File(
+        p.join(_driveRoot(layout.storageDrive), '.wds-drive.ico'),
+      );
+      final autorun = File(
+        p.join(_driveRoot(layout.storageDrive), 'autorun.inf'),
+      );
+      if (preparedIcon == null ||
+          !await icon.exists() ||
+          !await autorun.exists() ||
+          await _sha256File(icon) != sha256.convert(preparedIcon).toString()) {
+        return false;
+      }
+      final autorunText = (await autorun.readAsString()).toLowerCase();
+      if (!autorunText.contains('icon=.wds-drive.ico')) return false;
+      final expectedLabel = plan.customVolumeLabel.trim().toLowerCase();
+      if (expectedLabel.isNotEmpty &&
+          !autorunText.contains('label=$expectedLabel')) {
+        return false;
+      }
+    }
+    _logLine('All deployment postconditions passed.');
     return true;
   }
 
-  Future<bool> _ensureFallbackUefiBootFile({required String efiDrive}) async {
+  Future<void> _writeVolumeIdentity(
+    String storageDrive,
+    DeploymentPlan plan,
+    Uint8List? preparedIcon,
+  ) async {
+    if (plan.customIconPath.isEmpty) return;
+    if (preparedIcon == null) {
+      throw const _WtgFailure(
+        'deploy_compat_invalid_icon',
+        'The custom ICO file was not staged before disk erasure.',
+      );
+    }
+    final root = _driveRoot(storageDrive);
+    final target = File(p.join(root, '.wds-drive.ico'));
+    await target.writeAsBytes(preparedIcon, flush: true);
+    if (await _sha256File(target) != sha256.convert(preparedIcon).toString()) {
+      throw const _WtgFailure(
+        'deploy_compat_invalid_icon',
+        'The custom drive icon failed verification.',
+      );
+    }
+    final label = plan.customVolumeLabel.trim();
+    await File(p.join(root, 'autorun.inf')).writeAsString(
+      '[autorun]\r\nicon=.wds-drive.ico\r\n'
+      '${label.isEmpty ? '' : 'label=$label\r\n'}',
+      flush: true,
+    );
+    final attrib = await _runTracked('attrib', [
+      '+H',
+      '+S',
+      target.path,
+      p.join(root, 'autorun.inf'),
+    ], timeout: const Duration(seconds: 30));
+    if (attrib.exitCode != 0) {
+      throw const _WtgFailure(
+        'deploy_compat_invalid_icon',
+        'The custom drive icon attributes could not be applied.',
+      );
+    }
+  }
+
+  String _bcdPath(_WtgPartitionLayout layout) {
+    return layout.bootLayout == WtgBootLayout.legacyBios
+        ? p.join(_driveRoot(layout.bootDrive), 'Boot', 'BCD')
+        : p.join(
+            _driveRoot(layout.bootDrive),
+            'EFI',
+            'Microsoft',
+            'Boot',
+            'BCD',
+          );
+  }
+
+  Future<String?> _findInstallImage(String mountPoint) async {
+    for (final fileName in const ['install.wim', 'install.esd']) {
+      final candidate = p.join(mountPoint, 'sources', fileName);
+      if (await File(candidate).exists()) return candidate;
+    }
+    return null;
+  }
+
+  Future<String?> _mountIso(String isoPath) async {
+    if (!await File(isoPath).exists()) return null;
+    _notifyInternalMount();
     try {
-      final bootDir = Directory(_drivePath(efiDrive, 'EFI\\Boot'));
-      if (!await bootDir.exists()) {
-        await bootDir.create(recursive: true);
-      }
-
-      final fallback = File(_drivePath(efiDrive, 'EFI\\Boot\\bootx64.efi'));
-      if (await fallback.exists()) {
-        _logLine('UEFI fallback boot file exists: ${fallback.path}');
-        return true;
-      }
-
-      final candidates = <String>[
-        _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\bootmgfw.efi'),
-        _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\bootx64.efi'),
-      ];
-
-      for (final candidate in candidates) {
-        final source = File(candidate);
-        if (await source.exists()) {
-          await source.copy(fallback.path);
-          _logLine('Copied UEFI fallback boot file from $candidate');
-          return true;
+      await _runTracked(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'Dismount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction SilentlyContinue | Out-Null',
+        ],
+        environment: {...Platform.environment, 'WDS_ISO': isoPath},
+        timeout: const Duration(seconds: 20),
+      );
+      final mount = await _runTracked(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'Mount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction Stop | Out-Null',
+        ],
+        environment: {...Platform.environment, 'WDS_ISO': isoPath},
+        timeout: const Duration(minutes: 2),
+      );
+      if (mount.exitCode != 0) return null;
+      for (var attempt = 0; attempt < 30; attempt++) {
+        _throwIfCancelled();
+        final result = await _runTracked(
+          'powershell',
+          const [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            r'(Get-DiskImage -ImagePath $env:WDS_ISO -ErrorAction Stop | Get-Volume -ErrorAction Stop).DriveLetter',
+          ],
+          environment: {...Platform.environment, 'WDS_ISO': isoPath},
+          timeout: const Duration(seconds: 10),
+        );
+        final letter = _letterOnly(result.stdout.toString());
+        if (result.exitCode == 0 && letter.isNotEmpty) {
+          _currentIsoPath = isoPath;
+          return '$letter:\\';
         }
+        await Future<void>.delayed(const Duration(milliseconds: 350));
       }
-
-      _logLine('Unable to create UEFI fallback boot file');
-      return false;
-    } catch (e) {
-      _logLine('UEFI fallback boot file error: $e');
-      return false;
+    } on _WtgFailure {
+      rethrow;
+    } catch (error) {
+      _logLine('ISO mount error: $error');
     }
+    return null;
   }
 
-  Future<bool> _checkAdminRights() async {
+  void _notifyInternalMount() {
+    _logLine('Mounting ISO image.');
+  }
+
+  Future<void> _unmountIso(String isoPath) async {
     try {
-      final result = await Process.run('net', ['session']);
-      return result.exitCode == 0;
-    } catch (e) {
-      _logLine('Admin check failed: $e');
-      return false;
+      await _runTracked(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'Dismount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction SilentlyContinue | Out-Null',
+        ],
+        environment: {...Platform.environment, 'WDS_ISO': isoPath},
+        timeout: const Duration(seconds: 30),
+        allowWhenCancelled: true,
+      );
+    } catch (error) {
+      _logLine('ISO unmount warning: $error');
+    }
+    if (_currentIsoPath == isoPath) _currentIsoPath = null;
+  }
+
+  Future<void> _requireSafeDisk(DiskInfo disk) async {
+    final result = await ref
+        .read(diskSafetyServiceProvider)
+        .checkDiskSafety(disk);
+    if (!result.isSafe) {
+      throw _WtgFailure(result.reason, 'Target disk safety validation failed.');
     }
   }
 
-  Future<bool> _verifyWtg({
-    required String windowsDrive,
-    required String efiDrive,
-    required WtgBootLayout bootLayout,
+  Future<void> _revalidateTargetDisk(
+    DiskInfo disk,
+    _WtgPartitionLayout layout,
+  ) async {
+    await _requireSafeDisk(disk);
+    if (!await _verifyPartitionLayout(disk.diskNumber, layout)) {
+      throw const _WtgFailure(
+        'safety_disk_changed',
+        'The target disk partition binding changed during deployment.',
+      );
+    }
+  }
+
+  bool _diskpartSucceeded(ProcessResult result) {
+    if (result.exitCode != 0) return false;
+    final output = '${result.stdout}\n${result.stderr}'.toLowerCase();
+    const knownErrors = [
+      'diskpart has encountered an error',
+      'virtual disk service error',
+      'access is denied',
+      'the parameter is incorrect',
+      'diskpart 遇到错误',
+      '虚拟磁盘服务错误',
+      '拒绝访问',
+      '参数错误',
+    ];
+    return !knownErrors.any(output.contains);
+  }
+
+  void _throwIfCancelled() {
+    if (_cancelled) {
+      throw const _WtgFailure(
+        'deploy_cancel_requested',
+        'The deployment was cancelled.',
+      );
+    }
+  }
+
+  Future<ProcessResult> _runTracked(
+    String executable,
+    List<String> arguments, {
+    required Duration timeout,
+    Map<String, String>? environment,
+    bool allowWhenCancelled = false,
   }) async {
-    final errors = <String>[];
-
-    _logLine('Verification mode: ${bootLayout.name}');
-
-    // Check Windows partition
-    if (!await Directory(_drivePath(windowsDrive, 'Windows')).exists()) {
-      errors.add('Windows directory missing');
+    if (!allowWhenCancelled) _throwIfCancelled();
+    if (_currentProcess != null) {
+      throw const _WtgFailure(
+        'creator_error',
+        'A deployment subprocess is already running.',
+      );
     }
-
-    if (_driveRoot(windowsDrive).toUpperCase() ==
-        _driveRoot(efiDrive).toUpperCase()) {
-      errors.add('EFI partition must be separate from Windows partition');
+    final process = await Process.start(
+      executable,
+      arguments,
+      environment: environment,
+    );
+    _currentProcess = process;
+    if (_cancelled && !allowWhenCancelled) {
+      await _terminateProcess(process);
+      _throwIfCancelled();
     }
-
-    // GPT mode: check independent EFI partition
-    if (!await Directory(_drivePath(efiDrive, 'EFI')).exists()) {
-      errors.add('EFI directory missing');
+    final stdoutFuture = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .join();
+    final stderrFuture = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .join();
+    try {
+      final exitCode = await process.exitCode.timeout(timeout);
+      final stdout = await stdoutFuture;
+      final stderr = await stderrFuture;
+      if (!allowWhenCancelled) _throwIfCancelled();
+      return ProcessResult(process.pid, exitCode, stdout, stderr);
+    } on TimeoutException {
+      _logLine(
+        '$executable timed out after ${timeout.inSeconds}s; terminating process tree.',
+      );
+      await _terminateProcess(process);
+      rethrow;
+    } finally {
+      if (identical(_currentProcess, process)) _currentProcess = null;
     }
+  }
 
-    // Check BCD
-    final hasBcd = await File(
-      _drivePath(efiDrive, 'EFI\\Microsoft\\Boot\\BCD'),
-    ).exists();
-    if (!hasBcd) {
-      errors.add('BCD missing');
+  Future<void> _terminateProcess(Process process) async {
+    try {
+      await Process.run('taskkill', [
+        '/F',
+        '/T',
+        '/PID',
+        '${process.pid}',
+      ]).timeout(const Duration(seconds: 15));
+    } catch (_) {
+      process.kill(ProcessSignal.sigkill);
     }
-
-    if (bootLayout == WtgBootLayout.mbrHybrid) {
-      final hasBootmgr = await File(_drivePath(efiDrive, 'bootmgr')).exists();
-      if (!hasBootmgr) {
-        errors.add('BIOS bootmgr missing on system partition');
-      }
+    try {
+      await process.exitCode.timeout(const Duration(seconds: 10));
+    } catch (_) {
+      process.kill(ProcessSignal.sigkill);
     }
+  }
 
-    final hasFallbackEfi =
-        await File(_drivePath(efiDrive, 'EFI\\Boot\\bootx64.efi')).exists() ||
-        await File(_drivePath(efiDrive, 'EFI\\Boot\\bootaa64.efi')).exists();
-    if (!hasFallbackEfi) {
-      errors.add('UEFI fallback boot file missing');
+  Future<void> _stopCurrentProcess() async {
+    final process = _currentProcess;
+    if (process == null) return;
+    await _terminateProcess(process);
+    if (identical(_currentProcess, process)) _currentProcess = null;
+  }
+
+  void _killCurrentProcess() {
+    final process = _currentProcess;
+    if (process != null) unawaited(_terminateProcess(process));
+  }
+
+  void _notify(WtgProgressCallback? callback, WtgProgress progress) {
+    if (!_cancelled || progress.step == WtgStep.failed) {
+      callback?.call(progress);
     }
+  }
 
-    if (errors.isNotEmpty) {
-      _logLine('Verify issues: ${errors.join(', ')}');
-      return false;
+  void _logLine(String message) {
+    final line = '[${DateTime.now().toIso8601String()}] $message';
+    _log.add(line);
+    debugPrint(line);
+    try {
+      final directory = Directory(
+        p.join(AppConstants.appDataPath, 'WinDeployStudio', 'logs'),
+      );
+      directory.createSync(recursive: true);
+      File(
+        p.join(directory.path, 'wtg_detail.log'),
+      ).writeAsStringSync('$line\n', mode: FileMode.append);
+    } catch (_) {}
+  }
+
+  Future<String> saveLogToFile() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final file = File(
+        p.join(support.path, 'logs', 'last_wtg_creation_log.txt'),
+      );
+      await file.parent.create(recursive: true);
+      await file.writeAsString(logText, flush: true);
+      return file.path;
+    } catch (error) {
+      return 'Log save failed: $error';
     }
+  }
 
-    _logLine('Verification passed');
-    return true;
+  static String _normalizedPath(String value) =>
+      p.normalize(p.absolute(value.trim())).replaceAll('/', '\\').toUpperCase();
+
+  static String _letterOnly(String value) {
+    final match = RegExp(r'[A-Za-z]').firstMatch(value.trim());
+    return match?.group(0)?.toUpperCase() ?? '';
+  }
+
+  static String _driveRoot(String drive) {
+    final letter = _letterOnly(drive);
+    return letter.isEmpty ? drive : '$letter:\\';
+  }
+
+  static String _driveSpec(String drive) => '${_letterOnly(drive)}:';
+
+  static String _trimOutput(Object? value) {
+    final text = value?.toString().trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+    return text.length <= 1200 ? text : '${text.substring(0, 1200)}...';
   }
 }

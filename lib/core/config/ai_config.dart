@@ -13,8 +13,17 @@ class AiConfig {
   static Future<String> getProxyUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_prefKeyProxyUrl);
-    final normalized = normalizeProxyUrl(saved ?? '');
-    return normalized.isNotEmpty ? normalized : defaultProxyUrl;
+    if (saved == null || saved.trim().isEmpty) return defaultProxyUrl;
+
+    final normalized = normalizeProxyUrl(saved);
+    if (!isValidProxyUrl(normalized)) {
+      await prefs.remove(_prefKeyProxyUrl);
+      return defaultProxyUrl;
+    }
+    if (normalized != saved) {
+      await prefs.setString(_prefKeyProxyUrl, normalized);
+    }
+    return normalized;
   }
 
   static Future<void> setProxyUrl(String value) async {
@@ -38,18 +47,29 @@ class AiConfig {
   static String normalizeProxyUrl(String value) {
     var normalized = value.trim();
     if (normalized.isEmpty) return '';
-    if (!normalized.startsWith('http://') &&
-        !normalized.startsWith('https://')) {
+
+    final hasScheme = RegExp(
+      r'^[a-zA-Z][a-zA-Z0-9+.-]*://',
+    ).hasMatch(normalized);
+    if (!hasScheme) {
       normalized = 'https://$normalized';
     }
-    if (!normalized.endsWith('/')) normalized = '$normalized/';
-    return normalized;
+
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || uri.scheme.toLowerCase() != 'https') {
+      return normalized;
+    }
+    final path = uri.path.endsWith('/') ? uri.path : '${uri.path}/';
+    return uri.replace(scheme: 'https', path: path).toString();
   }
 
   static bool isValidProxyUrl(String value) {
     final uri = Uri.tryParse(value);
     if (uri == null) return false;
-    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
-    return uri.host.isNotEmpty;
+    if (uri.scheme.toLowerCase() != 'https') return false;
+    return uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty &&
+        uri.query.isEmpty &&
+        uri.fragment.isEmpty;
   }
 }

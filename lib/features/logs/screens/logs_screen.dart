@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../app/theme.dart';
 import '../../../app/typography.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/app_page.dart';
 import '../models/log_category.dart';
 import '../services/log_center_service.dart';
 import '../widgets/log_card.dart';
@@ -49,25 +51,28 @@ class _LogsScreenState extends State<LogsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 900;
+    final tokens = AppVisualTokens.of(context);
 
     return Scaffold(
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isCompact ? 16 : 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context, colorScheme),
-                  const SizedBox(height: 32),
-                  _buildStatsRow(context, colorScheme, isCompact),
-                  const SizedBox(height: 32),
-                  _buildCategoryGrid(context, isCompact),
-                  const SizedBox(height: 32),
-                  _buildRecentActivities(context, colorScheme),
-                ],
+          : LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: EdgeInsets.all(
+                  constraints.maxWidth < 600 ? 16 : tokens.pagePadding,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context, colorScheme),
+                    SizedBox(height: tokens.sectionSpacing),
+                    _buildStatsRow(context, colorScheme),
+                    SizedBox(height: tokens.sectionSpacing),
+                    _buildCategoryGrid(context),
+                    SizedBox(height: tokens.sectionSpacing),
+                    _buildRecentActivities(context, colorScheme),
+                  ],
+                ),
               ),
             ),
     );
@@ -75,37 +80,16 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            Icons.receipt_long_rounded,
-            size: 32,
-            color: colorScheme.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(width: 16),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tr(context, 'logs_title'),
-                style: AppTypography.pageTitleWith(colorScheme.onSurface),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                tr(context, 'logs_subtitle'),
-                style: AppTypography.bodyWith(colorScheme.onSurfaceVariant),
-              ),
-            ],
+          child: AppPageHeader(
+            icon: Icons.receipt_long_rounded,
+            title: tr(context, 'logs_title'),
+            subtitle: tr(context, 'logs_subtitle'),
           ),
         ),
+        const SizedBox(width: 8),
         _buildHeaderActions(context),
       ],
     );
@@ -113,6 +97,7 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Widget _buildHeaderActions(BuildContext context) {
     return PopupMenuButton<String>(
+      key: const Key('logs-header-menu'),
       icon: const Icon(Icons.more_vert),
       onSelected: (value) => _handleHeaderAction(context, value),
       itemBuilder: (context) => [
@@ -193,11 +178,7 @@ class _LogsScreenState extends State<LogsScreen> {
     );
   }
 
-  Widget _buildStatsRow(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isCompact,
-  ) {
+  Widget _buildStatsRow(BuildContext context, ColorScheme colorScheme) {
     final stats = _stats;
     if (stats == null) return const SizedBox.shrink();
 
@@ -207,45 +188,19 @@ class _LogsScreenState extends State<LogsScreen> {
     );
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          AppVisualTokens.of(context).surfaceRadius,
+        ),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: isCompact
-          ? Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: LogStatWidget(
-                        title: tr(context, 'logs_total'),
-                        value: '${stats.totalFiles}',
-                        icon: Icons.description_rounded,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    Expanded(
-                      child: LogStatWidget(
-                        title: tr(context, 'logs_total_size'),
-                        value: totalFilesText,
-                        icon: Icons.storage_rounded,
-                        color: colorScheme.secondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                LogStatWidget(
-                  title: tr(context, 'logs_last_activity'),
-                  value: lastActivityText,
-                  icon: Icons.access_time_rounded,
-                  color: colorScheme.tertiary,
-                ),
-              ],
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          if (compact) {
+            return Column(
               children: [
                 LogStatWidget(
                   title: tr(context, 'logs_total'),
@@ -253,22 +208,14 @@ class _LogsScreenState extends State<LogsScreen> {
                   icon: Icons.description_rounded,
                   color: colorScheme.primary,
                 ),
-                Container(
-                  width: 1,
-                  height: 60,
-                  color: colorScheme.outlineVariant,
-                ),
+                const Divider(height: 24),
                 LogStatWidget(
                   title: tr(context, 'logs_total_size'),
                   value: totalFilesText,
                   icon: Icons.storage_rounded,
                   color: colorScheme.secondary,
                 ),
-                Container(
-                  width: 1,
-                  height: 60,
-                  color: colorScheme.outlineVariant,
-                ),
+                const Divider(height: 24),
                 LogStatWidget(
                   title: tr(context, 'logs_last_activity'),
                   value: lastActivityText,
@@ -276,35 +223,82 @@ class _LogsScreenState extends State<LogsScreen> {
                   color: colorScheme.tertiary,
                 ),
               ],
-            ),
+            );
+          }
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Expanded(
+                child: LogStatWidget(
+                  title: tr(context, 'logs_total'),
+                  value: '${stats.totalFiles}',
+                  icon: Icons.description_rounded,
+                  color: colorScheme.primary,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 60,
+                color: colorScheme.outlineVariant,
+              ),
+              Expanded(
+                child: LogStatWidget(
+                  title: tr(context, 'logs_total_size'),
+                  value: totalFilesText,
+                  icon: Icons.storage_rounded,
+                  color: colorScheme.secondary,
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 60,
+                color: colorScheme.outlineVariant,
+              ),
+              Expanded(
+                child: LogStatWidget(
+                  title: tr(context, 'logs_last_activity'),
+                  value: lastActivityText,
+                  icon: Icons.access_time_rounded,
+                  color: colorScheme.tertiary,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildCategoryGrid(BuildContext context, bool isCompact) {
+  Widget _buildCategoryGrid(BuildContext context) {
     final stats = _stats;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isCompact ? 2 : 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.3,
-      ),
-      itemCount: LogCategory.values.length,
-      itemBuilder: (context, index) {
-        final category = LogCategory.values[index];
-        final count = stats?.categoryCounts[category] ?? 0;
+    return LayoutBuilder(
+      builder: (context, constraints) => GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          // A single wide card preserves the details at phone-sized widths.
+          maxCrossAxisExtent: constraints.maxWidth < 560
+              ? constraints.maxWidth
+              : 360,
+          mainAxisExtent: 180,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+        ),
+        itemCount: LogCategory.values.length,
+        itemBuilder: (context, index) {
+          final category = LogCategory.values[index];
+          final count = stats?.categoryCounts[category] ?? 0;
 
-        return LogCategoryCard(
-          category: category,
-          categoryDisplayName: tr(context, category.nameKey),
-          fileCount: count,
-          lastUpdate: null,
-          onTap: () => _service.openCategoryFolder(category),
-        );
-      },
+          return LogCategoryCard(
+            category: category,
+            categoryDisplayName: tr(context, category.nameKey),
+            fileCount: count,
+            lastUpdate: stats?.categoryLastUpdates[category],
+            onTap: () => _service.openCategoryFolder(category),
+          );
+        },
+      ),
     );
   }
 
@@ -360,8 +354,8 @@ class _ClearLogsDialogState extends State<_ClearLogsDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(tr(context, 'logs_clear_title')),
-      content: SizedBox(
-        width: 420,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -80,9 +80,7 @@ class MirrorSpeedTestService {
   static Future<MirrorLatency> _testSource(String name, String url) async {
     final sw = Stopwatch()..start();
     try {
-      final response = await http
-          .head(Uri.parse(url))
-          .timeout(_timeout);
+      final response = await http.head(Uri.parse(url)).timeout(_timeout);
       sw.stop();
       final online = response.statusCode < 500;
       final latency = online ? sw.elapsedMilliseconds : -1;
@@ -157,7 +155,9 @@ class MirrorSpeedTestService {
       await prefs.setBool(_cacheKeyChinaOnline, result.china.online);
       await prefs.setBool(_cacheKeyGlobalOnline, result.global.online);
       await prefs.setInt(
-          _cacheKeyTestTime, DateTime.now().millisecondsSinceEpoch);
+        _cacheKeyTestTime,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (_) {}
   }
 
@@ -165,8 +165,8 @@ class MirrorSpeedTestService {
     final reason = result.recommendedSource == 'china'
         ? 'LowerLatency'
         : result.recommendedSource == 'global'
-            ? 'LowerLatency'
-            : 'AllOffline';
+        ? 'LowerLatency'
+        : 'AllOffline';
 
     LogCenterService().logSystem(
       '[MirrorRecommendation] '

@@ -9,16 +9,27 @@ import '../features/mirror/models/mirror_models.dart';
 import '../features/mirror/providers/mirror_provider.dart';
 import '../features/creator/screens/creator_screen.dart';
 import '../features/wtg/screens/wtg_screen.dart';
+import '../features/benchmark/screens/drive_benchmark_screen.dart';
+import '../features/benchmark_history/screens/benchmark_history_screen.dart';
+import '../features/disk_tools/screens/disk_tools_screen.dart';
+import '../features/disk_tools/screens/disk_diagnostics_screen.dart';
+import '../features/disk_tools/screens/boot_repair_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/logs/screens/logs_screen.dart';
 import '../features/ai_assistant/screens/ai_assistant_screen.dart';
 import '../features/tools/screens/tools_screen.dart';
+import '../shared/widgets/app_navigation_shell.dart';
+
+final _shellNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'primary-navigation-shell',
+);
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     routes: [
       ShellRoute(
+        navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
           return ScaffoldWithNavigation(child: child);
         },
@@ -42,6 +53,35 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/wtg',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: WtgScreen()),
+          ),
+          GoRoute(
+            path: '/benchmark',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: DriveBenchmarkScreen()),
+            routes: [
+              GoRoute(
+                path: 'history',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: BenchmarkHistoryScreen()),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/disk-tools',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: DiskToolsScreen()),
+            routes: [
+              GoRoute(
+                path: 'diagnostics',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: DiskDiagnosticsScreen()),
+              ),
+              GoRoute(
+                path: 'boot-repair',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: BootRepairScreen()),
+              ),
+            ],
           ),
           GoRoute(
             path: '/logs',
@@ -74,8 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final item = state.extra as MirrorItem?;
           final locale = Localizations.localeOf(context);
-          final blocked =
-              item?.isStarValleyX == true && !item!.isVisibleInLocale(locale);
+          final blocked = item != null && !item.isVisibleInLocale(locale);
           if (item != null && !blocked) {
             return MirrorDetailScreen(item: item);
           }
@@ -116,8 +155,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           final foundItem = items.where((i) => i.id == id).firstOrNull;
 
           final foundBlocked =
-              foundItem?.isStarValleyX == true &&
-              !foundItem!.isVisibleInLocale(locale);
+              foundItem != null && !foundItem.isVisibleInLocale(locale);
           if (foundItem != null && !foundBlocked) {
             return MirrorDetailScreen(item: foundItem);
           }
@@ -148,6 +186,8 @@ class _ScaffoldWithNavigationState
     '/mirror',
     '/creator',
     '/wtg',
+    '/benchmark',
+    '/disk-tools',
     '/logs',
     '/ai',
     '/tools',
@@ -157,102 +197,101 @@ class _ScaffoldWithNavigationState
   @override
   Widget build(BuildContext context) {
     final currentPath = GoRouterState.of(context).uri.path;
-    int selectedIndex = _paths.indexOf(currentPath);
-    if (selectedIndex < 0) selectedIndex = 0;
+    final selectedIndex = appNavigationIndexForPath(currentPath);
 
     final destinations = [
-      NavigationRailDestination(
-        icon: const Icon(Icons.home_outlined),
-        selectedIcon: const Icon(Icons.home),
-        label: Text(tr(context, 'nav_home')),
+      AppNavigationDestination(
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+        label: tr(context, 'nav_home'),
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.cloud_outlined),
-        selectedIcon: const Icon(Icons.cloud),
-        label: Text(tr(context, 'nav_images')),
+      AppNavigationDestination(
+        icon: Icons.cloud_outlined,
+        selectedIcon: Icons.cloud,
+        label: tr(context, 'nav_images'),
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.usb_outlined),
-        selectedIcon: const Icon(Icons.usb),
-        label: Text(tr(context, 'nav_creator')),
+      AppNavigationDestination(
+        icon: Icons.usb_outlined,
+        selectedIcon: Icons.usb,
+        label: tr(context, 'nav_creator'),
+        startsSection: true,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.computer_outlined),
-        selectedIcon: const Icon(Icons.computer),
-        label: Text(tr(context, 'nav_wtg')),
+      AppNavigationDestination(
+        icon: Icons.computer_outlined,
+        selectedIcon: Icons.computer,
+        label: tr(context, 'nav_wtg'),
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.receipt_long_outlined),
-        selectedIcon: const Icon(Icons.receipt_long),
-        label: Text(tr(context, 'nav_logs')),
+      AppNavigationDestination(
+        icon: Icons.monitor_heart_outlined,
+        selectedIcon: Icons.monitor_heart,
+        label: tr(context, 'nav_benchmark'),
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.auto_awesome_outlined),
-        selectedIcon: const Icon(Icons.auto_awesome),
-        label: Text(tr(context, 'nav_ai')),
+      AppNavigationDestination(
+        icon: Icons.storage_outlined,
+        selectedIcon: Icons.storage,
+        label: tr(context, 'disk_tools_title'),
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.handyman_outlined),
-        selectedIcon: const Icon(Icons.handyman),
-        label: Text(tr(context, 'nav_tools')),
+      AppNavigationDestination(
+        icon: Icons.receipt_long_outlined,
+        selectedIcon: Icons.receipt_long,
+        label: tr(context, 'nav_logs'),
+        startsSection: true,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.settings_outlined),
-        selectedIcon: const Icon(Icons.settings),
-        label: Text(tr(context, 'nav_settings')),
+      AppNavigationDestination(
+        icon: Icons.auto_awesome_outlined,
+        selectedIcon: Icons.auto_awesome,
+        label: tr(context, 'nav_ai'),
+      ),
+      AppNavigationDestination(
+        icon: Icons.handyman_outlined,
+        selectedIcon: Icons.handyman,
+        label: tr(context, 'nav_tools'),
+        startsSection: true,
+      ),
+      AppNavigationDestination(
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+        label: tr(context, 'nav_settings'),
       ),
     ];
 
     return Scaffold(
-      body: Row(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
-              border: Border(
-                right: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-            child: NavigationRail(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (index) {
-                // Pop all routes back to root before navigating
-                Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).popUntil((route) => route.isFirst);
-                context.go(_paths[index]);
-              },
-              labelType: NavigationRailLabelType.all,
-              leading: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.desktop_windows_rounded,
-                      size: 32,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'WDS',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              destinations: destinations,
-            ),
-          ),
-          const VerticalDivider(thickness: 1, width: 1),
-          Expanded(child: widget.child),
-        ],
+      body: AppNavigationShell(
+        selectedIndex: selectedIndex,
+        destinations: destinations,
+        onDestinationSelected: (index) {
+          // Secondary disk-tool and benchmark pages are pushed on the shell
+          // navigator. Clear that stack before changing the primary route.
+          Navigator.of(
+            context,
+            rootNavigator: true,
+          ).popUntil((route) => route.isFirst);
+          _shellNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+          context.go(_paths[index]);
+        },
+        child: widget.child,
       ),
     );
   }
+}
+
+int appNavigationIndexForPath(String path) {
+  const paths = <String>[
+    '/',
+    '/mirror',
+    '/creator',
+    '/wtg',
+    '/benchmark',
+    '/disk-tools',
+    '/logs',
+    '/ai',
+    '/tools',
+    '/settings',
+  ];
+  final directIndex = paths.indexOf(path);
+  if (directIndex >= 0) return directIndex;
+
+  if (path.startsWith('/benchmark/')) return paths.indexOf('/benchmark');
+  if (path.startsWith('/disk-tools/')) return paths.indexOf('/disk-tools');
+  return 0;
 }

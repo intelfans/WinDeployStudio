@@ -1,12 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/bootable_usb_service.dart';
+import '../../../core/services/elevation_service.dart';
+import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
+import '../models/creator_task_progress.dart';
+
+enum _CreatorPlatform { windows, linux }
 
 class CreatorScreen extends ConsumerStatefulWidget {
   const CreatorScreen({super.key});
@@ -17,6 +24,7 @@ class CreatorScreen extends ConsumerStatefulWidget {
 
 class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   int _currentStep = 0;
+  _CreatorPlatform _platform = _CreatorPlatform.windows;
 
   IsoMetadata? _selectedIso;
   DiskInfo? _selectedDisk;
@@ -27,6 +35,18 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   SafetyCheckResult? _safetyResult;
 
   CreateProgress? _createProgress;
+  ElevatedTaskProgress? _latestTaskProgress;
+  ElevatedTaskController? _taskController;
+  bool _creationRunning = false;
+  bool _creationCancellable = false;
+  bool _creationCancelled = false;
+
+  DeploymentBootMode _bootMode = DeploymentBootMode.uefiGpt;
+  String _preferredDriveLetter = '';
+  String _customIconPath = '';
+  final TextEditingController _volumeLabelController = TextEditingController(
+    text: 'WINDEPLOY',
+  );
 
   // ISO parsing state (inline, no dialog)
   bool _isParsing = false;
@@ -37,6 +57,33 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   void initState() {
     super.initState();
     _detectDisks();
+  }
+
+  @override
+  void dispose() {
+    _volumeLabelController.dispose();
+    super.dispose();
+  }
+
+  bool get _isLinuxMode => _platform == _CreatorPlatform.linux;
+
+  void _setPlatform(_CreatorPlatform platform) {
+    if (_platform == platform || _creationRunning) return;
+    setState(() {
+      _platform = platform;
+      _currentStep = 0;
+      _selectedIso = null;
+      _selectedDisk = null;
+      _safetyResult = null;
+      _createProgress = null;
+      _latestTaskProgress = null;
+      _taskController = null;
+      _creationCancellable = false;
+      _creationCancelled = false;
+      _isParsing = false;
+      _parseStepText = '';
+      _parsePercent = 0;
+    });
   }
 
   Future<void> _detectDisks() async {
@@ -68,7 +115,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['iso'],
-        dialogTitle: tr(context, 'creator_select_iso'),
+        dialogTitle: tr(
+          context,
+          _isLinuxMode ? 'creator_linux_select_iso' : 'creator_select_iso',
+        ),
       );
 
       if (result == null || result.files.single.path == null) return;
@@ -76,6 +126,25 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       debugPrint('ISO selected: $path');
 
       if (!mounted) return;
+
+      if (_isLinuxMode) {
+        final file = File(path);
+        final metadata = IsoMetadata(
+          filePath: path,
+          fileName: p.basename(path),
+          fileSize: await file.length(),
+          windowsVersion: 'Linux ISOHybrid',
+        );
+        setState(() {
+          _selectedIso = metadata;
+          _currentStep = 1;
+        });
+        final logCenter = LogCenterService();
+        await logCenter.logIso(
+          'Linux ISO 已选择 | 文件: ${metadata.fileName} | 大小: ${metadata.displaySize}',
+        );
+        return;
+      }
 
       // Show inline progress
       setState(() {
@@ -192,6 +261,16 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     }
   }
 
+  Future<void> _pickCustomIcon() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['ico'],
+      dialogTitle: tr(context, 'deploy_custom_icon'),
+    );
+    final path = result?.files.single.path;
+    if (path != null && mounted) setState(() => _customIconPath = path);
+  }
+
   Future<void> _startCreation() async {
     debugPrint(
       '[WDS] _startCreation called: disk=${_selectedDisk?.diskNumber}, iso=${_selectedIso?.fileName}',
@@ -201,8 +280,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       return;
     }
 
+    final controller = ElevatedTaskController();
     setState(() {
       _currentStep = 3;
+      _creationRunning = true;
+      _creationCancellable = false;
+      _creationCancelled = false;
+      _latestTaskProgress = null;
+      _taskController = controller;
       _createProgress = CreateProgress(
         step: CreateStep.preparing,
         message: tr(context, 'creator_starting'),
@@ -211,23 +296,69 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     debugPrint('[WDS] _startCreation: step set to 3');
 
     try {
-      final service = ref.read(bootableUsbServiceProvider);
-      final success = await service.createBootableUsb(
-        diskNumber: _selectedDisk!.diskNumber,
-        isoPath: _selectedIso!.filePath,
+      final plan = DeploymentPlan(
+        platform: _isLinuxMode
+            ? DeploymentPlatform.linux
+            : DeploymentPlatform.windows,
+        purpose: DeploymentPurpose.installMedia,
+        imagePath: _selectedIso!.filePath,
+        imageName: _selectedIso!.fileName,
+        imageBuild: _selectedIso!.buildNumber ?? '',
+        imageArchitecture: _selectedIso!.architecture ?? '',
+        windowsGeneration: DeploymentPlan.detectWindowsGeneration(
+          build: _selectedIso!.buildNumber ?? '',
+          version: _selectedIso!.windowsVersion ?? '',
+        ),
+        bootMode: _bootMode,
+        preferredSystemLetter: _preferredDriveLetter,
+        customIconPath: _customIconPath,
+        customVolumeLabel: _volumeLabelController.text.trim(),
+      );
+      final success = await ElevationService.runTask(
+        ElevatedTaskSpec(
+          kind: _isLinuxMode
+              ? ElevatedTaskKind.linuxInstall
+              : ElevatedTaskKind.windowsInstall,
+          disk: _selectedDisk!,
+          isoPath: _selectedIso!.filePath,
+          localeCode: localeCodeFromLocale(Localizations.localeOf(context)),
+          deploymentPlan: plan,
+        ),
+        controller: controller,
         onProgress: (progress) {
-          if (mounted) {
-            setState(() => _createProgress = progress);
-          }
+          if (!mounted) return;
+          setState(() {
+            final current = _latestTaskProgress;
+            final preserveDetailedFailure =
+                progress.phase == 'failed' &&
+                progress.message == 'creator_error' &&
+                current?.phase == 'failed' &&
+                current!.message.isNotEmpty &&
+                current.message != 'creator_error';
+            if (!preserveDetailedFailure) {
+              _latestTaskProgress = progress;
+              _createProgress = createProgressFromElevatedTask(progress);
+            }
+            _creationCancellable = progress.cancellable;
+          });
         },
       );
-      debugPrint('[WDS] _startCreation: createBootableUsb returned: $success');
+      debugPrint('[WDS] _startCreation: elevated task returned: $success');
 
       if (mounted) {
-        if (success) {
-          setState(() => _currentStep = 4);
-        }
-        // On failure, stay on step 3 — the error is already shown via _createProgress
+        final terminal = finishCreatorElevatedTask(
+          success: success,
+          latestProgress: _latestTaskProgress,
+          cancelRequested: controller.cancelRequested,
+        );
+        setState(() {
+          _creationRunning = false;
+          _creationCancellable = false;
+          _creationCancelled = terminal.cancelled;
+          _taskController = null;
+          _createProgress = terminal.progress;
+          _currentStep = terminal.success ? 4 : 3;
+        });
         debugPrint('[WDS] _startCreation: final step = $_currentStep');
       }
     } catch (e, st) {
@@ -235,13 +366,35 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       debugPrint('[WDS] stacktrace: $st');
       if (mounted) {
         setState(() {
+          _creationRunning = false;
+          _creationCancellable = false;
+          _creationCancelled = controller.cancelRequested;
+          _taskController = null;
           _createProgress = CreateProgress(
             step: CreateStep.failed,
-            message: 'creator_error\n$e',
+            message: controller.cancelRequested
+                ? 'deploy_cancel_requested'
+                : 'creator_error\n$e',
           );
         });
       }
     }
+  }
+
+  Future<void> _cancelCreation() async {
+    final controller = _taskController;
+    if (controller == null || controller.cancelRequested) return;
+    await controller.cancel();
+    if (!mounted) return;
+    setState(() {
+      _creationCancelled = true;
+      _creationCancellable = false;
+      _createProgress = CreateProgress(
+        step: _createProgress?.step ?? CreateStep.preparing,
+        progress: _createProgress?.progress ?? 0,
+        message: 'deploy_cancel_requested',
+      );
+    });
   }
 
   @override
@@ -257,18 +410,26 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              tr(context, 'creator_title'),
+              tr(
+                context,
+                _isLinuxMode ? 'creator_linux_title' : 'creator_title',
+              ),
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              tr(context, 'creator_subtitle'),
+              tr(
+                context,
+                _isLinuxMode ? 'creator_linux_subtitle' : 'creator_subtitle',
+              ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(height: 16),
+            _buildPlatformSelector(),
             const SizedBox(height: 24),
             _buildStepIndicator(),
             const SizedBox(height: 24),
@@ -276,6 +437,27 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPlatformSelector() {
+    return SegmentedButton<_CreatorPlatform>(
+      segments: [
+        ButtonSegment(
+          value: _CreatorPlatform.windows,
+          icon: const Icon(Icons.window),
+          label: Text(tr(context, 'creator_platform_windows')),
+        ),
+        ButtonSegment(
+          value: _CreatorPlatform.linux,
+          icon: const Icon(Icons.terminal),
+          label: Text(tr(context, 'creator_platform_linux')),
+        ),
+      ],
+      selected: {_platform},
+      onSelectionChanged: _creationRunning
+          ? null
+          : (selection) => _setPlatform(selection.first),
     );
   }
 
@@ -391,12 +573,22 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               Icon(Icons.album, size: 64, color: theme.colorScheme.primary),
               const SizedBox(height: 16),
               Text(
-                tr(context, 'creator_select_iso'),
+                tr(
+                  context,
+                  _isLinuxMode
+                      ? 'creator_linux_select_iso'
+                      : 'creator_select_iso',
+                ),
                 style: theme.textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                tr(context, 'creator_select_iso_desc'),
+                tr(
+                  context,
+                  _isLinuxMode
+                      ? 'creator_linux_select_iso_desc'
+                      : 'creator_select_iso_desc',
+                ),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -558,7 +750,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tr(context, 'creator_confirm_title'),
+                  tr(
+                    context,
+                    _isLinuxMode
+                        ? 'creator_linux_confirm_title'
+                        : 'creator_confirm_title',
+                  ),
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
@@ -604,6 +801,86 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                     ),
                   ],
                 ),
+                if (!_isLinuxMode) ...[
+                  const Divider(),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(tr(context, 'deploy_install_options')),
+                    subtitle: Text(
+                      '${_bootModeLabel(_bootMode)} • ${_preferredDriveLetter.isEmpty ? tr(context, 'deploy_auto') : '$_preferredDriveLetter:'}',
+                    ),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SegmentedButton<DeploymentBootMode>(
+                          segments: [
+                            ButtonSegment(
+                              value: DeploymentBootMode.uefiGpt,
+                              label: Text(tr(context, 'deploy_boot_uefi_gpt')),
+                            ),
+                            ButtonSegment(
+                              value: DeploymentBootMode.uefiMbr,
+                              label: Text(tr(context, 'deploy_boot_uefi_mbr')),
+                            ),
+                            ButtonSegment(
+                              value: DeploymentBootMode.legacyBios,
+                              label: Text(tr(context, 'deploy_boot_legacy')),
+                            ),
+                          ],
+                          selected: {_bootMode},
+                          onSelectionChanged: (value) =>
+                              setState(() => _bootMode = value.first),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _preferredDriveLetter,
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'deploy_system_letter'),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: '',
+                            child: Text(tr(context, 'deploy_auto')),
+                          ),
+                          ...List.generate(23, (index) {
+                            final letter = String.fromCharCode(68 + index);
+                            return DropdownMenuItem(
+                              value: letter,
+                              child: Text('$letter:'),
+                            );
+                          }),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _preferredDriveLetter = value ?? ''),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _volumeLabelController,
+                        maxLength: 11,
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'deploy_volume_label'),
+                        ),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.image_outlined),
+                        title: Text(tr(context, 'deploy_custom_icon')),
+                        subtitle: Text(
+                          _customIconPath.isEmpty
+                              ? tr(context, 'deploy_custom_icon_desc')
+                              : _customIconPath,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          onPressed: _pickCustomIcon,
+                          icon: const Icon(Icons.folder_open),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -617,7 +894,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          tr(context, 'creator_warning'),
+                          tr(
+                            context,
+                            _isLinuxMode
+                                ? 'creator_linux_warning'
+                                : 'creator_warning',
+                          ),
                           style: TextStyle(
                             color: theme.colorScheme.onErrorContainer,
                             fontWeight: FontWeight.w600,
@@ -668,6 +950,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     return resolved;
   }
 
+  String _bootModeLabel(DeploymentBootMode mode) => switch (mode) {
+    DeploymentBootMode.uefiGpt => tr(context, 'deploy_boot_uefi_gpt'),
+    DeploymentBootMode.uefiMbr => tr(context, 'deploy_boot_uefi_mbr'),
+    DeploymentBootMode.legacyBios => tr(context, 'deploy_boot_legacy'),
+  };
+
   // --- Step 3: Creating ---
 
   Widget _buildCreatingStep() {
@@ -693,7 +981,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  tr(context, 'step_failed'),
+                  tr(
+                    context,
+                    _creationCancelled ? 'cancel_title' : 'step_failed',
+                  ),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.error,
@@ -752,6 +1043,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text('$pct%', style: theme.textTheme.bodySmall),
+                if (_creationRunning && _creationCancellable) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _cancelCreation,
+                    icon: const Icon(Icons.close),
+                    label: Text(tr(context, 'detail_cancel')),
+                  ),
+                ],
               ],
             ],
           ),
@@ -773,6 +1072,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       case CreateStep.mountingIso:
         return tr(context, 'step_mounting');
       case CreateStep.copyingFiles:
+        if (_isLinuxMode) {
+          return tr(context, 'linux_step_writing_image');
+        }
         return tr(context, 'step_copying');
       case CreateStep.splittingWim:
         return tr(context, 'step_splitting');
@@ -791,6 +1093,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   Widget _buildCompleteStep() {
     final theme = Theme.of(context);
+    final serverMessage = _resolveLocalizedMessage(
+      context,
+      _createProgress?.message ??
+          (_isLinuxMode ? 'linux_complete' : 'boot_complete'),
+    );
     return Center(
       child: Card(
         child: Padding(
@@ -805,15 +1112,21 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               ),
               const SizedBox(height: 24),
               Text(
-                tr(context, 'creator_complete_title'),
+                tr(
+                  context,
+                  _isLinuxMode
+                      ? 'creator_linux_complete_title'
+                      : 'creator_complete_title',
+                ),
                 style: theme.textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                tr(context, 'creator_complete_desc'),
+                serverMessage,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               FilledButton(
@@ -824,6 +1137,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                     _selectedDisk = null;
                     _safetyResult = null;
                     _createProgress = null;
+                    _latestTaskProgress = null;
+                    _taskController = null;
+                    _creationRunning = false;
+                    _creationCancellable = false;
+                    _creationCancelled = false;
                   });
                 },
                 child: Text(tr(context, 'creator_another')),

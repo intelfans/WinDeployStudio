@@ -15,12 +15,13 @@ enum UpdateChannel {
   }
 }
 
-class AppVersion {
+class AppVersion implements Comparable<AppVersion> {
   final int major;
   final int minor;
   final int patch;
+  final String preRelease;
 
-  const AppVersion(this.major, this.minor, this.patch);
+  const AppVersion(this.major, this.minor, this.patch, {this.preRelease = ''});
 
   factory AppVersion.parse(String version) {
     final cleaned = version
@@ -29,7 +30,7 @@ class AppVersion {
         .split('+')
         .first;
     final match = RegExp(
-      r'^(\d+)\.(\d+)\.(\d+)(?:[.-].*)?$',
+      r'^(\d+)\.(\d+)\.(\d+)(?:[-.]([0-9A-Za-z.-]+))?$',
     ).firstMatch(cleaned);
     if (match == null) {
       throw FormatException('Invalid version format: $version');
@@ -38,14 +39,37 @@ class AppVersion {
       int.parse(match.group(1)!),
       int.parse(match.group(2)!),
       int.parse(match.group(3)!),
+      preRelease: match.group(4) ?? '',
     );
   }
 
-  bool operator >(AppVersion other) {
-    if (major != other.major) return major > other.major;
-    if (minor != other.minor) return minor > other.minor;
-    return patch > other.patch;
+  @override
+  int compareTo(AppVersion other) {
+    if (major != other.major) return major.compareTo(other.major);
+    if (minor != other.minor) return minor.compareTo(other.minor);
+    if (patch != other.patch) return patch.compareTo(other.patch);
+    if (preRelease.isEmpty && other.preRelease.isEmpty) return 0;
+    if (preRelease.isEmpty) return 1;
+    if (other.preRelease.isEmpty) return -1;
+
+    final left = preRelease.split('.');
+    final right = other.preRelease.split('.');
+    for (var index = 0; index < left.length && index < right.length; index++) {
+      final leftNumber = BigInt.tryParse(left[index]);
+      final rightNumber = BigInt.tryParse(right[index]);
+      final comparison = switch ((leftNumber, rightNumber)) {
+        (final BigInt leftValue, final BigInt rightValue) =>
+          leftValue.compareTo(rightValue),
+        (final BigInt _, null) => -1,
+        (null, final BigInt _) => 1,
+        _ => left[index].toLowerCase().compareTo(right[index].toLowerCase()),
+      };
+      if (comparison != 0) return comparison;
+    }
+    return left.length.compareTo(right.length);
   }
+
+  bool operator >(AppVersion other) => compareTo(other) > 0;
 
   bool operator <(AppVersion other) => other > this;
 
@@ -59,14 +83,19 @@ class AppVersion {
     return other is AppVersion &&
         other.major == major &&
         other.minor == minor &&
-        other.patch == patch;
+        other.patch == patch &&
+        other.preRelease.toLowerCase() == preRelease.toLowerCase();
   }
 
   @override
-  int get hashCode => Object.hash(major, minor, patch);
+  int get hashCode =>
+      Object.hash(major, minor, patch, preRelease.toLowerCase());
 
   @override
-  String toString() => '$major.$minor.$patch';
+  String toString() {
+    final base = '$major.$minor.$patch';
+    return preRelease.isEmpty ? base : '$base-$preRelease';
+  }
 }
 
 class UpdateAsset {
@@ -74,12 +103,14 @@ class UpdateAsset {
   final String url;
   final int sizeBytes;
   final String contentType;
+  final String digest;
 
   const UpdateAsset({
     required this.name,
     required this.url,
     required this.sizeBytes,
     required this.contentType,
+    required this.digest,
   });
 
   factory UpdateAsset.fromJson(Map<String, dynamic> json) {
@@ -88,7 +119,16 @@ class UpdateAsset {
       url: json['browser_download_url'] as String? ?? '',
       sizeBytes: json['size'] as int? ?? 0,
       contentType: json['content_type'] as String? ?? '',
+      digest: json['digest'] as String? ?? '',
     );
+  }
+
+  String? get sha256 {
+    final match = RegExp(
+      r'^sha256:([0-9a-f]{64})$',
+      caseSensitive: false,
+    ).firstMatch(digest.trim());
+    return match?.group(1)?.toUpperCase();
   }
 
   String get formattedSize {
@@ -131,7 +171,7 @@ class UpdateInfo {
       body: json['body'] as String? ?? '',
       publishedAt:
           DateTime.tryParse(json['published_at'] as String? ?? '') ??
-          DateTime.now(),
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       assets: assetsList,
     );
   }
@@ -141,9 +181,6 @@ class UpdateInfo {
 
     final exeAssets = assets
         .where((a) => a.name.toLowerCase().endsWith('.exe'))
-        .toList();
-    final zipAssets = assets
-        .where((a) => a.name.toLowerCase().endsWith('.zip'))
         .toList();
 
     UpdateAsset? setupExe;
@@ -161,12 +198,7 @@ class UpdateInfo {
       exeAssets.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
       return exeAssets.first;
     }
-    if (zipAssets.isNotEmpty) {
-      zipAssets.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
-      return zipAssets.first;
-    }
-
-    return assets.first;
+    return null;
   }
 
   String generateDownloadUrl() {

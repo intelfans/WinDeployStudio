@@ -43,10 +43,6 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
         error: trCurrent('update_check_failed'),
         lastCheckTime: lastCheck,
       );
-      await Future.delayed(const Duration(seconds: 3));
-      if (state.status == UpdateStatus.error) {
-        state = state.copyWith(status: UpdateStatus.idle);
-      }
       return;
     }
 
@@ -77,6 +73,8 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
   Future<void> startDownload() async {
     if (state.info == null) return;
 
+    _downloadedFilePath = null;
+
     state = state.copyWith(
       status: UpdateStatus.downloading,
       downloadProgress: 0.0,
@@ -84,6 +82,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       downloadRemaining: '--',
       downloadPhase: DownloadPhase.connecting,
       retryCount: 0,
+      error: '',
     );
 
     _cancelToken = CancelToken();
@@ -107,6 +106,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       state = state.copyWith(
         status: UpdateStatus.downloaded,
         downloadProgress: 1.0,
+        error: '',
       );
     } else {
       if (_cancelToken!.cancelled) {
@@ -122,7 +122,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
 
   void cancelDownload() {
     _cancelToken?.cancel();
-    state = state.copyWith(status: UpdateStatus.available);
+    state = state.copyWith(status: UpdateStatus.available, error: '');
   }
 
   Future<bool> installUpdate() async {
@@ -133,7 +133,7 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     if (!success) {
       state = state.copyWith(
         status: UpdateStatus.downloaded,
-        error: 'Installer signature check failed or install could not start',
+        error: trCurrent('update_install_verification_failed'),
       );
     }
     return success;

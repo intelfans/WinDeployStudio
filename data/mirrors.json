@@ -172,9 +172,7 @@
         ]
       },
       "downloadUrl": "https://www.microsoft.com/en-us/software-download/windows10",
-      "sha256": "",
-      "size": "6.68 GB",
-      "needsFontPack": false
+      "size": "6.68 GB"
     },
     {
       "id": "official-win11",
@@ -336,9 +334,7 @@
         ]
       },
       "downloadUrl": "https://www.microsoft.com/en-au/software-download/windows11",
-      "sha256": "",
-      "size": "7.96 GB",
-      "needsFontPack": false
+      "size": "7.96 GB"
     },
     {
       "id": "tiny10",
@@ -511,7 +507,6 @@
         ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-NRSKh",
-      "sha256": "",
       "size": "3.58 GB",
       "needsFontPack": true,
       "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
@@ -678,7 +673,6 @@
         ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-uMR0h",
-      "sha256": "",
       "size": "5.14 GB",
       "needsFontPack": true,
       "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
@@ -855,7 +849,6 @@
         ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-1ZRKh",
-      "sha256": "",
       "size": "3.78 GB",
       "needsFontPack": true,
       "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
@@ -1021,7 +1014,6 @@
         ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-UMR0h",
-      "sha256": "",
       "size": "3.67 GB",
       "needsFontPack": true,
       "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
@@ -1132,65 +1124,52 @@
       "notes": {
         "zh": [
           "非官方系统",
-          "建议先备份数据",
-          "建议安装字体包"
+          "建议先备份数据"
         ],
         "zh_TW": [
           "非官方系統",
-          "建議先備份資料",
-          "建議安裝字體包"
+          "建議先備份資料"
         ],
         "en": [
           "Unofficial system",
-          "Back up data first",
-          "Font pack recommended"
+          "Back up data first"
         ],
         "fr": [
           "Système non officiel",
-          "Sauvegarde préalable recommandée",
-          "Pack de polices recommandé"
+          "Sauvegarde préalable recommandée"
         ],
         "de": [
           "Inoffizielles System",
-          "Daten vorher sichern",
-          "Schriftpaket empfohlen"
+          "Daten vorher sichern"
         ],
         "es": [
           "Sistema no oficial",
-          "Haz una copia de seguridad antes",
-          "Se recomienda el paquete de fuentes"
+          "Haz una copia de seguridad antes"
         ],
         "pt": [
           "Sistema não oficial",
-          "Faça backup dos dados antes",
-          "Pacote de fontes recomendado"
+          "Faça backup dos dados antes"
         ],
         "ru": [
           "Неофициальная система",
-          "Сначала сделайте резервную копию данных",
-          "Рекомендуется пакет шрифтов"
+          "Сначала сделайте резервную копию данных"
         ],
         "ar": [
           "نظام غير رسمي",
-          "انسخ بياناتك احتياطيًا أولًا",
-          "يوصى بحزمة الخطوط"
+          "انسخ بياناتك احتياطيًا أولًا"
         ],
         "ko": [
           "비공식 시스템",
-          "먼저 데이터를 백업하세요",
-          "글꼴 팩 권장"
+          "먼저 데이터를 백업하세요"
         ],
         "ja": [
           "非公式システム",
-          "事前にデータをバックアップしてください",
-          "フォントパック推奨"
+          "事前にデータをバックアップしてください"
         ]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
-      "sha256": "",
       "size": "9.64 GB",
-      "needsFontPack": true,
-      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
+      "needsFontPack": false,
       "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
       "globalUrl": "https://gofile.io/d/Cxz53k"
     },
@@ -1380,9 +1359,7 @@
         "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
         "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
       },
-      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-WkS0h",
-      "sha256": "",
-      "needsFontPack": false
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-WkS0h"
     },
     {
       "id": "ltsc-win11-enterprise",
@@ -1570,9 +1547,7 @@
         "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
         "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
       },
-      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-3g4Kh",
-      "sha256": "",
-      "needsFontPack": false
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-3g4Kh"
     },
     {
       "id": "ltsc-win10-iot",
@@ -1760,9 +1735,7 @@
         "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
         "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
       },
-      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh",
-      "sha256": "",
-      "needsFontPack": false
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh"
     },
     {
       "id": "ltsc-win11-iot",
@@ -1950,170 +1923,36 @@
         "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
         "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
       },
-      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h",
-      "sha256": "",
-      "needsFontPack": false
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h"
     },
     {
       "id": "font-pack",
       "name": {
         "zh": "CJK 字体包",
-        "zh_TW": "CJK 字體包",
-        "en": "CJK Font Pack",
-        "fr": "Pack de polices CJK",
-        "de": "CJK-Schriftpaket",
-        "es": "Paquete de fuentes CJK",
-        "pt": "Pacote de fontes CJK",
-        "ru": "Пакет шрифтов CJK",
-        "ar": "حزمة خطوط CJK",
-        "ko": "CJK 글꼴 팩",
-        "ja": "CJK フォントパック"
+        "zh_TW": "CJK 字型套件"
       },
       "category": "Tools",
       "type": {
         "zh": "字体包",
-        "zh_TW": "字體包",
-        "en": "Font pack",
-        "fr": "Pack de polices",
-        "de": "Schriftpaket",
-        "es": "Paquete de fuentes",
-        "pt": "Pacote de fontes",
-        "ru": "Пакет шрифтов",
-        "ar": "حزمة خطوط",
-        "ko": "글꼴 팩",
-        "ja": "フォントパック"
+        "zh_TW": "字型套件"
       },
       "description": {
-        "zh": "为 TinyOS、Windows X-Lite 和 StarValleyX 补齐缺失的 CJK 字体。安装时打开字体包文件夹，全选字体文件，右键选择“为所有用户安装”。",
-        "zh_TW": "為 TinyOS、Windows X-Lite 和 StarValleyX 補齊缺少的 CJK 字體。安裝時開啟字體包資料夾，全選字體檔案，右鍵選擇「為所有使用者安裝」。",
-        "en": "Adds missing CJK fonts for TinyOS, Windows X-Lite, and StarValleyX. To install, open the font pack folder, select all font files, right-click, then choose Install for all users.",
-        "fr": "Ajoute les polices CJK manquantes pour TinyOS, Windows X-Lite et StarValleyX. Pour l’installer, ouvrez le dossier, sélectionnez toutes les polices, faites un clic droit, puis choisissez Installer pour tous les utilisateurs.",
-        "de": "Ergänzt fehlende CJK-Schriften für TinyOS, Windows X-Lite und StarValleyX. Öffnen Sie zur Installation den Ordner, markieren Sie alle Schriftdateien, klicken Sie mit der rechten Maustaste und wählen Sie Für alle Benutzer installieren.",
-        "es": "Agrega las fuentes CJK que faltan en TinyOS, Windows X-Lite y StarValleyX. Para instalarlo, abre la carpeta, selecciona todos los archivos de fuente, haz clic derecho y elige Instalar para todos los usuarios.",
-        "pt": "Adiciona fontes CJK ausentes no TinyOS, Windows X-Lite e StarValleyX. Para instalar, abra a pasta, selecione todos os arquivos de fonte, clique com o botão direito e escolha Instalar para todos os usuários.",
-        "ru": "Добавляет недостающие шрифты CJK для TinyOS, Windows X-Lite и StarValleyX. Для установки откройте папку, выделите все файлы шрифтов, щелкните правой кнопкой и выберите установку для всех пользователей.",
-        "ar": "يضيف خطوط CJK الناقصة في TinyOS وWindows X-Lite وStarValleyX. للتثبيت، افتح مجلد الحزمة، وحدد كل ملفات الخطوط، ثم انقر بزر الماوس الأيمن واختر التثبيت لكل المستخدمين.",
-        "ko": "TinyOS, Windows X-Lite, StarValleyX에 누락된 CJK 글꼴을 추가합니다. 설치하려면 글꼴 팩 폴더를 열고 모든 글꼴 파일을 선택한 뒤, 마우스 오른쪽 버튼을 눌러 모든 사용자용 설치를 선택하세요.",
-        "ja": "TinyOS、Windows X-Lite、StarValleyX で不足しがちな CJK フォントを追加します。インストールするにはフォントパックのフォルダーを開き、すべてのフォントファイルを選択して右クリックし、すべてのユーザーにインストールを選んでください。"
+        "zh": "为 Tiny10、Tiny11 和 Windows X-Lite 补齐缺失的 CJK 字体。安装时打开字体包文件夹，全选字体文件，右键选择“为所有用户安装”。",
+        "zh_TW": "為 Tiny10、Tiny11 與 Windows X-Lite 補齊缺少的 CJK 字型。安裝時開啟字型套件資料夾，全選字型檔案，按一下滑鼠右鍵並選擇「為所有使用者安裝」。"
       },
       "audience": {
-        "zh": "TinyOS / X-Lite / StarValleyX 用户",
-        "zh_TW": "TinyOS / X-Lite / StarValleyX 使用者",
-        "en": "TinyOS / X-Lite / StarValleyX users",
-        "fr": "Utilisateurs de TinyOS / X-Lite / StarValleyX",
-        "de": "Nutzer von TinyOS / X-Lite / StarValleyX",
-        "es": "Usuarios de TinyOS / X-Lite / StarValleyX",
-        "pt": "Usuários do TinyOS / X-Lite / StarValleyX",
-        "ru": "Пользователи TinyOS / X-Lite / StarValleyX",
-        "ar": "مستخدمو TinyOS / X-Lite / StarValleyX",
-        "ko": "TinyOS / X-Lite / StarValleyX 사용자",
-        "ja": "TinyOS / X-Lite / StarValleyX ユーザー"
+        "zh": "Tiny10 / Tiny11 / Windows X-Lite 用户",
+        "zh_TW": "Tiny10 / Tiny11 / Windows X-Lite 使用者"
       },
       "pros": {
-        "zh": [
-          "补齐缺失的 CJK 字体",
-          "修复中日韩文字乱码",
-          "安装简单"
-        ],
-        "zh_TW": [
-          "補齊缺少的 CJK 字體",
-          "修正中日韓文字亂碼",
-          "安裝簡單"
-        ],
-        "en": [
-          "Adds missing CJK fonts",
-          "Fixes garbled CJK text",
-          "Easy to install"
-        ],
-        "fr": [
-          "Ajoute les polices CJK manquantes",
-          "Corrige le texte CJK illisible",
-          "Installation simple"
-        ],
-        "de": [
-          "Ergänzt fehlende CJK-Schriften",
-          "Behebt unleserlichen CJK-Text",
-          "Einfach zu installieren"
-        ],
-        "es": [
-          "Agrega fuentes CJK faltantes",
-          "Corrige texto CJK ilegible",
-          "Instalación sencilla"
-        ],
-        "pt": [
-          "Adiciona fontes CJK ausentes",
-          "Corrige texto CJK ilegível",
-          "Fácil de instalar"
-        ],
-        "ru": [
-          "Добавляет недостающие шрифты CJK",
-          "Исправляет нечитаемый CJK-текст",
-          "Простая установка"
-        ],
-        "ar": [
-          "يضيف خطوط CJK الناقصة",
-          "يصلح النصوص المشوشة للغات CJK",
-          "سهل التثبيت"
-        ],
-        "ko": [
-          "누락된 CJK 글꼴 추가",
-          "깨진 CJK 텍스트 수정",
-          "설치가 쉬움"
-        ],
-        "ja": [
-          "不足している CJK フォントを追加",
-          "文字化けした CJK テキストを修正",
-          "簡単にインストール可能"
-        ]
+        "zh": ["补齐缺失的 CJK 字体", "修复中日韩文字乱码", "安装简单"],
+        "zh_TW": ["補齊缺少的 CJK 字型", "修正中日韓文字亂碼", "安裝簡單"]
       },
       "notes": {
-        "zh": [
-          "需要手动安装",
-          "建议为所有用户安装"
-        ],
-        "zh_TW": [
-          "需要手動安裝",
-          "建議為所有使用者安裝"
-        ],
-        "en": [
-          "Manual installation required",
-          "Install for all users recommended"
-        ],
-        "fr": [
-          "Installation manuelle requise",
-          "Installation pour tous les utilisateurs recommandée"
-        ],
-        "de": [
-          "Manuelle Installation erforderlich",
-          "Installation für alle Benutzer empfohlen"
-        ],
-        "es": [
-          "Requiere instalación manual",
-          "Se recomienda instalar para todos los usuarios"
-        ],
-        "pt": [
-          "Instalação manual necessária",
-          "Recomendado instalar para todos os usuários"
-        ],
-        "ru": [
-          "Требуется ручная установка",
-          "Рекомендуется установить для всех пользователей"
-        ],
-        "ar": [
-          "يتطلب تثبيتًا يدويًا",
-          "يوصى بالتثبيت لكل المستخدمين"
-        ],
-        "ko": [
-          "수동 설치 필요",
-          "모든 사용자용 설치 권장"
-        ],
-        "ja": [
-          "手動インストールが必要",
-          "すべてのユーザーへのインストールを推奨"
-        ]
+        "zh": ["需要手动安装", "建议为所有用户安装"],
+        "zh_TW": ["需要手動安裝", "建議為所有使用者安裝"]
       },
       "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "sha256": "",
       "size": "244 MB",
       "needsFontPack": false,
       "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",

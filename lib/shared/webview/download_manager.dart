@@ -2,15 +2,16 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as p;
+
+import '../../features/logs/services/log_center_service.dart';
 
 enum DownloadStatus { downloading, paused, completed, cancelled, error }
 
 class DownloadItem {
   final String id;
   final String url;
-  String fileName;
-  String savePath;
+  final String fileName;
+  final String savePath;
   DownloadStatus status;
   double progress;
   int receivedBytes;
@@ -18,9 +19,12 @@ class DownloadItem {
   String speed;
   String? error;
   DateTime startTime;
+  String? eTag;
+  String? lastModified;
   IOSink? _sink;
   StreamSubscription<List<int>>? _subscription;
   http.Client? _client;
+  int _transferId = 0;
 
   DownloadItem({
     required this.id,
@@ -66,151 +70,272 @@ class DownloadManager extends ChangeNotifier {
   }
 
   Future<void> _doDownload(DownloadItem item) async {
+    final transferId = ++item._transferId;
+    final client = http.Client();
+    IOSink? sink;
+
+    void failBeforeStreaming(String message) {
+      client.close();
+      if (item._transferId != transferId) return;
+      if (identical(item._client, client)) item._client = null;
+      if (item.status == DownloadStatus.downloading) {
+        item.status = DownloadStatus.error;
+        item.error = message;
+        item.speed = '';
+        notifyListeners();
+      }
+    }
+
     try {
-      final client = http.Client();
       item._client = client;
 
       final existingFile = File(item.savePath);
-      final resumeFrom = item.receivedBytes > 0 && await existingFile.exists()
+      final localLength = await existingFile.exists()
           ? await existingFile.length()
           : 0;
-      final request = http.Request('GET', Uri.parse(item.url));
-      if (resumeFrom > 0) {
+      final previousTotal = item.totalBytes;
+      final resumeValidator = _resumeValidator(item);
+      final canResume =
+          localLength > 0 &&
+          previousTotal > localLength &&
+          resumeValidator != null;
+      final resumeFrom = canResume ? localLength : 0;
+      final request = http.Request('GET', Uri.parse(item.url))
+        ..headers['Accept-Encoding'] = 'identity';
+      if (canResume) {
         request.headers['Range'] = 'bytes=$resumeFrom-';
+        request.headers['If-Range'] = resumeValidator.value;
       }
       final response = await client.send(request);
 
-      final isPartial = response.statusCode == 206 && resumeFrom > 0;
-      if (response.statusCode != 200 && !isPartial) {
-        item.status = DownloadStatus.error;
-        item.error = 'HTTP ${response.statusCode}';
-        notifyListeners();
+      if (item._transferId != transferId) {
+        client.close();
         return;
       }
 
-      // Try Content-Disposition for real filename
-      final disposition = response.headers['content-disposition'];
-      if (disposition != null) {
-        final realName = _parseContentDisposition(disposition);
-        if (realName != null && realName.isNotEmpty) {
-          final safeName = _sanitizeFileName(realName);
-          item.fileName = safeName;
-          item.savePath = p.join(p.dirname(item.savePath), safeName);
+      final isPartial = canResume && response.statusCode == 206;
+      final isFullResponse = response.statusCode == 200;
+      if (!isPartial && !isFullResponse) {
+        failBeforeStreaming('HTTP ${response.statusCode}');
+        return;
+      }
+
+      final contentEncoding = response.headers['content-encoding']?.trim();
+      if (contentEncoding != null &&
+          contentEncoding.isNotEmpty &&
+          contentEncoding.toLowerCase() != 'identity') {
+        failBeforeStreaming('Unsupported Content-Encoding');
+        return;
+      }
+
+      final responseETag = response.headers['etag'];
+      final responseLastModified = response.headers['last-modified'];
+      late final int expectedTotal;
+      if (isPartial) {
+        final contentRange = _parseContentRange(
+          response.headers['content-range'],
+        );
+        final expectedRemaining = previousTotal - resumeFrom;
+        if (contentRange == null ||
+            contentRange.start != resumeFrom ||
+            contentRange.end != contentRange.total - 1 ||
+            contentRange.total != previousTotal ||
+            (response.contentLength != null &&
+                response.contentLength != expectedRemaining) ||
+            !_validatorMatches(
+              resumeValidator,
+              responseETag,
+              responseLastModified,
+            )) {
+          failBeforeStreaming('Invalid resume response');
+          return;
+        }
+        expectedTotal = contentRange.total;
+      } else {
+        final fullLength = response.contentLength;
+        if (fullLength == null || fullLength <= 0) {
+          failBeforeStreaming('Missing Content-Length');
+          return;
+        }
+        expectedTotal = fullLength;
+        item.eTag = responseETag?.trim();
+        item.lastModified = responseLastModified?.trim();
+      }
+
+      item.totalBytes = expectedTotal;
+      item.receivedBytes = isPartial ? resumeFrom : 0;
+      item.progress = item.receivedBytes / item.totalBytes;
+      item.error = null;
+
+      final file = File(item.savePath);
+      sink = file.openWrite(mode: isPartial ? FileMode.append : FileMode.write);
+      item._sink = sink;
+
+      int lastBytes = item.receivedBytes;
+      DateTime lastTime = DateTime.now();
+      var finished = false;
+
+      Future<void> finish({Object? failure}) async {
+        if (finished) return;
+        finished = true;
+        try {
+          await sink?.flush();
+        } catch (error) {
+          failure ??= error;
+        }
+        try {
+          await sink?.close();
+        } catch (error) {
+          failure ??= error;
+        }
+        sink = null;
+        client.close();
+
+        if (item._transferId != transferId) return;
+        item._sink = null;
+        item._subscription = null;
+        if (identical(item._client, client)) item._client = null;
+
+        if (item.status == DownloadStatus.cancelled) {
+          try {
+            if (await file.exists()) await file.delete();
+          } catch (_) {}
+        } else if (item.status == DownloadStatus.downloading) {
+          final finalLength = await file.length();
+          item.receivedBytes = finalLength;
+          item.progress = finalLength / item.totalBytes;
+          if (failure != null) {
+            item.status = DownloadStatus.error;
+            item.error = failure.toString();
+          } else if (finalLength != item.totalBytes) {
+            item.status = DownloadStatus.error;
+            item.error = 'Incomplete download';
+            notifyListeners();
+            unawaited(
+              LogCenterService().logDownload(
+                '[Download]\nURL=${item.url}\nStatus=Failed\nReason=LengthMismatch\nExpected=${item.totalBytes}\nActual=$finalLength',
+              ),
+            );
+          } else {
+            _markCompleted(item, finalLength);
+          }
         }
       }
 
-      final contentRangeTotal = _parseContentRangeTotal(
-        response.headers['content-range'],
-      );
-      item.totalBytes =
-          contentRangeTotal ??
-          ((response.contentLength ?? 0) + (isPartial ? resumeFrom : 0));
-      item.receivedBytes = isPartial ? resumeFrom : 0;
-      item.progress = item.totalBytes > 0
-          ? item.receivedBytes / item.totalBytes
-          : 0;
+      final sub = response.stream
+          .timeout(const Duration(seconds: 60))
+          .listen(
+            (chunk) {
+              if (finished ||
+                  item._transferId != transferId ||
+                  item.status != DownloadStatus.downloading) {
+                return;
+              }
+              if (item.receivedBytes + chunk.length > item.totalBytes) {
+                unawaited(finish(failure: 'Response exceeded expected length'));
+                return;
+              }
 
-      final file = File(item.savePath);
-      final sink = file.openWrite(
-        mode: isPartial ? FileMode.append : FileMode.write,
-      );
-      item._sink = sink;
+              sink?.add(chunk);
+              item.receivedBytes += chunk.length;
+              item.progress = item.receivedBytes / item.totalBytes;
 
-      int lastBytes = 0;
-      DateTime lastTime = DateTime.now();
+              final now = DateTime.now();
+              final elapsed = now.difference(lastTime).inMilliseconds;
+              if (elapsed >= 500) {
+                final bytesInPeriod = item.receivedBytes - lastBytes;
+                final bytesPerSec = bytesInPeriod * 1000 / elapsed;
+                item.speed = _formatSpeed(bytesPerSec);
+                lastBytes = item.receivedBytes;
+                lastTime = now;
+              }
 
-      final sub = response.stream.listen(
-        (chunk) {
-          if (item.status == DownloadStatus.cancelled) return;
-          if (item.status == DownloadStatus.paused) return;
-
-          sink.add(chunk);
-          item.receivedBytes += chunk.length;
-
-          if (item.totalBytes > 0) {
-            item.progress = item.receivedBytes / item.totalBytes;
-          }
-
-          final now = DateTime.now();
-          final elapsed = now.difference(lastTime).inMilliseconds;
-          if (elapsed >= 500) {
-            final bytesInPeriod = item.receivedBytes - lastBytes;
-            final bytesPerSec = bytesInPeriod * 1000 / elapsed;
-            item.speed = _formatSpeed(bytesPerSec);
-            lastBytes = item.receivedBytes;
-            lastTime = now;
-          }
-
-          notifyListeners();
-        },
-        onDone: () async {
-          await sink.close();
-          item._sink = null;
-          if (item.status == DownloadStatus.cancelled) {
-            try {
-              await file.delete();
-            } catch (_) {}
-          } else if (item.status != DownloadStatus.paused) {
-            item.status = DownloadStatus.completed;
-            item.progress = 1.0;
-            item.speed = '';
-            notifyListeners();
-          }
-          item._subscription = null;
-          item._client = null;
-        },
-        onError: (e) async {
-          await sink.close();
-          item._sink = null;
-          item.status = DownloadStatus.error;
-          item.error = e.toString();
-          notifyListeners();
-          item._subscription = null;
-          item._client = null;
-        },
-        cancelOnError: true,
-      );
+              notifyListeners();
+            },
+            onDone: () => unawaited(finish()),
+            onError: (Object error) => unawaited(finish(failure: error)),
+            cancelOnError: true,
+          );
 
       item._subscription = sub;
     } catch (e) {
-      item.status = DownloadStatus.error;
-      item.error = e.toString();
-      notifyListeners();
+      try {
+        await sink?.close();
+      } catch (_) {}
+      client.close();
+      if (item._transferId == transferId) {
+        item._sink = null;
+        item._subscription = null;
+        if (identical(item._client, client)) item._client = null;
+        if (item.status == DownloadStatus.downloading) {
+          item.status = DownloadStatus.error;
+          item.error = e.toString();
+          item.speed = '';
+          notifyListeners();
+        }
+      }
     }
   }
 
-  void pauseDownload(String id) {
+  Future<void> pauseDownload(String id) async {
     final item = _items.firstWhere((i) => i.id == id);
     if (item.status != DownloadStatus.downloading) return;
     item.status = DownloadStatus.paused;
+    item._transferId++;
     item.speed = '';
-    item._subscription?.cancel();
-    item._client?.close();
-    item._sink?.close();
+    final subscription = item._subscription;
+    final client = item._client;
+    final sink = item._sink;
     item._subscription = null;
     item._client = null;
     item._sink = null;
+    await subscription?.cancel();
+    client?.close();
+    try {
+      await sink?.flush();
+    } catch (_) {}
+    try {
+      await sink?.close();
+    } catch (_) {}
+    final file = File(item.savePath);
+    if (await file.exists()) {
+      item.receivedBytes = await file.length();
+      item.progress = item.totalBytes > 0
+          ? (item.receivedBytes / item.totalBytes).clamp(0.0, 1.0)
+          : 0;
+    }
     notifyListeners();
   }
 
-  void resumeDownload(String id) {
+  Future<void> resumeDownload(String id) async {
     final item = _items.firstWhere((i) => i.id == id);
     if (item.status != DownloadStatus.paused) return;
     item.status = DownloadStatus.downloading;
     item.speed = '';
+    item.error = null;
     notifyListeners();
-    _doDownload(item);
+    await _doDownload(item);
   }
 
-  void cancelDownload(String id) {
+  Future<void> cancelDownload(String id) async {
     final item = _items.firstWhere((i) => i.id == id);
     item.status = DownloadStatus.cancelled;
-    item._subscription?.cancel();
-    item._client?.close();
-    item._sink?.close();
+    item._transferId++;
+    final subscription = item._subscription;
+    final client = item._client;
+    final sink = item._sink;
     item._subscription = null;
     item._client = null;
     item._sink = null;
+    await subscription?.cancel();
+    client?.close();
+    try {
+      await sink?.close();
+    } catch (_) {}
+    try {
+      final file = File(item.savePath);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -229,85 +354,64 @@ class DownloadManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? _parseContentDisposition(String disposition) {
-    final rfc5987 = RegExp(
-      r"filename\*\s*=\s*UTF-8''(.+)",
+  _ContentRange? _parseContentRange(String? contentRange) {
+    if (contentRange == null) return null;
+    final match = RegExp(
+      r'^bytes\s+(\d+)-(\d+)/(\d+)$',
       caseSensitive: false,
-    );
-    final m1 = rfc5987.firstMatch(disposition);
-    if (m1 != null) return Uri.decodeComponent(m1.group(1)!.trim());
+    ).firstMatch(contentRange.trim());
+    if (match == null) return null;
+    final start = int.tryParse(match.group(1)!);
+    final end = int.tryParse(match.group(2)!);
+    final total = int.tryParse(match.group(3)!);
+    if (start == null ||
+        end == null ||
+        total == null ||
+        start < 0 ||
+        end < start ||
+        total <= end) {
+      return null;
+    }
+    return _ContentRange(start, end, total);
+  }
 
-    final rfc5987any = RegExp(
-      r"filename\*\s*=\s*[^']+'[^']*'(.+)",
-      caseSensitive: false,
-    );
-    final m2 = rfc5987any.firstMatch(disposition);
-    if (m2 != null) return Uri.decodeComponent(m2.group(1)!.trim());
-
-    final plain = RegExp(
-      r'filename\s*=\s*("?)([^";\r\n]*)\1',
-      caseSensitive: false,
-    );
-    final m3 = plain.firstMatch(disposition);
-    if (m3 != null) {
-      var name = m3.group(2)!.trim();
-      if (name.contains('%')) {
-        try {
-          name = Uri.decodeComponent(name);
-        } catch (_) {}
-      }
-      return name;
+  _ResumeValidator? _resumeValidator(DownloadItem item) {
+    final eTag = item.eTag?.trim();
+    if (eTag != null &&
+        eTag.length >= 2 &&
+        eTag.startsWith('"') &&
+        eTag.endsWith('"') &&
+        !eTag.toLowerCase().startsWith('w/')) {
+      return _ResumeValidator(eTag, isETag: true);
+    }
+    final lastModified = item.lastModified?.trim();
+    if (lastModified != null && lastModified.isNotEmpty) {
+      return _ResumeValidator(lastModified, isETag: false);
     }
     return null;
   }
 
-  String _sanitizeFileName(String name) {
-    var safe = p
-        .basename(name)
-        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
-        .trim();
-    while (safe.startsWith('.')) {
-      safe = safe.substring(1).trimLeft();
-    }
-    if (safe.isEmpty || safe == '.' || safe == '..') {
-      safe = 'download';
-    }
-    const reserved = {
-      'CON',
-      'PRN',
-      'AUX',
-      'NUL',
-      'COM1',
-      'COM2',
-      'COM3',
-      'COM4',
-      'COM5',
-      'COM6',
-      'COM7',
-      'COM8',
-      'COM9',
-      'LPT1',
-      'LPT2',
-      'LPT3',
-      'LPT4',
-      'LPT5',
-      'LPT6',
-      'LPT7',
-      'LPT8',
-      'LPT9',
-    };
-    final stem = p.basenameWithoutExtension(safe).toUpperCase();
-    if (reserved.contains(stem)) {
-      safe = '_$safe';
-    }
-    return safe;
+  bool _validatorMatches(
+    _ResumeValidator validator,
+    String? responseETag,
+    String? responseLastModified,
+  ) {
+    final responseValue = validator.isETag
+        ? responseETag?.trim()
+        : responseLastModified?.trim();
+    return responseValue == validator.value;
   }
 
-  int? _parseContentRangeTotal(String? contentRange) {
-    if (contentRange == null) return null;
-    final match = RegExp(r'/(\d+)$').firstMatch(contentRange.trim());
-    if (match == null) return null;
-    return int.tryParse(match.group(1)!);
+  void _markCompleted(DownloadItem item, int finalLength) {
+    item.status = DownloadStatus.completed;
+    item.progress = 1.0;
+    item.speed = '';
+    notifyListeners();
+    unawaited(
+      LogCenterService().logDownload(
+        '[Download]\nURL=${item.url}\nPath=${item.savePath}\nStatus=Success\nBytes=$finalLength',
+      ),
+    );
   }
 
   String _formatSpeed(double bytesPerSec) {
@@ -319,4 +423,19 @@ class DownloadManager extends ChangeNotifier {
     }
     return '${(bytesPerSec / (1024 * 1024)).toStringAsFixed(1)} MB/s';
   }
+}
+
+class _ContentRange {
+  final int start;
+  final int end;
+  final int total;
+
+  const _ContentRange(this.start, this.end, this.total);
+}
+
+class _ResumeValidator {
+  final String value;
+  final bool isETag;
+
+  const _ResumeValidator(this.value, {required this.isETag});
 }

@@ -4,6 +4,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/app_page.dart';
 import '../../../shared/widgets/special_thanks_section.dart';
 import '../models/update_models.dart';
 import '../providers/update_provider.dart';
@@ -23,6 +24,15 @@ class UpdateDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(updateProvider);
 
+    if (state.status == UpdateStatus.checking ||
+        state.status == UpdateStatus.installing) {
+      return _UpdateProgressDialog(
+        messageKey: state.status == UpdateStatus.installing
+            ? 'update_installing'
+            : 'update_checking',
+      );
+    }
+
     if (state.status == UpdateStatus.downloading) {
       return _DownloadingDialog(
         progress: state.downloadProgress,
@@ -36,6 +46,8 @@ class UpdateDialog extends ConsumerWidget {
     if (state.status == UpdateStatus.downloaded) {
       return _InstallDialog(
         info: state.info!,
+        error: state.error,
+        releasePageUrl: ref.read(updateProvider.notifier).releasePageUrl,
         onInstall: () async {
           final success = await ref
               .read(updateProvider.notifier)
@@ -63,7 +75,88 @@ class UpdateDialog extends ConsumerWidget {
       );
     }
 
+    if (state.status == UpdateStatus.error) {
+      return _UpdateErrorDialog(
+        message: state.error ?? tr(context, 'update_check_failed'),
+        releasePageUrl: ref.read(updateProvider.notifier).releasePageUrl,
+        onRetry: state.info == null
+            ? () => ref
+                  .read(updateProvider.notifier)
+                  .checkForUpdate(forceRefresh: true)
+            : () => ref.read(updateProvider.notifier).startDownload(),
+        onClose: () => Navigator.of(context).pop(),
+      );
+    }
+
     return const SizedBox.shrink();
+  }
+}
+
+class _UpdateProgressDialog extends StatelessWidget {
+  final String messageKey;
+
+  const _UpdateProgressDialog({required this.messageKey});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      content: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+          const SizedBox(width: 16),
+          Flexible(child: Text(tr(context, messageKey))),
+        ],
+      ),
+    );
+  }
+}
+
+class _UpdateErrorDialog extends StatelessWidget {
+  final String message;
+  final String releasePageUrl;
+  final VoidCallback onRetry;
+  final VoidCallback onClose;
+
+  const _UpdateErrorDialog({
+    required this.message,
+    required this.releasePageUrl,
+    required this.onRetry,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      icon: Icon(Icons.error_outline, color: colorScheme.error, size: 36),
+      title: Text(tr(context, 'creator_error')),
+      content: Text(message, textAlign: TextAlign.center),
+      actions: [
+        AppDialogActionBar(
+          children: [
+            TextButton(
+              onPressed: onClose,
+              child: Text(tr(context, 'detail_cancel')),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_browser, size: 18),
+              onPressed: () => launchUrl(Uri.parse(releasePageUrl)),
+              label: Text(tr(context, 'update_open_browser')),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.refresh, size: 18),
+              onPressed: onRetry,
+              label: Text(tr(context, 'images_retry')),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 
@@ -104,93 +197,101 @@ class _AvailableDialog extends StatelessWidget {
         '${tr(context, 'update_available_title')} v${info.version}',
         textAlign: TextAlign.center,
       ),
-      content: SizedBox(
-        width: 450,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              tr(context, 'update_available_desc'),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${tr(context, 'update_published')}: ${info.publishedAt.year}-${info.publishedAt.month.toString().padLeft(2, '0')}-${info.publishedAt.day.toString().padLeft(2, '0')}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (info.body.isNotEmpty) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  tr(context, 'update_release_notes'),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 450),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                tr(context, 'update_available_desc'),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 200),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: MarkdownBody(
-                  data: info.body,
-                  styleSheet: MarkdownStyleSheet(
-                    p: theme.textTheme.bodySmall,
-                    h1: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    h2: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    h3: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    code: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'Consolas',
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                    ),
-                    codeblockDecoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    listBullet: theme.textTheme.bodySmall,
-                  ),
+              Text(
+                '${tr(context, 'update_published')}: ${info.publishedAt.year}-${info.publishedAt.month.toString().padLeft(2, '0')}-${info.publishedAt.day.toString().padLeft(2, '0')}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
+              const SizedBox(height: 16),
+              if (info.body.isNotEmpty) ...[
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    tr(context, 'update_release_notes'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SingleChildScrollView(
+                    child: MarkdownBody(
+                      data: info.body,
+                      styleSheet: MarkdownStyleSheet(
+                        p: theme.textTheme.bodySmall,
+                        h1: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h2: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h3: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        code: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'Consolas',
+                          backgroundColor: colorScheme.surfaceContainerHighest,
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        listBullet: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              const SpecialThanksSection(compact: true),
             ],
-            const SizedBox(height: 12),
-            const SpecialThanksSection(compact: true),
-          ],
+          ),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: onIgnore,
-          child: Text(tr(context, 'update_ignore')),
-        ),
-        TextButton(
-          onPressed: onLater,
-          child: Text(tr(context, 'update_later')),
-        ),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.open_in_browser, size: 18),
-          onPressed: () => launchUrl(Uri.parse(releasePageUrl)),
-          label: Text(tr(context, 'update_open_browser')),
-        ),
-        FilledButton.icon(
-          icon: const Icon(Icons.download_rounded, size: 18),
-          onPressed: onUpdate,
-          label: Text(tr(context, 'update_now')),
+        AppDialogActionBar(
+          children: [
+            TextButton(
+              onPressed: onIgnore,
+              child: Text(tr(context, 'update_ignore')),
+            ),
+            TextButton(
+              onPressed: onLater,
+              child: Text(tr(context, 'update_later')),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_browser, size: 18),
+              onPressed: () => launchUrl(Uri.parse(releasePageUrl)),
+              label: Text(tr(context, 'update_open_browser')),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.download_rounded, size: 18),
+              onPressed: onUpdate,
+              label: Text(tr(context, 'update_now')),
+            ),
+          ],
         ),
       ],
     );
@@ -344,8 +445,8 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
         tr(context, 'update_downloading'),
         textAlign: TextAlign.center,
       ),
-      content: SizedBox(
-        width: 360,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -364,8 +465,10 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
               },
             ),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 Text(
                   '${tr(context, 'update_progress')}: $percent%',
@@ -380,21 +483,26 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
               ],
             ),
             const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
-                  child: Text(
-                    _getCurrentTip(context),
+                  child: Align(
                     key: ValueKey('${widget.phase}_$_tipIndex'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.primary,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      _getCurrentTip(context),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   '${tr(context, 'update_remaining')}: ${widget.remaining}',
+                  textAlign: TextAlign.end,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -416,11 +524,15 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
 
 class _InstallDialog extends StatelessWidget {
   final UpdateInfo info;
+  final String? error;
+  final String releasePageUrl;
   final VoidCallback onInstall;
   final VoidCallback onLater;
 
   const _InstallDialog({
     required this.info,
+    this.error,
+    required this.releasePageUrl,
     required this.onInstall,
     required this.onLater,
   });
@@ -444,22 +556,53 @@ class _InstallDialog extends StatelessWidget {
         ),
       ),
       title: Text(tr(context, 'update_install'), textAlign: TextAlign.center),
-      content: Text(
-        tr(context, 'update_install_desc'),
-        textAlign: TextAlign.center,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            tr(context, 'update_install_desc'),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (error != null && error!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                error!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
       actions: [
-        TextButton(
-          onPressed: onLater,
-          child: Text(tr(context, 'update_later')),
-        ),
-        FilledButton.icon(
-          icon: const Icon(Icons.install_desktop_rounded, size: 18),
-          onPressed: onInstall,
-          label: Text(tr(context, 'update_install')),
+        AppDialogActionBar(
+          children: [
+            TextButton(
+              onPressed: onLater,
+              child: Text(tr(context, 'update_later')),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.open_in_browser, size: 18),
+              onPressed: () => launchUrl(Uri.parse(releasePageUrl)),
+              label: Text(tr(context, 'update_open_browser')),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.install_desktop_rounded, size: 18),
+              onPressed: onInstall,
+              label: Text(tr(context, 'update_install')),
+            ),
+          ],
         ),
       ],
     );

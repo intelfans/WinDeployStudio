@@ -1,20 +1,23 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
+
 import '../../../core/localization/strings.dart';
-import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
+import '../../../core/services/elevation_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/wtg_service.dart';
-import '../../../core/services/wtg_compatibility_service.dart';
+import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
+import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
 
-enum _WtgPlatform { windows, linux }
+enum _ToGoPlatform { windows, linux }
 
 class WtgScreen extends ConsumerStatefulWidget {
   const WtgScreen({super.key});
@@ -24,2093 +27,1681 @@ class WtgScreen extends ConsumerStatefulWidget {
 }
 
 class _WtgScreenState extends ConsumerState<WtgScreen> {
-  int _currentStep = 0;
-  _WtgPlatform _platform = _WtgPlatform.windows;
+  static const _configurationSteps = 5;
 
-  IsoMetadata? _selectedIso;
-  DiskInfo? _selectedDisk;
-  List<Map<String, dynamic>> _wimImages = [];
-  int? _selectedImageIndex;
+  final _virtualDiskNameController = TextEditingController(
+    text: 'WinDeploy.vhdx',
+  );
+  final _virtualDiskSizeController = TextEditingController(text: '64');
+  final _volumeLabelController = TextEditingController(text: 'WINDEPLOY');
+  final _random = Random();
 
-  List<DiskInfo> _disks = [];
-  bool _isDetecting = false;
+  _ToGoPlatform _platform = _ToGoPlatform.windows;
+  int _step = 0;
+  IsoMetadata? _iso;
+  List<Map<String, dynamic>> _images = const [];
+  int? _imageIndex;
+  bool _loadingImage = false;
+  String _imageStatus = '';
 
-  WtgCompatibilityResult? _compatibilityResult;
-  bool _isCheckingCompatibility = false;
+  List<DiskInfo> _disks = const [];
+  DiskInfo? _disk;
+  SafetyCheckResult? _diskSafety;
+  bool _loadingDisks = false;
 
-  WtgProgress? _wtgProgress;
+  DeploymentBootMode _bootMode = DeploymentBootMode.uefiGpt;
+  DeploymentMode _deploymentMode = DeploymentMode.direct;
+  VirtualDiskType _virtualDiskType = VirtualDiskType.dynamic;
+  bool _blockLocalDisks = true;
+  bool _skipOobe = false;
+  bool _disableWinRe = true;
+  bool _disableUasp = false;
+  bool _compactOs = false;
+  bool _wimBoot = false;
+  bool _fixVhdLetter = true;
+  bool _enableNetFx3 = false;
+  String _systemLetter = '';
+  String _bootLetter = '';
+  String _driverDirectory = '';
+  String _customIconPath = '';
 
-  // ISO parsing state
-  bool _isParsing = false;
-  String _parseStepText = '';
-  int _parsePercent = 0;
+  bool _running = false;
+  bool _finished = false;
+  bool _success = false;
+  ElevatedTaskProgress? _taskProgress;
+  ElevatedTaskController? _taskController;
+  final List<String> _progressLog = [];
+  int _gameTarget = 4;
+  int _gameScore = 0;
+  bool _showGame = false;
 
-  // WIM loading state
-  bool _isLoadingWim = false;
-  List<String> _debugLogs = [];
-
-  // Confirmation state
-  final TextEditingController _confirmController = TextEditingController();
-  bool _isConfirmValid = false;
-
-  // Progress tracking
-  Stopwatch? _progressStopwatch;
-  Timer? _progressTimer;
-
-  // Lightweight waiting game state. UI-only; it never touches image creation.
-  final Random _idleGameRandom = Random();
-  int _idleGameTarget = 4;
-  int _idleGameScore = 0;
+  bool get _isLinux => _platform == _ToGoPlatform.linux;
 
   @override
   void initState() {
     super.initState();
-    _detectDisks();
-  }
-
-  bool get _isLinuxMode => _platform == _WtgPlatform.linux;
-
-  void _setPlatform(_WtgPlatform platform) {
-    if (_platform == platform) return;
-    setState(() {
-      _platform = platform;
-      _currentStep = 0;
-      _selectedIso = null;
-      _selectedDisk = null;
-      _wimImages = [];
-      _selectedImageIndex = null;
-      _compatibilityResult = null;
-      _wtgProgress = null;
-      _isParsing = false;
-      _isLoadingWim = false;
-      _debugLogs = [];
-      _confirmController.clear();
-      _isConfirmValid = false;
-    });
+    _loadDisks();
   }
 
   @override
   void dispose() {
-    _confirmController.dispose();
-    _progressTimer?.cancel();
-    _progressStopwatch?.stop();
+    _virtualDiskNameController.dispose();
+    _virtualDiskSizeController.dispose();
+    _volumeLabelController.dispose();
     super.dispose();
   }
 
-  Future<void> _detectDisks() async {
-    setState(() => _isDetecting = true);
+  Future<void> _loadDisks() async {
+    setState(() => _loadingDisks = true);
+    List<DiskInfo> disks;
     try {
-      final safety = ref.read(diskSafetyServiceProvider);
-      final disks = await safety.getRemovableDisks();
+      disks = await ref.read(diskSafetyServiceProvider).getRemovableDisks();
+    } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _disks = disks;
-        _isDetecting = false;
-      });
-    } catch (e) {
-      debugPrint('Detect disks error: $e');
-      if (!mounted) return;
-      setState(() => _isDetecting = false);
+      setState(() => _loadingDisks = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_localizedOrRaw(error.toString()))),
+      );
+      return;
     }
+    if (!mounted) return;
+    setState(() {
+      _disks = disks;
+      _loadingDisks = false;
+      if (_disk != null &&
+          !disks.any((item) => item.diskNumber == _disk!.diskNumber)) {
+        _disk = null;
+        _diskSafety = null;
+      }
+    });
   }
 
-  Future<void> _selectIsoFile() async {
+  void _changePlatform(_ToGoPlatform platform) {
+    if (platform == _platform) return;
+    setState(() {
+      _platform = platform;
+      _step = 0;
+      _iso = null;
+      _images = const [];
+      _imageIndex = null;
+      _deploymentMode = DeploymentMode.direct;
+      _bootMode = DeploymentBootMode.uefiGpt;
+      _compactOs = false;
+      _wimBoot = false;
+      _enableNetFx3 = false;
+    });
+  }
+
+  Future<void> _pickIso() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['iso'],
+      dialogTitle: tr(
+        context,
+        _isLinux ? 'wtg_linux_select_iso' : 'wtg_select_iso',
+      ),
+    );
+    final path = result?.files.single.path;
+    if (path == null || !mounted) return;
+
+    setState(() {
+      _loadingImage = true;
+      _imageStatus = tr(context, 'wtg_parsing_iso');
+      _images = const [];
+      _imageIndex = null;
+    });
+
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['iso'],
-        dialogTitle: tr(
-          context,
-          _isLinuxMode ? 'wtg_linux_select_iso' : 'wtg_select_iso',
-        ),
-      );
-
-      if (result == null || result.files.single.path == null) return;
-      final path = result.files.single.path!;
-      debugPrint('ISO selected: $path');
-
-      if (!mounted) return;
-
-      if (_isLinuxMode) {
+      if (_isLinux) {
         final file = File(path);
-        final metadata = IsoMetadata(
+        final iso = IsoMetadata(
           filePath: path,
           fileName: p.basename(path),
           fileSize: await file.length(),
           windowsVersion: 'Linux ISOHybrid',
         );
+        if (!mounted) return;
         setState(() {
-          _selectedIso = metadata;
-          _selectedImageIndex = 1;
-          _currentStep = 3;
+          _iso = iso;
+          _imageIndex = 1;
         });
-        final logCenter = LogCenterService();
-        await logCenter.logToGo(
-          'Linux To Go ISO 已选择 | 文件: ${metadata.fileName} | 大小: ${metadata.displaySize}',
-        );
-        return;
-      }
-
-      // Show inline progress
-      setState(() {
-        _isParsing = true;
-        _parseStepText = tr(context, 'wtg_parsing_iso');
-        _parsePercent = 0;
-      });
-
-      final isoService = ref.read(isoParseServiceProvider);
-      IsoMetadata? metadata;
-
-      try {
-        metadata = await isoService
+      } else {
+        final iso = await ref
+            .read(isoParseServiceProvider)
             .parseIso(
               path,
-              onProgress: (step, percent) {
+              onProgress: (phase, percent) {
                 if (!mounted) return;
-                String stepText;
-                switch (step) {
-                  case 'detect':
-                    stepText = tr(context, 'iso_step_detect');
-                    break;
-                  case 'mount':
-                    stepText = tr(context, 'iso_step_mount');
-                    break;
-                  case 'info':
-                    stepText = tr(context, 'iso_step_info');
-                    break;
-                  case 'cleanup':
-                    stepText = tr(context, 'iso_step_cleanup');
-                    break;
-                  default:
-                    stepText = step;
-                }
                 setState(() {
-                  _parseStepText = stepText;
-                  _parsePercent = percent;
+                  _imageStatus = '${tr(context, 'wtg_parsing_iso')} $percent%';
                 });
               },
-            )
-            .timeout(const Duration(seconds: 90));
-      } on TimeoutException {
-        debugPrint('ISO parse timed out');
-      } catch (e) {
-        debugPrint('ISO parse error: $e');
+            );
+        if (iso == null) throw StateError('creator_parse_error');
+        final images = await ref.read(wtgServiceProvider).getWimImages(path);
+        if (images.isEmpty) throw StateError('wtg_invalid_windows_iso');
+        if (!mounted) return;
+        setState(() {
+          _iso = iso;
+          _images = images;
+          _imageIndex = images.first['index'] as int?;
+        });
       }
-
+    } catch (error) {
       if (!mounted) return;
-
-      setState(() {
-        _isParsing = false;
-        if (metadata != null) {
-          _selectedIso = metadata;
-        }
-      });
-
-      if (metadata != null) {
-        final logCenter = LogCenterService();
-        await logCenter.logToGo(
-          'Windows To Go ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"}',
-        );
-        // Load WIM images
-        await _loadWimImages(path);
-      }
-    } catch (e) {
-      debugPrint('File picker error: $e');
-      if (mounted) {
-        setState(() => _isParsing = false);
-      }
-    }
-  }
-
-  Future<void> _loadWimImages(String isoPath) async {
-    setState(() {
-      _isLoadingWim = true;
-      _debugLogs = [];
-    });
-
-    try {
-      final wtgService = ref.read(wtgServiceProvider);
-      final images = await wtgService.getWimImages(isoPath);
-
-      if (!mounted) return;
-
-      // Get debug logs from service
-      final logs = wtgService.debugLogs;
-
-      setState(() {
-        _wimImages = images;
-        _isLoadingWim = false;
-        _debugLogs = logs;
-        if (images.isNotEmpty) {
-          _selectedImageIndex = images.first['index'] as int?;
-          _currentStep = 2; // Move to image selection step
-        }
-      });
-    } catch (e) {
-      debugPrint('Load WIM images error: $e');
+      final key = error.toString().replaceFirst('Bad state: ', '');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_localizedOrRaw(key))));
+    } finally {
       if (mounted) {
         setState(() {
-          _isLoadingWim = false;
-          _debugLogs.add('Exception: $e');
+          _loadingImage = false;
+          _imageStatus = '';
         });
       }
     }
   }
 
-  Future<void> _checkCompatibility(DiskInfo disk) async {
-    setState(() => _isCheckingCompatibility = true);
-
-    try {
-      // Get drive letter - try from disk info first
-      String driveLetter = '';
-      if (disk.driveLetters.isNotEmpty) {
-        final letter = disk.driveLetters.first;
-        if (letter.isNotEmpty) {
-          driveLetter = letter.length == 1 ? '$letter:' : letter;
-        }
-      }
-
-      final compatibilityService = ref.read(wtgCompatibilityServiceProvider);
-      final result = await compatibilityService.checkCompatibility(
-        diskNumber: disk.diskNumber,
-        driveLetter: driveLetter,
-        fallbackDisk: disk,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _compatibilityResult = result;
-        _isCheckingCompatibility = false;
-      });
-    } catch (e) {
-      debugPrint('Compatibility check error: $e');
-      if (mounted) {
-        setState(() => _isCheckingCompatibility = false);
-      }
-    }
-  }
-
-  Future<void> _startWtgCreation() async {
-    if (_selectedIso == null || _selectedDisk == null) {
-      return;
-    }
-    if (!_isLinuxMode && _selectedImageIndex == null) {
-      return;
-    }
-
-    // Start progress timer
-    _progressStopwatch = Stopwatch()..start();
-
-    // Update UI periodically to show elapsed time
-    _progressTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted &&
-          _progressStopwatch != null &&
-          _progressStopwatch!.isRunning) {
-        setState(() {}); // Refresh to update elapsed time display
-      }
-    });
-
+  Future<void> _selectDisk(DiskInfo disk) async {
     setState(() {
-      _currentStep = 5; // Move to progress step
-      _wtgProgress = WtgProgress(
-        step: WtgStep.preparing,
-        message: tr(context, _isLinuxMode ? 'linux_preparing' : 'wtg_starting'),
-        progress: 0.0,
-      );
+      _disk = disk;
+      _diskSafety = null;
     });
-
-    final bool result;
-    if (_isLinuxMode) {
-      final service = ref.read(bootableUsbServiceProvider);
-      result = await service.createLinuxIsoUsb(
-        isoPath: _selectedIso!.filePath,
-        diskNumber: _selectedDisk!.diskNumber,
-        kind: LinuxUsbKind.toGo,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() => _wtgProgress = _mapLinuxProgress(progress));
-          }
-        },
-      );
-    } else {
-      final wtgService = ref.read(wtgServiceProvider);
-      final driveLetter = _selectedDisk!.driveLetters.isNotEmpty
-          ? _selectedDisk!.driveLetters.first
-          : '';
-
-      result = await wtgService.createWtg(
-        isoPath: _selectedIso!.filePath,
-        imageIndex: _selectedImageIndex!,
-        diskNumber: _selectedDisk!.diskNumber,
-        driveLetter: driveLetter,
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() => _wtgProgress = progress);
-          }
-        },
-      );
-    }
-
-    if (mounted) {
-      _progressTimer?.cancel();
-      _progressStopwatch?.stop();
-      setState(() {
-        _currentStep = result ? 9 : 10; // Complete or Failed
-      });
+    final safety = await ref
+        .read(diskSafetyServiceProvider)
+        .checkDiskSafety(disk);
+    if (!mounted || _disk?.diskNumber != disk.diskNumber) return;
+    setState(() {
+      _diskSafety = safety;
+      if (!safety.isSafe) _disk = null;
+    });
+    if (!safety.isSafe) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_localizedOrRaw(safety.reason))));
     }
   }
 
-  WtgProgress _mapLinuxProgress(CreateProgress progress) {
-    final step = switch (progress.step) {
-      CreateStep.preparing => WtgStep.preparing,
-      CreateStep.cleaningDisk => WtgStep.partitioningDisk,
-      CreateStep.creatingPartitions => WtgStep.partitioningDisk,
-      CreateStep.formatting => WtgStep.partitioningDisk,
-      CreateStep.mountingIso => WtgStep.mountingIso,
-      CreateStep.copyingFiles => WtgStep.applyingImage,
-      CreateStep.splittingWim => WtgStep.applyingImage,
-      CreateStep.writingBootFiles => WtgStep.writingBootFiles,
-      CreateStep.verifying => WtgStep.verifying,
-      CreateStep.complete => WtgStep.complete,
-      CreateStep.failed => WtgStep.failed,
-    };
-    return WtgProgress(
-      step: step,
-      progress: progress.progress,
-      message: progress.message,
-      error: progress.error,
-      elapsedTime: _progressStopwatch?.elapsed,
+  Future<void> _pickDriverDirectory() async {
+    final path = await FilePicker.getDirectoryPath(
+      dialogTitle: tr(context, 'deploy_driver_directory'),
+    );
+    if (path != null && mounted) setState(() => _driverDirectory = path);
+  }
+
+  Future<void> _pickIcon() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['ico'],
+      dialogTitle: tr(context, 'deploy_custom_icon'),
+    );
+    final path = result?.files.single.path;
+    if (path != null && mounted) setState(() => _customIconPath = path);
+  }
+
+  Map<String, dynamic>? get _selectedImage {
+    final index = _imageIndex;
+    if (index == null) return null;
+    return _images.where((image) => image['index'] == index).firstOrNull;
+  }
+
+  DeploymentPlan get _plan {
+    final image = _selectedImage;
+    final build = image?['build']?.toString() ?? _iso?.buildNumber ?? '';
+    final version = image?['version']?.toString() ?? _iso?.windowsVersion ?? '';
+    return DeploymentPlan(
+      platform: _isLinux
+          ? DeploymentPlatform.linux
+          : DeploymentPlatform.windows,
+      purpose: DeploymentPurpose.toGo,
+      imagePath: _iso?.filePath ?? '',
+      imageIndex: _imageIndex ?? 1,
+      imageName: image?['name']?.toString() ?? _iso?.fileName ?? '',
+      imageEdition: image?['edition']?.toString() ?? '',
+      imageBuild: build,
+      imageArchitecture:
+          image?['architecture']?.toString() ?? _iso?.architecture ?? '',
+      windowsGeneration: DeploymentPlan.detectWindowsGeneration(
+        build: build,
+        version: version,
+      ),
+      bootMode: _bootMode,
+      deploymentMode: _isLinux ? DeploymentMode.direct : _deploymentMode,
+      virtualDiskType: _virtualDiskType,
+      virtualDiskSizeGb:
+          int.tryParse(_virtualDiskSizeController.text.trim()) ?? 64,
+      virtualDiskFileName: _normalizedVirtualDiskName(),
+      blockLocalDisks: !_isLinux && _blockLocalDisks,
+      skipOobe: !_isLinux && _skipOobe,
+      disableWinRe: !_isLinux && _disableWinRe,
+      disableUasp: !_isLinux && _disableUasp,
+      compactOs: !_isLinux && _compactOs,
+      wimBoot: !_isLinux && _wimBoot,
+      fixVhdDriveLetter:
+          !_isLinux &&
+          _deploymentMode != DeploymentMode.direct &&
+          _fixVhdLetter,
+      enableNetFx3: !_isLinux && _enableNetFx3,
+      ntfsUefiSupport: !_isLinux && _bootMode != DeploymentBootMode.legacyBios,
+      preferredSystemLetter: _isLinux ? '' : _systemLetter,
+      preferredBootLetter: _isLinux ? '' : _bootLetter,
+      driverDirectory: _driverDirectory,
+      customIconPath: _customIconPath,
+      customVolumeLabel: _volumeLabelController.text.trim(),
     );
   }
 
-  String _resolveLocalizedMessage(BuildContext context, String key) {
-    // Composite progress messages keep the first line as a localization key.
-    final parts = key.split('\n\nLog: ');
-    final messageLines = parts[0].split('\n');
-    final actualKey = messageLines.first;
-    final details = messageLines.skip(1).where((line) => line.isNotEmpty);
-    final logPath = parts.length > 1 ? parts[1] : null;
+  String _normalizedVirtualDiskName() {
+    final raw = _virtualDiskNameController.text.trim();
+    final base = raw.isEmpty ? 'WinDeploy' : p.basenameWithoutExtension(raw);
+    final extension = _deploymentMode == DeploymentMode.vhd ? '.vhd' : '.vhdx';
+    return '$base$extension';
+  }
 
-    var resolved = tr(context, actualKey);
-    if (details.isNotEmpty) {
-      resolved = '$resolved\n${details.join('\n')}';
+  bool _canContinue() {
+    return switch (_step) {
+      0 => _iso != null && (_isLinux || _imageIndex != null),
+      1 => _disk != null && _diskSafety?.isSafe == true,
+      2 => DeploymentCompatibility.evaluate(_plan).canDeploy,
+      3 => DeploymentCompatibility.evaluate(_plan).canDeploy,
+      4 => DeploymentCompatibility.evaluate(_plan).canDeploy,
+      _ => false,
+    };
+  }
+
+  Future<void> _start() async {
+    final disk = _disk;
+    if (disk == null) return;
+    final plan = _plan;
+    final compatibility = DeploymentCompatibility.evaluate(plan);
+    if (!compatibility.canDeploy) return;
+
+    final controller = ElevatedTaskController();
+    setState(() {
+      _running = true;
+      _finished = false;
+      _success = false;
+      _taskController = controller;
+      _taskProgress = const ElevatedTaskProgress(
+        phase: 'preparing',
+        message: 'wtg_step_preparing',
+        progress: 0,
+      );
+      _progressLog
+        ..clear()
+        ..add(tr(context, 'wtg_step_preparing'));
+    });
+
+    final localeCode = localeCodeFromLocale(Localizations.localeOf(context));
+    await LogCenterService().logToGo('[DeploymentPlan] ${plan.toJson()}');
+    if (!mounted) return;
+    var success = false;
+    try {
+      success = await ElevationService.runTask(
+        ElevatedTaskSpec(
+          kind: _isLinux
+              ? ElevatedTaskKind.linuxToGo
+              : ElevatedTaskKind.windowsToGo,
+          disk: disk,
+          isoPath: plan.imagePath,
+          imageIndex: plan.imageIndex,
+          localeCode: localeCode,
+          deploymentPlan: plan,
+        ),
+        controller: controller,
+        onProgress: (progress) {
+          if (!mounted) return;
+          setState(() {
+            _taskProgress = progress;
+            final message = _localizedOrRaw(progress.message.split('\n').first);
+            if (_progressLog.isEmpty || _progressLog.last != message) {
+              _progressLog.add(message);
+            }
+          });
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_localizedOrRaw(error.toString()))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _running = false;
+          _finished = true;
+          _success = success;
+          _taskController = null;
+        });
+      }
     }
-    if (logPath != null) {
-      resolved = '$resolved\n\n${tr(context, 'logs_title')}: $logPath';
-    }
-    return resolved;
+  }
+
+  Future<void> _cancel() async {
+    await _taskController?.cancel();
+    if (!mounted) return;
+    setState(() => _progressLog.add(tr(context, 'deploy_cancel_requested')));
+  }
+
+  void _reset() {
+    setState(() {
+      _step = 0;
+      _iso = null;
+      _images = const [];
+      _imageIndex = null;
+      _disk = null;
+      _diskSafety = null;
+      _running = false;
+      _finished = false;
+      _taskProgress = null;
+      _progressLog.clear();
+    });
+    _loadDisks();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_running || _finished) return _buildExecutionView();
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: DeploymentShell(
+        title: Text(tr(context, _isLinux ? 'wtg_linux_title' : 'wtg_title')),
+        subtitle: Text(
+          tr(context, _isLinux ? 'wtg_linux_subtitle' : 'wtg_subtitle'),
+        ),
+        destinations: _stepDestinations(),
+        selectedIndex: _step,
+        onDestinationSelected: _selectReachedStep,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              tr(context, _isLinuxMode ? 'wtg_linux_title' : 'wtg_title'),
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              tr(context, _isLinuxMode ? 'wtg_linux_subtitle' : 'wtg_subtitle'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
             _buildPlatformSelector(),
             const SizedBox(height: 24),
-            Expanded(child: _buildCurrentStep()),
+            DeploymentSection(
+              title: Text(tr(context, _stepTitleKey(_step))),
+              description: Text(tr(context, _stepDescriptionKey(_step))),
+              leading: Icon(_stepIcon(_step)),
+              framed: false,
+              child: _buildStep(),
+            ),
           ],
         ),
+        footer: _buildNavigation(),
       ),
     );
+  }
+
+  List<DeploymentShellDestination> _stepDestinations() {
+    final labels = [
+      tr(context, 'deploy_step_image'),
+      tr(context, 'deploy_step_disk'),
+      tr(context, 'deploy_step_method'),
+      tr(context, 'deploy_step_advanced'),
+      tr(context, 'deploy_step_summary'),
+    ];
+    return List.generate(
+      _configurationSteps,
+      (index) => DeploymentShellDestination(
+        label: labels[index],
+        icon: _stepIcon(index),
+        selectedIcon: index < _step ? Icons.check_circle : null,
+        enabled: index <= _step,
+      ),
+    );
+  }
+
+  IconData _stepIcon(int index) => switch (index) {
+    0 => Icons.disc_full_outlined,
+    1 => Icons.usb_rounded,
+    2 => Icons.install_desktop_outlined,
+    3 => Icons.tune_rounded,
+    4 => Icons.fact_check_outlined,
+    _ => Icons.circle_outlined,
+  };
+
+  String _stepTitleKey(int index) => switch (index) {
+    0 => 'deploy_image_title',
+    1 => 'deploy_disk_title',
+    2 => 'deploy_method_title',
+    3 => 'deploy_advanced_title',
+    4 => 'deploy_summary_title',
+    _ => 'wtg_title',
+  };
+
+  String _stepDescriptionKey(int index) => switch (index) {
+    0 => 'deploy_image_desc',
+    1 => 'deploy_disk_desc',
+    2 => _isLinux ? 'deploy_linux_method_desc' : 'deploy_method_desc',
+    3 => 'deploy_advanced_desc',
+    4 => 'deploy_summary_desc',
+    _ => 'wtg_subtitle',
+  };
+
+  void _selectReachedStep(int index) {
+    if (index < 0 || index > _step) return;
+    setState(() => _step = index);
   }
 
   Widget _buildPlatformSelector() {
     return Align(
-      alignment: Alignment.centerLeft,
-      child: SegmentedButton<_WtgPlatform>(
-        segments: [
-          ButtonSegment(
-            value: _WtgPlatform.windows,
-            icon: const Icon(Icons.window),
-            label: Text(tr(context, 'wtg_platform_windows')),
+      alignment: AlignmentDirectional.centerStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<_ToGoPlatform>(
+            key: const Key('wtg-platform-selector'),
+            expandedInsets: EdgeInsets.zero,
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              minimumSize: const WidgetStatePropertyAll(Size.fromHeight(60)),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              ),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: const VisualDensity(horizontal: -4),
+              iconSize: const WidgetStatePropertyAll(22),
+              textStyle: WidgetStatePropertyAll(
+                Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            segments: [
+              ButtonSegment(
+                value: _ToGoPlatform.windows,
+                icon: const Icon(Icons.window_rounded),
+                label: Text(
+                  tr(context, 'wtg_platform_windows'),
+                  key: const Key('wtg-platform-windows-label'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              ButtonSegment(
+                value: _ToGoPlatform.linux,
+                icon: const Icon(Icons.terminal_rounded),
+                label: Text(
+                  tr(context, 'wtg_platform_linux'),
+                  key: const Key('wtg-platform-linux-label'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+            selected: {_platform},
+            onSelectionChanged: (value) => _changePlatform(value.first),
           ),
-          ButtonSegment(
-            value: _WtgPlatform.linux,
-            icon: const Icon(Icons.terminal),
-            label: Text(tr(context, 'wtg_platform_linux')),
-          ),
-        ],
-        selected: {_platform},
-        onSelectionChanged: (selection) => _setPlatform(selection.first),
+        ),
       ),
     );
   }
 
-  Widget _buildCurrentStep() {
-    switch (_currentStep) {
-      case 0:
-        return _buildStep1SelectIso();
-      case 1:
-        return _buildStep2ParseIso();
-      case 2:
-        return _buildStep3SelectImage();
-      case 3:
-        return _buildStep4SelectDisk();
-      case 4:
-        return _buildStep5Confirm();
-      case 5:
-        return _buildStep6Progress();
-      case 9:
-        return _buildStepComplete();
-      case 10:
-        return _buildStepFailed();
-      default:
-        return const SizedBox.shrink();
-    }
+  Widget _buildStep() => switch (_step) {
+    0 => _buildImageStep(),
+    1 => _buildDiskStep(),
+    2 => _buildDeploymentStep(),
+    3 => _buildAdvancedStep(),
+    4 => _buildSummaryStep(),
+    _ => const SizedBox.shrink(),
+  };
+
+  Widget _stepContainer({required Widget child}) {
+    return Align(
+      alignment: AlignmentDirectional.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 980),
+        child: child,
+      ),
+    );
   }
 
-  Widget _buildStep1SelectIso() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(
-            context,
-            _isLinuxMode ? 'wtg_linux_step1_title' : 'wtg_step1_title',
+  Widget _buildImageStep() {
+    return _stepContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SelectionPanel(
+            icon: Icons.disc_full_outlined,
+            title: _iso?.fileName ?? tr(context, 'wtg_select_iso'),
+            subtitle: _iso == null
+                ? tr(context, 'deploy_image_none')
+                : '${_iso!.displaySize}  •  ${_iso!.windowsVersion ?? ''}',
+            selected: _iso != null,
+            trailing: FilledButton.tonalIcon(
+              onPressed: _loadingImage ? null : _pickIso,
+              icon: const Icon(Icons.folder_open),
+              label: Text(tr(context, 'creator_select_btn')),
+            ),
+            stackTrailingNarrowly: true,
           ),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(context, _isLinuxMode ? 'wtg_linux_step1_desc' : 'wtg_step1_desc'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        if (_isParsing) ...[
-          Center(
-            child: Column(
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(_parseStepText),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: 200,
-                  child: LinearProgressIndicator(value: _parsePercent / 100.0),
+          if (_loadingImage) ...[
+            const SizedBox(height: 12),
+            LinearProgressIndicator(semanticsLabel: _imageStatus),
+            const SizedBox(height: 8),
+            Text(_imageStatus),
+          ],
+          if (!_isLinux && _images.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              tr(context, 'wtg_step3_title'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 10),
+            ..._images.map((image) {
+              final index = image['index'] as int? ?? 1;
+              final selected = index == _imageIndex;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _SelectionPanel(
+                  icon: Icons.window_outlined,
+                  title: image['name']?.toString() ?? 'Windows',
+                  subtitle:
+                      [image['edition'], image['architecture'], image['build']]
+                          .where(
+                            (value) => value != null && '$value'.isNotEmpty,
+                          )
+                          .join(' • '),
+                  selected: selected,
+                  onTap: () => setState(() => _imageIndex = index),
                 ),
-                const SizedBox(height: 8),
-                Text('$_parsePercent%'),
-              ],
-            ),
-          ),
-        ] else if (_selectedIso != null) ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text(
-                        tr(context, 'wtg_iso_selected'),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _InfoRow(tr(context, 'creator_file'), _selectedIso!.fileName),
-                  _InfoRow(
-                    tr(context, 'creator_version'),
-                    _selectedIso!.windowsVersion ??
-                        tr(context, 'creator_unknown'),
-                  ),
-                  _InfoRow(
-                    tr(context, 'creator_size'),
-                    _selectedIso!.displaySize,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiskStep() {
+    return _stepContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              FilledButton.icon(
-                onPressed: () =>
-                    setState(() => _currentStep = _isLinuxMode ? 3 : 1),
-                icon: const Icon(Icons.arrow_forward),
-                label: Text(
-                  tr(
-                    context,
-                    _isLinuxMode ? 'wtg_next_select_disk' : 'wtg_next_parse',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _selectedIso = null;
-                    _wimImages = [];
-                    _selectedImageIndex = null;
-                  });
-                },
+              IconButton(
+                tooltip: tr(context, 'creator_retry'),
+                onPressed: _loadingDisks ? null : _loadDisks,
                 icon: const Icon(Icons.refresh),
-                label: Text(tr(context, 'wtg_rescan')),
               ),
             ],
           ),
-        ] else ...[
-          Card(
-            child: InkWell(
-              onTap: _selectIsoFile,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.folder_open,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
+          if (_loadingDisks)
+            const Center(child: CircularProgressIndicator())
+          else if (_disks.isEmpty)
+            _EmptyState(
+              icon: Icons.usb_off,
+              text: tr(context, 'creator_no_usb'),
+            )
+          else
+            ..._disks.map((disk) {
+              final selected = _disk?.diskNumber == disk.diskNumber;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: DiskSelectionRow(
+                  title: Text(disk.friendlyName),
+                  subtitle: disk.model == disk.friendlyName
+                      ? null
+                      : Text(disk.model),
+                  details: [
+                    Text(disk.sizeFormatted),
+                    Text(disk.busType),
                     Text(
-                      tr(context, 'creator_select_btn'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      '${tr(context, 'wtg_disk_prefix')} ${disk.diskNumber}',
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      tr(
-                        context,
-                        _isLinuxMode
-                            ? 'wtg_linux_select_iso_desc'
-                            : 'creator_select_iso_desc',
+                    if (disk.serialNumber.isNotEmpty)
+                      Text(
+                        '${tr(context, 'creator_serial')}: ${disk.serialNumber}',
                       ),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
                   ],
+                  selected: selected,
+                  status: selected && _diskSafety == null
+                      ? DiskSelectionStatus.checking
+                      : selected && _diskSafety?.isSafe == true
+                      ? DiskSelectionStatus.safe
+                      : DiskSelectionStatus.normal,
+                  onPressed: () => _selectDisk(disk),
+                ),
+              );
+            }),
+          if (_disk != null) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.monitor_heart_outlined),
+                title: Text(tr(context, 'wtg_benchmark_tip_title')),
+                subtitle: Text(tr(context, 'wtg_benchmark_tip_desc')),
+                trailing: OutlinedButton.icon(
+                  onPressed: () => context.go('/benchmark'),
+                  icon: const Icon(Icons.speed),
+                  label: Text(tr(context, 'wtg_benchmark_tip_button')),
                 ),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
-  Widget _buildStep2ParseIso() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(context, 'wtg_step2_title'),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(context, 'wtg_step2_desc'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        if (_isLoadingWim) ...[
-          Center(
-            child: Column(
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(tr(context, 'wtg_loading_wim')),
-              ],
-            ),
-          ),
-        ] else if (_wimImages.isNotEmpty) ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text(
-                        tr(context, 'wtg_wim_loaded'),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_wimImages.length} ${tr(context, 'wtg_wim_count_suffix')}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () => setState(() => _currentStep = 2),
-            icon: const Icon(Icons.arrow_forward),
-            label: Text(tr(context, 'wtg_next_select_image')),
-          ),
-        ] else ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        tr(context, 'wtg_no_wim_found'),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_debugLogs.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      tr(context, 'wtg_debug_info'),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      height: 200,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Scrollbar(
-                        child: SingleChildScrollView(
-                          child: SelectableText(
-                            _debugLogs.join('\n'),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(fontFamily: 'monospace'),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() {
-                          _currentStep = 0;
-                          _debugLogs = [];
-                        }),
-                        icon: const Icon(Icons.arrow_back),
-                        label: Text(tr(context, 'creator_back')),
-                      ),
-                      const SizedBox(width: 12),
-                      FilledButton.icon(
-                        onPressed: () {
-                          // Copy debug logs to clipboard
-                          final text = _debugLogs.join('\n');
-                          Clipboard.setData(ClipboardData(text: text));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(tr(context, 'wtg_debug_copied')),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.copy),
-                        label: Text(tr(context, 'wtg_copy_debug')),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildStep3SelectImage() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(context, 'wtg_step3_title'),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(context, 'wtg_step3_desc'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: RadioGroup<int>(
-            groupValue: _selectedImageIndex,
-            onChanged: (value) {
-              setState(() => _selectedImageIndex = value);
-            },
-            child: ListView.builder(
-              itemCount: _wimImages.length,
-              itemBuilder: (context, index) {
-                final image = _wimImages[index];
-                final imageIndex = image['index'] as int;
-                final isSelected = _selectedImageIndex == imageIndex;
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: Radio<int>(value: imageIndex),
-                    title: Text(
-                      image['name'] ??
-                          tr(
-                            context,
-                            'wtg_image_fallback',
-                          ).replaceAll('{index}', '$imageIndex'),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (image['description'] != null)
-                          Text(
-                            image['description'],
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            if (image['edition'] != null)
-                              _Chip(label: image['edition']),
-                            if (image['architecture'] != null)
-                              _Chip(label: image['architecture']),
-                            if (image['size'] != null)
-                              _Chip(label: image['size']),
-                          ],
-                        ),
-                      ],
-                    ),
-                    trailing: isSelected
-                        ? Icon(
-                            Icons.check_circle,
-                            color: Theme.of(context).colorScheme.primary,
-                          )
-                        : null,
-                    onTap: () {
-                      setState(() => _selectedImageIndex = imageIndex);
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
+  Widget _buildDeploymentStep() {
+    if (_isLinux) {
+      return _stepContainer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            FilledButton.icon(
-              onPressed: _selectedImageIndex != null
-                  ? () => setState(() => _currentStep = 3)
-                  : null,
-              icon: const Icon(Icons.arrow_forward),
-              label: Text(tr(context, 'wtg_next_select_disk')),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _currentStep = 1),
-              icon: const Icon(Icons.arrow_back),
-              label: Text(tr(context, 'creator_back')),
+            _OptionTile(
+              icon: Icons.terminal,
+              title: tr(context, 'deploy_direct'),
+              subtitle: tr(context, 'deploy_linux_direct_desc'),
+              selected: true,
             ),
           ],
         ),
-      ],
+      );
+    }
+
+    final availableModes = DeploymentCompatibility.deploymentModesFor(_plan);
+    if (!availableModes.contains(_deploymentMode)) {
+      _deploymentMode = availableModes.first;
+    }
+    return _stepContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            tr(context, 'deploy_boot_mode'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 10),
+          SegmentedButton<DeploymentBootMode>(
+            segments: [
+              ButtonSegment(
+                value: DeploymentBootMode.uefiGpt,
+                label: Text(tr(context, 'deploy_boot_uefi_gpt')),
+              ),
+              ButtonSegment(
+                value: DeploymentBootMode.uefiMbr,
+                label: Text(tr(context, 'deploy_boot_uefi_mbr')),
+              ),
+              ButtonSegment(
+                value: DeploymentBootMode.legacyBios,
+                label: Text(tr(context, 'deploy_boot_legacy')),
+              ),
+            ],
+            selected: {_bootMode},
+            onSelectionChanged: (value) =>
+                setState(() => _bootMode = value.first),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            tr(context, 'deploy_mode'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: availableModes.map((mode) {
+              return SizedBox(
+                width: 280,
+                child: _OptionTile(
+                  icon: switch (mode) {
+                    DeploymentMode.direct => Icons.install_desktop,
+                    DeploymentMode.vhd => Icons.storage,
+                    DeploymentMode.vhdx => Icons.dns_outlined,
+                  },
+                  title: _deploymentModeLabel(mode),
+                  subtitle: _deploymentModeDescription(mode),
+                  selected: mode == _deploymentMode,
+                  onTap: () {
+                    setState(() {
+                      _deploymentMode = mode;
+                      _virtualDiskNameController.text =
+                          _normalizedVirtualDiskName();
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+          if (_deploymentMode != DeploymentMode.direct) ...[
+            const SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    SegmentedButton<VirtualDiskType>(
+                      segments: [
+                        ButtonSegment(
+                          value: VirtualDiskType.dynamic,
+                          label: Text(tr(context, 'deploy_vdisk_dynamic')),
+                        ),
+                        ButtonSegment(
+                          value: VirtualDiskType.fixed,
+                          label: Text(tr(context, 'deploy_vdisk_fixed')),
+                        ),
+                      ],
+                      selected: {_virtualDiskType},
+                      onSelectionChanged: (value) =>
+                          setState(() => _virtualDiskType = value.first),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _virtualDiskSizeController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'deploy_vdisk_size'),
+                        suffixText: 'GB',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _virtualDiskNameController,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'deploy_vdisk_name'),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          _buildCompatibilityNotices(),
+        ],
+      ),
     );
   }
 
-  Widget _buildStep4SelectDisk() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(
-            context,
-            _isLinuxMode ? 'wtg_linux_step4_title' : 'wtg_step4_title',
-          ),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(context, _isLinuxMode ? 'wtg_linux_step4_desc' : 'wtg_step4_desc'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        if (_isDetecting) ...[
-          Center(
-            child: Column(
+  Widget _buildAdvancedStep() {
+    final plan = _plan;
+    return _stepContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            child: ExpansionTile(
+              initiallyExpanded: true,
+              leading: const Icon(Icons.tune),
+              title: Text(tr(context, 'deploy_standard_options')),
               children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text(tr(context, 'creator_no_usb')),
+                if (!_isLinux) ...[
+                  _switchTile(
+                    'deploy_block_local',
+                    'deploy_block_local_desc',
+                    _blockLocalDisks,
+                    (value) => _blockLocalDisks = value,
+                  ),
+                  _switchTile(
+                    'deploy_skip_oobe',
+                    'deploy_skip_oobe_desc',
+                    _skipOobe,
+                    (value) => _skipOobe = value,
+                  ),
+                  _switchTile(
+                    'deploy_disable_winre',
+                    'deploy_disable_winre_desc',
+                    _disableWinRe,
+                    (value) => _disableWinRe = value,
+                  ),
+                  _switchTile(
+                    'deploy_disable_uasp',
+                    'deploy_disable_uasp_desc',
+                    _disableUasp,
+                    (value) => _disableUasp = value,
+                  ),
+                  if (DeploymentCompatibility.supportsCompactOs(plan))
+                    _switchTile(
+                      'deploy_compact_os',
+                      'deploy_compact_os_desc',
+                      _compactOs,
+                      (value) => _compactOs = value,
+                    ),
+                  if (_deploymentMode != DeploymentMode.direct)
+                    _switchTile(
+                      'deploy_fix_vhd_letter',
+                      'deploy_fix_vhd_letter_desc',
+                      _fixVhdLetter,
+                      (value) => _fixVhdLetter = value,
+                    ),
+                  _switchTile(
+                    'deploy_netfx3',
+                    'deploy_netfx3_desc',
+                    _enableNetFx3,
+                    (value) => _enableNetFx3 = value,
+                  ),
+                ],
+                ListTile(
+                  leading: const Icon(Icons.folder_copy_outlined),
+                  title: Text(tr(context, 'deploy_driver_directory')),
+                  subtitle: Text(
+                    _driverDirectory.isEmpty
+                        ? tr(
+                            context,
+                            _isLinux
+                                ? 'deploy_linux_driver_desc'
+                                : 'deploy_windows_driver_desc',
+                          )
+                        : _driverDirectory,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    onPressed: _pickDriverDirectory,
+                    icon: const Icon(Icons.folder_open),
+                  ),
+                ),
               ],
             ),
           ),
-        ] else if (_disks.isEmpty) ...[
-          Center(
-            child: Column(
-              children: [
-                Icon(
-                  Icons.usb_off,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(height: 16),
-                Text(tr(context, 'creator_no_usb')),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _detectDisks,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(tr(context, 'creator_retry')),
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          if (!_isLinux) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: ExpansionTile(
+                leading: const Icon(Icons.science_outlined),
+                title: Text(tr(context, 'deploy_expert_options')),
+                subtitle: Text(tr(context, 'deploy_expert_desc')),
                 children: [
-                  // Disk list
-                  ..._disks.map((disk) {
-                    final isSelected =
-                        _selectedDisk?.diskNumber == disk.diskNumber;
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.usb,
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                  if (DeploymentCompatibility.supportsWimBoot(plan))
+                    _switchTile(
+                      'deploy_wimboot',
+                      'deploy_wimboot_desc',
+                      _wimBoot,
+                      (value) => _wimBoot = value,
+                    ),
+                  if (plan.usesNtfsUefiLayout)
+                    ListTile(
+                      leading: const Icon(Icons.verified_outlined),
+                      title: Text(tr(context, 'deploy_ntfs_uefi')),
+                      subtitle: Text(tr(context, 'deploy_ntfs_uefi_desc')),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _letterDropdown(
+                            'deploy_system_letter',
+                            _systemLetter,
+                            (value) => _systemLetter = value,
+                          ),
                         ),
-                        title: Text(
-                          disk.friendlyName,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _letterDropdown(
+                            'deploy_boot_letter',
+                            _bootLetter,
+                            (value) => _bootLetter = value,
+                          ),
                         ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${disk.sizeFormatted} • ${disk.busType}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            if (disk.serialNumber.isNotEmpty)
-                              Text(
-                                '${tr(context, 'creator_serial')}: ${disk.serialNumber}',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                          ],
-                        ),
-                        trailing: isSelected
-                            ? Icon(
-                                Icons.check_circle,
-                                color: Theme.of(context).colorScheme.primary,
-                              )
-                            : null,
-                        onTap: () {
-                          setState(() {
-                            _selectedDisk = disk;
-                            _compatibilityResult = null;
-                            _isCheckingCompatibility = false;
-                          });
-                          if (!_isLinuxMode) {
-                            _checkCompatibility(disk);
-                          }
-                        },
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ExpansionTile(
+                leading: const Icon(Icons.drive_file_rename_outline),
+                title: Text(tr(context, 'deploy_volume_identity')),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _volumeLabelController,
+                      maxLength: 32,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'deploy_volume_label'),
                       ),
-                    );
-                  }),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.image_outlined),
+                    title: Text(tr(context, 'deploy_custom_icon')),
+                    subtitle: Text(
+                      _customIconPath.isEmpty
+                          ? tr(context, 'deploy_custom_icon_desc')
+                          : _customIconPath,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      onPressed: _pickIcon,
+                      icon: const Icon(Icons.folder_open),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          _buildCompatibilityNotices(),
+        ],
+      ),
+    );
+  }
 
-                  // Compatibility checking indicator
-                  if (!_isLinuxMode && _isCheckingCompatibility) ...[
-                    const SizedBox(height: 16),
-                    Center(
-                      child: Column(
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 8),
-                          Text(tr(context, 'wtg_checking_compatibility')),
-                        ],
+  Widget _buildSummaryStep() {
+    final plan = _plan;
+    final disk = _disk;
+    return _stepContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            child: Column(
+              children: [
+                _summaryRow('deploy_summary_image', plan.imageName),
+                _summaryRow(
+                  'deploy_summary_disk',
+                  disk == null
+                      ? '-'
+                      : '${disk.friendlyName} • ${disk.sizeFormatted} • Disk ${disk.diskNumber}',
+                ),
+                _summaryRow(
+                  'deploy_summary_boot',
+                  _bootModeLabel(plan.bootMode),
+                ),
+                _summaryRow(
+                  'deploy_summary_method',
+                  _deploymentModeLabel(plan.deploymentMode),
+                ),
+                if (plan.usesVirtualDisk)
+                  _summaryRow(
+                    'deploy_summary_virtual_disk',
+                    '${plan.virtualDiskFileName} • ${plan.virtualDiskSizeGb} GB • ${_virtualDiskTypeLabel(plan.virtualDiskType)}',
+                  ),
+                _summaryRow(
+                  'deploy_summary_drivers',
+                  plan.driverDirectory.isEmpty
+                      ? tr(context, 'deploy_none')
+                      : plan.driverDirectory,
+                ),
+                _summaryRow(
+                  'deploy_summary_options',
+                  _enabledOptions(plan).join(', '),
+                ),
+              ],
+            ),
+          ),
+          _buildCompatibilityNotices(),
+          const SizedBox(height: 12),
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      tr(
+                        context,
+                        _isLinux ? 'creator_linux_warning' : 'creator_warning',
+                      ),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onErrorContainer,
                       ),
                     ),
-                  ],
-
-                  // Compatibility result card
-                  if (!_isLinuxMode && _compatibilityResult != null) ...[
-                    const SizedBox(height: 16),
-                    _buildCompatibilityCard(),
-                  ],
-
-                  // Action buttons
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      FilledButton.icon(
-                        onPressed: _selectedDisk != null
-                            ? () => setState(() => _currentStep = 4)
-                            : null,
-                        icon: const Icon(Icons.arrow_forward),
-                        label: Text(tr(context, 'wtg_next_confirm')),
-                      ),
-                      const SizedBox(width: 12),
-                      OutlinedButton.icon(
-                        onPressed: () =>
-                            setState(() => _currentStep = _isLinuxMode ? 0 : 2),
-                        icon: const Icon(Icons.arrow_back),
-                        label: Text(tr(context, 'creator_back')),
-                      ),
-                    ],
                   ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCompatibilityNotices() {
+    final report = DeploymentCompatibility.evaluate(_plan);
+    if (report.issues.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        children: report.issues.map((issue) {
+          final color = issue.severity == CompatibilitySeverity.error
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).colorScheme.tertiary;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                border: Border.all(color: color.withValues(alpha: 0.45)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    issue.severity == CompatibilitySeverity.error
+                        ? Icons.error_outline
+                        : Icons.info_outline,
+                    color: color,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(tr(context, issue.messageKey))),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildNavigation() {
+    return Row(
+      children: [
+        if (_step > 0)
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _step--),
+            icon: const Icon(Icons.arrow_back),
+            label: Text(tr(context, 'creator_back')),
+          ),
+        const Spacer(),
+        if (_step < _configurationSteps - 1)
+          FilledButton.icon(
+            onPressed: _canContinue() ? () => setState(() => _step++) : null,
+            icon: const Icon(Icons.arrow_forward),
+            label: Text(tr(context, 'creator_next')),
+          )
+        else
+          FilledButton.icon(
+            onPressed: _canContinue() ? _start : null,
+            icon: const Icon(Icons.play_arrow),
+            label: Text(tr(context, 'wtg_start_creation')),
+          ),
       ],
     );
   }
 
-  Widget _buildCompatibilityCard() {
-    final result = _compatibilityResult!;
-    final gradeColor = _getGradeColor(result.grade);
+  Widget _buildExecutionView() {
+    final progress = _taskProgress;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _finished
+                      ? tr(
+                          context,
+                          _success ? 'deploy_complete' : 'deploy_failed',
+                        )
+                      : tr(context, 'deploy_running'),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _finished
+                      ? tr(
+                          context,
+                          _success
+                              ? 'deploy_complete_desc'
+                              : 'deploy_failed_desc',
+                        )
+                      : _localizedOrRaw(
+                          progress?.message.split('\n').first ??
+                              'wtg_step_preparing',
+                        ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _finished
+                                  ? (_success
+                                        ? Icons.check_circle
+                                        : Icons.error_outline)
+                                  : Icons.sync,
+                              size: 42,
+                              color: _success
+                                  ? Colors.green
+                                  : (_finished
+                                        ? colorScheme.error
+                                        : colorScheme.primary),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _phaseLabel(progress?.phase ?? 'preparing'),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${((progress?.progress ?? (_success ? 1 : 0)) * 100).toStringAsFixed(0)}%',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _Metric(
+                              label: tr(context, 'wtg_elapsed'),
+                              value: _formatDuration(
+                                progress?.elapsedSeconds ?? 0,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        LinearProgressIndicator(
+                          value: _finished && _success
+                              ? 1
+                              : progress?.progress ?? 0,
+                        ),
+                        if ((progress?.totalBytes ?? 0) > 0) ...[
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _Metric(
+                                  label: tr(context, 'deploy_written'),
+                                  value:
+                                      '${_formatBytes(progress!.writtenBytes)} / ${_formatBytes(progress.totalBytes)}',
+                                ),
+                              ),
+                              Expanded(
+                                child: _Metric(
+                                  label: tr(context, 'deploy_speed'),
+                                  value:
+                                      '${_formatBytes(progress.speedBytesPerSecond)}/s',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tr(context, 'deploy_log_summary'),
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 10),
+                                Expanded(
+                                  child: ListView.builder(
+                                    itemCount: _progressLog.length,
+                                    itemBuilder: (context, index) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_outline,
+                                            size: 16,
+                                            color: colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(_progressLog[index]),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_showGame) ...[
+                        const SizedBox(width: 12),
+                        SizedBox(width: 230, child: _buildGame()),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (!_finished)
+                      TextButton.icon(
+                        onPressed: () => setState(() => _showGame = !_showGame),
+                        icon: const Icon(Icons.sports_esports_outlined),
+                        label: Text(tr(context, 'deploy_waiting_game')),
+                      ),
+                    const Spacer(),
+                    if (!_finished)
+                      OutlinedButton.icon(
+                        onPressed:
+                            progress?.cancellable == true &&
+                                _taskController?.cancelRequested != true
+                            ? _cancel
+                            : null,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                        label: Text(tr(context, 'cancel')),
+                      )
+                    else
+                      FilledButton.icon(
+                        onPressed: _reset,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(tr(context, 'creator_another')),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _buildGame() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: gradeColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      result.gradeText,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: gradeColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tr(context, 'wtg_compatibility_grade'),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        tr(context, result.gradeDescription),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            Text(
+              tr(context, 'deploy_waiting_game'),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
+            const SizedBox(height: 8),
+            Text('${tr(context, 'deploy_game_score')}: $_gameScore'),
             const SizedBox(height: 16),
-            _InfoRow(tr(context, 'wtg_bus_type'), result.busType),
-            _InfoRow(tr(context, 'wtg_usb_version'), result.usbVersion),
-            _InfoRow(tr(context, 'creator_size'), result.sizeFormatted),
-
-            // Speed test results
-            if (result.speedTestSuccess) ...[
-              _InfoRow(
-                tr(context, 'wtg_read_speed'),
-                '${result.readSpeedMBps} MB/s',
-              ),
-              _InfoRow(
-                tr(context, 'wtg_write_speed'),
-                '${result.writeSpeedMBps} MB/s',
-              ),
-            ] else if (result.speedTestSkipped) ...[
-              const Divider(),
-              Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      tr(context, 'wtg_speed_test_skipped'),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (result.speedTestError != null) ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 24),
-                  child: Text(
-                    tr(context, result.speedTestError!),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ] else ...[
-              const Divider(),
-              Row(
-                children: [
-                  Icon(
-                    Icons.speed,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    tr(context, 'wtg_speed_test_failed'),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              if (result.speedTestError != null) ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 24),
-                  child: Text(
-                    tr(context, result.speedTestError!),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-
-            // Warnings
-            if (result.warnings.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                tr(context, 'wtg_warnings'),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              ...result.warnings.map(
-                (w) => Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          tr(context, w),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-
-            // Recommendations
-            if (result.recommendations.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                tr(context, 'wtg_recommendations'),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              ...result.recommendations.map(
-                (r) => Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          tr(context, r),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-
-            // Debug info section (collapsible)
-            if (result.debugLogs.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: Text(
-                    tr(context, 'wtg_debug_info'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      height: 200,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Scrollbar(
-                        child: SingleChildScrollView(
-                          child: SelectableText(
-                            result.debugLogs.join('\n'),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontFamily: 'monospace',
-                                  fontSize: 10,
-                                ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getGradeColor(WtgCompatibilityGrade grade) {
-    switch (grade) {
-      case WtgCompatibilityGrade.a:
-        return Colors.green;
-      case WtgCompatibilityGrade.b:
-        return Colors.lightGreen;
-      case WtgCompatibilityGrade.c:
-        return Colors.orange;
-      case WtgCompatibilityGrade.d:
-        return Colors.deepOrange;
-      case WtgCompatibilityGrade.f:
-        return Colors.red;
-      case WtgCompatibilityGrade.unknown:
-        return Colors.grey;
-    }
-  }
-
-  Widget _buildStep5Confirm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(
-            context,
-            _isLinuxMode ? 'wtg_linux_confirm_title' : 'wtg_step5_title',
-          ),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(
-            context,
-            _isLinuxMode ? 'wtg_linux_confirm_desc' : 'wtg_step5_desc',
-          ),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // ISO Info Card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tr(context, 'creator_iso_section'),
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoRow(
-                          tr(context, 'creator_file'),
-                          _selectedIso?.fileName ?? '',
-                        ),
-                        _InfoRow(
-                          tr(context, 'creator_version'),
-                          _selectedIso?.windowsVersion ??
-                              tr(context, 'creator_unknown'),
-                        ),
-                        _InfoRow(
-                          tr(context, 'creator_size'),
-                          _selectedIso?.displaySize ?? '',
-                        ),
-                        if (!_isLinuxMode && _selectedImageIndex != null) ...[
-                          const Divider(),
-                          Text(
-                            tr(context, 'wtg_selected_image'),
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8),
-                          ..._wimImages
-                              .where(
-                                (img) => img['index'] == _selectedImageIndex,
-                              )
-                              .map(
-                                (img) => Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      img['name'] ??
-                                          tr(
-                                            context,
-                                            'wtg_image_fallback',
-                                          ).replaceAll(
-                                            '{index}',
-                                            '${img['index']}',
-                                          ),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    ),
-                                    if (img['edition'] != null)
-                                      Text(
-                                        img['edition'],
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                        ] else if (_isLinuxMode) ...[
-                          const Divider(),
-                          _InfoRow(
-                            tr(context, 'wtg_linux_workspace_type'),
-                            tr(context, 'wtg_linux_live_workspace'),
-                          ),
-                          _InfoRow(
-                            tr(context, 'wtg_linux_persistence'),
-                            tr(context, 'wtg_linux_persistence_note'),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Disk Info Card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tr(context, 'creator_usb_section'),
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoRow(
-                          tr(context, 'creator_disk'),
-                          '${tr(context, 'wtg_disk_prefix')} ${_selectedDisk?.diskNumber ?? 0}',
-                        ),
-                        _InfoRow(
-                          tr(context, 'creator_model'),
-                          _selectedDisk?.friendlyName ?? '',
-                        ),
-                        _InfoRow(
-                          tr(context, 'creator_serial'),
-                          _selectedDisk?.serialNumber ?? '',
-                        ),
-                        _InfoRow(
-                          tr(context, 'creator_size'),
-                          _selectedDisk?.sizeFormatted ?? '',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Warning Card
-                Card(
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 32,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          tr(
-                            context,
-                            _isLinuxMode
-                                ? 'creator_linux_warning'
-                                : 'creator_warning',
-                          ),
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                                fontWeight: FontWeight.bold,
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Confirmation Input
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tr(context, 'erase_title'),
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${tr(context, 'erase_desc_prefix')} ${tr(context, 'wtg_erase_confirm_word')} ${tr(context, 'erase_desc_suffix')}',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _confirmController,
-                          decoration: InputDecoration(
-                            hintText: tr(context, 'wtg_erase_confirm_word'),
-                            border: const OutlineInputBorder(),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _isConfirmValid =
-                                  value.trim() ==
-                                  tr(context, 'wtg_erase_confirm_word');
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            FilledButton.icon(
-              onPressed: _isConfirmValid ? _startWtgCreation : null,
-              icon: const Icon(Icons.play_arrow),
-              label: Text(tr(context, 'wtg_start_creation')),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _currentStep = 3),
-              icon: const Icon(Icons.arrow_back),
-              label: Text(tr(context, 'creator_back')),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStep6Progress() {
-    final progress = _wtgProgress;
-    if (progress == null) return const SizedBox.shrink();
-
-    String stepText;
-    switch (progress.step) {
-      case WtgStep.preparing:
-        stepText = tr(context, 'wtg_step_preparing');
-        break;
-      case WtgStep.partitioningDisk:
-        stepText = tr(
-          context,
-          _isLinuxMode ? 'linux_locking_disk' : 'wtg_step_partitioning',
-        );
-        break;
-      case WtgStep.mountingIso:
-        stepText = tr(context, 'wtg_step_mounting');
-        break;
-      case WtgStep.applyingImage:
-        stepText = tr(
-          context,
-          _isLinuxMode ? 'linux_step_writing_image' : 'wtg_step_applying',
-        );
-        break;
-      case WtgStep.writingBootFiles:
-        stepText = tr(context, 'wtg_step_boot');
-        break;
-      case WtgStep.verifying:
-        stepText = tr(context, 'wtg_step_verifying');
-        break;
-      case WtgStep.complete:
-        stepText = tr(context, 'step_complete');
-        break;
-      case WtgStep.failed:
-        stepText = tr(context, 'step_failed');
-        break;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(
-            context,
-            _isLinuxMode ? 'wtg_linux_step6_title' : 'wtg_step6_title',
-          ),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(context, _isLinuxMode ? 'wtg_linux_step6_desc' : 'wtg_step6_desc'),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: Center(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (progress.step != WtgStep.complete &&
-                        progress.step != WtgStep.failed) ...[
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 24),
-                    ] else if (progress.step == WtgStep.complete) ...[
-                      Icon(Icons.check_circle, size: 64, color: Colors.green),
-                      const SizedBox(height: 24),
-                    ] else ...[
-                      Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                    Text(
-                      stepText,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: 400,
-                      child: LinearProgressIndicator(
-                        value: progress.progress,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${(progress.progress * 100).toStringAsFixed(0)}%',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    // Progress details (only during applying image)
-                    if (progress.step == WtgStep.applyingImage) ...[
-                      const SizedBox(height: 16),
-                      _buildProgressDetails(progress),
-                    ],
-                    if (progress.currentFile != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        progress.currentFile!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    if (progress.message.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _resolveLocalizedMessage(context, progress.message),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: progress.step == WtgStep.failed
-                              ? Theme.of(context).colorScheme.error
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProgressDetails(WtgProgress progress) {
-    final elapsed = _progressStopwatch?.elapsed ?? progress.elapsedTime;
-    final formattedElapsed = _formatElapsed(elapsed ?? Duration.zero);
-
-    return SizedBox(
-      width: 560,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
             Expanded(
-              child: _ProgressDetailItem(
-                icon: Icons.timer_outlined,
-                label: tr(context, 'wtg_elapsed'),
-                value: formattedElapsed,
-              ),
-            ),
-            const SizedBox(width: 20),
-            _IdleGamePanel(
-              activeIndex: _idleGameTarget,
-              score: _idleGameScore,
-              onTileTap: _handleIdleGameTap,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatElapsed(Duration elapsed) {
-    final hours = elapsed.inHours.toString().padLeft(2, '0');
-    final minutes = (elapsed.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$seconds';
-  }
-
-  void _handleIdleGameTap(int index) {
-    if (index != _idleGameTarget) return;
-    setState(() {
-      _idleGameScore++;
-      var nextTarget = _idleGameRandom.nextInt(9);
-      if (nextTarget == _idleGameTarget) {
-        nextTarget = (nextTarget + 1) % 9;
-      }
-      _idleGameTarget = nextTarget;
-    });
-  }
-
-  Widget _buildStepComplete() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(
-            context,
-            _isLinuxMode
-                ? 'wtg_linux_step_complete_title'
-                : 'wtg_step_complete_title',
-          ),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(
-            context,
-            _isLinuxMode
-                ? 'wtg_linux_step_complete_desc'
-                : 'wtg_step_complete_desc',
-          ),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: Center(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, size: 64, color: Colors.green),
-                    const SizedBox(height: 24),
-                    Text(
-                      tr(
-                        context,
-                        _isLinuxMode
-                            ? 'wtg_linux_creation_complete'
-                            : 'wtg_creation_complete',
-                      ),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      tr(
-                        context,
-                        _isLinuxMode
-                            ? 'wtg_linux_creation_complete_desc'
-                            : 'wtg_creation_complete_desc',
-                      ),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 9,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
                 ),
+                itemBuilder: (context, index) {
+                  final active = index == _gameTarget;
+                  return IconButton.filledTonal(
+                    onPressed: () {
+                      if (!active) return;
+                      setState(() {
+                        _gameScore++;
+                        var next = _random.nextInt(9);
+                        if (next == _gameTarget) next = (next + 1) % 9;
+                        _gameTarget = next;
+                      });
+                    },
+                    icon: Icon(active ? Icons.bolt : Icons.circle_outlined),
+                  );
+                },
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            FilledButton.icon(
-              onPressed: () {
-                setState(() {
-                  _currentStep = 0;
-                  _selectedIso = null;
-                  _selectedDisk = null;
-                  _wimImages = [];
-                  _selectedImageIndex = null;
-                  _compatibilityResult = null;
-                  _wtgProgress = null;
-                  _confirmController.clear();
-                  _isConfirmValid = false;
-                });
-              },
-              icon: const Icon(Icons.refresh),
-              label: Text(tr(context, 'creator_another')),
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildStepFailed() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          tr(
-            context,
-            _isLinuxMode
-                ? 'wtg_linux_step_failed_title'
-                : 'wtg_step_failed_title',
-          ),
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr(
-            context,
-            _isLinuxMode
-                ? 'wtg_linux_step_failed_desc'
-                : 'wtg_step_failed_desc',
-          ),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: Center(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      tr(context, 'wtg_creation_failed'),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_wtgProgress?.message != null) ...[
-                      Text(
-                        _resolveLocalizedMessage(
-                          context,
-                          _wtgProgress!.message,
-                        ),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ],
-                ),
+  Widget _switchTile(
+    String titleKey,
+    String subtitleKey,
+    bool value,
+    ValueChanged<bool> update,
+  ) {
+    return SwitchListTile(
+      title: Text(tr(context, titleKey)),
+      subtitle: Text(tr(context, subtitleKey)),
+      value: value,
+      onChanged: (next) => setState(() => update(next)),
+    );
+  }
+
+  Widget _letterDropdown(
+    String labelKey,
+    String value,
+    ValueChanged<String> update,
+  ) {
+    final letters = [
+      '',
+      ...List.generate(23, (index) => String.fromCharCode(68 + index)),
+    ];
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: tr(context, labelKey)),
+      items: letters
+          .map(
+            (letter) => DropdownMenuItem(
+              value: letter,
+              child: Text(
+                letter.isEmpty ? tr(context, 'deploy_auto') : '$letter:',
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            FilledButton.icon(
-              onPressed: () {
-                setState(() {
-                  _currentStep = 0;
-                  _selectedIso = null;
-                  _selectedDisk = null;
-                  _wimImages = [];
-                  _selectedImageIndex = null;
-                  _compatibilityResult = null;
-                  _wtgProgress = null;
-                  _confirmController.clear();
-                  _isConfirmValid = false;
-                });
-              },
-              icon: const Icon(Icons.refresh),
-              label: Text(tr(context, 'creator_another')),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _currentStep = 4),
-              icon: const Icon(Icons.arrow_back),
-              label: Text(tr(context, 'creator_back')),
-            ),
-          ],
-        ),
-      ],
+          )
+          .toList(),
+      onChanged: (next) => setState(() => update(next ?? '')),
     );
+  }
+
+  Widget _summaryRow(String labelKey, String value) {
+    return ListTile(
+      title: Text(tr(context, labelKey)),
+      subtitle: Text(value.isEmpty ? '-' : value),
+    );
+  }
+
+  List<String> _enabledOptions(DeploymentPlan plan) {
+    final values = <String>[];
+    if (plan.blockLocalDisks) values.add(tr(context, 'deploy_block_local'));
+    if (plan.skipOobe) values.add(tr(context, 'deploy_skip_oobe'));
+    if (plan.disableWinRe) values.add(tr(context, 'deploy_disable_winre'));
+    if (plan.disableUasp) values.add(tr(context, 'deploy_disable_uasp'));
+    if (plan.compactOs) values.add('CompactOS');
+    if (plan.wimBoot) values.add('WIMBoot');
+    if (plan.enableNetFx3) values.add('.NET Framework 3.5');
+    if (plan.usesNtfsUefiLayout) {
+      values.add(tr(context, 'deploy_ntfs_uefi'));
+    }
+    return values.isEmpty ? [tr(context, 'deploy_none')] : values;
+  }
+
+  String _deploymentModeLabel(DeploymentMode mode) => switch (mode) {
+    DeploymentMode.direct => tr(context, 'deploy_direct'),
+    DeploymentMode.vhd => 'VHD',
+    DeploymentMode.vhdx => 'VHDX',
+  };
+
+  String _deploymentModeDescription(DeploymentMode mode) => switch (mode) {
+    DeploymentMode.direct => tr(context, 'deploy_direct_desc'),
+    DeploymentMode.vhd => tr(context, 'deploy_vhd_desc'),
+    DeploymentMode.vhdx => tr(context, 'deploy_vhdx_desc'),
+  };
+
+  String _bootModeLabel(DeploymentBootMode mode) => switch (mode) {
+    DeploymentBootMode.uefiGpt => tr(context, 'deploy_boot_uefi_gpt'),
+    DeploymentBootMode.uefiMbr => tr(context, 'deploy_boot_uefi_mbr'),
+    DeploymentBootMode.legacyBios => tr(context, 'deploy_boot_legacy'),
+  };
+
+  String _virtualDiskTypeLabel(VirtualDiskType type) => switch (type) {
+    VirtualDiskType.dynamic => tr(context, 'deploy_vdisk_dynamic'),
+    VirtualDiskType.fixed => tr(context, 'deploy_vdisk_fixed'),
+  };
+
+  String _phaseLabel(String phase) {
+    final key = switch (phase) {
+      'preparing' => 'wtg_step_preparing',
+      'partitioningDisk' || 'partitioning' => 'wtg_step_partitioning',
+      'mountingIso' => 'wtg_step_mounting',
+      'applyingImage' => 'wtg_step_applying',
+      'writingBootFiles' => 'wtg_step_boot',
+      'verifying' => 'wtg_step_verifying',
+      'complete' => 'step_complete',
+      'failed' => 'step_failed',
+      _ => 'wtg_step_preparing',
+    };
+    return tr(context, key);
+  }
+
+  String _localizedOrRaw(String value) {
+    final localized = tr(context, value);
+    return localized.isEmpty || localized.contains('unavailable')
+        ? value
+        : localized;
+  }
+
+  String _formatDuration(int seconds) {
+    final duration = Duration(seconds: seconds);
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final secs = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$secs';
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  final String label;
-
-  const _Chip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressDetailItem extends StatelessWidget {
+class _SelectionPanel extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String value;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+  final bool stackTrailingNarrowly;
 
-  const _ProgressDetailItem({
+  const _SelectionPanel({
     required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                value,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _IdleGamePanel extends StatelessWidget {
-  final int activeIndex;
-  final int score;
-  final ValueChanged<int> onTileTap;
-
-  const _IdleGamePanel({
-    required this.activeIndex,
-    required this.score,
-    required this.onTileTap,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    this.onTap,
+    this.trailing,
+    this.stackTrailingNarrowly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      width: 132,
-      child: Row(
-        children: [
-          SizedBox(
-            width: 78,
-            height: 78,
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: 9,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-              ),
-              itemBuilder: (context, index) {
-                final isActive = index == activeIndex;
-                return Material(
-                  color: isActive
-                      ? colorScheme.primary
-                      : colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(6),
-                    onTap: () => onTileTap(index),
-                    child: Center(
-                      child: AnimatedScale(
-                        scale: isActive ? 1 : 0.75,
-                        duration: const Duration(milliseconds: 140),
-                        child: Icon(
-                          Icons.circle,
-                          size: 8,
-                          color: isActive
-                              ? colorScheme.onPrimary
-                              : colorScheme.outlineVariant,
-                        ),
-                      ),
+    return Material(
+      color: selected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+          : colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stackTrailing =
+                stackTrailingNarrowly &&
+                trailing != null &&
+                constraints.maxWidth < 420;
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+                ],
+              ],
+            );
+            final leadingAndDetails = Row(
               children: [
                 Icon(
-                  Icons.sports_esports_outlined,
-                  size: 20,
-                  color: colorScheme.primary,
+                  icon,
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  score.toString(),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                const SizedBox(width: 14),
+                Expanded(child: details),
               ],
+            );
+
+            return ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 78),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: stackTrailing
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          leadingAndDetails,
+                          const SizedBox(height: 12),
+                          trailing!,
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Icon(
+                            icon,
+                            color: selected
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(child: details),
+                          if (trailing != null) ...[
+                            const SizedBox(width: 12),
+                            trailing!,
+                          ],
+                        ],
+                      ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  const _OptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _SelectionPanel(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      selected: selected,
+      onTap: onTap,
+      trailing: selected ? const Icon(Icons.check_circle) : null,
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _EmptyState({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(48),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 48,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+            const SizedBox(height: 12),
+            Text(text),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _Metric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),

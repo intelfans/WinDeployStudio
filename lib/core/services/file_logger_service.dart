@@ -72,7 +72,8 @@ class FileLoggerService {
     try {
       final dir = await logDir;
       final now = DateTime.now();
-      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final logFile = File(p.join(dir.path, '$dateStr.log'));
 
       await logFile.writeAsString(
@@ -86,17 +87,30 @@ class FileLoggerService {
 
   Future<void> _cleanOldLogs(Directory dir) async {
     try {
-      final files = dir.listSync()
+      final cutoff = DateTime.now().subtract(
+        const Duration(days: AppConstants.logRetentionDays),
+      );
+      final files = dir
+          .listSync()
           .whereType<File>()
           .where((f) => f.path.endsWith('.log'))
           .toList();
 
-      if (files.length > AppConstants.maxLogFiles) {
-        files.sort((a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()));
-        final toDelete = files.take(files.length - AppConstants.maxLogFiles);
-        for (final file in toDelete) {
+      for (final file in List<File>.from(files)) {
+        if (file.lastModifiedSync().isBefore(cutoff)) {
           await file.delete();
+          files.remove(file);
         }
+      }
+
+      if (files.length <= AppConstants.maxLogFiles) return;
+
+      files.sort(
+        (a, b) => a.lastModifiedSync().compareTo(b.lastModifiedSync()),
+      );
+      final toDelete = files.take(files.length - AppConstants.maxLogFiles);
+      for (final file in toDelete) {
+        await file.delete();
       }
     } catch (_) {}
   }
@@ -105,14 +119,17 @@ class FileLoggerService {
     try {
       final dir = await logDir;
       final now = DateTime.now();
-      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final logFile = File(p.join(dir.path, '$dateStr.log'));
 
       if (!await logFile.exists()) return [];
 
       final lines = await logFile.readAsLines();
       return lines.where((l) => l.isNotEmpty).map((line) {
-        final timestampMatch = RegExp(r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]').firstMatch(line);
+        final timestampMatch = RegExp(
+          r'^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]',
+        ).firstMatch(line);
         final timestamp = timestampMatch != null
             ? (DateTime.tryParse(timestampMatch.group(1)!) ?? DateTime.now())
             : DateTime.now();
@@ -121,7 +138,9 @@ class FileLoggerService {
         String target = '';
         String result = line;
 
-        final parts = RegExp(r'^\[.*?\]\s*\[\w+\]\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$').firstMatch(line);
+        final parts = RegExp(
+          r'^\[.*?\]\s*\[\w+\]\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$',
+        ).firstMatch(line);
         if (parts != null) {
           action = parts.group(1) ?? '';
           target = parts.group(2) ?? '';

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_constants.dart';
@@ -11,10 +13,11 @@ import '../models/update_models.dart';
 class UpdateService {
   static const _repoOwner = 'intelfans';
   static const _repoName = 'WinDeployStudio';
-  static const _apiUrl =
-      'https://api.github.com/repos/$_repoOwner/$_repoName/releases/latest';
+  static const _apiBaseUrl =
+      'https://api.github.com/repos/$_repoOwner/$_repoName/releases';
+  static const _apiUrl = '$_apiBaseUrl?per_page=100';
   static const _releasePageUrl =
-      'https://github.com/$_repoOwner/$_repoName/releases/latest';
+      'https://github.com/$_repoOwner/$_repoName/releases';
   static const _cacheDuration = Duration(hours: 6);
   static const _maxRetries = 2;
 
@@ -23,7 +26,7 @@ class UpdateService {
     'objects.githubusercontent.com',
     'release-assets.githubusercontent.com',
   };
-
+  static const _trustedPublisherCommonNames = {'intelfans', 'Bob Steve'};
   static const _prefKeyAutoCheck = 'update_auto_check';
   static const _prefKeyLastCheck = 'update_last_check';
   static const _prefKeyIgnoredVersion = 'update_ignored_version';
@@ -35,6 +38,8 @@ class UpdateService {
   factory UpdateService() => _instance ??= UpdateService._();
 
   String? _lastTrustedDownloadPath;
+  String? _lastPublishedDownloadHash;
+  int? _lastPublishedDownloadSize;
 
   String get releasePageUrl => _releasePageUrl;
 
@@ -88,6 +93,7 @@ class UpdateService {
   Future<void> setChannel(UpdateChannel channel) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_prefKeyChannel, channel.index);
+    await clearCache();
   }
 
   AppVersion getCurrentVersion() {
@@ -97,11 +103,14 @@ class UpdateService {
   Future<UpdateInfo?> checkForUpdate({bool forceRefresh = false}) async {
     final log = LogCenterService();
     final current = getCurrentVersion();
+    final channel = await getChannel();
 
-    log.logUpdate('[Update] CheckStart=true\nCurrent=$current');
+    log.logUpdate(
+      '[Update] CheckStart=true\nCurrent=$current\nChannel=${channel.name}',
+    );
 
     if (!forceRefresh) {
-      final cached = await _loadCachedInfo();
+      final cached = await _loadCachedInfo(channel);
       if (cached != null) {
         final hasUpdate = cached.version > current;
         log.logUpdate(
@@ -129,10 +138,18 @@ class UpdateService {
         return null;
       }
 
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final info = UpdateInfo.fromJson(json);
+      final decoded = jsonDecode(response.body);
+      if (decoded is! List) return null;
+      final releases = decoded
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .where((item) => item['draft'] != true)
+          .toList();
+      final selected = _selectReleaseForChannel(releases, channel);
+      if (selected == null) return null;
+      final info = UpdateInfo.fromJson(selected);
 
-      await _saveCachedInfo(info);
+      await _saveCachedInfo(info, channel);
       await _saveLastCheckTime();
 
       final hasUpdate = info.version > current;
@@ -148,7 +165,7 @@ class UpdateService {
     }
   }
 
-  Future<UpdateInfo?> _loadCachedInfo() async {
+  Future<UpdateInfo?> _loadCachedInfo(UpdateChannel channel) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastCheckMs = prefs.getInt(_prefKeyLastCheck);
@@ -159,20 +176,20 @@ class UpdateService {
 
       final cachedJson = prefs.getString(_prefKeyCachedInfo);
       if (cachedJson == null) return null;
-
-      return UpdateInfo.fromJson(
-        jsonDecode(cachedJson) as Map<String, dynamic>,
-      );
+      final decoded = jsonDecode(cachedJson) as Map<String, dynamic>;
+      if (decoded['_channel'] != channel.name) return null;
+      return UpdateInfo.fromJson(decoded);
     } catch (_) {
       return null;
     }
   }
 
-  Future<void> _saveCachedInfo(UpdateInfo info) async {
+  Future<void> _saveCachedInfo(UpdateInfo info, UpdateChannel channel) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _prefKeyCachedInfo,
       jsonEncode({
+        '_channel': channel.name,
         'tag_name': info.tagName,
         'name': info.name,
         'body': info.body,
@@ -184,11 +201,51 @@ class UpdateService {
                 'browser_download_url': a.url,
                 'size': a.sizeBytes,
                 'content_type': a.contentType,
+                'digest': a.digest,
               },
             )
             .toList(),
       }),
     );
+  }
+
+  Map<String, dynamic>? _selectReleaseForChannel(
+    List<Map<String, dynamic>> releases,
+    UpdateChannel channel,
+  ) {
+    final candidates = releases.where((release) {
+      if (!_releaseAllowedForChannel(release, channel)) return false;
+      try {
+        final asset = UpdateInfo.fromJson(release).bestAsset;
+        return asset != null && asset.sizeBytes > 0 && asset.sha256 != null;
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+
+    candidates.sort((left, right) {
+      final leftInfo = UpdateInfo.fromJson(left);
+      final rightInfo = UpdateInfo.fromJson(right);
+      final versionComparison = rightInfo.version.compareTo(leftInfo.version);
+      if (versionComparison != 0) return versionComparison;
+      return rightInfo.publishedAt.compareTo(leftInfo.publishedAt);
+    });
+    return candidates.firstOrNull;
+  }
+
+  bool _releaseAllowedForChannel(
+    Map<String, dynamic> release,
+    UpdateChannel channel,
+  ) {
+    final text = '${release['tag_name']} ${release['name']}'.toLowerCase();
+    final isNightly = RegExp(
+      r'(?:^|[^a-z0-9])(nightly|daily|dev|canary)(?:[^a-z0-9]|$)',
+    ).hasMatch(text);
+    return switch (channel) {
+      UpdateChannel.stable => release['prerelease'] != true && !isNightly,
+      UpdateChannel.beta => !isNightly,
+      UpdateChannel.nightly => true,
+    };
   }
 
   bool isUpdateAvailable(UpdateInfo? info) {
@@ -222,7 +279,22 @@ class UpdateService {
     onProgress,
     CancelToken cancelToken,
   ) async {
-    final asset = info.bestAsset;
+    _lastTrustedDownloadPath = null;
+    _lastPublishedDownloadHash = null;
+    _lastPublishedDownloadSize = null;
+
+    final freshRelease = await _fetchReleaseByTag(info.tagName);
+    final channel = await getChannel();
+    if (freshRelease == null ||
+        !_releaseAllowedForChannel(freshRelease, channel)) {
+      LogCenterService().logUpdate(
+        '[Download] State=Failed\nReason=Release metadata unavailable',
+      );
+      return null;
+    }
+
+    final freshInfo = UpdateInfo.fromJson(freshRelease);
+    final asset = freshInfo.bestAsset;
     if (asset == null) {
       LogCenterService().logUpdate(
         '[Download] State=Failed\nReason=No asset found',
@@ -230,7 +302,15 @@ class UpdateService {
       return null;
     }
 
-    final downloadUrl = info.generateDownloadUrl();
+    final publishedHash = asset.sha256;
+    if (asset.sizeBytes <= 0 || publishedHash == null) {
+      LogCenterService().logUpdate(
+        '[Download] State=Failed\nReason=Missing trusted release digest',
+      );
+      return null;
+    }
+
+    final downloadUrl = freshInfo.generateDownloadUrl();
     if (!isUrlAllowed(downloadUrl)) {
       LogCenterService().logUpdate(
         '[Download] State=Failed\nReason=Blocked URL',
@@ -267,7 +347,11 @@ class UpdateService {
 
       if (result != null) {
         _lastTrustedDownloadPath = result;
-        log.logUpdate('[Download] State=Stable\nPath=$result');
+        _lastPublishedDownloadHash = publishedHash;
+        _lastPublishedDownloadSize = asset.sizeBytes;
+        log.logUpdate(
+          '[Download] State=Stable\nPath=$result\nTrust=GitHubReleaseDigest',
+        );
         return result;
       }
 
@@ -279,6 +363,30 @@ class UpdateService {
 
     log.logUpdate('[Download] State=Failed\nReason=Max retries exceeded');
     return null;
+  }
+
+  Future<Map<String, dynamic>?> _fetchReleaseByTag(String tagName) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$_apiBaseUrl/tags/${Uri.encodeComponent(tagName)}'),
+            headers: {
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return null;
+      final release = Map<String, dynamic>.from(decoded);
+      if (release['draft'] == true || release['tag_name'] != tagName) {
+        return null;
+      }
+      return release;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<String?> _doDownload(
@@ -293,6 +401,11 @@ class UpdateService {
     onProgress,
     CancelToken cancelToken,
   ) async {
+    File? file;
+    IOSink? sink;
+    final client = http.Client();
+    var completed = false;
+    cancelToken.client = client;
     try {
       final tempDir = await getTemporaryDirectory();
       final updateDir = Directory('${tempDir.path}\\WinDeployStudio\\update');
@@ -300,41 +413,43 @@ class UpdateService {
         await updateDir.create(recursive: true);
       }
 
-      final filePath = '${updateDir.path}\\${asset.name}';
-      final file = File(filePath);
-      final sink = file.openWrite();
+      final safeAssetName = _sanitizeAssetName(asset.name);
+      final filePath = p.join(updateDir.path, safeAssetName);
+      file = File(filePath);
 
-      final client = http.Client();
-      cancelToken.client = client;
+      final response = await _sendAllowedGet(client, url);
 
-      final request = http.Request('GET', Uri.parse(url));
-      request.headers['User-Agent'] =
-          'WinDeployStudio/${AppConstants.appVersion}';
-
-      final response = await client.send(request);
-
-      if (response.statusCode != 200) {
-        await sink.close();
-        client.close();
+      if (response == null || response.statusCode != 200) {
         return null;
       }
 
-      final totalBytes = (response.contentLength ?? 0) > 0
-          ? response.contentLength!
-          : asset.sizeBytes;
+      final expectedHash = asset.sha256;
+      final responseLength = response.contentLength;
+      if (expectedHash == null ||
+          asset.sizeBytes <= 0 ||
+          (responseLength != null && responseLength != asset.sizeBytes)) {
+        return null;
+      }
+
+      sink = file.openWrite();
+
+      final totalBytes = asset.sizeBytes;
       int downloadedBytes = 0;
       int lastReportedBytes = 0;
       final stopwatch = Stopwatch()..start();
       final speedStopwatch = Stopwatch()..start();
       DownloadPhase currentPhase = DownloadPhase.connecting;
 
-      await for (final chunk in response.stream) {
+      await for (final chunk in response.stream.timeout(
+        const Duration(seconds: 60),
+      )) {
         if (cancelToken.cancelled) {
-          await sink.close();
-          client.close();
           return null;
         }
 
+        if (downloadedBytes + chunk.length > totalBytes) {
+          return null;
+        }
         sink.add(chunk);
         downloadedBytes += chunk.length;
 
@@ -381,14 +496,79 @@ class UpdateService {
         }
       }
 
+      await sink.flush();
       await sink.close();
-      client.close();
+      sink = null;
       stopwatch.stop();
 
+      final finalLength = await file.length();
+      if (totalBytes <= 0 ||
+          finalLength != totalBytes ||
+          (asset.sizeBytes > 0 && finalLength != asset.sizeBytes)) {
+        return null;
+      }
+
+      final actualHash = await _sha256File(file);
+      if (actualHash != expectedHash) {
+        LogCenterService().logUpdate(
+          '[Download] State=Failed\nReason=Published digest mismatch',
+        );
+        return null;
+      }
+
+      completed = true;
       return filePath;
-    } catch (e) {
+    } catch (_) {
       return null;
+    } finally {
+      try {
+        await sink?.close();
+      } catch (_) {}
+      client.close();
+      if (identical(cancelToken.client, client)) {
+        cancelToken.client = null;
+      }
+      if (!completed && file != null) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+      }
     }
+  }
+
+  Future<http.StreamedResponse?> _sendAllowedGet(
+    http.Client client,
+    String url,
+  ) async {
+    var current = Uri.parse(url);
+    for (var redirect = 0; redirect <= 5; redirect++) {
+      if (!isUrlAllowed(current.toString())) return null;
+      final request = http.Request('GET', current)
+        ..followRedirects = false
+        ..headers['User-Agent'] = 'WinDeployStudio/${AppConstants.appVersion}'
+        ..headers['Accept-Encoding'] = 'identity';
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 30));
+      if (!response.isRedirect) return response;
+      final location = response.headers['location'];
+      await response.stream.drain<void>();
+      if (location == null || location.isEmpty) return null;
+      current = current.resolve(location);
+    }
+    return null;
+  }
+
+  String _sanitizeAssetName(String name) {
+    final base = p
+        .basename(name)
+        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_');
+    return base.isEmpty ? 'WinDeployStudio-Update.exe' : base;
+  }
+
+  Future<String> _sha256File(File file) async {
+    final digest = await sha256.bind(file.openRead()).first;
+    return digest.toString().toUpperCase();
   }
 
   String _formatSpeed(double bytesPerSecond) {
@@ -415,37 +595,59 @@ class UpdateService {
       final isExe = filePath.toLowerCase().endsWith('.exe');
 
       if (isExe) {
-        final signature = await _verifyInstallerSignature(filePath);
-        final unsignedAllowed =
-            signature.status == 'NotSigned' &&
-            _isLastTrustedDownload(file.absolute.path);
-        if (!signature.valid && !unsignedAllowed) {
+        if (!_isLastTrustedDownload(file.absolute.path) ||
+            _lastPublishedDownloadHash == null ||
+            _lastPublishedDownloadSize == null ||
+            await file.length() != _lastPublishedDownloadSize ||
+            await _sha256File(file) != _lastPublishedDownloadHash) {
           log.logUpdate(
-            '[Update] InstallFail: Signature invalid\n'
+            '[Update] InstallFail: Published digest verification failed',
+          );
+          return false;
+        }
+
+        final signature = await _verifyInstallerSignature(filePath);
+        if (!signature.valid ||
+            signature.status != 'Valid' ||
+            signature.thumbprint.isEmpty ||
+            signature.subjectCommonName != signature.publisherCommonName ||
+            !_isTrustedPublisher(signature.publisherCommonName)) {
+          log.logUpdate(
+            '[Update] InstallFail: Authenticode verification failed\n'
             'Status=${signature.status}\n'
-            'Subject=${signature.subject}',
+            'Publisher=${signature.publisherCommonName}\n'
+            'SubjectCN=${signature.subjectCommonName}\n'
+            'Subject=${signature.subject}\n'
+            'Thumbprint=${signature.thumbprint}\n'
+            'Error=${signature.error}',
           );
           return false;
         }
 
         log.logUpdate(
-          '[Update] InstallerSignature\n'
-          'Valid=${signature.valid}\n'
-          'Status=${signature.status}\n'
+          '[Update] InstallerTrust\n'
+          'ReleaseDigest=Valid\n'
+          'Authenticode=Valid\n'
+          'Publisher=${signature.publisherCommonName}\n'
+          'SubjectCN=${signature.subjectCommonName}\n'
           'Subject=${signature.subject}\n'
-          'UnsignedAllowed=$unsignedAllowed',
+          'Thumbprint=${signature.thumbprint}',
         );
 
         try {
           await Process.start(filePath, [
             '/silent',
+            '/CLOSEAPPLICATIONS',
+            '/RESTARTAPPLICATIONS',
           ], mode: ProcessStartMode.detached);
           log.logUpdate('[Update] Started with /silent');
+          Timer(const Duration(milliseconds: 800), () => exit(0));
           return true;
         } catch (_) {
           log.logUpdate('[Update] Silent failed, trying normal');
           await Process.start(filePath, [], mode: ProcessStartMode.detached);
           log.logUpdate('[Update] Started in normal mode');
+          Timer(const Duration(milliseconds: 800), () => exit(0));
           return true;
         }
       } else {
@@ -464,43 +666,101 @@ class UpdateService {
         filePath.toLowerCase();
   }
 
+  bool _isTrustedPublisher(String commonName) {
+    final normalized = commonName.trim().toLowerCase();
+    return _trustedPublisherCommonNames.any(
+      (allowed) => allowed.toLowerCase() == normalized,
+    );
+  }
+
   Future<_SignatureCheck> _verifyInstallerSignature(String filePath) async {
-    try {
-      final quotedPath = _psQuote(filePath);
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
+    final quotedPath = _psQuote(filePath);
+    final script =
         '''
-        \$sig = Get-AuthenticodeSignature -LiteralPath $quotedPath
-        [PSCustomObject]@{
-          Status = \$sig.Status.ToString()
-          Subject = if (\$sig.SignerCertificate) { \$sig.SignerCertificate.Subject } else { '' }
-        } | ConvertTo-Json -Compress
-        ''',
-      ]).timeout(const Duration(seconds: 15));
+\$signature = Get-AuthenticodeSignature -LiteralPath $quotedPath
+\$certificate = \$signature.SignerCertificate
+[PSCustomObject]@{
+  Status = \$signature.Status.ToString()
+  Subject = if (\$null -ne \$certificate) { \$certificate.Subject } else { '' }
+  Publisher = if (\$null -ne \$certificate) {
+    \$certificate.GetNameInfo(
+      [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
+      \$false
+    )
+  } else { '' }
+  Thumbprint = if (\$null -ne \$certificate) { \$certificate.Thumbprint } else { '' }
+  Error = if (\$signature.StatusMessage) { \$signature.StatusMessage } else { '' }
+} | ConvertTo-Json -Compress
+''';
 
-      if (result.exitCode != 0) {
+    Object? lastError;
+    for (final executable in const ['pwsh.exe', 'powershell.exe']) {
+      try {
+        final result = await Process.run(executable, [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          script,
+        ]).timeout(const Duration(seconds: 20));
+        if (result.exitCode != 0) {
+          lastError = result.stderr.toString().trim();
+          continue;
+        }
+
+        final decoded = jsonDecode(result.stdout.toString());
+        if (decoded is! Map) {
+          lastError = 'Invalid PowerShell signature response';
+          continue;
+        }
+        final data = Map<String, dynamic>.from(decoded);
+        final status = data['Status']?.toString() ?? '';
+        final subject = data['Subject']?.toString() ?? '';
+        final publisher = data['Publisher']?.toString() ?? '';
+        final thumbprint = data['Thumbprint']?.toString() ?? '';
+        final error = data['Error']?.toString() ?? '';
+        final subjectCommonName = _extractSubjectCommonName(subject);
         return _SignatureCheck(
-          false,
-          'PowerShellFailed',
-          result.stderr.toString(),
+          valid:
+              status == 'Valid' &&
+              subject.isNotEmpty &&
+              publisher.isNotEmpty &&
+              thumbprint.isNotEmpty &&
+              subjectCommonName == publisher,
+          status: status,
+          subject: subject,
+          subjectCommonName: subjectCommonName,
+          publisherCommonName: publisher,
+          thumbprint: thumbprint,
+          error: error,
         );
+      } catch (error) {
+        lastError = error;
       }
-
-      final data = jsonDecode(result.stdout.toString()) as Map<String, dynamic>;
-      final status = data['Status']?.toString() ?? '';
-      final subject = data['Subject']?.toString() ?? '';
-      return _SignatureCheck(status == 'Valid', status, subject);
-    } catch (e) {
-      return _SignatureCheck(false, 'Exception', e.toString());
     }
+
+    return _SignatureCheck(
+      valid: false,
+      status: 'VerificationFailed',
+      subject: '',
+      subjectCommonName: '',
+      publisherCommonName: '',
+      thumbprint: '',
+      error: lastError?.toString() ?? 'No PowerShell runtime available',
+    );
   }
 
   String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
-  void clearCache() async {
+  String _extractSubjectCommonName(String subject) {
+    final match = RegExp(
+      r'(?:^|,\s*)CN\s*=\s*(?:"([^"]+)"|([^,]+))',
+      caseSensitive: false,
+    ).firstMatch(subject);
+    return (match?.group(1) ?? match?.group(2) ?? '').trim();
+  }
+
+  Future<void> clearCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefKeyCachedInfo);
     await prefs.remove(_prefKeyLastCheck);
@@ -511,8 +771,20 @@ class _SignatureCheck {
   final bool valid;
   final String status;
   final String subject;
+  final String subjectCommonName;
+  final String publisherCommonName;
+  final String thumbprint;
+  final String error;
 
-  const _SignatureCheck(this.valid, this.status, this.subject);
+  const _SignatureCheck({
+    required this.valid,
+    required this.status,
+    required this.subject,
+    required this.subjectCommonName,
+    required this.publisherCommonName,
+    required this.thumbprint,
+    required this.error,
+  });
 }
 
 class CancelToken {

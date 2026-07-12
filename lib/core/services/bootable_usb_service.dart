@@ -1,12 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'bootable_media_validation.dart';
 import 'file_logger_service.dart';
-import '../utils/file_utils.dart';
+import 'disk_safety_service.dart';
+import 'in_memory_powershell.dart';
+import 'linux_driver_staging_service.dart';
+import 'linux_media_preflight.dart';
+import '../../features/deployment/models/deployment_plan.dart';
 import '../../features/logs/services/log_center_service.dart';
 
 enum BootMode { uefi, bios, both }
@@ -48,10 +55,50 @@ final bootableUsbServiceProvider = Provider<BootableUsbService>((ref) {
 });
 
 class BootableUsbService {
+  static const int _fat32MaxFileBytes = 0xFFFFFFFF;
+  static const String _trustedMke2fsSha256 =
+      'BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A';
+  static const String _trustedMke2fsVersion = 'mke2fs 1.47.2 (1-Jan-2025)';
+  static const String _trustedMke2fsLibraryVersion =
+      'android-platform-15.0.0_r5-314-ga1f793f6b';
+
+  @visibleForTesting
+  static String trustedMke2fsPathForResolvedExecutable(
+    String resolvedExecutable,
+  ) => p.join(
+    File(resolvedExecutable).parent.path,
+    'tools',
+    'e2fsprogs',
+    'mke2fs.exe',
+  );
+
+  @visibleForTesting
+  static bool isTrustedMke2fsVersionOutput(String output) =>
+      output.contains(_trustedMke2fsVersion) &&
+      output.contains(_trustedMke2fsLibraryVersion);
+
   final Ref ref;
   final List<String> _log = [];
+  bool _cancelRequested = false;
+  Process? _activeLinuxRawWriteProcess;
+  Process? _activeLinuxVerificationProcess;
+  Process? _activeLinuxUtilityProcess;
 
   BootableUsbService(this.ref);
+
+  void cancel() {
+    _cancelRequested = true;
+    final processes = {
+      ?_activeLinuxRawWriteProcess,
+      ?_activeLinuxVerificationProcess,
+      ?_activeLinuxUtilityProcess,
+    };
+    for (final process in processes) {
+      unawaited(
+        _terminateProcessTree(process, reason: 'Linux operation cancelled'),
+      );
+    }
+  }
 
   void _logLine(String msg) {
     final line = '[${DateTime.now().toIso8601String()}] $msg';
@@ -60,6 +107,13 @@ class BootableUsbService {
   }
 
   String get logText => _log.join('\n');
+  bool get isCancelled => _cancelRequested;
+
+  @visibleForTesting
+  static String get linuxRawWriteScriptForTesting => _linuxRawWriteScript;
+
+  @visibleForTesting
+  static String get linuxRawVerifyScriptForTesting => _linuxRawVerifyScript;
 
   Future<String> saveLogToFile() async {
     try {
@@ -74,11 +128,37 @@ class BootableUsbService {
   }
 
   Future<bool> createBootableUsb({
-    required int diskNumber,
+    required DiskInfo disk,
     required String isoPath,
     BootMode bootMode = BootMode.both,
+    DeploymentPlan? deploymentPlan,
     ProgressCallback? onProgress,
   }) async {
+    final plan = deploymentPlan;
+    if (plan != null) {
+      final compatibility = DeploymentCompatibility.evaluate(plan);
+      if (!compatibility.canDeploy ||
+          plan.platform != DeploymentPlatform.windows ||
+          plan.purpose != DeploymentPurpose.installMedia) {
+        _logLine('Installation media deployment plan is not compatible.');
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: compatibility.errors.isEmpty
+                ? 'deploy_compat_install_direct_only'
+                : compatibility.errors.first.messageKey,
+          ),
+        );
+        return false;
+      }
+      bootMode = switch (plan.bootMode) {
+        DeploymentBootMode.uefiGpt => BootMode.uefi,
+        DeploymentBootMode.uefiMbr => BootMode.both,
+        DeploymentBootMode.legacyBios => BootMode.bios,
+      };
+    }
+    final diskNumber = disk.diskNumber;
     _log.clear();
     _logLine('=== Create Windows Installation Media Start ===');
     _logLine('Disk: $diskNumber, ISO: $isoPath, Mode: $bootMode');
@@ -106,6 +186,33 @@ class BootableUsbService {
         ),
       );
 
+      final safetyResult = await ref
+          .read(diskSafetyServiceProvider)
+          .checkDiskSafety(disk);
+      if (!safetyResult.isSafe) {
+        _logLine('Target disk safety check failed: ${safetyResult.reason}');
+        _notify(
+          onProgress,
+          CreateProgress(step: CreateStep.failed, message: safetyResult.reason),
+        );
+        return false;
+      }
+
+      final volumeIcon = await _prepareVolumeIcon(plan?.customIconPath ?? '');
+      if (!volumeIcon.success || volumeIcon.payload == null) {
+        final error = volumeIcon.error ?? 'Volume icon validation failed.';
+        _logLine('Volume icon preflight failed: $error');
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'deploy_compat_invalid_icon\n$error',
+            error: error,
+          ),
+        );
+        return false;
+      }
+
       _logLine('Using FAT32 boot media layout for $bootMode');
 
       // Step 2: Clean and partition disk
@@ -119,8 +226,11 @@ class BootableUsbService {
       );
 
       final partitionResult = await _partitionDisk(
-        diskNumber: diskNumber,
+        disk: disk,
         bootMode: bootMode,
+        deploymentBootMode: plan?.bootMode ?? DeploymentBootMode.uefiMbr,
+        preferredDriveLetter: plan?.preferredSystemLetter ?? '',
+        volumeLabel: plan?.customVolumeLabel ?? '',
       );
 
       if (!partitionResult.success) {
@@ -150,6 +260,24 @@ class BootableUsbService {
         return false;
       }
       _logLine('Partition OK, drive: $driveLetter');
+
+      final partitionedDiskSafety = await ref
+          .read(diskSafetyServiceProvider)
+          .checkDiskSafety(disk);
+      if (!partitionedDiskSafety.isSafe) {
+        _logLine(
+          'Target disk changed after partitioning: '
+          '${partitionedDiskSafety.reason}',
+        );
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: partitionedDiskSafety.reason,
+          ),
+        );
+        return false;
+      }
 
       // Step 3: Format (already done by diskpart, just verify)
       _notify(
@@ -346,7 +474,21 @@ class BootableUsbService {
           progress: 0.85,
         ),
       );
-      await _setVolumeIcon(driveLetter);
+      final iconSet = await _setVolumeIcon(
+        driveLetter,
+        icon: volumeIcon.payload!,
+        volumeLabel: plan?.customVolumeLabel ?? '',
+      );
+      if (!iconSet) {
+        _notify(
+          onProgress,
+          const CreateProgress(
+            step: CreateStep.failed,
+            message: 'deploy_compat_invalid_icon',
+          ),
+        );
+        return false;
+      }
 
       // Step 9: Verify
       _notify(
@@ -361,6 +503,8 @@ class BootableUsbService {
       final verifyResult = await _verifyBootableUsb(
         driveLetter: driveLetter,
         bootMode: bootMode,
+        expectedIconSha256: volumeIcon.payload!.sha256Digest,
+        expectedVolumeLabel: plan?.customVolumeLabel ?? '',
       );
       _logLine('Verify: ${verifyResult ? "OK" : "FAILED"}');
 
@@ -412,17 +556,34 @@ class BootableUsbService {
   }
 
   Future<bool> createLinuxIsoUsb({
-    required int diskNumber,
+    required DiskInfo disk,
     required String isoPath,
     required LinuxUsbKind kind,
+    DeploymentPlan? deploymentPlan,
     ProgressCallback? onProgress,
   }) async {
+    final diskNumber = disk.diskNumber;
+    _cancelRequested = false;
     _log.clear();
     final modeName = kind == LinuxUsbKind.toGo
         ? 'Linux To Go'
         : 'Linux Installation Media';
     _logLine('=== Create $modeName Start ===');
     _logLine('Disk: $diskNumber, ISO: $isoPath');
+
+    if (deploymentPlan != null &&
+        (deploymentPlan.platform != DeploymentPlatform.linux ||
+            deploymentPlan.purpose !=
+                (kind == LinuxUsbKind.toGo
+                    ? DeploymentPurpose.toGo
+                    : DeploymentPurpose.installMedia))) {
+      _logLine('Linux deployment plan does not match the requested operation.');
+      _notify(
+        onProgress,
+        const CreateProgress(step: CreateStep.failed, message: 'creator_error'),
+      );
+      return false;
+    }
 
     final logCenter = LogCenterService();
     await logCenter.logUsb('$modeName 创建开始 | 磁盘: $diskNumber | ISO: $isoPath');
@@ -444,6 +605,18 @@ class BootableUsbService {
         ),
       );
 
+      final safetyResult = await ref
+          .read(diskSafetyServiceProvider)
+          .checkDiskSafety(disk);
+      if (!safetyResult.isSafe) {
+        _logLine('Target disk safety check failed: ${safetyResult.reason}');
+        _notify(
+          onProgress,
+          CreateProgress(step: CreateStep.failed, message: safetyResult.reason),
+        );
+        return false;
+      }
+
       if (!await File(isoPath).exists()) {
         _logLine('ISO not found: $isoPath');
         final logPath = await saveLogToFile();
@@ -457,10 +630,66 @@ class BootableUsbService {
         return false;
       }
 
+      final sourcePreflight = await _validateLinuxSourceBeforeErase(
+        disk: disk,
+        isoPath: isoPath,
+      );
+      if (!sourcePreflight.success) {
+        final error = sourcePreflight.error ?? 'Linux source preflight failed.';
+        _logLine(error);
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'linux_write_failed\n$error',
+            error: error,
+          ),
+        );
+        return false;
+      }
+
+      final stagingService = LinuxDriverStagingService(log: _logLine);
+      final stagingPreparation = kind == LinuxUsbKind.toGo
+          ? await stagingService.prepare(
+              sourceDirectory: deploymentPlan?.driverDirectory ?? '',
+              targetDiskNumber: diskNumber,
+            )
+          : const LinuxDriverStagingPreparation.disabled();
+      if (!stagingPreparation.success) {
+        final error =
+            stagingPreparation.error ??
+            'Linux first-boot staging validation failed.';
+        _logLine(error);
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: 'creator_error\n$error',
+            error: error,
+          ),
+        );
+        return false;
+      }
+
       if (kind == LinuxUsbKind.toGo) {
+        final preflight = await _validateLinuxToGoIso(isoPath);
+        if (!preflight.success) {
+          _logLine('Linux To Go preflight failed: ${preflight.error}');
+          _notify(
+            onProgress,
+            CreateProgress(
+              step: CreateStep.failed,
+              message: preflight.error ?? 'linux_togo_unsupported_iso',
+              error: preflight.error,
+            ),
+          );
+          return false;
+        }
         final result = await _createPersistentLinuxToGo(
-          diskNumber: diskNumber,
+          disk: disk,
           isoPath: isoPath,
+          preflight: preflight,
+          stagingBundle: stagingPreparation.bundle,
           onProgress: onProgress,
         );
 
@@ -498,6 +727,18 @@ class BootableUsbService {
         return result.success;
       }
 
+      if (!await _isIsoHybridImage(isoPath)) {
+        _logLine('Linux image is not an ISOHybrid image');
+        _notify(
+          onProgress,
+          const CreateProgress(
+            step: CreateStep.failed,
+            message: 'linux_not_isohybrid',
+          ),
+        );
+        return false;
+      }
+
       _notify(
         onProgress,
         const CreateProgress(
@@ -508,6 +749,7 @@ class BootableUsbService {
       );
 
       final result = await _writeIsoHybridRaw(
+        disk: disk,
         diskNumber: diskNumber,
         isoPath: isoPath,
         onProgress: (rawProgress) {
@@ -524,10 +766,11 @@ class BootableUsbService {
 
       if (!result.success) {
         final errorDetail = result.error ?? 'Unknown error';
-        final errorKey =
-            errorDetail.contains('Access is denied') ||
-                errorDetail.contains('拒绝访问') ||
-                errorDetail.contains('UnauthorizedAccess')
+        final errorKey = result.cancelled
+            ? 'deploy_cancel_requested'
+            : errorDetail.contains('Access is denied') ||
+                  errorDetail.contains('拒绝访问') ||
+                  errorDetail.contains('UnauthorizedAccess')
             ? 'linux_access_denied'
             : 'linux_write_failed';
         _logLine('Linux raw write FAILED: $errorDetail');
@@ -562,36 +805,53 @@ class BootableUsbService {
       );
 
       final verifyResult = await _verifyLinuxRawWrite(
-        diskNumber: diskNumber,
+        disk: disk,
         isoPath: isoPath,
+        onProgress: (progress) {
+          _notify(
+            onProgress,
+            CreateProgress(
+              step: CreateStep.verifying,
+              message: 'linux_finalizing',
+              progress: 0.96 + progress * 0.04,
+            ),
+          );
+        },
       );
-      _logLine('Linux verify: ${verifyResult ? "OK" : "FAILED"}');
+      _logLine('Linux verify: ${verifyResult.success ? "OK" : "FAILED"}');
 
       _notify(
         onProgress,
         CreateProgress(
-          step: verifyResult ? CreateStep.complete : CreateStep.failed,
-          message: verifyResult ? 'linux_complete' : 'linux_verify_failed',
-          progress: verifyResult ? 1.0 : 0.0,
+          step: verifyResult.success ? CreateStep.complete : CreateStep.failed,
+          message: verifyResult.success
+              ? 'linux_complete'
+              : '${verifyResult.cancelled ? 'deploy_cancel_requested' : 'linux_verify_failed'}\n${verifyResult.error ?? ''}',
+          progress: verifyResult.success ? 1.0 : 0.0,
+          error: verifyResult.error,
         ),
       );
 
       await logger.log(
         action: 'Create $modeName',
         target: 'Disk $diskNumber',
-        result: verifyResult ? 'Success - Raw ISOHybrid write' : 'Failed',
-        level: verifyResult ? LogLevel.success : LogLevel.error,
+        result: verifyResult.success
+            ? 'Success - Raw ISOHybrid write'
+            : 'Failed: ${verifyResult.error ?? "Unknown error"}',
+        level: verifyResult.success ? LogLevel.success : LogLevel.error,
       );
 
-      if (verifyResult) {
+      if (verifyResult.success) {
         await logCenter.logUsb('$modeName 创建成功 | 磁盘: $diskNumber');
       } else {
-        await logCenter.logError('$modeName 验证失败 | 磁盘: $diskNumber');
+        await logCenter.logError(
+          '$modeName 验证失败 | 磁盘: $diskNumber | ${verifyResult.error ?? "Unknown"}',
+        );
       }
 
       final logPath = await saveLogToFile();
       _logLine('Log saved to: $logPath');
-      return verifyResult;
+      return verifyResult.success;
     } catch (e) {
       _logLine('Linux creation EXCEPTION: $e');
       final logPath = await saveLogToFile();
@@ -614,14 +874,16 @@ class BootableUsbService {
   }
 
   Future<_LinuxRawWriteResult> _createPersistentLinuxToGo({
-    required int diskNumber,
+    required DiskInfo disk,
     required String isoPath,
+    required _LinuxToGoPreflight preflight,
+    LinuxDriverStagingBundle? stagingBundle,
     ProgressCallback? onProgress,
   }) async {
+    final diskNumber = disk.diskNumber;
     const int mib = 1024 * 1024;
 
     try {
-      final isoBytes = await File(isoPath).length();
       final diskBytes = await _getDiskSizeBytes(diskNumber);
       if (diskBytes == null) {
         return const _LinuxRawWriteResult(
@@ -631,24 +893,50 @@ class BootableUsbService {
       }
 
       final diskSizeMb = diskBytes ~/ mib;
-      final isoSizeMb = (isoBytes + mib - 1) ~/ mib;
-      final partitionSizeMb = _minInt(diskSizeMb - 16, 32760);
+      final stagingContentMb = stagingBundle == null
+          ? 0
+          : ((stagingBundle.totalBytes + mib - 1) ~/ mib) + 16;
+      final dataRequiredMb =
+          ((preflight.totalContentBytes + mib - 1) ~/ mib) +
+          stagingContentMb +
+          256;
+      final bootContentMb =
+          ((preflight.bootContentBytes + mib - 1) ~/ mib) + 128;
+      final minimumPersistenceMb = stagingBundle == null
+          ? 512
+          : _maxInt(
+              512,
+              (stagingBundle.estimatedPersistenceBytes + mib - 1) ~/ mib,
+            );
       final persistenceSizeMb = _minInt(
         4095,
-        partitionSizeMb - isoSizeMb - 512,
+        diskSizeMb - dataRequiredMb - bootContentMb - 32,
       );
+      final bootPartitionSizeMb = bootContentMb + persistenceSizeMb;
 
-      if (partitionSizeMb <= isoSizeMb + 512 || persistenceSizeMb < 512) {
+      if (persistenceSizeMb < minimumPersistenceMb ||
+          bootPartitionSizeMb > 32760) {
         return _LinuxRawWriteResult(
           success: false,
           error:
-              'The target disk is too small for Linux To Go persistence. Need ISO size plus at least 512 MB free space.',
+              'The target disk is too small for this Linux To Go image. '
+              'It needs space for the complete Live image, boot files, '
+              '${stagingBundle == null ? 'and at least 512 MB of persistence.' : 'the verified Linux staging seed, and at least $minimumPersistenceMb MB of persistence for first-boot installation.'}',
         );
       }
 
       _logLine(
-        'Linux To Go layout: disk=${diskSizeMb}MB, boot=${partitionSizeMb}MB, persistence=${persistenceSizeMb}MB',
+        'Linux To Go layout: disk=${diskSizeMb}MB, '
+        'boot=${bootPartitionSizeMb}MB FAT32, '
+        'live>=${dataRequiredMb}MB NTFS, persistence=${persistenceSizeMb}MB, '
+        'staging=${stagingBundle?.totalBytes ?? 0} bytes',
       );
+
+      final destructivePreflight = await _validateLinuxSourceBeforeErase(
+        disk: disk,
+        isoPath: isoPath,
+      );
+      if (!destructivePreflight.success) return destructivePreflight;
 
       _notify(
         onProgress,
@@ -660,18 +948,21 @@ class BootableUsbService {
       );
 
       final partitionResult = await _partitionLinuxToGoDisk(
-        diskNumber: diskNumber,
-        partitionSizeMb: partitionSizeMb,
+        disk: disk,
+        bootPartitionSizeMb: bootPartitionSizeMb,
       );
-      if (!partitionResult.success || partitionResult.driveLetter == null) {
+      if (!partitionResult.success ||
+          partitionResult.bootDrive == null ||
+          partitionResult.liveDrive == null) {
         return _LinuxRawWriteResult(
           success: false,
           error: partitionResult.error ?? 'Failed to partition target disk.',
         );
       }
 
-      final targetDrive = partitionResult.driveLetter!;
-      _logLine('Linux To Go boot partition: $targetDrive');
+      final bootDrive = partitionResult.bootDrive!;
+      final liveDrive = partitionResult.liveDrive!;
+      _logLine('Linux To Go partitions: boot=$bootDrive, live=$liveDrive');
 
       _notify(
         onProgress,
@@ -682,14 +973,35 @@ class BootableUsbService {
         ),
       );
 
-      final formatOk = await _formatPartition(
-        driveLetter: targetDrive,
-        fileSystem: 'FAT32',
+      final bootReady = await _waitForLinuxToGoPartition(
+        drive: bootDrive,
+        expectedLabel: 'WDS_LTG',
+        expectedFileSystem: 'FAT32',
+        expectedPartitionNumber: 1,
+        diskNumber: diskNumber,
       );
-      if (!formatOk) {
+      final liveReady = await _waitForLinuxToGoPartition(
+        drive: liveDrive,
+        expectedLabel: 'WDS_LIVE',
+        expectedFileSystem: 'NTFS',
+        expectedPartitionNumber: 2,
+        diskNumber: diskNumber,
+      );
+      if (!bootReady || !liveReady) {
         return const _LinuxRawWriteResult(
           success: false,
-          error: 'Linux To Go boot partition was not formatted as FAT32.',
+          error:
+              'Linux To Go partitions did not pass the post-format identity check.',
+        );
+      }
+
+      final partitionedDiskSafety = await ref
+          .read(diskSafetyServiceProvider)
+          .checkDiskSafety(disk);
+      if (!partitionedDiskSafety.isSafe) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error: partitionedDiskSafety.reason,
         );
       }
 
@@ -720,28 +1032,62 @@ class BootableUsbService {
           ),
         );
 
-        final copyOk = await _copyIsoContents(
+        final liveCopyOk = await _copyIsoContents(
           mountPoint: mountPoint,
-          targetDrive: targetDrive,
+          targetDrive: liveDrive,
           excludeWim: false,
+          excludeAutoUnattend: false,
           onProgress: (progress) {
             _notify(
               onProgress,
               CreateProgress(
                 step: CreateStep.copyingFiles,
                 message: 'step_copying',
-                progress: 0.24 + progress * 0.44,
+                progress: 0.24 + progress * 0.34,
               ),
             );
           },
         );
 
-        if (!copyOk) {
+        if (!liveCopyOk) {
           return const _LinuxRawWriteResult(
             success: false,
-            error: 'Failed to copy Linux ISO files to the target disk.',
+            error: 'Failed to copy Linux Live files to the NTFS partition.',
           );
         }
+
+        final bootCopyOk = await _copyIsoContents(
+          mountPoint: mountPoint,
+          targetDrive: bootDrive,
+          excludeWim: false,
+          excludeAutoUnattend: false,
+          excludedExtensions: const {'squashfs', 'ext2'},
+          onProgress: (progress) {
+            _notify(
+              onProgress,
+              CreateProgress(
+                step: CreateStep.copyingFiles,
+                message: 'step_copying',
+                progress: 0.58 + progress * 0.12,
+              ),
+            );
+          },
+        );
+
+        if (!bootCopyOk) {
+          return const _LinuxRawWriteResult(
+            success: false,
+            error: 'Failed to copy Linux boot files to the FAT32 partition.',
+          );
+        }
+
+        final copied = await _verifyLinuxToGoCopies(
+          mountPoint: mountPoint,
+          bootDrive: bootDrive,
+          liveDrive: liveDrive,
+          preflight: preflight,
+        );
+        if (!copied.success) return copied;
       } finally {
         await _unmountIso(isoPath);
       }
@@ -755,8 +1101,15 @@ class BootableUsbService {
         ),
       );
 
-      final bootPatched = await _patchLinuxPersistenceBootConfigs(targetDrive);
-      if (!bootPatched) {
+      final bootPatched = await _patchLinuxPersistenceBootConfigs(
+        bootDrive,
+        enableFirstBootStaging: stagingBundle != null,
+      );
+      final livePatched = await _patchLinuxPersistenceBootConfigs(
+        liveDrive,
+        enableFirstBootStaging: stagingBundle != null,
+      );
+      if (!bootPatched || !livePatched) {
         return const _LinuxRawWriteResult(
           success: false,
           error:
@@ -774,11 +1127,26 @@ class BootableUsbService {
       );
 
       final persistenceResult = await _createPersistenceImage(
-        targetDrive: targetDrive,
+        targetDrive: bootDrive,
         sizeMb: persistenceSizeMb,
       );
       if (!persistenceResult.success) {
         return persistenceResult;
+      }
+
+      if (stagingBundle != null) {
+        final stagingResult = await LinuxDriverStagingService(log: _logLine)
+            .deploy(
+              bundle: stagingBundle,
+              liveDrive: liveDrive,
+              bootDrive: bootDrive,
+            );
+        if (!stagingResult.success) {
+          return _LinuxRawWriteResult(
+            success: false,
+            error: stagingResult.error,
+          );
+        }
       }
 
       _notify(
@@ -790,7 +1158,13 @@ class BootableUsbService {
         ),
       );
 
-      final verified = await _verifyLinuxToGoLayout(targetDrive);
+      final verified = await _verifyLinuxToGoLayout(
+        diskNumber: diskNumber,
+        bootDrive: bootDrive,
+        liveDrive: liveDrive,
+        preflight: preflight,
+        stagingBundle: stagingBundle,
+      );
       if (!verified) {
         return const _LinuxRawWriteResult(
           success: false,
@@ -803,6 +1177,239 @@ class BootableUsbService {
     } catch (e) {
       _logLine('Linux To Go creation error: $e');
       return _LinuxRawWriteResult(success: false, error: e.toString());
+    }
+  }
+
+  Future<_LinuxToGoPreflight> _validateLinuxToGoIso(String isoPath) async {
+    final mke2fs = await _findMke2fs();
+    if (mke2fs == null) {
+      return const _LinuxToGoPreflight(
+        success: false,
+        error: 'linux_togo_mke2fs_missing',
+      );
+    }
+
+    final mountPoint = await _mountIso(isoPath);
+    if (mountPoint == null) {
+      return const _LinuxToGoPreflight(
+        success: false,
+        error: 'linux_togo_mount_preflight_failed',
+      );
+    }
+
+    try {
+      final root = mountPoint.endsWith(r'\') ? mountPoint : '$mountPoint\\';
+      final hasCasperKernel = await File(
+        p.join(root, 'casper', 'vmlinuz'),
+      ).exists();
+      final hasCasperInitrd = await File(
+        p.join(root, 'casper', 'initrd'),
+      ).exists();
+      final grubConfigs = <File>[
+        File(p.join(root, 'boot', 'grub', 'grub.cfg')),
+        File(p.join(root, 'boot', 'grub', 'loopback.cfg')),
+      ];
+      var hasGrub = false;
+      for (final file in grubConfigs) {
+        if (await file.exists()) {
+          hasGrub = true;
+          break;
+        }
+      }
+      final hasEfi = await File(
+        p.join(root, 'EFI', 'BOOT', 'BOOTX64.EFI'),
+      ).exists();
+      if (!hasCasperKernel || !hasCasperInitrd || !hasGrub || !hasEfi) {
+        return const _LinuxToGoPreflight(
+          success: false,
+          error: 'linux_togo_unsupported_iso',
+        );
+      }
+
+      var hasPatchableCasperEntry = false;
+      for (final file in grubConfigs) {
+        if (!await file.exists()) continue;
+        final text = await file.readAsString();
+        if (RegExp(
+          r'^\s*linux(efi)?\s+.*\/casper\/vmlinuz(?:\s|$)',
+          caseSensitive: false,
+          multiLine: true,
+        ).hasMatch(text)) {
+          hasPatchableCasperEntry = true;
+          break;
+        }
+      }
+      if (!hasPatchableCasperEntry) {
+        return const _LinuxToGoPreflight(
+          success: false,
+          error: 'linux_togo_boot_config_unsupported',
+        );
+      }
+
+      var totalContentBytes = 0;
+      var bootContentBytes = 0;
+      var largestBootFileBytes = 0;
+      final livePayloads = <_LinuxToGoPayload>[];
+      await for (final entity in Directory(
+        root,
+      ).list(recursive: true, followLinks: false)) {
+        if (entity is! File) continue;
+        final length = await entity.length();
+        totalContentBytes += length;
+        final relativePath = p.relative(entity.path, from: root);
+        final extension = p.extension(relativePath).toLowerCase();
+        final isLivePayload = extension == '.squashfs' || extension == '.ext2';
+        if (isLivePayload) {
+          livePayloads.add(
+            _LinuxToGoPayload(relativePath: relativePath, sizeBytes: length),
+          );
+          continue;
+        }
+
+        bootContentBytes += length;
+        if (length > largestBootFileBytes) largestBootFileBytes = length;
+      }
+
+      if (livePayloads.isEmpty) {
+        return const _LinuxToGoPreflight(
+          success: false,
+          error: 'linux_togo_unsupported_iso',
+        );
+      }
+      if (largestBootFileBytes > _fat32MaxFileBytes) {
+        return const _LinuxToGoPreflight(
+          success: false,
+          error: 'linux_togo_boot_file_too_large',
+        );
+      }
+
+      _logLine(
+        'Linux To Go preflight: content=$totalContentBytes, '
+        'boot=$bootContentBytes, live payloads=${livePayloads.length}, '
+        'largest live=${livePayloads.map((item) => item.sizeBytes).fold<int>(0, _maxInt)}',
+      );
+      return _LinuxToGoPreflight(
+        success: true,
+        totalContentBytes: totalContentBytes,
+        bootContentBytes: bootContentBytes,
+        livePayloads: livePayloads,
+      );
+    } finally {
+      await _unmountIso(isoPath);
+    }
+  }
+
+  Future<bool> _isIsoHybridImage(String isoPath) async {
+    final inspection = await LinuxIsoHybridInspector.inspect(isoPath);
+    if (!inspection.isValid) {
+      _logLine('ISOHybrid preflight failed: ${inspection.error}');
+      return false;
+    }
+    _logLine(
+      'ISOHybrid preflight: ISO9660/El Torito/EFI valid, '
+      'catalog LBA=${inspection.bootCatalogLba}, '
+      'EFI image LBA=${inspection.efiImageLba}',
+    );
+    return true;
+  }
+
+  Future<_LinuxRawWriteResult> _validateLinuxSourceBeforeErase({
+    required DiskInfo disk,
+    required String isoPath,
+  }) async {
+    try {
+      final source = File(isoPath);
+      final sourceType = await FileSystemEntity.type(
+        source.path,
+        followLinks: false,
+      );
+      if (sourceType != FileSystemEntityType.file) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error: 'The Linux image source must be a regular file.',
+        );
+      }
+      final imageBytes = await source.length();
+      final targetBytes = await _getDiskSizeBytes(disk.diskNumber);
+      if (targetBytes == null ||
+          targetBytes <= 0 ||
+          targetBytes != disk.sizeBytes) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error: 'The target disk size or identity changed before writing.',
+        );
+      }
+      if (imageBytes <= 0 || imageBytes >= targetBytes) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error:
+              'The Linux image must be smaller than the target disk '
+              '(image=$imageBytes bytes, target=$targetBytes bytes).',
+        );
+      }
+
+      final sourceOnTarget = await _isPathOnTargetDisk(
+        source.path,
+        disk.diskNumber,
+      );
+      if (sourceOnTarget == null) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error:
+              'The physical disk containing the Linux image could not be verified.',
+        );
+      }
+      if (sourceOnTarget) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error:
+              'The Linux image is stored on the target disk and would be erased.',
+        );
+      }
+
+      _logLine(
+        'Linux source preflight: image=$imageBytes bytes, '
+        'target=$targetBytes bytes, source disk differs from target',
+      );
+      return const _LinuxRawWriteResult(success: true);
+    } catch (error) {
+      return _LinuxRawWriteResult(
+        success: false,
+        error: 'Linux source preflight failed: $error',
+      );
+    }
+  }
+
+  Future<bool?> _isPathOnTargetDisk(String path, int targetDiskNumber) async {
+    try {
+      final result = await Process.run(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$volume = Get-Volume -FilePath $env:WDS_SOURCE_PATH -ErrorAction Stop
+$partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
+if ($partitions.Count -ne 1) {
+  throw "Source path did not resolve to exactly one physical partition."
+}
+[int]$partitions[0].DiskNumber''',
+        ],
+        environment: {...Platform.environment, 'WDS_SOURCE_PATH': path},
+      ).timeout(const Duration(seconds: 10));
+      if (result.exitCode != 0) {
+        _logLine('Linux source disk resolution failed: ${result.stderr}');
+        return null;
+      }
+      final sourceDiskNumber = int.tryParse(result.stdout.toString().trim());
+      return sourceDiskNumber == null
+          ? null
+          : sourceDiskNumber == targetDiskNumber;
+    } catch (error) {
+      _logLine('Linux source disk resolution error: $error');
+      return null;
     }
   }
 
@@ -829,50 +1436,199 @@ class BootableUsbService {
   }
 
   int _minInt(int a, int b) => a < b ? a : b;
+  int _maxInt(int a, int b) => a > b ? a : b;
 
-  Future<_DiskPartResult> _partitionLinuxToGoDisk({
-    required int diskNumber,
-    required int partitionSizeMb,
+  Future<_LinuxToGoPartitionResult> _partitionLinuxToGoDisk({
+    required DiskInfo disk,
+    required int bootPartitionSizeMb,
   }) async {
+    final diskNumber = disk.diskNumber;
+    final letters = await _reserveLinuxToGoDriveLetters();
+    if (letters == null) {
+      return const _LinuxToGoPartitionResult(
+        success: false,
+        error: 'Could not reserve two drive letters for Linux To Go.',
+      );
+    }
+
     final script =
         '''
 select disk $diskNumber
 clean
-convert mbr
-create partition primary size=$partitionSizeMb
-active
+convert gpt
+create partition efi size=$bootPartitionSizeMb
 format fs=fat32 label="WDS_LTG" quick
-assign
+assign letter=${letters.bootLetter}
+create partition primary
+format fs=ntfs label="WDS_LIVE" quick
+assign letter=${letters.liveLetter}
 exit
 ''';
     _logLine('Linux To Go DiskPart script:\n$script');
 
-    final result = await _runDiskpart(script);
+    final result = await ref
+        .read(diskSafetyServiceProvider)
+        .runGuardedDiskpart(disk, script);
     _logLine('Linux To Go DiskPart exit: ${result.exitCode}');
 
-    if (result.exitCode != 0) {
+    if (!_diskpartSucceeded(result)) {
       final stderr = result.stderr.toString();
       final stdout = result.stdout.toString();
       _logLine('Linux To Go DiskPart stderr: $stderr');
       _logLine('Linux To Go DiskPart stdout: $stdout');
-      return _DiskPartResult(
+      return _LinuxToGoPartitionResult(
         success: false,
         error: stderr.isNotEmpty ? stderr : stdout,
       );
     }
 
-    final driveLetter = await _findDriveLetterForDisk(diskNumber);
-    if (driveLetter == null) {
-      return const _DiskPartResult(
-        success: false,
-        error: 'Could not find Linux To Go boot partition drive letter.',
-      );
-    }
-
-    return _DiskPartResult(success: true, driveLetter: driveLetter);
+    return _LinuxToGoPartitionResult(
+      success: true,
+      bootDrive: '${letters.bootLetter}:',
+      liveDrive: '${letters.liveLetter}:',
+    );
   }
 
-  Future<bool> _patchLinuxPersistenceBootConfigs(String targetDrive) async {
+  bool _diskpartSucceeded(ProcessResult result) {
+    if (result.exitCode != 0) return false;
+    final combined = '${result.stdout}\n${result.stderr}'.toLowerCase();
+    const errors = [
+      'diskpart has encountered an error',
+      'virtual disk service error',
+      'the parameter is incorrect',
+      'access is denied',
+      'the volume size is too big',
+      'diskpart 遇到错误',
+      '虚拟磁盘服务错误',
+      '参数错误',
+      '拒绝访问',
+      '卷大小太大',
+    ];
+    return !errors.any(combined.contains);
+  }
+
+  Future<_LinuxToGoDriveLetters?> _reserveLinuxToGoDriveLetters() async {
+    final usedLetters = await _getUsedDriveLetters();
+    if (usedLetters == null) return null;
+    String? pick(List<String> preferred, Set<String> blocked) {
+      for (final letter in preferred) {
+        final normalized = letter.toUpperCase();
+        if (!usedLetters.contains(normalized) &&
+            !blocked.contains(normalized)) {
+          return normalized;
+        }
+      }
+      return null;
+    }
+
+    final boot = pick(const ['S', 'R', 'T', 'U', 'V', 'X', 'Y', 'Z'], const {});
+    if (boot == null) return null;
+    final live = pick(const ['W', 'V', 'U', 'T', 'R', 'X', 'Y', 'Z'], {boot});
+    if (live == null) return null;
+    _logLine('Reserved Linux To Go drive letters: boot=$boot, live=$live');
+    return _LinuxToGoDriveLetters(bootLetter: boot, liveLetter: live);
+  }
+
+  Future<Set<String>?> _getUsedDriveLetters() async {
+    try {
+      final result = await Process.run('powershell', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        r'''
+$letters = @()
+try {
+  $letters += Get-Volume -ErrorAction SilentlyContinue |
+    Where-Object { $_.DriveLetter } |
+    ForEach-Object { $_.DriveLetter.ToString() }
+} catch {}
+try {
+  $letters += Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '^[A-Za-z]$' } |
+    ForEach-Object { $_.Name }
+} catch {}
+$letters |
+  Where-Object { $_ } |
+  ForEach-Object { $_.ToString().TrimEnd(':').ToUpperInvariant() } |
+  Sort-Object -Unique
+''',
+      ]).timeout(const Duration(seconds: 10));
+      if (result.exitCode == 0) {
+        return result.stdout
+            .toString()
+            .split(RegExp(r'\s+'))
+            .map((item) => item.trim().replaceAll(':', '').toUpperCase())
+            .where((item) => item.length == 1)
+            .toSet();
+      }
+      _logLine('Drive letter scan failed: ${result.stderr}');
+    } catch (e) {
+      _logLine('Drive letter scan error: $e');
+    }
+    return null;
+  }
+
+  Future<bool> _waitForLinuxToGoPartition({
+    required String drive,
+    required String expectedLabel,
+    required String expectedFileSystem,
+    required int expectedPartitionNumber,
+    required int diskNumber,
+  }) async {
+    final root = drive.endsWith(r'\') ? drive : '$drive\\';
+    final letter = drive.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
+    for (var attempt = 1; attempt <= 30; attempt++) {
+      try {
+        final result = await Process.run(
+          'powershell',
+          [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            r'''$partition = Get-Partition -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+$volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+[PSCustomObject]@{
+  DiskNumber = $partition.DiskNumber
+  PartitionNumber = $partition.PartitionNumber
+  Label = $volume.FileSystemLabel
+  FileSystem = $volume.FileSystem
+} | ConvertTo-Json -Compress''',
+          ],
+          environment: {...Platform.environment, 'WDS_DRIVE_LETTER': letter},
+        ).timeout(const Duration(seconds: 5));
+        if (result.exitCode == 0) {
+          final decoded = jsonDecode(result.stdout.toString());
+          final matches =
+              decoded is Map &&
+              decoded['DiskNumber'].toString() == diskNumber.toString() &&
+              decoded['PartitionNumber'].toString() ==
+                  expectedPartitionNumber.toString() &&
+              decoded['Label'].toString().toUpperCase() ==
+                  expectedLabel.toUpperCase() &&
+              decoded['FileSystem'].toString().toUpperCase() ==
+                  expectedFileSystem.toUpperCase();
+          if (matches && await Directory(root).exists()) {
+            final probe = File(p.join(root, '.wds_ltg_probe'));
+            await probe.writeAsString('ok');
+            await probe.delete();
+            _logLine('$expectedLabel ready at $root (attempt $attempt)');
+            return true;
+          }
+        }
+      } catch (e) {
+        _logLine('$expectedLabel readiness attempt $attempt failed: $e');
+      }
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    return false;
+  }
+
+  Future<bool> _patchLinuxPersistenceBootConfigs(
+    String targetDrive, {
+    required bool enableFirstBootStaging,
+  }) async {
     final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
     final configFiles = <File>[
       File(p.join(root, 'boot', 'grub', 'grub.cfg')),
@@ -902,21 +1658,55 @@ exit
               r'^\s*linux(efi)?\s+',
               caseSensitive: false,
             ).hasMatch(line);
-            if (!isLinuxLine || !line.contains('/casper/vmlinuz')) {
+            if (!isLinuxLine ||
+                !RegExp(
+                  r'\/casper\/vmlinuz(?:\s|$)',
+                  caseSensitive: false,
+                ).hasMatch(line)) {
               return line;
             }
 
             foundCasperEntry = true;
-            if (RegExp(r'(^|\s)persistent(\s|$)').hasMatch(line)) {
-              return line;
+            var updated = line;
+            final persistentPattern = RegExp(
+              r'(^|\s)persistent(\s|$)',
+              caseSensitive: false,
+            );
+            if (!persistentPattern.hasMatch(updated)) {
+              updated = _insertGrubKernelArgument(updated, 'persistent');
             }
 
-            changed = true;
-            final markerIndex = line.indexOf(' ---');
-            if (markerIndex >= 0) {
-              return '${line.substring(0, markerIndex)} persistent${line.substring(markerIndex)}';
+            const liveMediaArgument = 'live-media=/dev/disk/by-label/WDS_LIVE';
+            final liveMediaPattern = RegExp(
+              r'(^|\s)live-media=\S+',
+              caseSensitive: false,
+            );
+            if (liveMediaPattern.hasMatch(updated)) {
+              updated = updated.replaceFirstMapped(
+                liveMediaPattern,
+                (match) => '${match.group(1)}$liveMediaArgument',
+              );
+            } else {
+              updated = _insertGrubKernelArgument(updated, liveMediaArgument);
             }
-            return '$line persistent';
+
+            if (enableFirstBootStaging) {
+              for (final argument in const [
+                LinuxDriverStagingService.bootMarkerArgument,
+                LinuxDriverStagingService.systemdWantsArgument,
+              ]) {
+                final argumentPattern = RegExp(
+                  '(^|\\s)${RegExp.escape(argument)}(\\s|\$)',
+                  caseSensitive: false,
+                );
+                if (!argumentPattern.hasMatch(updated)) {
+                  updated = _insertGrubKernelArgument(updated, argument);
+                }
+              }
+            }
+
+            if (updated != line) changed = true;
+            return updated;
           })
           .join('\n');
 
@@ -929,6 +1719,14 @@ exit
     }
 
     return foundBootConfig && foundCasperEntry;
+  }
+
+  String _insertGrubKernelArgument(String line, String argument) {
+    final markerIndex = line.indexOf(' ---');
+    if (markerIndex >= 0) {
+      return '${line.substring(0, markerIndex)} $argument${line.substring(markerIndex)}';
+    }
+    return '$line $argument';
   }
 
   Future<_LinuxRawWriteResult> _createPersistenceImage({
@@ -959,14 +1757,14 @@ exit
       await raf.close();
     }
 
-    final result = await Process.run(mke2fs, [
+    final result = await _runLinuxUtility(mke2fs, [
       '-t',
       'ext4',
       '-F',
       '-L',
       'writable',
       image.path,
-    ]).timeout(const Duration(minutes: 5));
+    ], timeout: const Duration(minutes: 5));
 
     _logLine('mke2fs exit: ${result.exitCode}');
     if (result.stdout.toString().trim().isNotEmpty) {
@@ -989,68 +1787,260 @@ exit
   }
 
   Future<String?> _findMke2fs() async {
-    final candidates = <String>[];
-
-    final executableDir = File(Platform.resolvedExecutable).parent.path;
-    final currentDir = Directory.current.path;
-    candidates.addAll([
-      p.join(executableDir, 'tools', 'e2fsprogs', 'mke2fs.exe'),
-      p.join(executableDir, 'tools', 'mke2fs.exe'),
-      p.join(executableDir, 'data', 'tools', 'e2fsprogs', 'mke2fs.exe'),
-      p.join(executableDir, 'data', 'tools', 'mke2fs.exe'),
-      p.join(currentDir, 'tools', 'e2fsprogs', 'mke2fs.exe'),
-      p.join(currentDir, 'tools', 'mke2fs.exe'),
-    ]);
-
-    for (final name in const ['mke2fs.exe', 'mke2fs']) {
-      try {
-        final result = await Process.run('where.exe', [
-          name,
-        ]).timeout(const Duration(seconds: 5));
-        if (result.exitCode == 0) {
-          candidates.addAll(
-            result.stdout
-                .toString()
-                .split(RegExp(r'\r?\n'))
-                .map((line) => line.trim())
-                .where((line) => line.isNotEmpty),
-          );
-        }
-      } catch (_) {}
-    }
-
-    for (final candidate in candidates) {
-      if (candidate.isEmpty) continue;
-      if (await File(candidate).exists()) {
-        _logLine('Using mke2fs: $candidate');
-        return candidate;
+    final candidate = trustedMke2fsPathForResolvedExecutable(
+      Platform.resolvedExecutable,
+    );
+    try {
+      final file = File(candidate);
+      if (await FileSystemEntity.type(candidate, followLinks: false) !=
+          FileSystemEntityType.file) {
+        _logLine('Trusted mke2fs not found at: $candidate');
+        return null;
       }
-    }
+      final resolved = await file.resolveSymbolicLinks();
+      if (p.normalize(resolved).toLowerCase() !=
+          p.normalize(candidate).toLowerCase()) {
+        _logLine('Trusted mke2fs path resolves through a link: $candidate');
+        return null;
+      }
 
-    _logLine('mke2fs not found');
-    return null;
+      final digest = (await sha256.bind(file.openRead()).first)
+          .toString()
+          .toUpperCase();
+      if (digest != _trustedMke2fsSha256) {
+        _logLine(
+          'Trusted mke2fs SHA-256 mismatch: expected '
+          '$_trustedMke2fsSha256, actual $digest',
+        );
+        return null;
+      }
+
+      final versionResult = await Process.run(candidate, const [
+        '-V',
+      ]).timeout(const Duration(seconds: 10));
+      final versionOutput = '${versionResult.stdout}\n${versionResult.stderr}'
+          .trim();
+      if (versionResult.exitCode != 0 ||
+          !isTrustedMke2fsVersionOutput(versionOutput)) {
+        _logLine(
+          'Trusted mke2fs version check failed '
+          '(exit ${versionResult.exitCode}): $versionOutput',
+        );
+        return null;
+      }
+
+      _logLine(
+        'Using trusted mke2fs: $candidate '
+        '(SHA-256 $digest; $_trustedMke2fsVersion)',
+      );
+      return candidate;
+    } catch (error) {
+      _logLine('Trusted mke2fs validation failed: $error');
+      return null;
+    }
   }
 
-  Future<bool> _verifyLinuxToGoLayout(String targetDrive) async {
+  Future<_LinuxRawWriteResult> _verifyLinuxToGoCopies({
+    required String mountPoint,
+    required String bootDrive,
+    required String liveDrive,
+    required _LinuxToGoPreflight preflight,
+  }) async {
     try {
-      final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
-      final bootx64 = File(p.join(root, 'EFI', 'BOOT', 'BOOTx64.EFI'));
-      final grub = File(p.join(root, 'boot', 'grub', 'grub.cfg'));
-      final writable = File(p.join(root, 'writable'));
+      final sourceRoot = mountPoint.endsWith(r'\')
+          ? mountPoint
+          : '$mountPoint\\';
+      final bootRoot = bootDrive.endsWith(r'\') ? bootDrive : '$bootDrive\\';
+      final liveRoot = liveDrive.endsWith(r'\') ? liveDrive : '$liveDrive\\';
+      var verifiedLiveBytes = 0;
+      var verifiedBootBytes = 0;
 
-      if (!await bootx64.exists()) {
+      await for (final entity in Directory(
+        sourceRoot,
+      ).list(recursive: true, followLinks: false)) {
+        if (entity is! File) continue;
+        final relativePath = p.relative(entity.path, from: sourceRoot);
+        final sourceLength = await entity.length();
+        final sourceDigest = (await sha256.bind(entity.openRead()).first)
+            .toString();
+        verifiedLiveBytes += sourceLength;
+        final liveFile = File(p.join(liveRoot, relativePath));
+        if (!await liveFile.exists() ||
+            await liveFile.length() != sourceLength) {
+          return _LinuxRawWriteResult(
+            success: false,
+            error: 'Linux Live copy verification failed: $relativePath',
+          );
+        }
+        final liveDigest = (await sha256.bind(liveFile.openRead()).first)
+            .toString();
+        if (liveDigest != sourceDigest) {
+          return _LinuxRawWriteResult(
+            success: false,
+            error:
+                'Linux Live copy SHA-256 mismatch: $relativePath '
+                '(source=$sourceDigest, copy=$liveDigest)',
+          );
+        }
+
+        final extension = p.extension(relativePath).toLowerCase();
+        final isLivePayload = extension == '.squashfs' || extension == '.ext2';
+        final bootFile = File(p.join(bootRoot, relativePath));
+        if (isLivePayload) {
+          if (await bootFile.exists()) {
+            return _LinuxRawWriteResult(
+              success: false,
+              error:
+                  'Linux boot partition contains an unexpected Live payload: $relativePath',
+            );
+          }
+        } else if (!await bootFile.exists() ||
+            await bootFile.length() != sourceLength) {
+          return _LinuxRawWriteResult(
+            success: false,
+            error: 'Linux boot copy verification failed: $relativePath',
+          );
+        } else {
+          final bootDigest = (await sha256.bind(bootFile.openRead()).first)
+              .toString();
+          if (bootDigest != sourceDigest) {
+            return _LinuxRawWriteResult(
+              success: false,
+              error:
+                  'Linux boot copy SHA-256 mismatch: $relativePath '
+                  '(source=$sourceDigest, copy=$bootDigest)',
+            );
+          }
+          verifiedBootBytes += sourceLength;
+        }
+      }
+
+      if (verifiedLiveBytes != preflight.totalContentBytes ||
+          verifiedBootBytes != preflight.bootContentBytes) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error:
+              'Linux To Go copy size verification failed: '
+              'live=$verifiedLiveBytes/${preflight.totalContentBytes}, '
+              'boot=$verifiedBootBytes/${preflight.bootContentBytes}.',
+        );
+      }
+
+      _logLine('Linux To Go copy verification: OK');
+      return const _LinuxRawWriteResult(success: true);
+    } catch (e) {
+      return _LinuxRawWriteResult(
+        success: false,
+        error: 'Linux To Go copy verification failed: $e',
+      );
+    }
+  }
+
+  Future<bool> _verifyLinuxToGoLayout({
+    required int diskNumber,
+    required String bootDrive,
+    required String liveDrive,
+    required _LinuxToGoPreflight preflight,
+    LinuxDriverStagingBundle? stagingBundle,
+  }) async {
+    try {
+      final bootMatches = await _partitionMatchesLinuxToGoLayout(
+        drive: bootDrive,
+        expectedLabel: 'WDS_LTG',
+        expectedFileSystem: 'FAT32',
+        expectedPartitionNumber: 1,
+        diskNumber: diskNumber,
+      );
+      final liveMatches = await _partitionMatchesLinuxToGoLayout(
+        drive: liveDrive,
+        expectedLabel: 'WDS_LIVE',
+        expectedFileSystem: 'NTFS',
+        expectedPartitionNumber: 2,
+        diskNumber: diskNumber,
+      );
+      if (!bootMatches || !liveMatches) {
+        _logLine('Linux To Go verify failed: partition identity mismatch');
+        return false;
+      }
+
+      final bootRoot = bootDrive.endsWith(r'\') ? bootDrive : '$bootDrive\\';
+      final liveRoot = liveDrive.endsWith(r'\') ? liveDrive : '$liveDrive\\';
+      final bootx64 = File(p.join(bootRoot, 'EFI', 'BOOT', 'BOOTx64.EFI'));
+      final liveBootx64 = File(p.join(liveRoot, 'EFI', 'BOOT', 'BOOTx64.EFI'));
+      final bootGrub = File(p.join(bootRoot, 'boot', 'grub', 'grub.cfg'));
+      final liveGrub = File(p.join(liveRoot, 'boot', 'grub', 'grub.cfg'));
+      final bootKernel = File(p.join(bootRoot, 'casper', 'vmlinuz'));
+      final bootInitrd = File(p.join(bootRoot, 'casper', 'initrd'));
+      final writable = File(p.join(bootRoot, 'writable'));
+
+      if (!await bootx64.exists() || !await liveBootx64.exists()) {
         _logLine('Linux To Go verify failed: BOOTx64.EFI missing');
         return false;
       }
-      if (!await grub.exists()) {
-        _logLine('Linux To Go verify failed: grub.cfg missing');
+      if (!await bootKernel.exists() || !await bootInitrd.exists()) {
+        _logLine('Linux To Go verify failed: casper kernel or initrd missing');
+        return false;
+      }
+      if (!await bootGrub.exists() || !await liveGrub.exists()) {
+        _logLine('Linux To Go verify failed: GRUB config missing');
         return false;
       }
 
-      final grubText = await grub.readAsString();
-      if (!RegExp(r'(^|\s)persistent(\s|$)').hasMatch(grubText)) {
-        _logLine('Linux To Go verify failed: persistent boot arg missing');
+      final bootGrubText = await bootGrub.readAsString();
+      final liveGrubText = await liveGrub.readAsString();
+      final persistentPattern = RegExp(r'(^|\s)persistent(\s|$)');
+      final liveMediaPattern = RegExp(
+        r'(^|\s)live-media=\/dev\/disk\/by-label\/WDS_LIVE(\s|$)',
+        caseSensitive: false,
+      );
+      if (!persistentPattern.hasMatch(bootGrubText) ||
+          !persistentPattern.hasMatch(liveGrubText) ||
+          !liveMediaPattern.hasMatch(bootGrubText) ||
+          !liveMediaPattern.hasMatch(liveGrubText)) {
+        _logLine('Linux To Go verify failed: required boot args missing');
         return false;
+      }
+
+      if (stagingBundle != null) {
+        for (final argument in const [
+          LinuxDriverStagingService.bootMarkerArgument,
+          LinuxDriverStagingService.systemdWantsArgument,
+        ]) {
+          if (!bootGrubText.contains(argument) ||
+              !liveGrubText.contains(argument)) {
+            _logLine(
+              'Linux To Go verify failed: staging boot argument missing: '
+              '$argument',
+            );
+            return false;
+          }
+        }
+        final stagingVerified = await LinuxDriverStagingService(log: _logLine)
+            .verifyDeployment(
+              bundle: stagingBundle,
+              liveDrive: liveDrive,
+              bootDrive: bootDrive,
+            );
+        if (!stagingVerified) return false;
+      }
+
+      for (final payload in preflight.livePayloads) {
+        final liveFile = File(p.join(liveRoot, payload.relativePath));
+        if (!await liveFile.exists() ||
+            await liveFile.length() != payload.sizeBytes) {
+          _logLine(
+            'Linux To Go verify failed: Live payload missing or truncated: '
+            '${payload.relativePath}',
+          );
+          return false;
+        }
+        if (await File(p.join(bootRoot, payload.relativePath)).exists()) {
+          _logLine(
+            'Linux To Go verify failed: Live payload leaked onto FAT32: '
+            '${payload.relativePath}',
+          );
+          return false;
+        }
       }
 
       if (!await writable.exists() ||
@@ -1078,109 +2068,394 @@ exit
     }
   }
 
+  Future<bool> _partitionMatchesLinuxToGoLayout({
+    required String drive,
+    required String expectedLabel,
+    required String expectedFileSystem,
+    required int expectedPartitionNumber,
+    required int diskNumber,
+  }) async {
+    try {
+      final letter = drive.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
+      final result = await Process.run(
+        'powershell',
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$partition = Get-Partition -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+$volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+[PSCustomObject]@{
+  DiskNumber = $partition.DiskNumber
+  PartitionNumber = $partition.PartitionNumber
+  Label = $volume.FileSystemLabel
+  FileSystem = $volume.FileSystem
+} | ConvertTo-Json -Compress''',
+        ],
+        environment: {...Platform.environment, 'WDS_DRIVE_LETTER': letter},
+      ).timeout(const Duration(seconds: 5));
+      if (result.exitCode != 0) return false;
+      final decoded = jsonDecode(result.stdout.toString());
+      return decoded is Map &&
+          decoded['DiskNumber'].toString() == diskNumber.toString() &&
+          decoded['PartitionNumber'].toString() ==
+              expectedPartitionNumber.toString() &&
+          decoded['Label'].toString().toUpperCase() ==
+              expectedLabel.toUpperCase() &&
+          decoded['FileSystem'].toString().toUpperCase() ==
+              expectedFileSystem.toUpperCase();
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<_LinuxRawWriteResult> _writeIsoHybridRaw({
+    required DiskInfo disk,
     required int diskNumber,
     required String isoPath,
     required void Function(double progress) onProgress,
   }) async {
-    final tempDir = await FileUtils.getTempDirectory();
-    final scriptFile = File(p.join(tempDir, 'wds_linux_raw_write.ps1'));
-    await scriptFile.writeAsString(_linuxRawWriteScript);
-
-    final process = await Process.start('powershell', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      scriptFile.path,
-      '-DiskNumber',
-      '$diskNumber',
-      '-IsoPath',
-      isoPath,
-    ]);
-
-    final stdoutLines = process.stdout
-        .transform(const SystemEncoding().decoder)
-        .transform(const LineSplitter());
-    final stderrText = StringBuffer();
-
-    final stderrFuture = process.stderr
-        .transform(const SystemEncoding().decoder)
-        .listen((chunk) {
-          stderrText.write(chunk);
-          if (chunk.trim().isNotEmpty) {
-            _logLine('Linux raw stderr: ${chunk.trim()}');
-          }
-        })
-        .asFuture<void>();
-
-    await for (final line in stdoutLines) {
-      final cleanLine = line.trim();
-      if (cleanLine.isEmpty) continue;
-      _logLine('Linux raw stdout: $cleanLine');
-      if (cleanLine.startsWith('WDS_PROGRESS:')) {
-        final parts = cleanLine.split(':');
-        if (parts.length >= 2) {
-          final percent = int.tryParse(parts[1]) ?? 0;
-          onProgress((percent.clamp(0, 100)) / 100.0);
-        }
+    final imageBytes = await File(isoPath).length();
+    final command = InMemoryPowerShell.build(
+      script: _linuxRawWriteScript,
+      parameters: {
+        'DiskNumber': '$diskNumber',
+        'IsoPath': isoPath,
+        'ExpectedIsoLength': '$imageBytes',
+        'ExpectedSize': '${disk.sizeBytes}',
+        'ExpectedModel': disk.model,
+        'ExpectedBus': disk.busType,
+        'ExpectedUniqueId': disk.reliableUniqueId,
+        'ExpectedSerial': disk.reliableSerialNumber,
+        'ExpectedDevicePath': disk.reliableDevicePath,
+      },
+    );
+    Process? process;
+    try {
+      process = await Process.start(
+        command.executable,
+        command.arguments,
+        environment: command.environment,
+      );
+      _activeLinuxRawWriteProcess = process;
+      if (_cancelRequested) {
+        await _terminateProcessTree(process, reason: 'Linux write cancelled');
+        return const _LinuxRawWriteResult(
+          success: false,
+          cancelled: true,
+          error: 'Linux raw writing was cancelled.',
+        );
       }
-    }
 
-    final exitCode = await process.exitCode;
-    await stderrFuture.catchError((_) {});
-    await scriptFile.delete().catchError((_) => scriptFile);
-
-    if (exitCode != 0) {
+      final stdoutText = StringBuffer();
+      final stderrText = StringBuffer();
+      final stdoutDone = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+            final cleanLine = line.trim();
+            if (cleanLine.isEmpty) return;
+            stdoutText.writeln(cleanLine);
+            _logLine('Linux raw stdout: $cleanLine');
+            if (cleanLine.startsWith('WDS_PROGRESS:')) {
+              final percent = int.tryParse(
+                cleanLine.substring('WDS_PROGRESS:'.length),
+              );
+              if (percent != null) {
+                onProgress(percent.clamp(0, 100) / 100.0);
+              }
+            }
+          })
+          .asFuture<void>();
+      final stderrDone = process.stderr
+          .transform(const SystemEncoding().decoder)
+          .listen(stderrText.write)
+          .asFuture<void>();
+      final timeout = linuxRawWriteTimeoutForBytes(imageBytes);
+      int exitCode;
+      try {
+        exitCode = await process.exitCode.timeout(timeout);
+      } on TimeoutException {
+        await _terminateProcessTree(process, reason: 'Linux write timed out');
+        await Future.wait([
+          stdoutDone.catchError((_) {}),
+          stderrDone.catchError((_) {}),
+        ]);
+        return _LinuxRawWriteResult(
+          success: false,
+          error:
+              'Linux raw writing timed out after ${timeout.inSeconds} seconds.',
+        );
+      }
+      await Future.wait([
+        stdoutDone.catchError((_) {}),
+        stderrDone.catchError((_) {}),
+      ]);
+      if (_cancelRequested) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          cancelled: true,
+          error: 'Linux raw writing was cancelled.',
+        );
+      }
+      if (exitCode != 0) {
+        final detail = stderrText.toString().trim().isNotEmpty
+            ? stderrText.toString().trim()
+            : stdoutText.toString().trim();
+        return _LinuxRawWriteResult(
+          success: false,
+          error: detail.isEmpty
+              ? 'PowerShell exited with code $exitCode'
+              : detail,
+        );
+      }
+      return const _LinuxRawWriteResult(success: true);
+    } catch (error) {
+      if (process != null) {
+        await _terminateProcessTree(process, reason: 'Linux write failed');
+      }
       return _LinuxRawWriteResult(
         success: false,
-        error: stderrText.toString().trim().isNotEmpty
-            ? stderrText.toString().trim()
-            : 'PowerShell exited with code $exitCode',
+        error: 'Linux raw writing failed: $error',
       );
+    } finally {
+      if (identical(_activeLinuxRawWriteProcess, process)) {
+        _activeLinuxRawWriteProcess = null;
+      }
     }
-
-    return const _LinuxRawWriteResult(success: true);
   }
 
-  Future<bool> _verifyLinuxRawWrite({
-    required int diskNumber,
+  Future<_LinuxRawWriteResult> _verifyLinuxRawWrite({
+    required DiskInfo disk,
     required String isoPath,
+    required void Function(double progress) onProgress,
   }) async {
-    final tempDir = await FileUtils.getTempDirectory();
-    final scriptFile = File(p.join(tempDir, 'wds_linux_verify_raw_write.ps1'));
-
+    Process? process;
     try {
-      await scriptFile.writeAsString(_linuxRawVerifyScript);
+      final imageBytes = await File(isoPath).length();
+      final timeout = linuxRawVerificationTimeoutForBytes(imageBytes);
+      _logLine(
+        'Linux full verification timeout: ${timeout.inSeconds}s for '
+        '$imageBytes bytes at minimum '
+        '$linuxRawVerificationMinimumBytesPerSecond B/s',
+      );
 
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        scriptFile.path,
-        '-DiskNumber',
-        '$diskNumber',
-        '-IsoPath',
-        isoPath,
-      ]).timeout(const Duration(seconds: 15));
-      if (result.exitCode != 0) {
-        _logLine('Verify command failed: ${result.stderr}');
-        return false;
+      final command = InMemoryPowerShell.build(
+        script: _linuxRawVerifyScript,
+        parameters: {
+          'DiskNumber': '${disk.diskNumber}',
+          'IsoPath': isoPath,
+          'ExpectedSize': '${disk.sizeBytes}',
+          'ExpectedModel': disk.model,
+          'ExpectedBus': disk.busType,
+          'ExpectedSerial': disk.reliableSerialNumber,
+          'ExpectedDevicePath': disk.reliableDevicePath,
+          'ExpectedUniqueId': disk.reliableUniqueId,
+        },
+      );
+      process = await Process.start(
+        command.executable,
+        command.arguments,
+        environment: command.environment,
+      );
+      _activeLinuxVerificationProcess = process;
+
+      final stdoutText = StringBuffer();
+      final stderrText = StringBuffer();
+      var verified = false;
+      final stdoutDone = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+            final cleanLine = line.trim();
+            if (cleanLine.isEmpty) return;
+            stdoutText.writeln(cleanLine);
+            if (cleanLine == 'OK') verified = true;
+            if (cleanLine.startsWith('WDS_VERIFY_PROGRESS:')) {
+              final percent = int.tryParse(
+                cleanLine.substring('WDS_VERIFY_PROGRESS:'.length),
+              );
+              if (percent != null) {
+                onProgress(percent.clamp(0, 100) / 100.0);
+              }
+            }
+          })
+          .asFuture<void>();
+      final stderrDone = process.stderr
+          .transform(const SystemEncoding().decoder)
+          .listen(stderrText.write)
+          .asFuture<void>();
+      final exitFuture = process.exitCode;
+      final deadline = DateTime.now().add(timeout);
+
+      int? exitCode;
+      while (exitCode == null) {
+        if (_cancelRequested) {
+          await _terminateProcessTree(
+            process,
+            reason: 'Linux verification cancelled',
+          );
+          await Future.wait([
+            stdoutDone.catchError((_) {}),
+            stderrDone.catchError((_) {}),
+          ]);
+          return const _LinuxRawWriteResult(
+            success: false,
+            cancelled: true,
+            error: 'Linux byte-for-byte verification was cancelled.',
+          );
+        }
+
+        final remaining = deadline.difference(DateTime.now());
+        if (remaining <= Duration.zero) {
+          await _terminateProcessTree(
+            process,
+            reason: 'Linux verification timed out',
+          );
+          await Future.wait([
+            stdoutDone.catchError((_) {}),
+            stderrDone.catchError((_) {}),
+          ]);
+          return _LinuxRawWriteResult(
+            success: false,
+            error:
+                'Linux byte-for-byte verification timed out after '
+                '${timeout.inSeconds} seconds.',
+          );
+        }
+
+        final pollDelay = remaining < const Duration(milliseconds: 250)
+            ? remaining
+            : const Duration(milliseconds: 250);
+        exitCode = await Future.any<int?>([
+          exitFuture.then<int?>((value) => value),
+          Future<int?>.delayed(pollDelay, () => null),
+        ]);
       }
-      return result.stdout.toString().contains('OK');
-    } catch (e) {
-      _logLine('Verify command exception: $e');
-      return false;
+
+      await Future.wait([
+        stdoutDone.catchError((_) {}),
+        stderrDone.catchError((_) {}),
+      ]);
+      if (_cancelRequested) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          cancelled: true,
+          error: 'Linux byte-for-byte verification was cancelled.',
+        );
+      }
+      if (exitCode != 0 || !verified) {
+        final detail = stderrText.toString().trim().isNotEmpty
+            ? stderrText.toString().trim()
+            : stdoutText.toString().trim();
+        _logLine('Verify command failed (exit $exitCode): $detail');
+        return _LinuxRawWriteResult(
+          success: false,
+          error: detail.isEmpty
+              ? 'PowerShell verification exited with code $exitCode.'
+              : detail,
+        );
+      }
+
+      onProgress(1.0);
+      return const _LinuxRawWriteResult(success: true);
+    } catch (error) {
+      _logLine('Verify command exception: $error');
+      if (process != null) {
+        await _terminateProcessTree(
+          process,
+          reason: 'Linux verification failed',
+        );
+      }
+      return _LinuxRawWriteResult(
+        success: false,
+        error: 'Linux byte-for-byte verification failed: $error',
+      );
     } finally {
-      await scriptFile.delete().catchError((_) => scriptFile);
+      if (identical(_activeLinuxVerificationProcess, process)) {
+        _activeLinuxVerificationProcess = null;
+      }
+    }
+  }
+
+  Future<void> _terminateProcessTree(
+    Process process, {
+    required String reason,
+  }) async {
+    _logLine('$reason; terminating process tree PID ${process.pid}');
+    if (Platform.isWindows) {
+      try {
+        final result = await Process.run('taskkill', [
+          '/PID',
+          '${process.pid}',
+          '/T',
+          '/F',
+        ]).timeout(const Duration(seconds: 15));
+        _logLine('taskkill PID ${process.pid} exit: ${result.exitCode}');
+      } catch (error) {
+        _logLine('taskkill PID ${process.pid} failed: $error');
+      }
+    }
+    process.kill(ProcessSignal.sigkill);
+    try {
+      await process.exitCode.timeout(const Duration(seconds: 10));
+    } catch (error) {
+      _logLine('Process PID ${process.pid} did not confirm exit: $error');
+    }
+  }
+
+  Future<ProcessResult> _runLinuxUtility(
+    String executable,
+    List<String> arguments, {
+    required Duration timeout,
+  }) async {
+    Process? process;
+    try {
+      process = await Process.start(executable, arguments);
+      _activeLinuxUtilityProcess = process;
+      final stdoutFuture = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .join();
+      final stderrFuture = process.stderr
+          .transform(const SystemEncoding().decoder)
+          .join();
+      int exitCode;
+      try {
+        exitCode = await process.exitCode.timeout(timeout);
+      } on TimeoutException {
+        await _terminateProcessTree(process, reason: '$executable timed out');
+        return ProcessResult(
+          process.pid,
+          -1,
+          await stdoutFuture,
+          '${await stderrFuture}\nProcess timed out after ${timeout.inSeconds} seconds.',
+        );
+      }
+      return ProcessResult(
+        process.pid,
+        exitCode,
+        await stdoutFuture,
+        await stderrFuture,
+      );
+    } finally {
+      if (identical(_activeLinuxUtilityProcess, process)) {
+        _activeLinuxUtilityProcess = null;
+      }
     }
   }
 
   static const String _linuxRawWriteScript = r'''
 param(
   [Parameter(Mandatory = $true)][int]$DiskNumber,
-  [Parameter(Mandatory = $true)][string]$IsoPath
+  [Parameter(Mandatory = $true)][string]$IsoPath,
+  [Parameter(Mandatory = $true)][int64]$ExpectedIsoLength,
+  [Parameter(Mandatory = $true)][int64]$ExpectedSize,
+  [Parameter(Mandatory = $true)][string]$ExpectedModel,
+  [Parameter(Mandatory = $true)][string]$ExpectedBus,
+  [string]$ExpectedUniqueId = '',
+  [string]$ExpectedSerial = '',
+  [string]$ExpectedDevicePath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1193,10 +2468,64 @@ if (-not (Test-Path -LiteralPath $IsoPath -PathType Leaf)) {
   throw "ISO file not found: $IsoPath"
 }
 
-$disk = Get-Disk -Number $DiskNumber -ErrorAction Stop
-if ($disk.IsSystem -or $disk.IsBoot) {
-  throw "Refusing to write to a system or boot disk."
+$isoItem = Get-Item -LiteralPath $IsoPath -ErrorAction Stop
+if ([int64]$isoItem.Length -ne $ExpectedIsoLength -or $ExpectedIsoLength -le 0) {
+  throw "ISO file changed after preflight."
 }
+
+$disk = Get-Disk -Number $DiskNumber -ErrorAction Stop
+$bus = $disk.BusType.ToString().ToUpperInvariant()
+$isExternal = $bus -in @('USB', 'SD', 'MMC') -or [bool]$disk.IsRemovable
+if (-not $isExternal -or $disk.IsSystem -or $disk.IsBoot -or $disk.IsOffline) {
+  throw "Refusing to write to a disk that is not a safe external target."
+}
+if ([int64]$disk.Size -ne $ExpectedSize -or
+    $disk.FriendlyName.ToString().Trim().ToUpperInvariant() -ne $ExpectedModel.Trim().ToUpperInvariant() -or
+    $bus -ne $ExpectedBus.Trim().ToUpperInvariant()) {
+  throw "Target disk identity changed after selection."
+}
+if ($ExpectedSerial -and $ExpectedSerial.Trim().ToUpperInvariant() -notin @('N/A', 'UNKNOWN')) {
+  $physical = Get-PhysicalDisk -ErrorAction Stop |
+    Where-Object { $_.DeviceId -eq $disk.Number.ToString() } |
+    Select-Object -First 1
+  $currentSerial = if ($physical -and $physical.SerialNumber) {
+    $physical.SerialNumber.ToString().Trim().ToUpperInvariant()
+  } else { '' }
+  if ($currentSerial -ne $ExpectedSerial.Trim().ToUpperInvariant()) {
+    throw "Target disk serial number changed after selection."
+  }
+} elseif ($ExpectedUniqueId) {
+  $currentUniqueId = if ($disk.UniqueId) { $disk.UniqueId.ToString().Trim().ToUpperInvariant() } else { '' }
+  if ($currentUniqueId -ne $ExpectedUniqueId.Trim().ToUpperInvariant()) {
+    throw "Target disk unique identity changed after selection."
+  }
+} elseif ($ExpectedDevicePath) {
+  $currentPath = if ($disk.Path) { $disk.Path.ToString().Trim().ToUpperInvariant() } else { '' }
+  if ($currentPath -ne $ExpectedDevicePath.Trim().ToUpperInvariant()) {
+    throw "Target disk device path changed after selection."
+  }
+} else {
+  throw "Target disk has no reliable physical identity."
+}
+
+if ($ExpectedIsoLength -ge [int64]$disk.Size) {
+  throw "ISO image must be smaller than the target disk."
+}
+$sourceVolume = Get-Volume -FilePath $IsoPath -ErrorAction Stop
+$sourcePartitions = @(Get-Partition -Volume $sourceVolume -ErrorAction Stop)
+if ($sourcePartitions.Count -ne 1) {
+  throw "ISO source did not resolve to exactly one physical partition."
+}
+if ([int]$sourcePartitions[0].DiskNumber -eq $DiskNumber) {
+  throw "ISO source is stored on the target disk."
+}
+
+$source = [System.IO.File]::Open(
+  $IsoPath,
+  [System.IO.FileMode]::Open,
+  [System.IO.FileAccess]::Read,
+  [System.IO.FileShare]::Read
+)
 
 if ($disk.IsOffline) {
   Set-Disk -Number $DiskNumber -IsOffline $false -ErrorAction SilentlyContinue
@@ -1220,13 +2549,6 @@ foreach ($letter in $driveLetters) {
 
 Clear-Disk -Number $DiskNumber -RemoveData -RemoveOEM -Confirm:$false -ErrorAction Stop
 Start-Sleep -Milliseconds 700
-
-$source = [System.IO.File]::Open(
-  $IsoPath,
-  [System.IO.FileMode]::Open,
-  [System.IO.FileAccess]::Read,
-  [System.IO.FileShare]::Read
-)
 
 $targetPath = "\\.\PhysicalDrive$DiskNumber"
 $target = [System.IO.File]::Open(
@@ -1267,7 +2589,13 @@ Write-Output "WDS_DONE"
   static const String _linuxRawVerifyScript = r'''
 param(
   [Parameter(Mandatory = $true)][int]$DiskNumber,
-  [Parameter(Mandatory = $true)][string]$IsoPath
+  [Parameter(Mandatory = $true)][string]$IsoPath,
+  [Parameter(Mandatory = $true)][int64]$ExpectedSize,
+  [Parameter(Mandatory = $true)][string]$ExpectedModel,
+  [Parameter(Mandatory = $true)][string]$ExpectedBus,
+  [string]$ExpectedSerial = '',
+  [string]$ExpectedDevicePath = '',
+  [string]$ExpectedUniqueId = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1358,6 +2686,39 @@ if ($isoLength -le 0) {
 }
 
 $targetDisk = Get-Disk -Number $DiskNumber -ErrorAction Stop
+$targetBus = $targetDisk.BusType.ToString().ToUpperInvariant()
+$isExternal = $targetBus -in @('USB', 'SD', 'MMC') -or [bool]$targetDisk.IsRemovable
+if (-not $isExternal -or $targetDisk.IsSystem -or $targetDisk.IsBoot -or $targetDisk.IsOffline) {
+  throw "The verification target is no longer a safe external disk."
+}
+if ([int64]$targetDisk.Size -ne $ExpectedSize -or
+    $targetDisk.FriendlyName.ToString().Trim().ToUpperInvariant() -ne $ExpectedModel.Trim().ToUpperInvariant() -or
+    $targetBus -ne $ExpectedBus.Trim().ToUpperInvariant()) {
+  throw "The verification target changed after writing."
+}
+if ($ExpectedSerial -and $ExpectedSerial.Trim().ToUpperInvariant() -notin @('N/A', 'UNKNOWN')) {
+  $physical = Get-PhysicalDisk -ErrorAction Stop |
+    Where-Object { $_.DeviceId -eq $targetDisk.Number.ToString() } |
+    Select-Object -First 1
+  $currentSerial = if ($physical -and $physical.SerialNumber) {
+    $physical.SerialNumber.ToString().Trim().ToUpperInvariant()
+  } else { '' }
+  if ($currentSerial -ne $ExpectedSerial.Trim().ToUpperInvariant()) {
+    throw "The verification target serial number changed after writing."
+  }
+} elseif ($ExpectedUniqueId) {
+  $currentUniqueId = if ($targetDisk.UniqueId) { $targetDisk.UniqueId.ToString().Trim().ToUpperInvariant() } else { '' }
+  if ($currentUniqueId -ne $ExpectedUniqueId.Trim().ToUpperInvariant()) {
+    throw "The verification target unique ID changed after writing."
+  }
+} elseif ($ExpectedDevicePath) {
+  $currentPath = if ($targetDisk.Path) { $targetDisk.Path.ToString().Trim().ToUpperInvariant() } else { '' }
+  if ($currentPath -ne $ExpectedDevicePath.Trim().ToUpperInvariant()) {
+    throw "The verification target device path changed after writing."
+  }
+} else {
+  throw "The verification target has no reliable physical identity."
+}
 if ([int64]$targetDisk.Size -lt $isoLength) {
   throw "Target disk is smaller than the ISO image."
 }
@@ -1411,27 +2772,50 @@ try {
     }
   }
 
-  $blockLength = 4096
-  $sampleOffsets = New-Object System.Collections.Generic.List[Int64]
-  $sampleOffsets.Add([int64]1048576) | Out-Null
-  $sampleOffsets.Add([int64][Math]::Floor($isoLength * 0.25)) | Out-Null
-  $sampleOffsets.Add([int64][Math]::Floor($isoLength * 0.50)) | Out-Null
-  $sampleOffsets.Add([int64][Math]::Floor($isoLength * 0.75)) | Out-Null
-
-  $checked = New-Object System.Collections.Generic.HashSet[Int64]
-  foreach ($offset in $sampleOffsets) {
-    $alignedOffset = [int64]([Math]::Floor($offset / 4096) * 4096)
-    if (
-      $alignedOffset -ge 1048576 -and
-      ($alignedOffset + $blockLength) -lt ($isoLength - 16777216) -and
-      $checked.Add($alignedOffset)
-    ) {
-      Compare-Block $source $target $alignedOffset $blockLength
+  $bufferLength = 8388608
+  $sourceBuffer = New-Object byte[] $bufferLength
+  $targetBuffer = New-Object byte[] $bufferLength
+  $source.Seek(0, [System.IO.SeekOrigin]::Begin) | Out-Null
+  $target.Seek(0, [System.IO.SeekOrigin]::Begin) | Out-Null
+  $sourceHash = [System.Security.Cryptography.IncrementalHash]::CreateHash(
+    [System.Security.Cryptography.HashAlgorithmName]::SHA256
+  )
+  $targetHash = [System.Security.Cryptography.IncrementalHash]::CreateHash(
+    [System.Security.Cryptography.HashAlgorithmName]::SHA256
+  )
+  $verified = [int64]0
+  $lastPercent = -1
+  Write-Output "WDS_VERIFY_PROGRESS:0"
+  while ($verified -lt $isoLength) {
+    $requested = [int][Math]::Min($bufferLength, $isoLength - $verified)
+    $sourceRead = $source.Read($sourceBuffer, 0, $requested)
+    $targetRead = $target.Read($targetBuffer, 0, $requested)
+    if ($sourceRead -ne $requested -or $targetRead -ne $requested) {
+      throw "Short read while verifying at offset $verified."
     }
+    $sourceHash.AppendData($sourceBuffer, 0, $requested)
+    $targetHash.AppendData($targetBuffer, 0, $requested)
+    $verified += $requested
+    $percent = [int][Math]::Floor(($verified * 100.0) / $isoLength)
+    if ($percent -ne $lastPercent) {
+      Write-Output ("WDS_VERIFY_PROGRESS:{0}" -f $percent)
+      $lastPercent = $percent
+    }
+  }
+
+  $sourceDigest = $sourceHash.GetHashAndReset()
+  $targetDigest = $targetHash.GetHashAndReset()
+  if (-not [System.Linq.Enumerable]::SequenceEqual(
+      [byte[]]$sourceDigest,
+      [byte[]]$targetDigest
+    )) {
+    throw "Full-stream SHA-256 verification mismatch."
   }
 
   Write-Output "OK"
 } finally {
+  if ($null -ne $targetHash) { $targetHash.Dispose() }
+  if ($null -ne $sourceHash) { $sourceHash.Dispose() }
   $target.Dispose()
   $source.Dispose()
 }
@@ -1440,24 +2824,51 @@ try {
   // --- Disk Partitioning ---
 
   Future<_DiskPartResult> _partitionDisk({
-    required int diskNumber,
+    required DiskInfo disk,
     required BootMode bootMode,
+    required DeploymentBootMode deploymentBootMode,
+    required String preferredDriveLetter,
+    required String volumeLabel,
   }) async {
-    final activeLine = bootMode == BootMode.uefi ? '' : 'active';
+    final diskNumber = disk.diskNumber;
+    final requestedLetter = _normalizePreferredLetter(preferredDriveLetter);
+    if (preferredDriveLetter.isNotEmpty && requestedLetter == null) {
+      return const _DiskPartResult(
+        success: false,
+        error: 'The requested drive letter is invalid.',
+      );
+    }
+    if (requestedLetter != null &&
+        !await _isDriveLetterAvailable(requestedLetter, diskNumber)) {
+      return const _DiskPartResult(
+        success: false,
+        error: 'The requested drive letter is already in use.',
+      );
+    }
+    final label = _sanitizeVolumeLabel(volumeLabel, fallback: 'WDS_BOOT');
+    final useGpt = deploymentBootMode == DeploymentBootMode.uefiGpt;
+    final activeLine = deploymentBootMode == DeploymentBootMode.legacyBios
+        ? 'active'
+        : '';
+    final assignLine = requestedLetter == null
+        ? 'assign'
+        : 'assign letter=$requestedLetter';
     final script =
         '''
 select disk $diskNumber
 clean
-convert mbr
+convert ${useGpt ? 'gpt' : 'mbr'}
 create partition primary
 $activeLine
-format fs=fat32 label="WDS_BOOT" quick
-assign
+format fs=fat32 label="$label" quick
+$assignLine
 exit
 ''';
     _logLine('DiskPart script:\n$script');
 
-    final result = await _runDiskpart(script);
+    final result = await ref
+        .read(diskSafetyServiceProvider)
+        .runGuardedDiskpart(disk, script);
     _logLine('DiskPart exit: ${result.exitCode}');
 
     if (result.exitCode != 0) {
@@ -1471,7 +2882,9 @@ exit
       );
     }
 
-    final driveLetter = await _findDriveLetterForDisk(diskNumber);
+    final driveLetter = requestedLetter == null
+        ? await _findDriveLetterForDisk(diskNumber)
+        : '$requestedLetter:';
     if (driveLetter == null) {
       _logLine('Could not find drive letter');
       return _DiskPartResult(
@@ -1480,7 +2893,106 @@ exit
       );
     }
 
+    if (!await _verifyInstallMediaPartition(
+      diskNumber: diskNumber,
+      driveLetter: driveLetter,
+      expectedPartitionStyle: useGpt ? 'GPT' : 'MBR',
+      expectedLabel: label,
+    )) {
+      _logLine('Install media partition postcondition check failed');
+      return const _DiskPartResult(
+        success: false,
+        error: 'Created partition does not match the requested layout.',
+      );
+    }
+
     return _DiskPartResult(success: true, driveLetter: driveLetter);
+  }
+
+  Future<bool> _verifyInstallMediaPartition({
+    required int diskNumber,
+    required String driveLetter,
+    required String expectedPartitionStyle,
+    required String expectedLabel,
+  }) async {
+    try {
+      final letter = driveLetter.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
+      final result = await Process.run(
+        'powershell',
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$partition = Get-Partition -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+$volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+$disk = Get-Disk -Number $partition.DiskNumber -ErrorAction Stop
+[PSCustomObject]@{
+  DiskNumber = $partition.DiskNumber
+  PartitionStyle = $disk.PartitionStyle.ToString()
+  Label = $volume.FileSystemLabel
+  FileSystem = $volume.FileSystem
+} | ConvertTo-Json -Compress''',
+        ],
+        environment: {...Platform.environment, 'WDS_DRIVE_LETTER': letter},
+      ).timeout(const Duration(seconds: 8));
+      if (result.exitCode != 0) return false;
+      final data = jsonDecode(result.stdout.toString());
+      return data is Map &&
+          data['DiskNumber'].toString() == diskNumber.toString() &&
+          data['PartitionStyle'].toString().toUpperCase() ==
+              expectedPartitionStyle.toUpperCase() &&
+          data['Label'].toString().toUpperCase() ==
+              expectedLabel.toUpperCase() &&
+          data['FileSystem'].toString().toUpperCase() == 'FAT32';
+    } catch (error) {
+      _logLine('Install media partition verification error: $error');
+      return false;
+    }
+  }
+
+  String? _normalizePreferredLetter(String value) {
+    final normalized = value
+        .trim()
+        .replaceAll(RegExp(r'[:\\]'), '')
+        .toUpperCase();
+    if (normalized.isEmpty) return null;
+    return RegExp(r'^[D-Z]$').hasMatch(normalized) ? normalized : null;
+  }
+
+  Future<bool> _isDriveLetterAvailable(String letter, int diskNumber) async {
+    try {
+      final result = await Process.run(
+        'powershell',
+        const [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$partition = Get-Partition -DriveLetter $env:WDS_LETTER -ErrorAction SilentlyContinue
+if (-not $partition) { exit 0 }
+if ($partition.DiskNumber -eq [int]$env:WDS_DISK_NUMBER) { exit 0 }
+exit 1''',
+        ],
+        environment: {
+          ...Platform.environment,
+          'WDS_LETTER': letter,
+          'WDS_DISK_NUMBER': '$diskNumber',
+        },
+      ).timeout(const Duration(seconds: 8));
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _sanitizeVolumeLabel(String value, {required String fallback}) {
+    final sanitized = value
+        .trim()
+        .replaceAll(RegExp(r'["*/:<>?\\|+,;=\[\]]'), '')
+        .trim();
+    if (sanitized.isEmpty) return fallback;
+    return sanitized.length > 11 ? sanitized.substring(0, 11) : sanitized;
   }
 
   Future<String?> _findDriveLetterForDisk(int diskNumber) async {
@@ -1605,6 +3117,8 @@ exit
     required String mountPoint,
     required String targetDrive,
     required bool excludeWim,
+    bool excludeAutoUnattend = true,
+    Set<String> excludedExtensions = const {},
     void Function(double progress)? onProgress,
   }) async {
     try {
@@ -1616,9 +3130,15 @@ exit
 
       final excludedNames = <String>{
         if (excludeWim) ...['install.wim', 'install.esd'],
-        'AutoUnattend.xml',
-        'autounattend.xml',
+        if (excludeAutoUnattend) ...['AutoUnattend.xml', 'autounattend.xml'],
       };
+      final normalizedExtensions = excludedExtensions
+          .map(
+            (extension) =>
+                extension.replaceFirst(RegExp(r'^\.'), '').toLowerCase(),
+          )
+          .where((extension) => extension.isNotEmpty)
+          .toSet();
 
       // robocopy args
       final args = <String>[
@@ -1634,19 +3154,21 @@ exit
         '/MT:8', // 8 threads
       ];
 
-      if (excludeWim) {
-        args.addAll(['/XF', 'install.wim', 'install.esd']);
+      final excludedPatterns = <String>[
+        if (excludeWim) ...['install.wim', 'install.esd'],
+        if (excludeAutoUnattend) ...['AutoUnattend.xml', 'autounattend.xml'],
+        ...normalizedExtensions.map((extension) => '*.$extension'),
+      ];
+      if (excludedPatterns.isNotEmpty) {
+        args.addAll(['/XF', ...excludedPatterns]);
       }
-
-      // Always exclude AutoUnattend.xml from ISO (may contain invalid keys
-      // that break Windows Setup on USB drives)
-      args.addAll(['/XF', 'AutoUnattend.xml', 'autounattend.xml']);
 
       _logLine('robocopy args: ${args.join(" ")}');
 
       final totalBytes = await _directorySize(
         srcDir,
         excludedNames: excludedNames,
+        excludedExtensions: normalizedExtensions,
       );
       _logLine('robocopy total bytes: $totalBytes');
 
@@ -1680,6 +3202,7 @@ exit
         final copiedBytes = await _directorySize(
           dstDir,
           excludedNames: excludedNames,
+          excludedExtensions: normalizedExtensions,
         );
         final progress = (copiedBytes / totalBytes).clamp(0.0, 0.99);
         onProgress?.call(progress);
@@ -1697,20 +3220,28 @@ exit
       await stdoutSub.cancel();
       await stderrSub.cancel();
 
-      // robocopy exit codes: 0-7 are success, 8+ are failures
+      // Only 0-3 are accepted. Codes 4-7 report mismatched files and must fail
+      // before any later boot or content verification is trusted.
       // 0 = no files copied (already up to date)
       // 1 = files copied successfully
       // 2 = extra files in destination
       // 3 = files copied + extra files
-      // 4 = mismatched files
-      // 5 = files copied + mismatched
-      // 6 = extra + mismatched
-      // 7 = all of the above
       _logLine('robocopy exit: $exitCode');
 
-      if (exitCode >= 8) {
+      if (!isAcceptedRobocopyExitCode(exitCode)) {
         _logLine('robocopy FAILED: ${stderrBuffer.toString().trim()}');
         _logLine('robocopy stdout: ${stdoutBuffer.toString().trim()}');
+        return false;
+      }
+
+      final contentVerified = await _verifyCopiedTree(
+        sourceRoot: srcDir,
+        targetRoot: dstDir,
+        excludedNames: excludedNames,
+        excludedExtensions: normalizedExtensions,
+      );
+      if (!contentVerified) {
+        _logLine('robocopy content verification FAILED');
         return false;
       }
 
@@ -1723,14 +3254,75 @@ exit
     }
   }
 
+  Future<bool> _verifyCopiedTree({
+    required String sourceRoot,
+    required String targetRoot,
+    required Set<String> excludedNames,
+    required Set<String> excludedExtensions,
+  }) async {
+    final excluded = excludedNames.map((name) => name.toLowerCase()).toSet();
+    var verifiedFiles = 0;
+    var verifiedBytes = 0;
+    try {
+      await for (final entity in Directory(
+        sourceRoot,
+      ).list(recursive: true, followLinks: false)) {
+        if (entity is! File) continue;
+        if (excluded.contains(p.basename(entity.path).toLowerCase())) continue;
+        final extension = p
+            .extension(entity.path)
+            .replaceFirst('.', '')
+            .toLowerCase();
+        if (excludedExtensions.contains(extension)) continue;
+
+        final relativePath = p.relative(entity.path, from: sourceRoot);
+        final target = File(p.join(targetRoot, relativePath));
+        final sourceBytes = await entity.length();
+        if (!await target.exists() || await target.length() != sourceBytes) {
+          _logLine('Copy verification missing/truncated: $relativePath');
+          return false;
+        }
+        final sourceDigest = (await sha256.bind(entity.openRead()).first)
+            .toString();
+        final targetDigest = (await sha256.bind(target.openRead()).first)
+            .toString();
+        if (sourceDigest != targetDigest) {
+          _logLine(
+            'Copy verification SHA-256 mismatch: $relativePath '
+            '(source=$sourceDigest, target=$targetDigest)',
+          );
+          return false;
+        }
+        verifiedFiles++;
+        verifiedBytes += sourceBytes;
+      }
+      _logLine(
+        'Copy content verification OK: $verifiedFiles files, '
+        '$verifiedBytes bytes',
+      );
+      return true;
+    } catch (error) {
+      _logLine('Copy content verification error: $error');
+      return false;
+    }
+  }
+
   Future<int> _directorySize(
     String rootPath, {
     Set<String> excludedNames = const {},
+    Set<String> excludedExtensions = const {},
   }) async {
     final root = Directory(rootPath);
     if (!await root.exists()) return 0;
 
     final excluded = excludedNames.map((name) => name.toLowerCase()).toSet();
+    final excludedSuffixes = excludedExtensions
+        .map(
+          (extension) =>
+              extension.replaceFirst(RegExp(r'^\.'), '').toLowerCase(),
+        )
+        .where((extension) => extension.isNotEmpty)
+        .toSet();
     var total = 0;
 
     try {
@@ -1740,6 +3332,11 @@ exit
       )) {
         if (entity is! File) continue;
         if (excluded.contains(p.basename(entity.path).toLowerCase())) continue;
+        final extension = p
+            .extension(entity.path)
+            .replaceFirst('.', '')
+            .toLowerCase();
+        if (excludedSuffixes.contains(extension)) continue;
 
         try {
           total += await entity.length();
@@ -1935,6 +3532,8 @@ exit
   Future<bool> _verifyBootableUsb({
     required String driveLetter,
     required BootMode bootMode,
+    required String expectedIconSha256,
+    required String expectedVolumeLabel,
   }) async {
     final errors = <String>[];
 
@@ -1963,6 +3562,33 @@ exit
     // setup.exe is optional (slim ISOs like Tiny10/X-Lite may not have it)
     if (!await File('$driveLetter\\setup.exe').exists()) {
       _logLine('Note: setup.exe not found (OK for slim ISOs)');
+    }
+
+    final iconFile = File('$driveLetter\\intel.ico');
+    if (!await iconFile.exists()) {
+      errors.add('volume icon missing');
+    } else {
+      final actualIconDigest = (await sha256.bind(iconFile.openRead()).first)
+          .toString();
+      if (actualIconDigest != expectedIconSha256) {
+        errors.add('volume icon content mismatch');
+      }
+    }
+    final autorunFile = File('$driveLetter\\autorun.inf');
+    if (!await autorunFile.exists()) {
+      errors.add('autorun.inf missing');
+    } else {
+      final autorun = (await autorunFile.readAsString())
+          .replaceAll('\r\n', '\n')
+          .trim();
+      final label = _sanitizeVolumeLabel(
+        expectedVolumeLabel,
+        fallback: 'WINDEPLOY',
+      );
+      final expectedAutorun = '[autorun]\nicon=intel.ico\nlabel=$label';
+      if (autorun != expectedAutorun) {
+        errors.add('autorun.inf content mismatch');
+      }
     }
 
     if (errors.isNotEmpty) {
@@ -1996,17 +3622,66 @@ exit
 
   // --- Volume Icon ---
 
-  Future<void> _setVolumeIcon(String driveLetter) async {
+  Future<_VolumeIconPreparation> _prepareVolumeIcon(
+    String customIconPath,
+  ) async {
     try {
-      _logLine('Loading intel.ico from app assets...');
+      final requestedPath = customIconPath.trim();
+      final Uint8List iconData;
+      if (requestedPath.isNotEmpty) {
+        if (p.extension(requestedPath).toLowerCase() != '.ico') {
+          return const _VolumeIconPreparation.failure(
+            'Custom volume icon must be an ICO file.',
+          );
+        }
+        if (await FileSystemEntity.type(requestedPath, followLinks: false) !=
+            FileSystemEntityType.file) {
+          return const _VolumeIconPreparation.failure(
+            'The requested custom volume icon does not exist or is not a regular file.',
+          );
+        }
+        final file = File(requestedPath);
+        if (await file.length() > 16 * 1024 * 1024) {
+          return const _VolumeIconPreparation.failure(
+            'Custom volume icon exceeds the 16 MiB safety limit.',
+          );
+        }
+        iconData = await file.readAsBytes();
+        _logLine('Custom volume icon validated before erase: $requestedPath');
+      } else {
+        final iconBytes = await rootBundle.load('assets/intel.ico');
+        iconData = iconBytes.buffer.asUint8List(
+          iconBytes.offsetInBytes,
+          iconBytes.lengthInBytes,
+        );
+      }
 
-      // Load icon from Flutter asset bundle
-      final iconBytes = await rootBundle.load('assets/intel.ico');
-      final iconData = iconBytes.buffer.asUint8List();
+      final validationError = validateIcoBytes(iconData);
+      if (validationError != null) {
+        return _VolumeIconPreparation.failure(validationError);
+      }
+      return _VolumeIconPreparation.success(
+        _VolumeIconPayload(
+          bytes: Uint8List.fromList(iconData),
+          sha256Digest: sha256.convert(iconData).toString(),
+        ),
+      );
+    } catch (error) {
+      return _VolumeIconPreparation.failure(
+        'Volume icon validation failed: $error',
+      );
+    }
+  }
 
+  Future<bool> _setVolumeIcon(
+    String driveLetter, {
+    required _VolumeIconPayload icon,
+    required String volumeLabel,
+  }) async {
+    try {
       // Copy icon to USB root
       final iconDest = File('$driveLetter\\intel.ico');
-      await iconDest.writeAsBytes(iconData);
+      await iconDest.writeAsBytes(icon.bytes, flush: true);
       _logLine('Icon written to: ${iconDest.path}');
 
       // Create autorun.inf — remove existing first (Windows may block it)
@@ -2022,8 +3697,10 @@ exit
         await autorunFile.delete().catchError((_) => autorunFile);
       } catch (_) {}
 
+      final label = _sanitizeVolumeLabel(volumeLabel, fallback: 'WINDEPLOY');
       await autorunFile.writeAsString(
-        '[autorun]\nicon=intel.ico\nlabel=INTEL\n',
+        '[autorun]\nicon=intel.ico\nlabel=$label\n',
+        flush: true,
       );
       _logLine('autorun.inf created');
 
@@ -2040,30 +3717,22 @@ exit
         iconDest.path,
       ]).timeout(const Duration(seconds: 5));
 
+      final writtenDigest = (await sha256.bind(iconDest.openRead()).first)
+          .toString();
+      final autorun = (await autorunFile.readAsString())
+          .replaceAll('\r\n', '\n')
+          .trim();
+      if (writtenDigest != icon.sha256Digest ||
+          autorun != '[autorun]\nicon=intel.ico\nlabel=$label') {
+        throw StateError(
+          'Volume icon or autorun.inf content verification failed.',
+        );
+      }
       _logLine('Volume icon set OK');
+      return true;
     } catch (e) {
-      _logLine('Volume icon error: $e (non-fatal, continuing)');
-    }
-  }
-
-  // --- Utility ---
-
-  Future<ProcessResult> _runDiskpart(String script) async {
-    final tempDir = await FileUtils.getTempDirectory();
-    final scriptFile = File(p.join(tempDir, 'winddeploy_diskpart.txt'));
-    await scriptFile.writeAsString(script);
-
-    try {
-      final result = await Process.run('diskpart', ['/s', scriptFile.path])
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              return ProcessResult(0, -1, '', 'diskpart timed out after 30s');
-            },
-          );
-      return result;
-    } finally {
-      await scriptFile.delete().catchError((_) => scriptFile);
+      _logLine('Volume icon error: $e');
+      return false;
     }
   }
 
@@ -2080,9 +3749,85 @@ class _DiskPartResult {
   const _DiskPartResult({required this.success, this.driveLetter, this.error});
 }
 
+class _VolumeIconPayload {
+  final Uint8List bytes;
+  final String sha256Digest;
+
+  const _VolumeIconPayload({required this.bytes, required this.sha256Digest});
+}
+
+class _VolumeIconPreparation {
+  final _VolumeIconPayload? payload;
+  final String? error;
+
+  const _VolumeIconPreparation._({this.payload, this.error});
+
+  const _VolumeIconPreparation.success(_VolumeIconPayload payload)
+    : this._(payload: payload);
+
+  const _VolumeIconPreparation.failure(String error) : this._(error: error);
+
+  bool get success => error == null;
+}
+
 class _LinuxRawWriteResult {
   final bool success;
   final String? error;
+  final bool cancelled;
 
-  const _LinuxRawWriteResult({required this.success, this.error});
+  const _LinuxRawWriteResult({
+    required this.success,
+    this.error,
+    this.cancelled = false,
+  });
+}
+
+class _LinuxToGoPreflight {
+  final bool success;
+  final String? error;
+  final int totalContentBytes;
+  final int bootContentBytes;
+  final List<_LinuxToGoPayload> livePayloads;
+
+  const _LinuxToGoPreflight({
+    required this.success,
+    this.error,
+    this.totalContentBytes = 0,
+    this.bootContentBytes = 0,
+    this.livePayloads = const [],
+  });
+}
+
+class _LinuxToGoPayload {
+  final String relativePath;
+  final int sizeBytes;
+
+  const _LinuxToGoPayload({
+    required this.relativePath,
+    required this.sizeBytes,
+  });
+}
+
+class _LinuxToGoPartitionResult {
+  final bool success;
+  final String? bootDrive;
+  final String? liveDrive;
+  final String? error;
+
+  const _LinuxToGoPartitionResult({
+    required this.success,
+    this.bootDrive,
+    this.liveDrive,
+    this.error,
+  });
+}
+
+class _LinuxToGoDriveLetters {
+  final String bootLetter;
+  final String liveLetter;
+
+  const _LinuxToGoDriveLetters({
+    required this.bootLetter,
+    required this.liveLetter,
+  });
 }

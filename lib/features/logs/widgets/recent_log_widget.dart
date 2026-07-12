@@ -27,7 +27,11 @@ class RecentLogWidget extends StatelessWidget {
               color: activity.category.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(activity.category.icon, size: 18, color: activity.category.color),
+            child: Icon(
+              activity.category.icon,
+              size: 18,
+              color: activity.category.color,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -36,9 +40,9 @@ class RecentLogWidget extends StatelessWidget {
               children: [
                 Text(
                   categoryDisplayName,
-                  style: AppTypography.captionWith(activity.category.color).copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTypography.captionWith(
+                    activity.category.color,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   activity.title,
@@ -52,7 +56,9 @@ class RecentLogWidget extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             activity.timeFormatted,
-            style: AppTypography.captionWith(theme.colorScheme.onSurfaceVariant),
+            style: AppTypography.captionWith(
+              theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

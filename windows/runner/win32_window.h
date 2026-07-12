@@ -12,6 +12,12 @@
 // rendering and input handling
 class Win32Window {
  public:
+  enum class VisualStyle {
+    kWindows11,
+    kWindows10,
+    kWindows7,
+  };
+
   struct Point {
     unsigned int x;
     unsigned int y;
@@ -55,6 +61,12 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
+  // Applies non-client styling while retaining the system window frame.
+  void SetWindowStyle(VisualStyle style,
+                      bool dark_mode,
+                      COLORREF accent_color,
+                      COLORREF surface_color);
+
  protected:
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
@@ -87,8 +99,13 @@ class Win32Window {
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
-  // Update the window frame's theme to match the system theme.
-  static void UpdateTheme(HWND const window);
+  // Applies the current visual style to the native non-client frame.
+  void ApplyWindowStyle(HWND const window);
+
+  VisualStyle visual_style_ = VisualStyle::kWindows10;
+  bool dark_mode_ = false;
+  COLORREF accent_color_ = RGB(0, 113, 197);
+  COLORREF surface_color_ = RGB(243, 243, 243);
 
   bool quit_on_close_ = false;
 

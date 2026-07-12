@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../app/theme.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/mirror_speed_test_service.dart';
+import '../../../shared/widgets/app_page.dart';
 import '../models/mirror_models.dart';
 import '../providers/mirror_source_provider.dart';
 import '../widgets/ltsc_warning_dialog.dart';
@@ -45,83 +47,55 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isCompact = screenWidth < 900;
     final locale = Localizations.localeOf(context);
+    final tokens = AppVisualTokens.of(context);
 
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isCompact ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextButton.icon(
-              onPressed: () => context.go('/mirror'),
-              icon: const Icon(Icons.arrow_back, size: 18),
-              label: Text(tr(context, 'detail_back')),
-            ),
-            const SizedBox(height: 16),
-            if (widget.item.needsFontPack && _isChineseLocale(context)) ...[
-              const _FontPackWarning(),
-              const SizedBox(height: 16),
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: EdgeInsets.all(
+            constraints.maxWidth < 600 ? 16 : tokens.pagePadding,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextButton.icon(
+                onPressed: () => context.go('/mirror'),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: Text(tr(context, 'detail_back')),
+              ),
+              const SizedBox(height: 12),
+              if (widget.item.requiresFontPack &&
+                  _isChineseLocale(context)) ...[
+                const _FontPackWarning(),
+                SizedBox(height: tokens.sectionSpacing),
+              ],
+              _buildHeader(context, locale),
+              SizedBox(height: tokens.sectionSpacing),
+              AdaptiveTwoPane(
+                primary: _buildInfoSection(context, locale),
+                secondary: Column(
+                  children: [
+                    if (!widget.item.isOfficialMicrosoft) ...[
+                      _buildSpeedTestCard(context),
+                      SizedBox(height: tokens.itemSpacing),
+                    ],
+                    if (widget.item.isEnterpriseLtsc) ...[
+                      _buildLtscDisclaimer(context),
+                      SizedBox(height: tokens.itemSpacing),
+                    ],
+                    _buildDownloadSection(context, locale),
+                  ],
+                ),
+              ),
             ],
-            _buildHeader(context, locale),
-            const SizedBox(height: 24),
-            isCompact
-                ? Column(
-                    children: [
-                      if (widget.item.isEnterpriseLtsc) ...[
-                        _buildLtscDisclaimer(context),
-                        const SizedBox(height: 24),
-                      ],
-                      _buildInfoSection(context, locale),
-                      if (!widget.item.isOfficialMicrosoft) ...[
-                        const SizedBox(height: 24),
-                        _buildSpeedTestCard(context),
-                      ],
-                      const SizedBox(height: 24),
-                      _buildDownloadSection(context, locale),
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: _buildInfoSection(context, locale),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        flex: 1,
-                        child: Column(
-                          children: [
-                            if (!widget.item.isOfficialMicrosoft) ...[
-                              _buildSpeedTestCard(context),
-                              const SizedBox(height: 16),
-                            ],
-                            if (widget.item.isEnterpriseLtsc) ...[
-                              _buildLtscDisclaimer(context),
-                              const SizedBox(height: 16),
-                            ],
-                            _buildDownloadSection(context, locale),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  bool _isChineseLocale(BuildContext context) {
-    final code = Localizations.localeOf(context).languageCode;
-    return code == 'zh';
-  }
-
   Widget _buildHeader(BuildContext context, Locale locale) {
-    final theme = Theme.of(context);
     final name = widget.item.getName(locale);
     final type = widget.item.getType(locale);
     final trustBadge = widget.item.isOfficialMicrosoft
@@ -131,56 +105,30 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         : widget.item.isEnterpriseLtsc
         ? tr(context, 'mirror_badge_ltsc')
         : null;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: _catColor(widget.item.category).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+    return AppPageHeader(
+      icon: _catIcon(widget.item.category),
+      title: name,
+      details: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          if (type.isNotEmpty) _Tag(type),
+          if (trustBadge != null) _Tag(trustBadge),
+          Tooltip(
+            message: tr(context, widget.item.skillLevel.tooltipKey),
+            child: _Tag(tr(context, widget.item.skillLevel.labelKey)),
           ),
-          child: Icon(
-            _catIcon(widget.item.category),
-            size: 32,
-            color: _catColor(widget.item.category),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  if (type.isNotEmpty) _Tag(type),
-                  if (trustBadge != null) _Tag(trustBadge),
-                  Tooltip(
-                    message: tr(context, widget.item.skillLevel.tooltipKey),
-                    child: _Tag(tr(context, widget.item.skillLevel.labelKey)),
-                  ),
-                  if (widget.item.version != null) _Tag(widget.item.version!),
-                  if (widget.item.build != null) _Tag(widget.item.build!),
-                  if (widget.item.architecture != null)
-                    _Tag(widget.item.architecture!),
-                  if (widget.item.size != null) _Tag(widget.item.size!),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
+          if (widget.item.version != null) _Tag(widget.item.version!),
+          if (widget.item.build != null) _Tag(widget.item.build!),
+          if (widget.item.architecture != null) _Tag(widget.item.architecture!),
+          if (widget.item.size != null) _Tag(widget.item.size!),
+        ],
+      ),
     );
+  }
+
+  bool _isChineseLocale(BuildContext context) {
+    return Localizations.localeOf(context).languageCode == 'zh';
   }
 
   Widget _buildLtscDisclaimer(BuildContext context) {
@@ -241,13 +189,14 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               children: [
                 Icon(Icons.speed, size: 20, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(
-                  tr(context, 'mirror_speed_test_title'),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    tr(context, 'mirror_speed_test_title'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 if (!_testing)
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 18),
@@ -302,20 +251,30 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               ] else ...[
                 const Divider(height: 20),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.recommend, size: 16, color: Colors.green),
                     const SizedBox(width: 6),
-                    Text(
-                      '${tr(context, 'mirror_speed_test_recommend')}: ',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    Text(
-                      _testResult!.recommendedSource == 'china'
-                          ? tr(context, 'mirror_china_title')
-                          : tr(context, 'mirror_global_title'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text:
+                                  '${tr(context, 'mirror_speed_test_recommend')}: ',
+                            ),
+                            TextSpan(
+                              text: _testResult!.recommendedSource == 'china'
+                                  ? tr(context, 'mirror_china_title')
+                                  : tr(context, 'mirror_global_title'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                        style: theme.textTheme.bodySmall,
                       ),
                     ),
                   ],
@@ -370,43 +329,6 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
                 children: [
                   Text('•  ', style: TextStyle(color: Colors.orange.shade700)),
                   Expanded(child: Text(n, style: theme.textTheme.bodyMedium)),
-                ],
-              ),
-            ),
-          ),
-        ],
-        if (widget.item.sha256 != null && widget.item.sha256!.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          _SectionTitle(Icons.fingerprint, 'SHA256'),
-          const SizedBox(height: 8),
-          InkWell(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: widget.item.sha256!));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(tr(context, 'detail_sha256_copied'))),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.5,
-                ),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.item.sha256!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: 'Consolas',
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.copy, size: 14, color: theme.colorScheme.primary),
                 ],
               ),
             ),
@@ -679,7 +601,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         'Category=${widget.item.categoryLogName}\n'
         'Image=$name\n'
         'Mirror=${mirrorLogName ?? mirrorLabel}\n'
-        'Status=Success',
+        'Status=PageOpened',
       );
     }
   }
@@ -700,23 +622,6 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         return Icons.folder;
     }
   }
-
-  Color _catColor(String category) {
-    switch (category) {
-      case 'Official Microsoft':
-      case 'Official Microsoft Images':
-        return const Color(0xFF0071C5);
-      case 'Community Images':
-      case 'Community Editions':
-        return const Color(0xFF008272);
-      case 'Enterprise & LTSC Builds':
-        return const Color(0xFFC43E1C);
-      case 'Tools':
-        return Colors.teal;
-      default:
-        return Colors.grey;
-    }
-  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -731,11 +636,13 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.primary,
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.primary,
+            ),
           ),
         ),
       ],
@@ -769,19 +676,41 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-          ),
-        ],
+    final theme = Theme.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: constraints.maxWidth < 300
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: theme.textTheme.bodySmall),
+                  Text(
+                    value,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(label, style: theme.textTheme.bodySmall),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      value,
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -794,45 +723,36 @@ class _FontPackWarning extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.tertiaryContainer,
-        border: Border.all(color: colorScheme.tertiary),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber, color: colorScheme.tertiary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tr(context, 'fontpack_warning'),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onTertiaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  tr(context, 'fontpack_recommend'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onTertiaryContainer,
-                  ),
-                ),
-              ],
-            ),
+    final message = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          tr(context, 'fontpack_warning'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onTertiaryContainer,
           ),
-          const SizedBox(width: 12),
-          FilledButton.tonal(
-            onPressed: () => context.go('/mirror/font-pack'),
-            child: Text(tr(context, 'fontpack_download')),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          tr(context, 'fontpack_recommend'),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onTertiaryContainer,
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+    final button = FilledButton.tonalIcon(
+      onPressed: () => context.go('/mirror/font-pack'),
+      icon: const Icon(Icons.font_download_outlined, size: 18),
+      label: Text(tr(context, 'fontpack_download')),
+    );
+
+    return AppInfoBox(
+      icon: Icons.info_outline,
+      color: colorScheme.tertiary,
+      actions: [button],
+      child: message,
     );
   }
 }
@@ -859,8 +779,8 @@ class _MirrorStatusRow extends StatelessWidget {
           color: online ? Colors.green : Colors.red,
         ),
         const SizedBox(width: 8),
-        Text(label, style: theme.textTheme.bodySmall),
-        const Spacer(),
+        Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+        const SizedBox(width: 8),
         Text(
           online ? '${latency}ms' : 'Offline',
           style: theme.textTheme.bodySmall?.copyWith(
@@ -910,8 +830,8 @@ class _MirrorSelectionDialog extends StatelessWidget {
         tr(context, 'mirror_select_title'),
         textAlign: TextAlign.center,
       ),
-      content: SizedBox(
-        width: 380,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 380),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1013,7 +933,10 @@ class _MirrorOption extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       Text(
                         title,
@@ -1022,7 +945,6 @@ class _MirrorOption extends StatelessWidget {
                         ),
                       ),
                       if (tag != null) ...[
-                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -1060,7 +982,9 @@ class _MirrorOption extends StatelessWidget {
               ),
             ),
             Icon(
-              Icons.arrow_forward_ios,
+              Directionality.of(context) == TextDirection.rtl
+                  ? Icons.arrow_back_ios_new
+                  : Icons.arrow_forward_ios,
               size: 16,
               color: colorScheme.onSurfaceVariant,
             ),

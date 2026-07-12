@@ -35,7 +35,6 @@ class MirrorItem {
   final Map<String, List<String>> _pros;
   final Map<String, List<String>> _notes;
   final String downloadUrl;
-  final String? sha256;
   final String? size;
   final bool needsFontPack;
   final String? fontPackUrl;
@@ -55,7 +54,6 @@ class MirrorItem {
     this._pros = const {},
     this._notes = const {},
     required this.downloadUrl,
-    this.sha256,
     this.size,
     this.needsFontPack = false,
     this.fontPackUrl,
@@ -104,13 +102,21 @@ class MirrorItem {
       category == 'Community Editions' || category == 'Community Images';
   bool get isCommunityImage => isCommunityEdition;
   bool get isEnterpriseLtsc => category == 'Enterprise & LTSC Builds';
+  bool get isFontPack => id == 'font-pack';
   bool get isImageCenterItem =>
-      isOfficialMicrosoftImage || isCommunityEdition || isEnterpriseLtsc;
+      isOfficialMicrosoftImage ||
+      isCommunityEdition ||
+      isEnterpriseLtsc ||
+      isFontPack;
   bool get isStarValleyX => id == 'starvalleyx';
+  bool get isChineseOnlyResource => isStarValleyX || isFontPack;
+  bool get requiresFontPack => needsFontPack && !isStarValleyX;
   bool get isIotLtsc => id.contains('iot');
 
   MirrorSkillLevel get skillLevel {
-    if (isOfficialMicrosoftImage) return MirrorSkillLevel.beginner;
+    if (isOfficialMicrosoftImage || isFontPack) {
+      return MirrorSkillLevel.beginner;
+    }
     if (isEnterpriseLtsc) return MirrorSkillLevel.expert;
     return MirrorSkillLevel.advanced;
   }
@@ -141,7 +147,7 @@ class MirrorItem {
 
   bool isVisibleInLocale(Locale locale) {
     if (!isImageCenterItem) return false;
-    if (!isStarValleyX) return true;
+    if (!isChineseOnlyResource) return true;
     return normalizeLocaleCode(localeCodeFromLocale(locale)).startsWith('zh');
   }
 
@@ -183,7 +189,6 @@ class MirrorItem {
       pros: parseListMap(json['pros']) ?? {},
       notes: parseListMap(json['notes']) ?? {},
       downloadUrl: json['downloadUrl'] as String? ?? '',
-      sha256: json['sha256'] as String?,
       size: json['size'] as String?,
       needsFontPack: json['needsFontPack'] as bool? ?? false,
       fontPackUrl: json['fontPackUrl'] as String?,
@@ -205,7 +210,6 @@ class MirrorItem {
     if (_pros.isNotEmpty) 'pros': _pros,
     if (_notes.isNotEmpty) 'notes': _notes,
     'downloadUrl': downloadUrl,
-    if (sha256 != null) 'sha256': sha256,
     if (size != null) 'size': size,
     'needsFontPack': needsFontPack,
     if (fontPackUrl != null) 'fontPackUrl': fontPackUrl,
@@ -257,6 +261,7 @@ class MirrorListData {
       'Community Editions',
       'Community Images',
       'Enterprise & LTSC Builds',
+      'Tools',
     ];
 
     final categories = <MirrorCategory>[];
@@ -304,6 +309,7 @@ class MirrorListData {
       'Community Editions' => trByCode(code, 'mirror_category_community'),
       'Community Images' => trByCode(code, 'mirror_category_community'),
       'Enterprise & LTSC Builds' => trByCode(code, 'mirror_category_ltsc'),
+      'Tools' => trByCode(code, 'tools_title'),
       _ => category,
     };
   }
@@ -318,6 +324,8 @@ class MirrorListData {
         return 'community';
       case 'Enterprise & LTSC Builds':
         return 'ltsc';
+      case 'Tools':
+        return 'tools';
       default:
         return 'other';
     }
