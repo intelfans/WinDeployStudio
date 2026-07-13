@@ -1003,7 +1003,7 @@ class _ResultPanel extends StatelessWidget {
                 ),
               ],
             ),
-            if (!result.elevationCancelled) ...[
+            ...[
               const SizedBox(height: 16),
               Text(
                 diskToolsText(context, 'boot_repair_backup_title'),

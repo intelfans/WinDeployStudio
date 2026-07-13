@@ -35,7 +35,7 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
     super.dispose();
   }
 
-  Future<void> _collect({bool administrator = false}) async {
+  Future<void> _collect() async {
     final cancellationToken = DiskToolsCancellationToken();
     _collectionCancellation?.cancel();
     _collectionCancellation = cancellationToken;
@@ -46,10 +46,7 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
     try {
       final snapshot = await ref
           .read(windowsDiskDiagnosticsServiceProvider)
-          .collect(
-            requestAdministrator: administrator,
-            cancellationToken: cancellationToken,
-          );
+          .collect(cancellationToken: cancellationToken);
       if (!mounted || !identical(_collectionCancellation, cancellationToken)) {
         return;
       }
@@ -71,9 +68,7 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
       }
       setState(() {
         _loading = false;
-        _errorKey = error.elevationCancelled
-            ? 'disk_diag_admin_cancelled'
-            : error.localizationKey;
+        _errorKey = error.localizationKey;
       });
     } catch (_) {
       if (!mounted || !identical(_collectionCancellation, cancellationToken)) {
@@ -157,11 +152,6 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
                         style: AppTypography.bodyWith(colors.onSurfaceVariant),
                       ),
                       const SizedBox(height: 16),
-                      _AdminNotice(
-                        isAdministrator: _snapshot?.isAdministrator == true,
-                        loading: _loading,
-                        onScan: () => _collect(administrator: true),
-                      ),
                       if (warnings.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         _InlineMessage(
@@ -217,74 +207,6 @@ class _DiskDiagnosticsScreenState extends ConsumerState<DiskDiagnosticsScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdminNotice extends StatelessWidget {
-  final bool isAdministrator;
-  final bool loading;
-  final VoidCallback onScan;
-
-  const _AdminNotice({
-    required this.isAdministrator,
-    required this.loading,
-    required this.onScan,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isAdministrator
-                ? Icons.admin_panel_settings_rounded
-                : Icons.info_outline_rounded,
-            color: colors.primary,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  diskToolsText(
-                    context,
-                    isAdministrator
-                        ? 'disk_diag_admin_active'
-                        : 'disk_diag_standard_active',
-                  ),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                if (!isAdministrator)
-                  Text(
-                    diskToolsText(context, 'disk_diag_admin_hint'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (!isAdministrator) ...[
-            const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: loading ? null : onScan,
-              icon: const Icon(Icons.security_rounded),
-              label: Text(diskToolsText(context, 'disk_diag_scan_admin')),
-            ),
-          ],
         ],
       ),
     );
@@ -399,18 +321,19 @@ class _DiagnosticReportView extends StatelessWidget {
                     ],
                   ),
                 ),
-                _StatusChip(
-                  label: diskToolsText(
-                    context,
-                    report.isExternal
-                        ? 'disk_diag_external'
-                        : 'disk_diag_internal',
+                if (report.hasKnownConnectionClassification)
+                  _StatusChip(
+                    label: diskToolsText(
+                      context,
+                      report.isExternal
+                          ? 'disk_diag_external'
+                          : 'disk_diag_internal',
+                    ),
+                    icon: report.isExternal
+                        ? Icons.usb_rounded
+                        : Icons.computer_rounded,
                   ),
-                  icon: report.isExternal
-                      ? Icons.usb_rounded
-                      : Icons.computer_rounded,
-                ),
-                if (report.isSystem || report.isBoot) ...[
+                if (report.isSystemDisk || report.isBootDisk) ...[
                   const SizedBox(width: 8),
                   _StatusChip(
                     label: diskToolsText(context, 'disk_diag_system'),
@@ -565,6 +488,8 @@ class _DiagnosticReportView extends StatelessWidget {
                 ),
                 _textRow('disk_diag_pnp_id', report.pnpDeviceId),
                 _textRow('disk_diag_device_path', report.devicePath),
+                _boolRow('disk_diag_system_disk', report.isSystem),
+                _boolRow('disk_diag_boot_disk', report.isBoot),
                 _boolRow('disk_diag_offline', report.isOffline),
                 _boolRow('disk_diag_read_only', report.isReadOnly),
                 _boolRow('disk_diag_removable', report.isRemovable),
@@ -593,10 +518,11 @@ class _DiagnosticReportView extends StatelessWidget {
       final statusKey = _healthStatusKey(field.value);
       return _DiagnosticRowData(
         labelKey: key,
-        value: statusKey,
+        value: statusKey ?? field.value,
         valueIsKey: statusKey != null,
-        available: statusKey != null,
+        available: field.isAvailable,
         sourceKey: _sourceKey(field.source),
+        unavailableReasonKey: _unavailableReasonKey(field),
       );
     }
     return _DiagnosticRowData(
@@ -604,6 +530,7 @@ class _DiagnosticReportView extends StatelessWidget {
       value: field.value,
       available: field.isAvailable,
       sourceKey: _sourceKey(field.source),
+      unavailableReasonKey: _unavailableReasonKey(field),
     );
   }
 
@@ -619,6 +546,7 @@ class _DiagnosticReportView extends StatelessWidget {
       available: field.isAvailable,
       sourceKey: _sourceKey(field.source),
       noteKey: noteKey,
+      unavailableReasonKey: _unavailableReasonKey(field),
     );
   }
 
@@ -632,17 +560,25 @@ class _DiagnosticReportView extends StatelessWidget {
       value: field.value == null ? null : formatter(field.value!),
       available: field.isAvailable,
       sourceKey: _sourceKey(field.source),
+      unavailableReasonKey: _unavailableReasonKey(field),
     );
   }
 
-  static _DiagnosticRowData _boolRow(String key, bool value) {
+  static _DiagnosticRowData _boolRow(String key, DiagnosticValue<bool> field) {
     return _DiagnosticRowData(
       labelKey: key,
-      value: value ? 'disk_tools_yes' : 'disk_tools_no',
+      value: field.value == true ? 'disk_tools_yes' : 'disk_tools_no',
       valueIsKey: true,
-      available: true,
-      sourceKey: 'disk_diag_source_cim',
+      available: field.isAvailable,
+      sourceKey: _sourceKey(field.source),
+      unavailableReasonKey: _unavailableReasonKey(field),
     );
+  }
+
+  static String? _unavailableReasonKey<T>(DiagnosticValue<T> field) {
+    return field.isAvailable
+        ? null
+        : field.unavailableReasonKind?.localizationKey;
   }
 
   static String _sourceKey(String source) {
@@ -655,6 +591,10 @@ class _DiagnosticReportView extends StatelessWidget {
     }
     if (normalized.contains('smart failure')) {
       return 'disk_diag_source_smart_prediction';
+    }
+    if (normalized.contains('ata smart') ||
+        normalized.contains('sat pass-through')) {
+      return 'disk_diag_source_ata_smart';
     }
     if (normalized.contains('calculated')) {
       return 'disk_diag_source_calculated';
@@ -757,6 +697,7 @@ class _DiagnosticRowData {
   final bool available;
   final String sourceKey;
   final String? noteKey;
+  final String? unavailableReasonKey;
 
   const _DiagnosticRowData({
     required this.labelKey,
@@ -765,6 +706,7 @@ class _DiagnosticRowData {
     required this.available,
     required this.sourceKey,
     this.noteKey,
+    this.unavailableReasonKey,
   });
 }
 
@@ -822,6 +764,14 @@ class _DiagnosticRow extends StatelessWidget {
               if (data.available)
                 Text(
                   diskToolsText(context, data.sourceKey),
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                )
+              else if (data.unavailableReasonKey != null)
+                Text(
+                  diskToolsText(context, data.unavailableReasonKey!),
                   textAlign: TextAlign.end,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,

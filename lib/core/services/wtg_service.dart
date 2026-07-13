@@ -15,6 +15,7 @@ import '../constants/app_constants.dart';
 import 'disk_safety_service.dart';
 import 'file_logger_service.dart';
 import 'wim_info_service.dart';
+import 'windows_iso_preflight.dart';
 
 enum WtgStep {
   preparing,
@@ -65,6 +66,37 @@ class WtgBootContract {
   static String _driveSpec(String value) {
     final match = RegExp(r'[A-Za-z]').firstMatch(value.trim());
     return '${match?.group(0)?.toUpperCase() ?? ''}:';
+  }
+}
+
+/// Files written to the target volume only when the user explicitly supplies
+/// an ICO file. A blank icon path intentionally leaves File Explorer's
+/// standard drive icon in place.
+@immutable
+class WtgVolumeIdentity {
+  static const iconFileName = '.wds-drive.ico';
+
+  final String volumeLabel;
+  final String customIconPath;
+
+  const WtgVolumeIdentity({
+    required this.volumeLabel,
+    required this.customIconPath,
+  });
+
+  factory WtgVolumeIdentity.fromPlan(DeploymentPlan plan) => WtgVolumeIdentity(
+    volumeLabel: plan.customVolumeLabel.trim(),
+    customIconPath: plan.customIconPath.trim(),
+  );
+
+  bool get usesCustomIcon => customIconPath.trim().isNotEmpty;
+
+  /// Null means no autorun file or icon file is written to the volume.
+  String? get autorunContents {
+    if (!usesCustomIcon) return null;
+    final label = volumeLabel.trim();
+    final labelLine = label.isEmpty ? '' : 'label=$label\r\n';
+    return '[autorun]\r\nicon=$iconFileName\r\n$labelLine';
   }
 }
 
@@ -274,9 +306,16 @@ class WtgService {
     try {
       mountPoint = await _mountIso(isoPath);
       if (mountPoint == null) return const [];
-      final imagePath = await _findInstallImage(mountPoint);
-      if (imagePath == null) return const [];
-      final images = await WimInfoService.readImages(imagePath);
+      final layout = await WindowsIsoLayoutInspector.inspectMountedRoot(
+        mountPoint,
+      );
+      if (!layout.isValid ||
+          layout.imagePath == null ||
+          layout.imageFormat == WindowsInstallImageFormat.swm) {
+        _logLine('Windows To Go image selection rejected: ${layout.error}');
+        return const [];
+      }
+      final images = await WimInfoService.readImages(layout.imagePath!);
       return images.map((image) => image.toMap()).toList(growable: false);
     } catch (error) {
       _debugLogs.add(error.toString());
@@ -333,6 +372,7 @@ class WtgService {
         ),
       );
       _validateTaskPlan(plan, isoPath, imageIndex);
+      await _validateWindowsIsoLayoutBeforeErase(isoPath);
       await _requireSafeDisk(disk);
       // Reject an ISO on the target before mounting it or preparing any target work.
       await _validateIsoSourceBeforeErase(isoPath, diskNumber);
@@ -445,7 +485,7 @@ class WtgService {
       }
       await _writeVolumeIdentity(
         layout.storageDrive,
-        source.plan,
+        WtgVolumeIdentity.fromPlan(source.plan),
         preparedIcon,
       );
       _throwIfCancelled();
@@ -605,13 +645,23 @@ class WtgService {
     DeploymentPlan requestedPlan,
     int imageIndex,
   ) async {
-    final imagePath = await _findInstallImage(mountPoint);
-    if (imagePath == null) {
-      throw const _WtgFailure(
-        'wtg_svc_no_wim',
-        'The ISO has no install.wim or install.esd.',
+    final layout = await WindowsIsoLayoutInspector.inspectMountedRoot(
+      mountPoint,
+    );
+    if (!layout.isValid || layout.imagePath == null) {
+      throw _WtgFailure(
+        'wtg_invalid_windows_iso',
+        layout.error ??
+            'The ISO does not contain a valid Windows setup layout.',
       );
     }
+    if (layout.imageFormat == WindowsInstallImageFormat.swm) {
+      throw const _WtgFailure(
+        'wtg_svc_no_wim',
+        'Windows To Go does not yet support split install.swm images.',
+      );
+    }
+    final imagePath = layout.imagePath!;
     final images = await WimInfoService.readImages(imagePath);
     final matches = images.where((image) => image.index == imageIndex);
     if (matches.length != 1) {
@@ -728,6 +778,21 @@ class WtgService {
     );
   }
 
+  Future<void> _validateWindowsIsoLayoutBeforeErase(String isoPath) async {
+    final layout = await ref.read(windowsIsoPreflightProvider).inspect(isoPath);
+    if (!layout.isValid) {
+      throw _WtgFailure(
+        'wtg_invalid_windows_iso',
+        layout.error ??
+            'The ISO does not contain a valid Windows setup layout.',
+      );
+    }
+    _logLine(
+      'Windows To Go ISO layout preflight passed: '
+      '${layout.imageFormat?.name ?? 'unknown'} image.',
+    );
+  }
+
   Future<_DriverManifest> _prepareDriverManifest(
     String directoryPath,
     int targetDiskNumber,
@@ -813,8 +878,7 @@ class WtgService {
         await FileSystemEntity.type(directory.path, followLinks: false) ==
             FileSystemEntityType.link ||
         await directory.resolveSymbolicLinks() != manifest.resolvedRootPath ||
-        await _pathDiskNumber(directory.path) !=
-            manifest.sourceDiskNumber) {
+        await _pathDiskNumber(directory.path) != manifest.sourceDiskNumber) {
       throw const _WtgFailure(
         'wtg_svc_apply_failed',
         'The Windows driver source location changed after preflight.',
@@ -1878,9 +1942,10 @@ exit
         'NTFS UEFI layout VERIFIED: NTFS system storage uses a separate FAT32 EFI partition.',
       );
     }
-    if (plan.customIconPath.isNotEmpty) {
+    final volumeIdentity = WtgVolumeIdentity.fromPlan(plan);
+    if (volumeIdentity.usesCustomIcon) {
       final icon = File(
-        p.join(_driveRoot(layout.storageDrive), '.wds-drive.ico'),
+        p.join(_driveRoot(layout.storageDrive), WtgVolumeIdentity.iconFileName),
       );
       final autorun = File(
         p.join(_driveRoot(layout.storageDrive), 'autorun.inf'),
@@ -1892,8 +1957,10 @@ exit
         return false;
       }
       final autorunText = (await autorun.readAsString()).toLowerCase();
-      if (!autorunText.contains('icon=.wds-drive.ico')) return false;
-      final expectedLabel = plan.customVolumeLabel.trim().toLowerCase();
+      if (!autorunText.contains('icon=${WtgVolumeIdentity.iconFileName}')) {
+        return false;
+      }
+      final expectedLabel = volumeIdentity.volumeLabel.toLowerCase();
       if (expectedLabel.isNotEmpty &&
           !autorunText.contains('label=$expectedLabel')) {
         return false;
@@ -1905,10 +1972,16 @@ exit
 
   Future<void> _writeVolumeIdentity(
     String storageDrive,
-    DeploymentPlan plan,
+    WtgVolumeIdentity identity,
     Uint8List? preparedIcon,
   ) async {
-    if (plan.customIconPath.isEmpty) return;
+    final autorunContents = identity.autorunContents;
+    if (autorunContents == null) {
+      _logLine(
+        'No custom volume icon requested; leaving the Windows default drive icon.',
+      );
+      return;
+    }
     if (preparedIcon == null) {
       throw const _WtgFailure(
         'deploy_compat_invalid_icon',
@@ -1916,7 +1989,7 @@ exit
       );
     }
     final root = _driveRoot(storageDrive);
-    final target = File(p.join(root, '.wds-drive.ico'));
+    final target = File(p.join(root, WtgVolumeIdentity.iconFileName));
     await target.writeAsBytes(preparedIcon, flush: true);
     if (await _sha256File(target) != sha256.convert(preparedIcon).toString()) {
       throw const _WtgFailure(
@@ -1924,12 +1997,9 @@ exit
         'The custom drive icon failed verification.',
       );
     }
-    final label = plan.customVolumeLabel.trim();
-    await File(p.join(root, 'autorun.inf')).writeAsString(
-      '[autorun]\r\nicon=.wds-drive.ico\r\n'
-      '${label.isEmpty ? '' : 'label=$label\r\n'}',
-      flush: true,
-    );
+    await File(
+      p.join(root, 'autorun.inf'),
+    ).writeAsString(autorunContents, flush: true);
     final attrib = await _runTracked('attrib', [
       '+H',
       '+S',
@@ -1954,14 +2024,6 @@ exit
             'Boot',
             'BCD',
           );
-  }
-
-  Future<String?> _findInstallImage(String mountPoint) async {
-    for (final fileName in const ['install.wim', 'install.esd']) {
-      final candidate = p.join(mountPoint, 'sources', fileName);
-      if (await File(candidate).exists()) return candidate;
-    }
-    return null;
   }
 
   Future<String?> _mountIso(String isoPath) async {

@@ -1,12 +1,38 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/bootable_media_validation.dart';
 
 void main() {
-  test('bundled volume icon has a valid ICO structure', () async {
-    final bytes = await File('assets/intel.ico').readAsBytes();
+  test('accepts a well-formed ICO directory', () {
+    final bytes = Uint8List.fromList(const [
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      16,
+      16,
+      0,
+      0,
+      1,
+      0,
+      32,
+      0,
+      4,
+      0,
+      0,
+      0,
+      22,
+      0,
+      0,
+      0,
+      40,
+      0,
+      0,
+      0,
+    ]);
 
     expect(validateIcoBytes(bytes), isNull);
   });

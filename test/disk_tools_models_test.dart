@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:win_deploy_studio/core/localization/strings.dart';
 import 'package:win_deploy_studio/features/disk_tools/models/boot_repair_models.dart';
 import 'package:win_deploy_studio/features/disk_tools/models/disk_diagnostic_models.dart';
 
@@ -12,7 +13,52 @@ void main() {
       expect(health.isAvailable, isFalse);
       expect(health.value, isNull);
       expect(health.unavailableReason, contains('no health state'));
+      expect(
+        health.unavailableReasonKind,
+        DiagnosticUnavailableReason.notReported,
+      );
     });
+
+    test('precise unavailability reasons use stable localization keys', () {
+      expect(
+        DiagnosticUnavailableReason.administratorRequired.localizationKey,
+        'disk_diag_unavailable_admin_required',
+      );
+      expect(
+        DiagnosticUnavailableReason.permissionDenied.localizationKey,
+        'disk_diag_unavailable_permission_denied',
+      );
+      expect(
+        DiagnosticUnavailableReason.usbBridgeUnsupported.localizationKey,
+        'disk_diag_unavailable_usb_bridge',
+      );
+      expect(
+        DiagnosticUnavailableReason.protocolResponseInvalid.localizationKey,
+        'disk_diag_unavailable_protocol_invalid',
+      );
+    });
+
+    test(
+      'unavailable reason keys are translated in every supported locale',
+      () {
+        for (final locale in supportedLocaleCodes) {
+          final missing = trByCode(locale, 'translation_missing');
+          final keys = <String>[
+            ...DiagnosticUnavailableReason.values.map(
+              (reason) => reason.localizationKey,
+            ),
+            'disk_diag_source_ata_smart',
+            'disk_diag_system_disk',
+            'disk_diag_boot_disk',
+          ];
+          for (final key in keys) {
+            final localized = trByCode(locale, key);
+            expect(localized, isNotEmpty, reason: '$locale/$key');
+            expect(localized, isNot(missing), reason: '$locale/$key');
+          }
+        }
+      },
+    );
 
     test(
       'external classification requires an external bus or removable flag',
@@ -252,6 +298,7 @@ void main() {
 
       expect(result.operationCancelled, isTrue);
       expect(result.success, isFalse);
+      expect(result.messageKey, 'boot_repair_result_cancelled');
       expect(result.existingBcdBackedUp, isTrue);
       expect(result.rollbackStatus, BootRepairRollbackStatus.succeeded);
     });
@@ -322,11 +369,11 @@ DiskDiagnosticReport _diagnosticReport({
     pnpDeviceId: unavailableString,
     devicePath: unavailableString,
     driveLetters: const [],
-    isSystem: false,
-    isBoot: false,
-    isOffline: false,
-    isReadOnly: false,
-    isRemovable: removable,
+    isSystem: const DiagnosticValue.available(false, source: 'CIM'),
+    isBoot: const DiagnosticValue.available(false, source: 'CIM'),
+    isOffline: const DiagnosticValue.available(false, source: 'CIM'),
+    isReadOnly: const DiagnosticValue.available(false, source: 'CIM'),
+    isRemovable: DiagnosticValue.available(removable, source: 'CIM'),
   );
 }
 

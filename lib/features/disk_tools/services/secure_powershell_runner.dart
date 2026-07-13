@@ -20,40 +20,31 @@ class PowerShellLaunchCommand {
   final String executable;
   final List<String> arguments;
   final Map<String, String> environment;
-  final String? elevatedPidToken;
 
   const PowerShellLaunchCommand({
     required this.executable,
     required this.arguments,
     required this.environment,
-    this.elevatedPidToken,
   });
 }
 
 class PowerShellCommandBuilder {
   static const scriptPayloadVariable = 'WDS_PS_SCRIPT_GZIP';
   static const bootstrapVariable = 'WDS_PS_BOOTSTRAP';
-  static const executableVariable = 'WDS_PS_EXECUTABLE';
   static const cancelPathVariable = 'WDS_PS_CANCEL_PATH';
   static const cancelGraceVariable = 'WDS_PS_CANCEL_GRACE_MS';
-  static const elevatedPidTokenVariable = 'WDS_PS_ELEVATED_PID_TOKEN';
-  static const elevatedPidMarker = '__WDS_ELEVATED_PID__=';
 
   static final RegExp _variableName = RegExp(r'^WDS_[A-Z0-9_]+$');
-  static final Random _random = Random.secure();
   static const Set<String> _reservedVariables = {
     scriptPayloadVariable,
     bootstrapVariable,
-    executableVariable,
     cancelPathVariable,
     cancelGraceVariable,
-    elevatedPidTokenVariable,
   };
 
   static PowerShellLaunchCommand build({
     required String script,
     required Map<String, String> variables,
-    required bool elevated,
     required String powershellPath,
     required String cancelPath,
     required Duration cancelGracePeriod,
@@ -87,50 +78,29 @@ class PowerShellCommandBuilder {
     }
 
     final bootstrap = encodeCommand(_bootstrapScript);
-    final elevatedPidToken = elevated ? _newElevationPidToken() : null;
     final environment = <String, String>{
       ...?baseEnvironment,
       ...checkedVariables,
       scriptPayloadVariable: payload,
       bootstrapVariable: bootstrap,
-      executableVariable: powershellPath,
       cancelPathVariable: cancelPath,
       cancelGraceVariable: '${cancelGracePeriod.inMilliseconds}',
-      ...?elevatedPidToken == null
-          ? null
-          : <String, String>{elevatedPidTokenVariable: elevatedPidToken},
     };
-    final arguments = elevated
-        ? [
-            '-NoLogo',
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-EncodedCommand',
-            _encodedElevationLauncher,
-          ]
-        : [
-            '-NoLogo',
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-EncodedCommand',
-            bootstrap,
-          ];
+    final arguments = [
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-EncodedCommand',
+      bootstrap,
+    ];
     return PowerShellLaunchCommand(
       executable: powershellPath,
       arguments: List.unmodifiable(arguments),
       environment: Map.unmodifiable(environment),
-      elevatedPidToken: elevatedPidToken,
     );
   }
-
-  static String _newElevationPidToken() => List<int>.generate(
-    24,
-    (_) => _random.nextInt(256),
-  ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
 
   static String encodeCommand(String source) {
     final bytes = <int>[];
@@ -220,44 +190,10 @@ try {
   }
 }
 ''';
-
-  static const _elevationLauncher = r'''
-$ErrorActionPreference = 'Stop'
-try {
-  $markerToken = $env:WDS_PS_ELEVATED_PID_TOKEN
-  if ([string]::IsNullOrWhiteSpace($markerToken)) {
-    throw 'The elevated process marker token is missing.'
-  }
-  $arguments = @(
-    '-NoLogo',
-    '-NoProfile',
-    '-NonInteractive',
-    '-ExecutionPolicy',
-    'Bypass',
-    '-EncodedCommand',
-    $env:WDS_PS_BOOTSTRAP
-  )
-  $process = Start-Process -FilePath $env:WDS_PS_EXECUTABLE `
-    -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden -PassThru
-  [Console]::Out.WriteLine('__WDS_ELEVATED_PID__=' + $markerToken + ':' + $process.Id)
-  [Console]::Out.Flush()
-  $process.WaitForExit()
-  exit $process.ExitCode
-} catch {
-  if ($_.Exception.NativeErrorCode -eq 1223) { exit 1223 }
-  [Console]::Error.WriteLine($_.Exception.ToString())
-  exit 1
-}
-''';
-
-  static final String _encodedElevationLauncher = encodeCommand(
-    _elevationLauncher,
-  );
 }
 
 class PowerShellRunResult {
   final int processId;
-  final int? elevatedProcessId;
   final int exitCode;
   final String stdout;
   final String stderr;
@@ -265,7 +201,6 @@ class PowerShellRunResult {
 
   const PowerShellRunResult({
     required this.processId,
-    required this.elevatedProcessId,
     required this.exitCode,
     required this.stdout,
     required this.stderr,
@@ -274,8 +209,6 @@ class PowerShellRunResult {
 
   bool get timedOut => completion == PowerShellCompletion.timedOut;
   bool get cancelled => completion == PowerShellCompletion.cancelled;
-  bool get elevationCancelled =>
-      completion == PowerShellCompletion.exited && exitCode == 1223;
 }
 
 typedef DiskToolsProcessStarter =
@@ -285,67 +218,24 @@ typedef DiskToolsProcessStarter =
       Map<String, String>? environment,
     });
 typedef DiskToolsProcessTreeTerminator = Future<void> Function(int processId);
-typedef DiskToolsProcessExitWaiter = Future<void> Function(int processId);
-
-/// Accepts only complete, token-bound records emitted by the elevation launcher.
-class _ElevatedPidRecordParser {
-  static const _maximumRecordLength = 128;
-
-  final String _prefix;
-  String _pending = '';
-
-  _ElevatedPidRecordParser(String token)
-    : _prefix = '${PowerShellCommandBuilder.elevatedPidMarker}$token:';
-
-  int? add(String text) {
-    if (text.isEmpty) return null;
-
-    final records = ('$_pending$text').split('\n');
-    _pending = records.removeLast();
-    if (_pending.length > _maximumRecordLength) _pending = '';
-
-    for (final record in records) {
-      final processId = _parseRecord(record);
-      if (processId != null) return processId;
-    }
-    return null;
-  }
-
-  int? _parseRecord(String record) {
-    if (record.endsWith('\r')) {
-      record = record.substring(0, record.length - 1);
-    }
-    if (!record.startsWith(_prefix)) return null;
-
-    final processIdText = record.substring(_prefix.length);
-    if (!RegExp(r'^[1-9][0-9]*$').hasMatch(processIdText)) return null;
-    final processId = int.tryParse(processIdText);
-    if (processId == null || processId > 0xffffffff) return null;
-    return processId;
-  }
-}
 
 class SecurePowerShellRunner {
   final DiskToolsProcessStarter _startProcess;
   final DiskToolsProcessTreeTerminator _terminateProcessTree;
-  final DiskToolsProcessExitWaiter _waitForProcessExit;
   final String powershellPath;
 
   SecurePowerShellRunner({
     DiskToolsProcessStarter? processStarter,
     DiskToolsProcessTreeTerminator? processTreeTerminator,
-    DiskToolsProcessExitWaiter? processExitWaiter,
     String? powershellPath,
   }) : _startProcess = processStarter ?? _defaultStartProcess,
        _terminateProcessTree =
            processTreeTerminator ?? _defaultTerminateProcessTree,
-       _waitForProcessExit = processExitWaiter ?? _defaultWaitForProcessExit,
        powershellPath = powershellPath ?? _defaultPowerShellPath;
 
   Future<PowerShellRunResult> run({
     required String script,
     Map<String, String> variables = const {},
-    required bool elevated,
     required Duration timeout,
     required String cancelPath,
     DiskToolsCancellationToken? cancellationToken,
@@ -354,7 +244,6 @@ class SecurePowerShellRunner {
     if (cancellationToken?.isCancelled == true) {
       return const PowerShellRunResult(
         processId: 0,
-        elevatedProcessId: null,
         exitCode: -1,
         stdout: '',
         stderr: '',
@@ -365,7 +254,6 @@ class SecurePowerShellRunner {
     final command = PowerShellCommandBuilder.build(
       script: script,
       variables: variables,
-      elevated: elevated,
       powershellPath: powershellPath,
       cancelPath: cancelPath,
       cancelGracePeriod: cancellationGracePeriod,
@@ -377,20 +265,9 @@ class SecurePowerShellRunner {
       environment: command.environment,
     );
 
-    int? elevatedProcessId;
     final stdoutBuffer = StringBuffer();
     final stderrBuffer = StringBuffer();
-    final elevatedPidParser = command.elevatedPidToken == null
-        ? null
-        : _ElevatedPidRecordParser(command.elevatedPidToken!);
-    final stdoutDone = _capture(
-      process.stdout,
-      stdoutBuffer,
-      onText: (text) {
-        final processId = elevatedPidParser?.add(text);
-        if (processId != null) elevatedProcessId ??= processId;
-      },
-    );
+    final stdoutDone = _capture(process.stdout, stdoutBuffer);
     final stderrDone = _capture(process.stderr, stderrBuffer);
     final exitCodeFuture = process.exitCode;
     final firstEvent = Completer<_ProcessEvent>();
@@ -431,11 +308,6 @@ class SecurePowerShellRunner {
           ? await _waitForGracefulExit(exitCodeFuture, cancellationGracePeriod)
           : null;
       if (exitCode == null) {
-        final elevatedPid = elevatedProcessId;
-        if (elevatedPid != null) {
-          await _terminateTree(elevatedPid);
-          await _waitForProcessExit(elevatedPid);
-        }
         await _terminateTree(process.pid);
         exitCode = await exitCodeFuture;
       }
@@ -445,7 +317,6 @@ class SecurePowerShellRunner {
     final confirmedExitCode = exitCode ?? await exitCodeFuture;
     return PowerShellRunResult(
       processId: process.pid,
-      elevatedProcessId: elevatedProcessId,
       exitCode: confirmedExitCode,
       stdout: stdoutBuffer.toString(),
       stderr: stderrBuffer.toString(),
@@ -453,18 +324,13 @@ class SecurePowerShellRunner {
     );
   }
 
-  static Future<void> _capture(
-    Stream<List<int>> stream,
-    StringBuffer target, {
-    void Function(String text)? onText,
-  }) {
+  static Future<void> _capture(Stream<List<int>> stream, StringBuffer target) {
     final completed = Completer<void>();
     stream
         .transform(const SystemEncoding().decoder)
         .listen(
           (chunk) {
             target.write(chunk);
-            onText?.call(chunk);
           },
           onError: (_) {
             if (!completed.isCompleted) completed.complete();
@@ -521,31 +387,6 @@ class SecurePowerShellRunner {
         '$processId',
       ]).timeout(const Duration(seconds: 15));
     } catch (_) {}
-  }
-
-  static Future<void> _defaultWaitForProcessExit(int processId) async {
-    final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
-    final tasklist = '$systemRoot\\System32\\tasklist.exe';
-    final deadline = DateTime.now().add(const Duration(seconds: 30));
-    while (DateTime.now().isBefore(deadline)) {
-      try {
-        final result = await Process.run(tasklist, [
-          '/FI',
-          'PID eq $processId',
-          '/FO',
-          'CSV',
-          '/NH',
-        ]).timeout(const Duration(seconds: 5));
-        final output = result.stdout.toString();
-        if (!RegExp('(?:^|,)"?$processId"?(?:,|\$)').hasMatch(output)) {
-          return;
-        }
-      } catch (_) {
-        return;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
-    throw TimeoutException('Process $processId did not exit after taskkill.');
   }
 
   static String get _defaultPowerShellPath {

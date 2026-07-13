@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,8 @@ import '../../../core/services/mirror_speed_test_service.dart';
 import '../../../shared/widgets/app_page.dart';
 import '../models/mirror_models.dart';
 import '../providers/mirror_source_provider.dart';
+import '../providers/recent_mirrors_provider.dart';
+import '../services/recent_mirrors_service.dart';
 import '../widgets/ltsc_warning_dialog.dart';
 import '../../logs/services/log_center_service.dart';
 import '../../../shared/webview/webview_helper.dart';
@@ -24,13 +28,20 @@ class MirrorDetailScreen extends ConsumerStatefulWidget {
 class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   MirrorTestResult? _testResult;
   bool _testing = false;
+  final _recentMirrors = const RecentMirrorsService();
 
   @override
   void initState() {
     super.initState();
+    unawaited(_recordRecentMirror());
     if (!widget.item.isOfficialMicrosoft) {
       _runSpeedTest();
     }
+  }
+
+  Future<void> _recordRecentMirror() async {
+    await _recentMirrors.recordMirror(widget.item.id);
+    if (mounted) ref.invalidate(recentMirrorEntriesProvider);
   }
 
   Future<void> _runSpeedTest({bool force = false}) async {
@@ -551,6 +562,8 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
     if (confirmed != true || !context.mounted) return;
 
+    await _recordRecentMirror();
+
     await LogCenterService().logDownload(
       '[OfficialDownload]\n'
       'Product=${widget.item.productLogName}\n'
@@ -574,6 +587,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     required String mirrorLabel,
     String? mirrorLogName,
   }) async {
+    await _recordRecentMirror();
     final logCenter = LogCenterService();
     await logCenter.logDownload(
       '[CommunityDownload]\n'

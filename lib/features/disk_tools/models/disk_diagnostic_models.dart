@@ -1,13 +1,54 @@
+enum DiagnosticUnavailableReason {
+  notReported,
+  notExposedByDeviceOrDriver,
+  notApplicable,
+  queryFailed,
+  administratorRequired,
+  permissionDenied,
+  usbBridgeUnsupported,
+  protocolResponseInvalid,
+}
+
+extension DiagnosticUnavailableReasonLocalization
+    on DiagnosticUnavailableReason {
+  String get localizationKey {
+    return switch (this) {
+      DiagnosticUnavailableReason.notReported =>
+        'disk_diag_unavailable_not_reported',
+      DiagnosticUnavailableReason.notExposedByDeviceOrDriver =>
+        'disk_diag_unavailable_driver',
+      DiagnosticUnavailableReason.notApplicable =>
+        'disk_diag_unavailable_not_applicable',
+      DiagnosticUnavailableReason.queryFailed =>
+        'disk_diag_unavailable_query_failed',
+      DiagnosticUnavailableReason.administratorRequired =>
+        'disk_diag_unavailable_admin_required',
+      DiagnosticUnavailableReason.permissionDenied =>
+        'disk_diag_unavailable_permission_denied',
+      DiagnosticUnavailableReason.usbBridgeUnsupported =>
+        'disk_diag_unavailable_usb_bridge',
+      DiagnosticUnavailableReason.protocolResponseInvalid =>
+        'disk_diag_unavailable_protocol_invalid',
+    };
+  }
+}
+
 class DiagnosticValue<T> {
   final T? value;
   final String source;
+
+  /// Technical detail retained for copied reports, never rendered directly in
+  /// the localized interface.
   final String? unavailableReason;
+  final DiagnosticUnavailableReason? unavailableReasonKind;
 
   const DiagnosticValue.available(this.value, {required this.source})
-    : unavailableReason = null;
+    : unavailableReason = null,
+      unavailableReasonKind = null;
 
   const DiagnosticValue.unavailable({
     required this.unavailableReason,
+    this.unavailableReasonKind = DiagnosticUnavailableReason.notReported,
     this.source = 'Windows did not expose this value',
   }) : value = null;
 
@@ -60,11 +101,11 @@ class DiskDiagnosticReport {
   final DiagnosticValue<String> pnpDeviceId;
   final DiagnosticValue<String> devicePath;
   final List<String> driveLetters;
-  final bool isSystem;
-  final bool isBoot;
-  final bool isOffline;
-  final bool isReadOnly;
-  final bool isRemovable;
+  final DiagnosticValue<bool> isSystem;
+  final DiagnosticValue<bool> isBoot;
+  final DiagnosticValue<bool> isOffline;
+  final DiagnosticValue<bool> isReadOnly;
+  final DiagnosticValue<bool> isRemovable;
 
   const DiskDiagnosticReport({
     required this.diskNumber,
@@ -109,7 +150,29 @@ class DiskDiagnosticReport {
 
   bool get isExternal {
     final bus = busType.value?.toUpperCase();
-    return isRemovable || bus == 'USB' || bus == 'SD' || bus == 'MMC';
+    return isRemovable.value == true ||
+        bus == 'USB' ||
+        bus == 'SD' ||
+        bus == 'MMC';
+  }
+
+  bool get isSystemDisk => isSystem.value == true;
+
+  bool get isBootDisk => isBoot.value == true;
+
+  bool get hasKnownConnectionClassification {
+    final bus = busType.value?.toUpperCase();
+    return isRemovable.value == true ||
+        const {
+          'USB',
+          'SD',
+          'MMC',
+          'SATA',
+          'NVME',
+          'ATA',
+          'SAS',
+          'RAID',
+        }.contains(bus);
   }
 
   String toPlainText() {
@@ -181,15 +244,24 @@ class DiskDiagnosticReport {
     add('Operational status', operationalStatus, (value) => value);
     add('PnP device ID', pnpDeviceId, (value) => value);
     add('Device path', devicePath, (value) => value);
-    lines.add(
-      'Flags: system=$isSystem, boot=$isBoot, offline=$isOffline, '
-      'readOnly=$isReadOnly, removable=$isRemovable',
-    );
+    lines.add('System disk: ${_formatDiagnosticFlag(isSystem)}');
+    lines.add('Boot disk: ${_formatDiagnosticFlag(isBoot)}');
+    lines.add('Offline: ${_formatDiagnosticFlag(isOffline)}');
+    lines.add('Read-only: ${_formatDiagnosticFlag(isReadOnly)}');
+    lines.add('Removable: ${_formatDiagnosticFlag(isRemovable)}');
     lines.add(
       'Mounted volumes: ${driveLetters.isEmpty ? 'None' : driveLetters.join(', ')}',
     );
     return lines.join('\n');
   }
+}
+
+String _formatDiagnosticFlag(DiagnosticValue<bool> field) {
+  final value = field.value;
+  if (value == null) {
+    return 'Unknown (${field.unavailableReason ?? 'not reported'})';
+  }
+  return '${value ? 'Yes' : 'No'} [${field.source}]';
 }
 
 String formatDiagnosticInteger(BigInt value) {

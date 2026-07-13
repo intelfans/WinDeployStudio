@@ -12,6 +12,7 @@ import 'package:win_deploy_studio/core/localization/strings.dart';
 import 'package:win_deploy_studio/core/services/disk_safety_service.dart';
 import 'package:win_deploy_studio/core/services/iso_parse_service.dart';
 import 'package:win_deploy_studio/core/services/wtg_service.dart';
+import 'package:win_deploy_studio/core/services/windows_iso_preflight.dart';
 import 'package:win_deploy_studio/features/mirror/screens/mirror_screen.dart';
 import 'package:win_deploy_studio/features/wtg/screens/wtg_screen.dart';
 
@@ -83,6 +84,11 @@ void main() {
         diskSafetyServiceProvider.overrideWithValue(_NoDisksService()),
         isoParseServiceProvider.overrideWithValue(_ParsedIsoService()),
         wtgServiceProvider.overrideWithValue(_EmptyWimService()),
+        windowsIsoPreflightProvider.overrideWithValue(
+          _StaticWindowsIsoPreflight(
+            const WindowsIsoLayoutInspection.invalid('Linux layout'),
+          ),
+        ),
       ],
     );
 
@@ -98,11 +104,50 @@ void main() {
     _expectNoFlutterExceptions(tester);
   });
 
+  testWidgets('Linux To Go rejects a Windows ISO before configuration', (
+    tester,
+  ) async {
+    await _setSurface(tester, const Size(1000, 760));
+    final originalPicker = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = _SingleFilePicker(r'C:\test\win11.iso');
+    addTearDown(() => FilePickerPlatform.instance = originalPicker);
+
+    await _pumpApp(
+      tester,
+      const WtgScreen(),
+      locale: const Locale('zh'),
+      overrides: [
+        diskSafetyServiceProvider.overrideWithValue(_NoDisksService()),
+        windowsIsoPreflightProvider.overrideWithValue(
+          _StaticWindowsIsoPreflight(
+            const WindowsIsoLayoutInspection.valid(
+              imageFormat: WindowsInstallImageFormat.wim,
+              imagePath: r'X:\sources\install.wim',
+            ),
+          ),
+        ),
+      ],
+    );
+
+    await tester.tap(find.byKey(const Key('wtg-platform-linux-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(trByCode('zh', 'creator_select_btn')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(trByCode('zh', 'wtg_windows_iso_in_linux_mode')),
+      findsOneWidget,
+    );
+    expect(find.text('win11.iso'), findsNothing);
+    _expectNoFlutterExceptions(tester);
+  });
+
   test('To Go ISO mismatch keys exist in every supported locale', () {
     for (final code in supportedLocaleCodes) {
       final missing = trByCode(code, 'translation_missing');
       for (final key in const [
         'wtg_invalid_windows_iso',
+        'wtg_windows_iso_in_linux_mode',
         'linux_togo_unsupported_iso',
       ]) {
         final localized = trByCode(code, key);
@@ -233,6 +278,16 @@ class _EmptyWimService implements WtgService {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _StaticWindowsIsoPreflight implements WindowsIsoPreflight {
+  const _StaticWindowsIsoPreflight(this.inspection);
+
+  final WindowsIsoLayoutInspection inspection;
+
+  @override
+  Future<WindowsIsoLayoutInspection> inspect(String isoPath) async =>
+      inspection;
+}
+
 class _SingleFilePicker extends FilePickerPlatform {
   _SingleFilePicker(this.path);
 
@@ -254,7 +309,7 @@ class _SingleFilePicker extends FilePickerPlatform {
     bool cancelUploadOnWindowBlur = true,
   }) async {
     return FilePickerResult([
-      PlatformFile(name: 'ubuntu.iso', size: 1024, path: path),
+      PlatformFile(name: path.split('\\').last, size: 1024, path: path),
     ]);
   }
 }

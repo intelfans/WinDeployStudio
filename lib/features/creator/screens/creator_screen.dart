@@ -1,14 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as p;
 import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/bootable_usb_service.dart';
-import '../../../core/services/elevation_service.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
 import '../models/creator_task_progress.dart';
@@ -35,11 +32,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   SafetyCheckResult? _safetyResult;
 
   CreateProgress? _createProgress;
-  ElevatedTaskProgress? _latestTaskProgress;
-  ElevatedTaskController? _taskController;
+  BootableUsbService? _creationService;
   bool _creationRunning = false;
   bool _creationCancellable = false;
   bool _creationCancelled = false;
+  bool _creationCancelRequested = false;
 
   DeploymentBootMode _bootMode = DeploymentBootMode.uefiGpt;
   String _preferredDriveLetter = '';
@@ -52,6 +49,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   bool _isParsing = false;
   String _parseStepText = '';
   int _parsePercent = 0;
+  String? _isoSelectionErrorKey;
 
   @override
   void initState() {
@@ -76,13 +74,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       _selectedDisk = null;
       _safetyResult = null;
       _createProgress = null;
-      _latestTaskProgress = null;
-      _taskController = null;
+      _creationService = null;
       _creationCancellable = false;
       _creationCancelled = false;
+      _creationCancelRequested = false;
       _isParsing = false;
       _parseStepText = '';
       _parsePercent = 0;
+      _isoSelectionErrorKey = null;
     });
   }
 
@@ -127,30 +126,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
       if (!mounted) return;
 
-      if (_isLinuxMode) {
-        final file = File(path);
-        final metadata = IsoMetadata(
-          filePath: path,
-          fileName: p.basename(path),
-          fileSize: await file.length(),
-          windowsVersion: 'Linux ISOHybrid',
-        );
-        setState(() {
-          _selectedIso = metadata;
-          _currentStep = 1;
-        });
-        final logCenter = LogCenterService();
-        await logCenter.logIso(
-          'Linux ISO 已选择 | 文件: ${metadata.fileName} | 大小: ${metadata.displaySize}',
-        );
-        return;
-      }
-
-      // Show inline progress
+      final selectedLinuxMode = _isLinuxMode;
       setState(() {
         _isParsing = true;
         _parseStepText = tr(context, 'creator_parsing');
         _parsePercent = 0;
+        _isoSelectionErrorKey = null;
       });
 
       final isoService = ref.read(isoParseServiceProvider);
@@ -197,38 +178,67 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         debugPrint('ISO parse error: $e');
       }
 
-      if (!mounted) return;
+      if (!mounted || _isLinuxMode != selectedLinuxMode) return;
 
       setState(() {
         _isParsing = false;
-        if (metadata != null) {
-          _selectedIso = metadata;
-          _currentStep = 1;
-        }
       });
 
-      if (metadata != null) {
+      if (metadata == null) {
+        _showIsoSelectionError('creator_parse_error');
+        return;
+      }
+
+      if (selectedLinuxMode) {
+        if (metadata.isValidWindowsIso) {
+          _showIsoSelectionError('creator_windows_iso_in_linux_mode');
+          return;
+        }
+        final linuxMetadata = IsoMetadata(
+          filePath: metadata.filePath,
+          fileName: metadata.fileName,
+          fileSize: metadata.fileSize,
+          windowsVersion: 'Linux ISOHybrid',
+        );
+        setState(() {
+          _selectedIso = linuxMetadata;
+          _currentStep = 1;
+          _isoSelectionErrorKey = null;
+        });
         final logCenter = LogCenterService();
         await logCenter.logIso(
-          'ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"} | 构建: ${metadata.buildNumber ?? "未知"}',
+          'Linux ISO 已选择 | 文件: ${linuxMetadata.fileName} | 大小: ${linuxMetadata.displaySize}',
         );
+        return;
       }
 
-      if (!mounted) return;
-
-      if (metadata == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr(context, 'creator_parse_error'))),
-        );
+      if (!metadata.isValidWindowsIso) {
+        _showIsoSelectionError('creator_invalid_windows_iso');
+        return;
       }
+
+      setState(() {
+        _selectedIso = metadata;
+        _currentStep = 1;
+        _isoSelectionErrorKey = null;
+      });
+      final logCenter = LogCenterService();
+      await logCenter.logIso(
+        'ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"} | 构建: ${metadata.buildNumber ?? "未知"}',
+      );
     } catch (e) {
       debugPrint('ISO select error: $e');
       if (!mounted) return;
-      setState(() => _isParsing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${tr(context, "creator_error")}: $e')),
-      );
+      _showIsoSelectionError('creator_error');
     }
+  }
+
+  void _showIsoSelectionError(String messageKey) {
+    if (!mounted) return;
+    setState(() {
+      _isParsing = false;
+      _isoSelectionErrorKey = messageKey;
+    });
   }
 
   void _cancelParsing() {
@@ -275,118 +285,167 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     debugPrint(
       '[WDS] _startCreation called: disk=${_selectedDisk?.diskNumber}, iso=${_selectedIso?.fileName}',
     );
-    if (_selectedDisk == null || _selectedIso == null) {
+    final disk = _selectedDisk;
+    final iso = _selectedIso;
+    if (disk == null || iso == null) {
       debugPrint('[WDS] _startCreation: disk or iso is null, returning');
       return;
     }
 
-    final controller = ElevatedTaskController();
+    final isLinuxMode = _isLinuxMode;
+    final service = ref.read(bootableUsbServiceProvider);
     setState(() {
       _currentStep = 3;
       _creationRunning = true;
       _creationCancellable = false;
       _creationCancelled = false;
-      _latestTaskProgress = null;
-      _taskController = controller;
-      _createProgress = CreateProgress(
+      _creationCancelRequested = false;
+      _creationService = service;
+      // Progress messages are localization keys. Resolving this here would make
+      // the renderer attempt a second lookup using the translated text as a key.
+      _createProgress = const CreateProgress(
         step: CreateStep.preparing,
-        message: tr(context, 'creator_starting'),
+        message: 'creator_starting',
       );
     });
     debugPrint('[WDS] _startCreation: step set to 3');
 
     try {
       final plan = DeploymentPlan(
-        platform: _isLinuxMode
+        platform: isLinuxMode
             ? DeploymentPlatform.linux
             : DeploymentPlatform.windows,
         purpose: DeploymentPurpose.installMedia,
-        imagePath: _selectedIso!.filePath,
-        imageName: _selectedIso!.fileName,
-        imageBuild: _selectedIso!.buildNumber ?? '',
-        imageArchitecture: _selectedIso!.architecture ?? '',
+        imagePath: iso.filePath,
+        imageName: iso.fileName,
+        imageBuild: iso.buildNumber ?? '',
+        imageArchitecture: iso.architecture ?? '',
         windowsGeneration: DeploymentPlan.detectWindowsGeneration(
-          build: _selectedIso!.buildNumber ?? '',
-          version: _selectedIso!.windowsVersion ?? '',
+          build: iso.buildNumber ?? '',
+          version: iso.windowsVersion ?? '',
         ),
         bootMode: _bootMode,
         preferredSystemLetter: _preferredDriveLetter,
         customIconPath: _customIconPath,
         customVolumeLabel: _volumeLabelController.text.trim(),
       );
-      final success = await ElevationService.runTask(
-        ElevatedTaskSpec(
-          kind: _isLinuxMode
-              ? ElevatedTaskKind.linuxInstall
-              : ElevatedTaskKind.windowsInstall,
-          disk: _selectedDisk!,
-          isoPath: _selectedIso!.filePath,
-          localeCode: localeCodeFromLocale(Localizations.localeOf(context)),
-          deploymentPlan: plan,
-        ),
-        controller: controller,
-        onProgress: (progress) {
-          if (!mounted) return;
-          setState(() {
-            final current = _latestTaskProgress;
-            final preserveDetailedFailure =
-                progress.phase == 'failed' &&
-                progress.message == 'creator_error' &&
-                current?.phase == 'failed' &&
-                current!.message.isNotEmpty &&
-                current.message != 'creator_error';
-            if (!preserveDetailedFailure) {
-              _latestTaskProgress = progress;
-              _createProgress = createProgressFromElevatedTask(progress);
-            }
-            _creationCancellable = progress.cancellable;
-          });
-        },
-      );
-      debugPrint('[WDS] _startCreation: elevated task returned: $success');
-
-      if (mounted) {
-        final terminal = finishCreatorElevatedTask(
-          success: success,
-          latestProgress: _latestTaskProgress,
-          cancelRequested: controller.cancelRequested,
+      final compatibility = DeploymentCompatibility.evaluate(plan);
+      if (!compatibility.canDeploy) {
+        _finishCreation(
+          success: false,
+          latestProgress: CreateProgress(
+            step: CreateStep.failed,
+            message: compatibility.errors.isEmpty
+                ? 'deploy_compat_install_direct_only'
+                : compatibility.errors.first.messageKey,
+          ),
         );
-        setState(() {
-          _creationRunning = false;
-          _creationCancellable = false;
-          _creationCancelled = terminal.cancelled;
-          _taskController = null;
-          _createProgress = terminal.progress;
-          _currentStep = terminal.success ? 4 : 3;
-        });
-        debugPrint('[WDS] _startCreation: final step = $_currentStep');
+        return;
       }
+
+      final operationLock = await DiskOperationLock.tryAcquire(disk.diskNumber);
+      if (operationLock == null) {
+        _finishCreation(
+          success: false,
+          latestProgress: const CreateProgress(
+            step: CreateStep.failed,
+            message: 'safety_disk_busy',
+          ),
+        );
+        return;
+      }
+
+      bool success;
+      try {
+        success = isLinuxMode
+            ? await service.createLinuxIsoUsb(
+                disk: disk,
+                isoPath: iso.filePath,
+                kind: LinuxUsbKind.installMedia,
+                deploymentPlan: plan,
+                onProgress: _onCreationProgress,
+              )
+            : await service.createBootableUsb(
+                disk: disk,
+                isoPath: iso.filePath,
+                deploymentPlan: plan,
+                onProgress: _onCreationProgress,
+              );
+      } finally {
+        await operationLock.release();
+      }
+
+      debugPrint('[WDS] _startCreation: direct task returned: $success');
+      _finishCreation(
+        success: success,
+        cancelRequested:
+            _creationCancelRequested || (isLinuxMode && service.isCancelled),
+      );
     } catch (e, st) {
       debugPrint('[WDS] _startCreation exception: $e');
       debugPrint('[WDS] stacktrace: $st');
-      if (mounted) {
-        setState(() {
-          _creationRunning = false;
-          _creationCancellable = false;
-          _creationCancelled = controller.cancelRequested;
-          _taskController = null;
-          _createProgress = CreateProgress(
-            step: CreateStep.failed,
-            message: controller.cancelRequested
-                ? 'deploy_cancel_requested'
-                : 'creator_error\n$e',
-          );
-        });
-      }
+      _finishCreation(
+        success: false,
+        cancelRequested: _creationCancelRequested,
+        latestProgress: CreateProgress(
+          step: CreateStep.failed,
+          message: _creationCancelRequested
+              ? 'deploy_cancel_requested'
+              : 'creator_error\n$e',
+        ),
+      );
     }
   }
 
-  Future<void> _cancelCreation() async {
-    final controller = _taskController;
-    if (controller == null || controller.cancelRequested) return;
-    await controller.cancel();
+  void _onCreationProgress(CreateProgress progress) {
     if (!mounted) return;
     setState(() {
+      final current = _createProgress;
+      final preserveDetailedFailure =
+          progress.step == CreateStep.failed &&
+          progress.message == 'creator_error' &&
+          current?.step == CreateStep.failed &&
+          current!.message.isNotEmpty &&
+          current.message != 'creator_error';
+      if (!preserveDetailedFailure) {
+        _createProgress = progress;
+      }
+      _creationCancellable =
+          _isLinuxMode &&
+          (progress.step == CreateStep.copyingFiles ||
+              progress.step == CreateStep.verifying);
+    });
+  }
+
+  void _finishCreation({
+    required bool success,
+    bool cancelRequested = false,
+    CreateProgress? latestProgress,
+  }) {
+    if (!mounted) return;
+    final terminal = finishCreatorTask(
+      success: success,
+      latestProgress: latestProgress ?? _createProgress,
+      cancelRequested: cancelRequested,
+    );
+    setState(() {
+      _creationRunning = false;
+      _creationCancellable = false;
+      _creationCancelled = terminal.cancelled;
+      _creationService = null;
+      _createProgress = terminal.progress;
+      _currentStep = terminal.success ? 4 : 3;
+    });
+    debugPrint('[WDS] _startCreation: final step = $_currentStep');
+  }
+
+  void _cancelCreation() {
+    final service = _creationService;
+    if (service == null || _creationCancelRequested) return;
+    service.cancel();
+    if (!mounted) return;
+    setState(() {
+      _creationCancelRequested = true;
       _creationCancelled = true;
       _creationCancellable = false;
       _createProgress = CreateProgress(
@@ -593,13 +652,19 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (_isoSelectionErrorKey != null) ...[
+                const SizedBox(height: 16),
+                _IsoSelectionError(
+                  message: tr(context, _isoSelectionErrorKey!),
+                ),
+              ],
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: _selectIsoFile,
                 icon: const Icon(Icons.folder_open),
                 label: Text(tr(context, 'creator_select_btn')),
               ),
-              if (_selectedIso != null) ...[
+              if (_selectedIso != null && _isoSelectionErrorKey == null) ...[
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
@@ -856,6 +921,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+                        key: const Key('creator-volume-label'),
                         controller: _volumeLabelController,
                         maxLength: 11,
                         decoration: InputDecoration(
@@ -867,15 +933,33 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                         leading: const Icon(Icons.image_outlined),
                         title: Text(tr(context, 'deploy_custom_icon')),
                         subtitle: Text(
-                          _customIconPath.isEmpty
-                              ? tr(context, 'deploy_custom_icon_desc')
+                          _customIconPath.trim().isEmpty
+                              ? tr(context, 'deploy_custom_icon_default')
                               : _customIconPath,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: IconButton(
-                          onPressed: _pickCustomIcon,
-                          icon: const Icon(Icons.folder_open),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_customIconPath.trim().isNotEmpty)
+                              IconButton(
+                                key: const Key('creator-icon-clear'),
+                                tooltip: tr(
+                                  context,
+                                  'deploy_clear_custom_icon',
+                                ),
+                                onPressed: () =>
+                                    setState(() => _customIconPath = ''),
+                                icon: const Icon(Icons.close),
+                              ),
+                            IconButton(
+                              key: const Key('creator-icon-picker'),
+                              tooltip: tr(context, 'deploy_custom_icon'),
+                              onPressed: _pickCustomIcon,
+                              icon: const Icon(Icons.folder_open),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -1137,11 +1221,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                     _selectedDisk = null;
                     _safetyResult = null;
                     _createProgress = null;
-                    _latestTaskProgress = null;
-                    _taskController = null;
+                    _creationService = null;
                     _creationRunning = false;
                     _creationCancellable = false;
                     _creationCancelled = false;
+                    _creationCancelRequested = false;
                   });
                 },
                 child: Text(tr(context, 'creator_another')),
@@ -1225,6 +1309,52 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 }
 
 // --- Sub-widgets ---
+
+class _IsoSelectionError extends StatelessWidget {
+  final String message;
+
+  const _IsoSelectionError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: DecoratedBox(
+        key: const Key('creator-iso-selection-error'),
+        decoration: BoxDecoration(
+          color: colors.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.error.withValues(alpha: 0.55)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                color: colors.onErrorContainer,
+                semanticLabel: '',
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.onErrorContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _IsoInfoCard extends StatelessWidget {
   final IsoMetadata iso;

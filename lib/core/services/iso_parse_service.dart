@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import '../../features/logs/services/log_center_service.dart';
 import 'wim_info_service.dart';
+import 'windows_iso_preflight.dart';
 
 class IsoMetadata {
   final String filePath;
@@ -91,32 +92,38 @@ class IsoParseService {
       debugPrint('Mounted at: $mountPoint');
       _report(onProgress, 'detect', 0);
 
-      final wimPath = '${mountPoint}sources\\install.wim';
-      final esdPath = '${mountPoint}sources\\install.esd';
-      final hasWim = await File(wimPath).exists();
-      final hasEsd = await File(esdPath).exists();
-      if (!hasWim && !hasEsd) return fastResult;
+      final layout = await WindowsIsoLayoutInspector.inspectMountedRoot(
+        mountPoint,
+      );
+      if (!layout.isValid || layout.imagePath == null) {
+        debugPrint('Windows setup layout not found: ${layout.error}');
+        return fastResult;
+      }
       _report(onProgress, 'detect', 100);
       if (_cancelled) return null;
 
-      _report(onProgress, 'info', 30);
-      final images = await WimInfoService.readImages(
-        hasWim ? wimPath : esdPath,
-      );
-      final image = images.first;
-      dismInfo = {
-        'build': image.build,
-        'architecture': image.architecture,
-        'language': image.language,
-        'edition': image.name.isEmpty ? image.edition : image.name,
-      };
-      final buildNumber = int.tryParse(image.build) ?? 0;
-      if (buildNumber >= 22000) {
-        dismInfo['version'] = 'Windows 11 (Build ${image.build})';
-      } else if (buildNumber >= 10240) {
-        dismInfo['version'] = 'Windows 10 (Build ${image.build})';
-      } else if (image.version.isNotEmpty) {
-        dismInfo['version'] = image.version;
+      if (layout.imageFormat != WindowsInstallImageFormat.swm) {
+        _report(onProgress, 'info', 30);
+        final images = await WimInfoService.readImages(layout.imagePath!);
+        final image = images.first;
+        dismInfo = {
+          'build': image.build,
+          'architecture': image.architecture,
+          'language': image.language,
+          'edition': image.name.isEmpty ? image.edition : image.name,
+        };
+        final buildNumber = int.tryParse(image.build) ?? 0;
+        if (buildNumber >= 22000) {
+          dismInfo['version'] = 'Windows 11 (Build ${image.build})';
+        } else if (buildNumber >= 10240) {
+          dismInfo['version'] = 'Windows 10 (Build ${image.build})';
+        } else if (image.version.isNotEmpty) {
+          dismInfo['version'] = image.version;
+        }
+      } else {
+        debugPrint(
+          'Split WIM layout detected; skipping optional WIM metadata.',
+        );
       }
       _report(onProgress, 'info', 100);
     } catch (error) {

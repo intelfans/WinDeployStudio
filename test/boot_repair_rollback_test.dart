@@ -156,7 +156,6 @@ $payload = [PSCustomObject]@{
           'WDS_TEST_HAD_EXISTING': '$hadExistingStore',
           'WDS_TEST_OUTPUT': workspace.outputFile.path,
         },
-        elevated: false,
         timeout: const Duration(seconds: 20),
         cancelPath: workspace.cancelFile.path,
       );

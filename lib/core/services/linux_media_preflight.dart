@@ -29,6 +29,14 @@ Duration linuxRawVerificationTimeoutForBytes(int imageBytes) {
   return calculated > maximum ? maximum : calculated;
 }
 
+Duration linuxRawWriteAndVerifyTimeoutForBytes(int imageBytes) {
+  final calculated =
+      linuxRawWriteTimeoutForBytes(imageBytes) +
+      linuxRawVerificationTimeoutForBytes(imageBytes);
+  const maximum = Duration(hours: 24);
+  return calculated > maximum ? maximum : calculated;
+}
+
 class LinuxIsoHybridInspection {
   final bool isValid;
   final String? error;

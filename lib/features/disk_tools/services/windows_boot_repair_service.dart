@@ -119,7 +119,6 @@ class WindowsBootRepairService {
       final response = await _runOperation(
         mode: 'execute',
         selection: preflight.selection,
-        requestAdministrator: true,
         backupDirectory: backupDirectory,
         logPath: logPath,
         timeout: const Duration(minutes: 3),
@@ -225,7 +224,6 @@ class WindowsBootRepairService {
   Future<Map<String, dynamic>> _runOperation({
     required String mode,
     required BootRepairSelection selection,
-    bool requestAdministrator = false,
     String backupDirectory = '',
     String logPath = '',
     required Duration timeout,
@@ -240,10 +238,10 @@ class WindowsBootRepairService {
     return _runScript(
       script: _bootOperationScript,
       variables: {'WDS_BOOT_SPEC': jsonEncode(spec)},
-      requestAdministrator: requestAdministrator,
+      isExecution: mode == 'execute',
       timeout: timeout,
       cancellationToken: cancellationToken,
-      cancellationGracePeriod: requestAdministrator
+      cancellationGracePeriod: mode == 'execute'
           ? const Duration(seconds: 15)
           : const Duration(seconds: 2),
     );
@@ -252,7 +250,7 @@ class WindowsBootRepairService {
   Future<Map<String, dynamic>> _runScript({
     required String script,
     Map<String, String> variables = const {},
-    bool requestAdministrator = false,
+    bool isExecution = false,
     required Duration timeout,
     DiskToolsCancellationToken? cancellationToken,
     Duration cancellationGracePeriod = const Duration(seconds: 2),
@@ -270,7 +268,6 @@ class WindowsBootRepairService {
           'WDS_BOOT_OUTPUT': outputFile.path,
           'WDS_RESPONSE_NONCE': workspace.nonce,
         },
-        elevated: requestAdministrator,
         timeout: timeout,
         cancelPath: workspace.cancelFile.path,
         cancellationToken: cancellationToken,
@@ -278,18 +275,15 @@ class WindowsBootRepairService {
       );
 
       if (!await outputFile.exists()) {
-        if (requestAdministrator && result.elevationCancelled) {
-          return <String, dynamic>{'ok': false, 'elevationCancelled': true};
-        }
         if (result.timedOut) {
           throw BootRepairException(
-            requestAdministrator
+            isExecution
                 ? 'boot_repair_error_execution_timeout'
                 : 'boot_repair_error_preflight_timeout',
           );
         }
         throw BootRepairException(
-          requestAdministrator
+          isExecution
               ? 'boot_repair_error_execution'
               : 'boot_repair_error_preflight',
           result.stderr,

@@ -5,75 +5,61 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/features/disk_tools/services/secure_powershell_runner.dart';
 import 'package:win_deploy_studio/features/disk_tools/services/windows_boot_repair_service.dart';
-import 'package:win_deploy_studio/features/disk_tools/services/windows_disk_diagnostics_service.dart';
 
 void main() {
   group('secure PowerShell command construction', () {
-    test(
-      'elevated scripts remain in memory and parameters stay serialized',
-      () {
-        const script = r'''
+    test('scripts remain in memory and parameters stay serialized', () {
+      const script = r'''
 $value = $env:WDS_TEST_SPEC | ConvertFrom-Json
 if ($value.path -ne 'C:\quoted path') { throw 'bad spec' }
 ''';
-        final serialized = jsonEncode({
-          'path': r'C:\quoted path',
-          'text': 'quotes " and newlines\nremain JSON',
-        });
+      final serialized = jsonEncode({
+        'path': r'C:\quoted path',
+        'text': 'quotes " and newlines\nremain JSON',
+      });
 
-        final command = PowerShellCommandBuilder.build(
-          script: script,
-          variables: {'WDS_TEST_SPEC': serialized},
-          elevated: true,
-          powershellPath:
-              r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe',
-          cancelPath: r'C:\Temp\wds\cancel.signal',
-          cancelGracePeriod: const Duration(seconds: 5),
-          baseEnvironment: const {'SystemRoot': r'C:\Windows'},
-        );
+      final command = PowerShellCommandBuilder.build(
+        script: script,
+        variables: {'WDS_TEST_SPEC': serialized},
+        powershellPath:
+            r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe',
+        cancelPath: r'C:\Temp\wds\cancel.signal',
+        cancelGracePeriod: const Duration(seconds: 5),
+        baseEnvironment: const {'SystemRoot': r'C:\Windows'},
+      );
 
-        expect(command.arguments, contains('-EncodedCommand'));
-        expect(command.arguments, isNot(contains('-File')));
-        expect(command.arguments.join(' '), isNot(contains('.ps1')));
-        expect(command.arguments.join(' '), isNot(contains(script)));
-        expect(command.environment['WDS_TEST_SPEC'], serialized);
-        final elevatedPidToken = command
-            .environment[PowerShellCommandBuilder.elevatedPidTokenVariable];
-        expect(elevatedPidToken, matches(RegExp(r'^[0-9a-f]{48}$')));
-        expect(
-          PowerShellCommandBuilder.decompressScript(
-            command.environment[PowerShellCommandBuilder
-                .scriptPayloadVariable]!,
-          ),
-          script,
-        );
+      expect(command.arguments, contains('-EncodedCommand'));
+      expect(command.arguments, isNot(contains('-File')));
+      expect(command.arguments.join(' '), isNot(contains('.ps1')));
+      expect(command.arguments.join(' '), isNot(contains(script)));
+      expect(command.environment['WDS_TEST_SPEC'], serialized);
+      expect(
+        PowerShellCommandBuilder.decompressScript(
+          command.environment[PowerShellCommandBuilder.scriptPayloadVariable]!,
+        ),
+        script,
+      );
 
-        final launcher = PowerShellCommandBuilder.decodeCommand(
-          command.arguments.last,
-        );
-        final bootstrap = PowerShellCommandBuilder.decodeCommand(
-          command.environment[PowerShellCommandBuilder.bootstrapVariable]!,
-        );
-        expect(launcher, contains('Start-Process'));
-        expect(launcher, contains('-Verb RunAs'));
-        expect(launcher, contains('-EncodedCommand'));
-        expect(
-          launcher,
-          contains(PowerShellCommandBuilder.elevatedPidTokenVariable),
-        );
-        expect(launcher, isNot(contains("'-File'")));
-        expect(bootstrap, contains('GZipStream'));
-        expect(bootstrap, contains('[ScriptBlock]::Create'));
-        expect(bootstrap, contains('taskkill.exe'));
-      },
-    );
+      final bootstrap = PowerShellCommandBuilder.decodeCommand(
+        command.arguments.last,
+      );
+      expect(
+        command.arguments.last,
+        command.environment[PowerShellCommandBuilder.bootstrapVariable],
+      );
+      expect(bootstrap, isNot(contains('Start-Process')));
+      expect(bootstrap, isNot(contains('RunAs')));
+      expect(bootstrap, isNot(contains("'-File'")));
+      expect(bootstrap, contains('GZipStream'));
+      expect(bootstrap, contains('[ScriptBlock]::Create'));
+      expect(bootstrap, contains('taskkill.exe'));
+    });
 
     test('rejects environment names outside the disk-tools contract', () {
       expect(
         () => PowerShellCommandBuilder.build(
           script: 'Write-Output ok',
           variables: const {'PATH': 'untrusted'},
-          elevated: false,
           powershellPath: 'powershell.exe',
           cancelPath: r'C:\Temp\cancel.signal',
           cancelGracePeriod: Duration.zero,
@@ -86,7 +72,6 @@ if ($value.path -ne 'C:\quoted path') { throw 'bad spec' }
       final scripts = [
         WindowsBootRepairService.discoveryScriptForTesting,
         WindowsBootRepairService.bootOperationScriptForTesting,
-        WindowsDiskDiagnosticsService.diagnosticsScriptForTesting,
       ];
 
       for (final script in scripts) {
@@ -150,7 +135,6 @@ if ($value.path -ne 'C:\quoted path') { throw 'bad spec' }
         final scripts = [
           WindowsBootRepairService.discoveryScriptForTesting,
           WindowsBootRepairService.bootOperationScriptForTesting,
-          WindowsDiskDiagnosticsService.diagnosticsScriptForTesting,
         ];
         const parserScript = r'''
 $compressed = [Convert]::FromBase64String($env:WDS_TEST_SCRIPT_GZIP)
@@ -180,7 +164,6 @@ try {
                   script,
                 ),
               },
-              elevated: false,
               timeout: const Duration(seconds: 20),
               cancelPath: workspace.cancelFile.path,
             );
@@ -194,68 +177,48 @@ try {
     );
   });
 
-  test(
-    'cancellation terminates the token-confirmed elevated process tree first',
-    () async {
-      final fake = _FakeProcess(91);
-      final started = Completer<void>();
-      final lifecycle = <String>[];
-      final token = DiskToolsCancellationToken();
-      String? elevatedPidToken;
-      final workspace = await DiskToolsPowerShellWorkspace.create(
-        'wds_runner_test',
+  test('cancellation terminates the direct PowerShell process tree', () async {
+    final fake = _FakeProcess(91);
+    final started = Completer<void>();
+    final lifecycle = <String>[];
+    final token = DiskToolsCancellationToken();
+    final workspace = await DiskToolsPowerShellWorkspace.create(
+      'wds_runner_test',
+    );
+    final runner = SecurePowerShellRunner(
+      powershellPath: 'powershell.exe',
+      processStarter: (executable, arguments, {environment}) async {
+        started.complete();
+        return fake;
+      },
+      processTreeTerminator: (processId) async {
+        lifecycle.add('terminate:$processId');
+        if (processId == fake.pid) fake.complete(9);
+      },
+    );
+
+    try {
+      final run = runner.run(
+        script: 'Start-Sleep -Seconds 30',
+        timeout: const Duration(minutes: 1),
+        cancelPath: workspace.cancelFile.path,
+        cancellationToken: token,
+        cancellationGracePeriod: Duration.zero,
       );
-      final runner = SecurePowerShellRunner(
-        powershellPath: 'powershell.exe',
-        processStarter: (executable, arguments, {environment}) async {
-          elevatedPidToken =
-              environment![PowerShellCommandBuilder.elevatedPidTokenVariable];
-          started.complete();
-          return fake;
-        },
-        processTreeTerminator: (processId) async {
-          lifecycle.add('terminate:$processId');
-          if (processId == fake.pid) fake.complete(9);
-        },
-        processExitWaiter: (processId) async {
-          lifecycle.add('wait:$processId');
-        },
-      );
+      await started.future;
+      token.cancel();
 
-      try {
-        final run = runner.run(
-          script: 'Start-Sleep -Seconds 30',
-          elevated: true,
-          timeout: const Duration(minutes: 1),
-          cancelPath: workspace.cancelFile.path,
-          cancellationToken: token,
-          cancellationGracePeriod: Duration.zero,
-        );
-        await started.future;
-        final marker =
-            '${PowerShellCommandBuilder.elevatedPidMarker}$elevatedPidToken:4242';
-        fake.emitStdout(
-          '${PowerShellCommandBuilder.elevatedPidMarker}forged-token:9999\n',
-        );
-        fake.emitStdout('unexpected output $marker\n');
-        fake.emitStdout(marker.substring(0, 17));
-        fake.emitStdout('${marker.substring(17)}\r');
-        fake.emitStdout('\n');
-        await Future<void>.delayed(Duration.zero);
-        token.cancel();
+      final result = await run;
 
-        final result = await run;
-
-        expect(result.cancelled, isTrue);
-        expect(result.elevatedProcessId, 4242);
-        expect(await workspace.cancelFile.exists(), isTrue);
-        expect(lifecycle, ['terminate:4242', 'wait:4242', 'terminate:91']);
-      } finally {
-        fake.complete(9);
-        await workspace.dispose();
-      }
-    },
-  );
+      expect(result.cancelled, isTrue);
+      expect(result.processId, fake.pid);
+      expect(await workspace.cancelFile.exists(), isTrue);
+      expect(lifecycle, ['terminate:91']);
+    } finally {
+      fake.complete(9);
+      await workspace.dispose();
+    }
+  });
 }
 
 class _FakeProcess implements Process {
@@ -280,10 +243,6 @@ class _FakeProcess implements Process {
 
   @override
   IOSink get stdin => IOSink(_stdin.sink);
-
-  void emitStdout(String value) {
-    if (!_stdout.isClosed) _stdout.add(ascii.encode(value));
-  }
 
   void complete(int value) {
     if (_exitCode.isCompleted) return;

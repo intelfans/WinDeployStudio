@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/wtg_service.dart';
+import 'package:win_deploy_studio/features/deployment/models/deployment_plan.dart';
 
 void main() {
   test('direct deployment requires distinct device and osdevice bindings', () {
@@ -46,6 +47,35 @@ osdevice vhd=[R:]\Portable.vhdx''', expected),
       WtgBootContract.listingMatches(r'''device vhd=[locate]\Portable.vhdx
 osdevice vhd=[locate]\Portable.vhdx''', expected),
       isFalse,
+    );
+  });
+
+  test('blank custom icon preserves the Windows default drive icon', () {
+    const identity = WtgVolumeIdentity(
+      volumeLabel: 'PORTABLE',
+      customIconPath: '   ',
+    );
+
+    expect(identity.usesCustomIcon, isFalse);
+    expect(identity.autorunContents, isNull);
+  });
+
+  test('custom icon produces only the expected volume autorun content', () {
+    const plan = DeploymentPlan(
+      platform: DeploymentPlatform.windows,
+      purpose: DeploymentPurpose.toGo,
+      imagePath: r'D:\Images\Windows.iso',
+      customVolumeLabel: 'PORTABLE',
+      customIconPath: r' D:\Icons\portable.ico ',
+    );
+
+    final identity = WtgVolumeIdentity.fromPlan(plan);
+
+    expect(identity.usesCustomIcon, isTrue);
+    expect(identity.customIconPath, r'D:\Icons\portable.ico');
+    expect(
+      identity.autorunContents,
+      '[autorun]\r\nicon=.wds-drive.ico\r\nlabel=PORTABLE\r\n',
     );
   });
 }

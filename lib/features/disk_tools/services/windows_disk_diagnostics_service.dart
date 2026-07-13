@@ -16,13 +16,11 @@ final windowsDiskDiagnosticsServiceProvider =
 class DiskDiagnosticsException implements Exception {
   final String message;
   final String localizationKey;
-  final bool elevationCancelled;
   final bool operationCancelled;
 
   const DiskDiagnosticsException(
     this.message, {
     this.localizationKey = 'disk_diag_error',
-    this.elevationCancelled = false,
     this.operationCancelled = false,
   });
 
@@ -37,8 +35,8 @@ typedef DiskDiagnosticsProcessStarter =
 ///
 /// The helper isolates each storage IOCTL in its own process. That matters for
 /// USB bridges and storage drivers which can leave a normal synchronous query
-/// blocked indefinitely. PowerShell is only used to request an optional
-/// elevated launch; it never enumerates the storage provider for this feature.
+/// blocked indefinitely. The main application always starts elevated, so the
+/// helper inherits the same token without opening a second UAC flow.
 class WindowsDiskDiagnosticsService {
   static const _nativeSource = 'Native Windows storage APIs';
   static const _reliabilitySource = 'Windows Storage Reliability Counter';
@@ -46,20 +44,16 @@ class WindowsDiskDiagnosticsService {
   static const _helperTimeout = Duration(seconds: 24);
   static const _streamDrainTimeout = Duration(seconds: 2);
 
-  final SecurePowerShellRunner _powerShellRunner;
   final DiskDiagnosticsProcessStarter _startNativeProcess;
   final String Function() _helperPath;
 
   WindowsDiskDiagnosticsService({
-    SecurePowerShellRunner? powerShellRunner,
     DiskDiagnosticsProcessStarter? nativeProcessStarter,
     String Function()? helperPath,
-  }) : _powerShellRunner = powerShellRunner ?? SecurePowerShellRunner(),
-       _startNativeProcess = nativeProcessStarter ?? _defaultStartNativeProcess,
+  }) : _startNativeProcess = nativeProcessStarter ?? _defaultStartNativeProcess,
        _helperPath = helperPath ?? _defaultHelperPath;
 
   Future<DiskDiagnosticsSnapshot> collect({
-    bool requestAdministrator = false,
     DiskToolsCancellationToken? cancellationToken,
   }) async {
     if (!Platform.isWindows) {
@@ -84,9 +78,7 @@ class WindowsDiskDiagnosticsService {
       );
     }
 
-    final nativeResponse = requestAdministrator
-        ? await _runElevatedHelper(helper, cancellationToken)
-        : await _runHelperDirectly(helper, cancellationToken);
+    final nativeResponse = await _runHelperDirectly(helper, cancellationToken);
     final root = _decodeResponse(nativeResponse);
     if (root['ok'] != true) {
       throw DiskDiagnosticsException(
@@ -113,7 +105,11 @@ class WindowsDiskDiagnosticsService {
       }
       final report = Map<String, dynamic>.from(raw);
       reports.add(
-        _parseReport(report, _NvmeHealthData.fromJson(report['nvme'])),
+        _parseReport(
+          report,
+          _NvmeHealthData.fromJson(report['nvme']),
+          _AtaSmartData.fromJson(report['ataSmart']),
+        ),
       );
     }
     reports.sort((left, right) => left.diskNumber.compareTo(right.diskNumber));
@@ -216,100 +212,73 @@ class WindowsDiskDiagnosticsService {
     return response;
   }
 
-  Future<String> _runElevatedHelper(
-    File helper,
-    DiskToolsCancellationToken? cancellationToken,
-  ) async {
-    final workspace = await DiskToolsPowerShellWorkspace.create(
-      'wds_disk_diagnostics',
-    );
-    final outputFile = workspace.outputFile;
-    try {
-      final result = await _powerShellRunner.run(
-        script: _elevatedHelperScript,
-        variables: {
-          'WDS_DIAGNOSTICS_HELPER': helper.path,
-          'WDS_DIAGNOSTICS_OUTPUT': outputFile.path,
-          'WDS_RESPONSE_NONCE': workspace.nonce,
-        },
-        elevated: true,
-        timeout: const Duration(seconds: 35),
-        cancelPath: workspace.cancelFile.path,
-        cancellationToken: cancellationToken,
-      );
-      if (result.timedOut) {
-        throw const DiskDiagnosticsException(
-          'The native disk diagnostic helper timed out.',
-          localizationKey: 'disk_diag_error_timeout',
-        );
-      }
-      if (result.cancelled) {
-        throw const DiskDiagnosticsException(
-          'Disk diagnostic collection was cancelled.',
-          localizationKey: 'disk_diag_error_cancelled',
-          operationCancelled: true,
-        );
-      }
-      if (!await outputFile.exists()) {
-        final cancelled = result.elevationCancelled;
-        throw DiskDiagnosticsException(
-          cancelled
-              ? 'Administrator access was cancelled.'
-              : 'The native disk diagnostic helper returned no data.',
-          localizationKey: cancelled
-              ? 'disk_diag_admin_cancelled'
-              : 'disk_diag_error_no_data',
-          elevationCancelled: cancelled,
-        );
-      }
-
-      final envelope = _decodeResponse(await outputFile.readAsString());
-      if (envelope['responseNonce'] != workspace.nonce) {
-        throw const DiskDiagnosticsException(
-          'Windows returned an invalid diagnostic response.',
-          localizationKey: 'disk_diag_error_invalid_response',
-        );
-      }
-      if (envelope['ok'] != true) {
-        throw DiskDiagnosticsException(
-          _cleanString(envelope['error']) ??
-              'The native disk diagnostic helper did not complete.',
-          localizationKey: 'disk_diag_error_helper_failed',
-        );
-      }
-      final nativeResponse = _cleanString(envelope['nativeResponse']);
-      if (nativeResponse == null) {
-        throw const DiskDiagnosticsException(
-          'The native disk diagnostic helper returned no data.',
-          localizationKey: 'disk_diag_error_no_data',
-        );
-      }
-      return nativeResponse;
-    } finally {
-      try {
-        await workspace.dispose();
-      } catch (_) {}
-    }
-  }
-
   DiskDiagnosticReport _parseReport(
     Map<String, dynamic> raw,
     _NvmeHealthData nvme,
+    _AtaSmartData ataSmart,
   ) {
     final reliabilityReason =
         _cleanString(raw['reliabilityUnavailableReason']) ??
         'The storage driver did not expose a reliability counter.';
+    final reliabilityReasonCode =
+        _cleanString(raw['reliabilityUnavailableReasonCode']) ??
+        _cleanString(raw['reliabilityReasonCode']);
+    final reliabilityWindowsError =
+        _intFrom(raw['reliabilityUnavailableWindowsError']) ??
+        _intFrom(raw['reliabilityWindowsError']) ??
+        _intFrom(raw['reliabilityUnavailableError']);
+    final reliabilityUnavailableReasonKind =
+        _unavailabilityKindForTechnicalReason(
+          reliabilityReason,
+          reasonCode: reliabilityReasonCode,
+          windowsError: reliabilityWindowsError,
+          fallback: DiagnosticUnavailableReason.notExposedByDeviceOrDriver,
+        );
     final diskNumber = _intFrom(raw['diskNumber']) ?? -1;
-    final wear = _intDiagnostic(
-      raw['wearPercent'],
-      _reliabilitySource,
-      reliabilityReason,
-    ).orElse(nvme.percentageUsed, nvme.source, nvme.unavailableReason);
+    final busType = _stringDiagnostic(
+      raw['busType'],
+      _nativeSource,
+      'Windows reported the bus type as unknown.',
+      rejectUnknown: true,
+    );
+    final usbIdentifierUnavailableReasonKind =
+        busType.isAvailable && busType.value?.toUpperCase() != 'USB'
+        ? DiagnosticUnavailableReason.notApplicable
+        : DiagnosticUnavailableReason.notReported;
+    final smartFallback = _SmartMetricFallback.forDisk(
+      busType: busType,
+      nvme: nvme,
+      ataSmart: ataSmart,
+      reliabilityReason: reliabilityReason,
+      reliabilityUnavailableReasonKind: reliabilityUnavailableReasonKind,
+    );
+    // The native top-level metrics come exclusively from Windows storage
+    // counters. ATA/SAT values live in ataSmart and are only used below as a
+    // fallback, so the rendered source always matches the actual query path.
+    const topLevelMetricSource = _reliabilitySource;
+    final topLevelMetricUnavailableReason = reliabilityReason;
+    final topLevelMetricUnavailableReasonKind =
+        reliabilityUnavailableReasonKind;
+    final wear =
+        _intDiagnostic(
+          raw['wearPercent'],
+          topLevelMetricSource,
+          topLevelMetricUnavailableReason,
+          unavailableReasonKind: topLevelMetricUnavailableReasonKind,
+        ).orElse(
+          smartFallback.percentageUsed,
+          smartFallback.source,
+          smartFallback.unavailableReason,
+          smartFallback.unavailableReasonKind,
+        );
     final wearValue = wear.value;
     final remainingLife = wearValue == null
         ? DiagnosticValue<int>.unavailable(
             unavailableReason: wear.unavailableReason,
             source: wear.source,
+            unavailableReasonKind:
+                wear.unavailableReasonKind ??
+                DiagnosticUnavailableReason.notReported,
           )
         : DiagnosticValue<int>.available(
             (100 - wearValue).clamp(0, 100),
@@ -338,94 +307,117 @@ class WindowsDiskDiagnosticsService {
         _nativeSource,
         'Windows did not expose a unique disk identifier.',
       ),
-      busType: _stringDiagnostic(
-        raw['busType'],
-        _nativeSource,
-        'Windows reported the bus type as unknown.',
-        rejectUnknown: true,
-      ),
+      busType: busType,
       vendorId: _stringDiagnostic(
         raw['vendorId'],
         'Windows PnP device ancestry',
         'No USB VID was present in the PnP device ancestry.',
+        unavailableReasonKind: usbIdentifierUnavailableReasonKind,
       ),
       productId: _stringDiagnostic(
         raw['productId'],
         'Windows PnP device ancestry',
         'No USB PID was present in the PnP device ancestry.',
+        unavailableReasonKind: usbIdentifierUnavailableReasonKind,
       ),
       health: _stringDiagnostic(
         raw['health'],
         _cleanString(raw['healthSource']) ?? _nativeSource,
-        'Windows did not report a usable health state.',
+        smartFallback.unavailableReason,
         rejectUnknown: true,
+        unavailableReasonKind: smartFallback.unavailableReasonKind,
       ),
-      temperatureCelsius: _intDiagnostic(
-        raw['temperatureCelsius'],
-        _reliabilitySource,
-        reliabilityReason,
-      ).orElse(nvme.temperatureCelsius, nvme.source, nvme.unavailableReason),
+      temperatureCelsius:
+          _intDiagnostic(
+            raw['temperatureCelsius'],
+            topLevelMetricSource,
+            topLevelMetricUnavailableReason,
+            unavailableReasonKind: topLevelMetricUnavailableReasonKind,
+          ).orElse(
+            smartFallback.temperatureCelsius,
+            smartFallback.source,
+            smartFallback.unavailableReason,
+            smartFallback.unavailableReasonKind,
+          ),
       wearPercent: wear,
       estimatedRemainingLifePercent: remainingLife,
       readErrorsCorrected: _bigIntDiagnostic(
         raw['readErrorsCorrected'],
-        _reliabilitySource,
-        reliabilityReason,
+        topLevelMetricSource,
+        topLevelMetricUnavailableReason,
+        unavailableReasonKind: topLevelMetricUnavailableReasonKind,
       ),
       readErrorsUncorrected: _bigIntDiagnostic(
         raw['readErrorsUncorrected'],
-        _reliabilitySource,
-        reliabilityReason,
+        topLevelMetricSource,
+        topLevelMetricUnavailableReason,
+        unavailableReasonKind: topLevelMetricUnavailableReasonKind,
       ),
       readErrorsTotal: _bigIntDiagnostic(
         raw['readErrorsTotal'],
-        _reliabilitySource,
-        reliabilityReason,
+        topLevelMetricSource,
+        topLevelMetricUnavailableReason,
+        unavailableReasonKind: topLevelMetricUnavailableReasonKind,
       ),
       writeErrorsCorrected: _bigIntDiagnostic(
         raw['writeErrorsCorrected'],
-        _reliabilitySource,
-        reliabilityReason,
+        topLevelMetricSource,
+        topLevelMetricUnavailableReason,
+        unavailableReasonKind: topLevelMetricUnavailableReasonKind,
       ),
       writeErrorsUncorrected: _bigIntDiagnostic(
         raw['writeErrorsUncorrected'],
-        _reliabilitySource,
-        reliabilityReason,
+        topLevelMetricSource,
+        topLevelMetricUnavailableReason,
+        unavailableReasonKind: topLevelMetricUnavailableReasonKind,
       ),
       writeErrorsTotal: _bigIntDiagnostic(
         raw['writeErrorsTotal'],
-        _reliabilitySource,
-        reliabilityReason,
+        topLevelMetricSource,
+        topLevelMetricUnavailableReason,
+        unavailableReasonKind: topLevelMetricUnavailableReasonKind,
       ),
-      powerOnHours: _bigIntDiagnostic(
-        raw['powerOnHours'],
-        _reliabilitySource,
-        reliabilityReason,
-      ).orElse(nvme.powerOnHours, nvme.source, nvme.unavailableReason),
+      powerOnHours:
+          _bigIntDiagnostic(
+            raw['powerOnHours'],
+            topLevelMetricSource,
+            topLevelMetricUnavailableReason,
+            unavailableReasonKind: topLevelMetricUnavailableReasonKind,
+          ).orElse(
+            smartFallback.powerOnHours,
+            smartFallback.source,
+            smartFallback.unavailableReason,
+            smartFallback.unavailableReasonKind,
+          ),
       hostReadBytes: _diagnosticFromNullable(
-        nvme.hostReadBytes,
-        source: nvme.source,
-        unavailableReason: nvme.unavailableReason,
+        smartFallback.hostReadBytes,
+        source: smartFallback.source,
+        unavailableReason: smartFallback.unavailableReason,
+        unavailableReasonKind: smartFallback.unavailableReasonKind,
       ),
       hostWrittenBytes: _diagnosticFromNullable(
-        nvme.hostWrittenBytes,
-        source: nvme.source,
-        unavailableReason: nvme.unavailableReason,
+        smartFallback.hostWrittenBytes,
+        source: smartFallback.source,
+        unavailableReason: smartFallback.unavailableReason,
+        unavailableReasonKind: smartFallback.unavailableReasonKind,
       ),
       hostReadCommands: _diagnosticFromNullable(
-        nvme.hostReadCommands,
-        source: nvme.source,
-        unavailableReason: nvme.unavailableReason,
+        smartFallback.hostReadCommands,
+        source: smartFallback.source,
+        unavailableReason: smartFallback.unavailableReason,
+        unavailableReasonKind: smartFallback.unavailableReasonKind,
       ),
       hostWriteCommands: _diagnosticFromNullable(
-        nvme.hostWriteCommands,
-        source: nvme.source,
-        unavailableReason: nvme.unavailableReason,
+        smartFallback.hostWriteCommands,
+        source: smartFallback.source,
+        unavailableReason: smartFallback.unavailableReason,
+        unavailableReasonKind: smartFallback.unavailableReasonKind,
       ),
       mediaAndDataIntegrityErrors: _diagnosticFromNullable(
-        nvme.mediaAndDataIntegrityErrors,
-        source: nvme.source,
-        unavailableReason: nvme.unavailableReason,
+        smartFallback.mediaAndDataIntegrityErrors,
+        source: smartFallback.source,
+        unavailableReason: smartFallback.unavailableReason,
+        unavailableReasonKind: smartFallback.unavailableReasonKind,
       ),
       firmwareVersion: _stringDiagnostic(
         raw['firmwareVersion'],
@@ -461,11 +453,31 @@ class WindowsDiskDiagnosticsService {
         'Windows did not expose a storage device path.',
       ),
       driveLetters: _stringList(raw['driveLetters']),
-      isSystem: raw['isSystem'] == true,
-      isBoot: raw['isBoot'] == true,
-      isOffline: raw['isOffline'] == true,
-      isReadOnly: raw['isReadOnly'] == true,
-      isRemovable: raw['isRemovable'] == true,
+      isSystem: _boolDiagnostic(
+        raw['isSystem'],
+        'Windows volume mapping',
+        'Windows did not report whether this is the system disk.',
+      ),
+      isBoot: _boolDiagnostic(
+        raw['isBoot'],
+        _nativeSource,
+        'Windows did not report whether this is the boot disk.',
+      ),
+      isOffline: _boolDiagnostic(
+        raw['isOffline'],
+        _nativeSource,
+        'Windows did not report the offline state.',
+      ),
+      isReadOnly: _boolDiagnostic(
+        raw['isReadOnly'],
+        _nativeSource,
+        'Windows did not report the read-only state.',
+      ),
+      isRemovable: _boolDiagnostic(
+        raw['isRemovable'],
+        _nativeSource,
+        'Windows did not report the removable-media state.',
+      ),
     );
   }
 
@@ -526,46 +538,6 @@ class WindowsDiskDiagnosticsService {
   static String _defaultHelperPath() {
     return p.join(p.dirname(Platform.resolvedExecutable), _helperName);
   }
-
-  static String get diagnosticsScriptForTesting => _elevatedHelperScript;
-
-  static const _elevatedHelperScript = r'''
-$ErrorActionPreference = 'Stop'
-
-function Write-DiagnosticEnvelope([bool]$ok, [string]$error, [string]$nativeResponse) {
-  $payload = [PSCustomObject]@{
-    ok = $ok
-    error = $error
-    nativeResponse = $nativeResponse
-    responseNonce = $env:WDS_RESPONSE_NONCE
-  } | ConvertTo-Json -Compress
-  [IO.File]::WriteAllText(
-    $env:WDS_DIAGNOSTICS_OUTPUT,
-    $payload,
-    (New-Object Text.UTF8Encoding($false))
-  )
-}
-
-try {
-  $helper = $env:WDS_DIAGNOSTICS_HELPER
-  if ([string]::IsNullOrWhiteSpace($helper) -or
-      -not (Test-Path -LiteralPath $helper -PathType Leaf)) {
-    throw 'The bundled disk diagnostic helper is unavailable.'
-  }
-  $nativeLines = @(& $helper '--inventory')
-  if ($LASTEXITCODE -ne 0) {
-    throw 'The bundled disk diagnostic helper did not complete.'
-  }
-  $nativeResponse = $nativeLines -join [Environment]::NewLine
-  if ([string]::IsNullOrWhiteSpace($nativeResponse)) {
-    throw 'The bundled disk diagnostic helper returned no data.'
-  }
-  Write-DiagnosticEnvelope $true $null $nativeResponse
-} catch {
-  Write-DiagnosticEnvelope $false 'The bundled disk diagnostic helper did not complete.' $null
-  exit 1
-}
-''';
 }
 
 extension<T> on DiagnosticValue<T> {
@@ -573,12 +545,14 @@ extension<T> on DiagnosticValue<T> {
     T? fallback,
     String fallbackSource,
     String fallbackReason,
+    DiagnosticUnavailableReason fallbackReasonKind,
   ) {
     if (isAvailable) return this;
     return _diagnosticFromNullable(
       fallback,
       source: fallbackSource,
       unavailableReason: fallbackReason,
+      unavailableReasonKind: fallbackReasonKind,
     );
   }
 }
@@ -587,11 +561,14 @@ DiagnosticValue<T> _diagnosticFromNullable<T>(
   T? value, {
   required String source,
   required String unavailableReason,
+  DiagnosticUnavailableReason unavailableReasonKind =
+      DiagnosticUnavailableReason.notReported,
 }) {
   return value == null
       ? DiagnosticValue<T>.unavailable(
           unavailableReason: unavailableReason,
           source: source,
+          unavailableReasonKind: unavailableReasonKind,
         )
       : DiagnosticValue<T>.available(value, source: source);
 }
@@ -601,10 +578,19 @@ DiagnosticValue<String> _stringDiagnostic(
   String source,
   String unavailableReason, {
   bool rejectUnknown = false,
+  DiagnosticUnavailableReason unavailableReasonKind =
+      DiagnosticUnavailableReason.notReported,
 }) {
   final value = _cleanString(raw);
+  final normalized = value?.toUpperCase();
   final unavailable =
       value == null ||
+      const {
+        'N/A',
+        'NA',
+        'NOT AVAILABLE',
+        'UNAVAILABLE',
+      }.contains(normalized) ||
       (rejectUnknown &&
           const {
             'UNKNOWN',
@@ -615,6 +601,7 @@ DiagnosticValue<String> _stringDiagnostic(
       ? DiagnosticValue<String>.unavailable(
           unavailableReason: unavailableReason,
           source: source,
+          unavailableReasonKind: unavailableReasonKind,
         )
       : DiagnosticValue<String>.available(value, source: source);
 }
@@ -622,24 +609,45 @@ DiagnosticValue<String> _stringDiagnostic(
 DiagnosticValue<int> _intDiagnostic(
   dynamic raw,
   String source,
-  String unavailableReason,
-) {
+  String unavailableReason, {
+  DiagnosticUnavailableReason unavailableReasonKind =
+      DiagnosticUnavailableReason.notReported,
+}) {
   return _diagnosticFromNullable(
     _intFrom(raw),
     source: source,
     unavailableReason: unavailableReason,
+    unavailableReasonKind: unavailableReasonKind,
   );
 }
 
 DiagnosticValue<BigInt> _bigIntDiagnostic(
   dynamic raw,
   String source,
-  String unavailableReason,
-) {
+  String unavailableReason, {
+  DiagnosticUnavailableReason unavailableReasonKind =
+      DiagnosticUnavailableReason.notReported,
+}) {
   return _diagnosticFromNullable(
     _bigIntFrom(raw),
     source: source,
     unavailableReason: unavailableReason,
+    unavailableReasonKind: unavailableReasonKind,
+  );
+}
+
+DiagnosticValue<bool> _boolDiagnostic(
+  dynamic raw,
+  String source,
+  String unavailableReason, {
+  DiagnosticUnavailableReason unavailableReasonKind =
+      DiagnosticUnavailableReason.notReported,
+}) {
+  return _diagnosticFromNullable(
+    _boolFrom(raw),
+    source: source,
+    unavailableReason: unavailableReason,
+    unavailableReasonKind: unavailableReasonKind,
   );
 }
 
@@ -664,6 +672,132 @@ BigInt? _bigIntFrom(dynamic raw) {
   return BigInt.tryParse(raw.toString());
 }
 
+bool? _boolFrom(dynamic raw) {
+  if (raw is bool) return raw;
+  final normalized = raw?.toString().trim().toLowerCase();
+  return switch (normalized) {
+    'true' || '1' => true,
+    'false' || '0' => false,
+    _ => null,
+  };
+}
+
+DiagnosticUnavailableReason _unavailabilityKindForTechnicalReason(
+  String? reason, {
+  String? reasonCode,
+  int? windowsError,
+  required DiagnosticUnavailableReason fallback,
+}) {
+  final normalizedCode = _normalizeTechnicalReasonCode(reasonCode);
+  final normalized = reason?.toLowerCase() ?? '';
+  if (const {
+    'administrator_required',
+    'administrative_privileges_required',
+    'elevation_required',
+    'elevated_access_required',
+    'privilege_not_held',
+    'requires_administrator',
+  }.contains(normalizedCode)) {
+    return DiagnosticUnavailableReason.administratorRequired;
+  }
+  if (const {
+    'access_denied',
+    'permission_denied',
+    'query_access_denied',
+  }.contains(normalizedCode)) {
+    return DiagnosticUnavailableReason.permissionDenied;
+  }
+  if (const {
+    'usb_bridge_unsupported',
+    'usb_bridge_not_supported',
+    'scsi_bridge_unsupported',
+    'sat_unsupported',
+    'sat_pass_through_unsupported',
+  }.contains(normalizedCode)) {
+    return DiagnosticUnavailableReason.usbBridgeUnsupported;
+  }
+  if (const {
+    'protocol_response_invalid',
+    'invalid_protocol_response',
+    'malformed_protocol_response',
+    'invalid_response',
+    'malformed_response',
+    'invalid_data',
+  }.contains(normalizedCode)) {
+    return DiagnosticUnavailableReason.protocolResponseInvalid;
+  }
+
+  // Win32 error codes are intentionally handled before English text so a new
+  // native helper can retain diagnostics without coupling the UI to wording.
+  switch (windowsError) {
+    case 740: // ERROR_ELEVATION_REQUIRED
+    case 1314: // ERROR_PRIVILEGE_NOT_HELD
+      return DiagnosticUnavailableReason.administratorRequired;
+    case 5: // ERROR_ACCESS_DENIED
+      return DiagnosticUnavailableReason.permissionDenied;
+    case 13: // ERROR_INVALID_DATA
+      return DiagnosticUnavailableReason.protocolResponseInvalid;
+  }
+
+  if (normalized.contains('administrator') ||
+      normalized.contains('elevat') ||
+      normalized.contains('privilege') ||
+      normalized.contains('requires admin')) {
+    return DiagnosticUnavailableReason.administratorRequired;
+  }
+  if (normalized.contains('access denied') ||
+      normalized.contains('permission denied') ||
+      normalized.contains('access is denied') ||
+      normalized.contains('denied by policy')) {
+    return DiagnosticUnavailableReason.permissionDenied;
+  }
+  if ((normalized.contains('usb') || normalized.contains('scsi')) &&
+      normalized.contains('bridge') &&
+      (normalized.contains('smart') ||
+          normalized.contains('sat') ||
+          normalized.contains('pass-through'))) {
+    return DiagnosticUnavailableReason.usbBridgeUnsupported;
+  }
+  if (normalized.contains('invalid reliability counter') ||
+      normalized.contains('invalid protocol') ||
+      normalized.contains('invalid response') ||
+      normalized.contains('malformed response') ||
+      normalized.contains('invalid data') ||
+      normalized.contains('invalid metadata')) {
+    return DiagnosticUnavailableReason.protocolResponseInvalid;
+  }
+  if (normalized.contains('not applicable') ||
+      normalized.contains('not an nvme') ||
+      normalized.contains('not a sata') ||
+      normalized.contains('this storage bus') ||
+      normalized.contains('not supported by this device type')) {
+    return DiagnosticUnavailableReason.notApplicable;
+  }
+  if (normalized.contains('could not') ||
+      normalized.contains('failed') ||
+      normalized.contains('timed out') ||
+      normalized.contains('error')) {
+    return DiagnosticUnavailableReason.queryFailed;
+  }
+  if (normalized.contains('did not expose') ||
+      normalized.contains('does not expose') ||
+      normalized.contains('not expose') ||
+      normalized.contains('not support') ||
+      normalized.contains('denied')) {
+    return DiagnosticUnavailableReason.notExposedByDeviceOrDriver;
+  }
+  return fallback;
+}
+
+String? _normalizeTechnicalReasonCode(String? code) {
+  final value = _cleanString(code);
+  if (value == null) return null;
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+}
+
 class _NvmeHealthData {
   final int? temperatureCelsius;
   final int? percentageUsed;
@@ -675,6 +809,7 @@ class _NvmeHealthData {
   final BigInt? mediaAndDataIntegrityErrors;
   final String source;
   final String unavailableReason;
+  final DiagnosticUnavailableReason unavailableReasonKind;
 
   const _NvmeHealthData({
     required this.temperatureCelsius,
@@ -687,11 +822,15 @@ class _NvmeHealthData {
     required this.mediaAndDataIntegrityErrors,
     required this.source,
   }) : unavailableReason =
-           'The device or storage driver did not expose this NVMe value.';
+           'The device or storage driver did not expose this NVMe value.',
+       unavailableReasonKind =
+           DiagnosticUnavailableReason.notExposedByDeviceOrDriver;
 
   const _NvmeHealthData.unavailable(
     this.unavailableReason, {
     this.source = 'Windows NVMe protocol query',
+    this.unavailableReasonKind =
+        DiagnosticUnavailableReason.notExposedByDeviceOrDriver,
   }) : temperatureCelsius = null,
        percentageUsed = null,
        hostReadBytes = null,
@@ -709,10 +848,20 @@ class _NvmeHealthData {
     }
     final map = Map<String, dynamic>.from(raw);
     if (map['available'] != true) {
+      final reason =
+          _cleanString(map['reason']) ??
+          'The device or storage driver did not expose NVMe health data.';
+      final reasonCode = _cleanString(map['reasonCode']);
+      final windowsError = _intFrom(map['windowsError']);
       return _NvmeHealthData.unavailable(
-        _cleanString(map['reason']) ??
-            'The device or storage driver did not expose NVMe health data.',
+        reason,
         source: _cleanString(map['source']) ?? 'Windows NVMe protocol query',
+        unavailableReasonKind: _unavailabilityKindForTechnicalReason(
+          reason,
+          reasonCode: reasonCode,
+          windowsError: windowsError,
+          fallback: DiagnosticUnavailableReason.notExposedByDeviceOrDriver,
+        ),
       );
     }
     return _NvmeHealthData(
@@ -727,6 +876,167 @@ class _NvmeHealthData {
         map['mediaAndDataIntegrityErrors'],
       ),
       source: _cleanString(map['source']) ?? 'Windows NVMe protocol query',
+    );
+  }
+}
+
+class _AtaSmartData {
+  final bool isAvailable;
+  final bool wasReported;
+  final int? temperatureCelsius;
+  final int? wearPercent;
+  final BigInt? powerOnHours;
+  final String source;
+  final String unavailableReason;
+  final DiagnosticUnavailableReason unavailableReasonKind;
+
+  const _AtaSmartData.available({
+    required this.source,
+    required this.temperatureCelsius,
+    required this.wearPercent,
+    required this.powerOnHours,
+  }) : isAvailable = true,
+       wasReported = true,
+       unavailableReason = 'The ATA SMART response did not include this value.',
+       unavailableReasonKind = DiagnosticUnavailableReason.notReported;
+
+  const _AtaSmartData.unavailable(
+    this.unavailableReason, {
+    required this.wasReported,
+    this.source = 'ATA SMART / SAT pass-through',
+    this.unavailableReasonKind =
+        DiagnosticUnavailableReason.notExposedByDeviceOrDriver,
+  }) : isAvailable = false,
+       temperatureCelsius = null,
+       wearPercent = null,
+       powerOnHours = null;
+
+  String get missingValueReason {
+    return isAvailable
+        ? 'The ATA SMART response did not include this value.'
+        : unavailableReason;
+  }
+
+  DiagnosticUnavailableReason get missingValueReasonKind {
+    return isAvailable
+        ? DiagnosticUnavailableReason.notReported
+        : unavailableReasonKind;
+  }
+
+  factory _AtaSmartData.fromJson(dynamic raw) {
+    if (raw is! Map) {
+      return const _AtaSmartData.unavailable(
+        'The native helper did not return an ATA SMART response.',
+        wasReported: false,
+      );
+    }
+    final map = Map<String, dynamic>.from(raw);
+    final source =
+        _cleanString(map['source']) ?? 'ATA SMART / SAT pass-through';
+    if (map['available'] == true) {
+      return _AtaSmartData.available(
+        source: source,
+        temperatureCelsius: _intFrom(map['temperatureCelsius']),
+        wearPercent: _intFrom(map['wearPercent']),
+        powerOnHours: _bigIntFrom(map['powerOnHours']),
+      );
+    }
+    final reason =
+        _cleanString(map['reason']) ??
+        'The device or storage driver did not expose ATA SMART data.';
+    final reasonCode = _cleanString(map['reasonCode']);
+    final windowsError = _intFrom(map['windowsError']);
+    return _AtaSmartData.unavailable(
+      reason,
+      wasReported: true,
+      source: source,
+      unavailableReasonKind: _unavailabilityKindForTechnicalReason(
+        reason,
+        reasonCode: reasonCode,
+        windowsError: windowsError,
+        fallback: DiagnosticUnavailableReason.notExposedByDeviceOrDriver,
+      ),
+    );
+  }
+}
+
+class _SmartMetricFallback {
+  final int? temperatureCelsius;
+  final int? percentageUsed;
+  final BigInt? hostReadBytes;
+  final BigInt? hostWrittenBytes;
+  final BigInt? hostReadCommands;
+  final BigInt? hostWriteCommands;
+  final BigInt? powerOnHours;
+  final BigInt? mediaAndDataIntegrityErrors;
+  final String source;
+  final String unavailableReason;
+  final DiagnosticUnavailableReason unavailableReasonKind;
+
+  const _SmartMetricFallback({
+    required this.temperatureCelsius,
+    required this.percentageUsed,
+    required this.hostReadBytes,
+    required this.hostWrittenBytes,
+    required this.hostReadCommands,
+    required this.hostWriteCommands,
+    required this.powerOnHours,
+    required this.mediaAndDataIntegrityErrors,
+    required this.source,
+    required this.unavailableReason,
+    required this.unavailableReasonKind,
+  });
+
+  factory _SmartMetricFallback.forDisk({
+    required DiagnosticValue<String> busType,
+    required _NvmeHealthData nvme,
+    required _AtaSmartData ataSmart,
+    required String reliabilityReason,
+    required DiagnosticUnavailableReason reliabilityUnavailableReasonKind,
+  }) {
+    final bus = busType.value?.toUpperCase();
+    if (bus == 'NVME' || bus == 'RAID') {
+      return _SmartMetricFallback(
+        temperatureCelsius: nvme.temperatureCelsius,
+        percentageUsed: nvme.percentageUsed,
+        hostReadBytes: nvme.hostReadBytes,
+        hostWrittenBytes: nvme.hostWrittenBytes,
+        hostReadCommands: nvme.hostReadCommands,
+        hostWriteCommands: nvme.hostWriteCommands,
+        powerOnHours: nvme.powerOnHours,
+        mediaAndDataIntegrityErrors: nvme.mediaAndDataIntegrityErrors,
+        source: nvme.source,
+        unavailableReason: nvme.unavailableReason,
+        unavailableReasonKind: nvme.unavailableReasonKind,
+      );
+    }
+    if (ataSmart.wasReported) {
+      return _SmartMetricFallback(
+        temperatureCelsius: ataSmart.temperatureCelsius,
+        percentageUsed: ataSmart.wearPercent,
+        hostReadBytes: null,
+        hostWrittenBytes: null,
+        hostReadCommands: null,
+        hostWriteCommands: null,
+        powerOnHours: ataSmart.powerOnHours,
+        mediaAndDataIntegrityErrors: null,
+        source: ataSmart.source,
+        unavailableReason: ataSmart.missingValueReason,
+        unavailableReasonKind: ataSmart.missingValueReasonKind,
+      );
+    }
+    return _SmartMetricFallback(
+      temperatureCelsius: null,
+      percentageUsed: null,
+      hostReadBytes: null,
+      hostWrittenBytes: null,
+      hostReadCommands: null,
+      hostWriteCommands: null,
+      powerOnHours: null,
+      mediaAndDataIntegrityErrors: null,
+      source: WindowsDiskDiagnosticsService._reliabilitySource,
+      unavailableReason: reliabilityReason,
+      unavailableReasonKind: reliabilityUnavailableReasonKind,
     );
   }
 }

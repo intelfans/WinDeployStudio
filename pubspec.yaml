@@ -82,6 +82,5 @@ flutter:
   assets:
     - data/mirrors.json
     - data/tools.json
-    - assets/intel.ico
     - assets/easter_egg/easter_egg.png
     - assets/intel-1.jpg

@@ -45,7 +45,7 @@ The project is distributed under the MIT License.
 
 - **Disk Tools**
   - Collect read-only disk identity, health, reliability, lifetime, temperature, wear, and NVMe telemetry through a bounded native helper. Slow or unsupported storage queries become explicit unavailable values or collection warnings instead of blocking the whole scan.
-  - Supports direct and administrator-requested collection while isolating storage queries, so an unresponsive device produces a bounded failure instead of leaving the diagnostic screen stuck.
+  - Runs the bounded native helper from the elevated application process, so an unresponsive device produces a bounded failure instead of leaving the diagnostic screen stuck.
   - Repair UEFI or BIOS boot files only on a revalidated external, non-system disk, with preflight checks, a typed confirmation, BCD backup, no formatting, post-repair verification, and technical logs.
 
 - **Image Center**
@@ -203,7 +203,7 @@ The built-in website page is used for web-based resources such as community mirr
 | Storage | 500 MB for app | Extra space for ISO files and deployment media |
 | Runtime | WebView2 for built-in web pages | Latest WebView2 Runtime |
 
-Administrative privileges are requested only for disk partitioning, image writing, boot configuration, and tools that require elevation. The main UI, settings, AI, and WebView run without administrator privileges.
+WinDeploy Studio requests administrator privileges when it starts. This gives all deployment, disk, and boot operations one elevated process and avoids opening separate elevation windows. If UAC is cancelled, the application does not start.
 
 ## Download
 
@@ -345,7 +345,7 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 - **磁盘工具**
   - 通过带超时边界的原生 helper 以只读方式收集磁盘身份、健康、可靠性、寿命、温度、磨损和 NVMe 遥测；慢速或不受支持的查询会明确显示为不可用或采集警告，不会阻塞整个扫描。
-  - 支持直接采集和按需管理员采集，并隔离存储查询；设备无响应时会给出受限失败结果，不会让诊断界面一直卡住。
+  - 从已提升权限的应用进程中运行带超时边界的原生 helper；设备无响应时会给出受限失败结果，不会让诊断界面一直卡住。
   - 仅对重新核验后的外接非系统磁盘修复 UEFI/BIOS 启动文件，执行前经过预检、输入确认和 BCD 备份；不格式化磁盘，并在完成后验证结果和保存技术日志。
 
 - **镜像中心**
@@ -492,7 +492,7 @@ AI 助手用于部署问答、排障建议和日志分析。对 USB 分析和随
 | 存储空间 | 应用本体约 500 MB | 为 ISO 文件和部署介质预留额外空间 |
 | 运行时 | 内置网页需要 WebView2 | 最新版 WebView2 Runtime |
 
-只有磁盘分区、镜像写入、启动配置和确实需要提权的工具会请求管理员权限。主界面、设置、AI 与 WebView 均以普通用户权限运行。
+WinDeploy Studio 会在启动时请求管理员权限。这样部署、磁盘和启动修复操作都在同一个已提升权限的进程内执行，不会再打开单独的提权窗口。若取消 UAC 授权，应用不会启动。
 
 ## 下载
 

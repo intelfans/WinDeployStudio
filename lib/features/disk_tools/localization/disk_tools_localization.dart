@@ -46,6 +46,20 @@ const diskToolsEnglish = <String, String>{
   'disk_diag_collecting': 'Collecting native Windows disk data...',
   'disk_diag_no_disks': 'Windows did not report any physical disks.',
   'disk_diag_error': 'Disk diagnostics could not be collected.',
+  'disk_diag_error_helper_missing':
+      'The diagnostic component is missing. Reinstall the application.',
+  'disk_diag_error_helper_start':
+      'The diagnostic component could not be started.',
+  'disk_diag_error_helper_failed':
+      'The diagnostic component did not complete successfully.',
+  'disk_diag_error_timeout': 'The disk query timed out.',
+  'disk_diag_error_no_data':
+      'The diagnostic component returned no usable data.',
+  'disk_diag_error_invalid_response':
+      'Windows returned an invalid diagnostic response.',
+  'disk_diag_error_cancelled': 'Disk diagnostic collection was cancelled.',
+  'disk_diag_warning_partial':
+      'Some details could not be collected. Fields remain marked as unknown.',
   'disk_diag_admin_cancelled': 'Administrator access was cancelled.',
   'disk_diag_admin_hint':
       'Some storage drivers expose reliability counters only to administrators.',
@@ -72,6 +86,10 @@ const diskToolsEnglish = <String, String>{
   'disk_diag_firmware': 'Firmware',
   'disk_diag_media_type': 'Media type',
   'disk_diag_health': 'Windows health status',
+  'disk_diag_health_healthy': 'Healthy',
+  'disk_diag_health_warning': 'Warning',
+  'disk_diag_health_no_failure_predicted': 'No SMART failure predicted',
+  'disk_diag_health_failure_predicted': 'SMART failure predicted',
   'disk_diag_health_unknown_note':
       'Windows did not expose a trustworthy health state. No health claim is made.',
   'disk_diag_temperature': 'Temperature',
@@ -102,6 +120,9 @@ const diskToolsEnglish = <String, String>{
   'disk_diag_source_cim': 'Windows CIM / Storage Management',
   'disk_diag_source_reliability': 'Storage Reliability Counter',
   'disk_diag_source_nvme': 'Native Windows NVMe health log',
+  'disk_diag_source_intel_rst': 'Intel RST NVMe health log',
+  'disk_diag_source_intel_vroc': 'Intel VROC NVMe health log',
+  'disk_diag_source_smart_prediction': 'Windows SMART failure prediction',
   'disk_diag_source_native': 'Native Windows storage APIs',
   'disk_diag_source_calculated': 'Calculated from a native counter',
   'disk_diag_unavailable_note':
@@ -187,7 +208,7 @@ const diskToolsEnglish = <String, String>{
   'boot_repair_execute': 'Repair boot files',
   'boot_repair_executing':
       'Backing up BCD, running bcdboot, and verifying boot files...',
-  'boot_repair_result_cancelled': 'Administrator access was cancelled.',
+  'boot_repair_result_cancelled': 'Boot repair was cancelled.',
   'boot_repair_result_success':
       'Boot repair completed and verification passed.',
   'boot_repair_result_failed':

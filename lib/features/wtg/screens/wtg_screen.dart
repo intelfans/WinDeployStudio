@@ -9,15 +9,72 @@ import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/localization/strings.dart';
+import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
-import '../../../core/services/elevation_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/wtg_service.dart';
+import '../../../core/services/windows_iso_preflight.dart';
 import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
 
 enum _ToGoPlatform { windows, linux }
+
+class _ToGoProgress {
+  final String phase;
+  final String message;
+  final double progress;
+  final bool cancellable;
+  final int writtenBytes;
+  final int totalBytes;
+  final int speedBytesPerSecond;
+  final int elapsedSeconds;
+
+  const _ToGoProgress({
+    required this.phase,
+    required this.message,
+    required this.progress,
+    this.cancellable = false,
+    this.writtenBytes = 0,
+    this.totalBytes = 0,
+    this.speedBytesPerSecond = 0,
+    this.elapsedSeconds = 0,
+  });
+
+  factory _ToGoProgress.fromWtg(
+    WtgProgress progress, {
+    required int elapsedSeconds,
+  }) {
+    final step = progress.step;
+    return _ToGoProgress(
+      phase: step.name,
+      message: progress.message,
+      progress: progress.progress,
+      cancellable:
+          step == WtgStep.mountingIso ||
+          step == WtgStep.applyingImage ||
+          step == WtgStep.verifying,
+      writtenBytes: progress.writtenBytes,
+      totalBytes: progress.totalBytes,
+      speedBytesPerSecond: progress.currentSpeedBytes,
+      elapsedSeconds: elapsedSeconds,
+    );
+  }
+
+  factory _ToGoProgress.fromLinux(
+    CreateProgress progress, {
+    required int elapsedSeconds,
+  }) {
+    final step = progress.step;
+    return _ToGoProgress(
+      phase: step.name,
+      message: progress.message,
+      progress: progress.progress,
+      cancellable: step != CreateStep.complete && step != CreateStep.failed,
+      elapsedSeconds: elapsedSeconds,
+    );
+  }
+}
 
 class WtgScreen extends ConsumerStatefulWidget {
   const WtgScreen({super.key});
@@ -68,8 +125,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   bool _running = false;
   bool _finished = false;
   bool _success = false;
-  ElevatedTaskProgress? _taskProgress;
-  ElevatedTaskController? _taskController;
+  _ToGoProgress? _taskProgress;
+  WtgService? _activeWtgService;
+  BootableUsbService? _activeLinuxService;
+  final _executionStopwatch = Stopwatch();
+  bool _cancelRequested = false;
   final List<String> _progressLog = [];
   int _gameTarget = 4;
   int _gameScore = 0;
@@ -153,6 +213,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
     try {
       if (_isLinux) {
+        final windowsLayout = await ref
+            .read(windowsIsoPreflightProvider)
+            .inspect(path);
+        if (windowsLayout.isValid) {
+          throw StateError('wtg_windows_iso_in_linux_mode');
+        }
         final file = File(path);
         final iso = IsoMetadata(
           filePath: path,
@@ -166,6 +232,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           _imageIndex = 1;
         });
       } else {
+        final windowsLayout = await ref
+            .read(windowsIsoPreflightProvider)
+            .inspect(path);
+        if (!windowsLayout.isValid) {
+          throw StateError('wtg_invalid_windows_iso');
+        }
         final iso = await ref
             .read(isoParseServiceProvider)
             .parseIso(
@@ -317,13 +389,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final compatibility = DeploymentCompatibility.evaluate(plan);
     if (!compatibility.canDeploy) return;
 
-    final controller = ElevatedTaskController();
+    _executionStopwatch
+      ..reset()
+      ..start();
     setState(() {
       _running = true;
       _finished = false;
       _success = false;
-      _taskController = controller;
-      _taskProgress = const ElevatedTaskProgress(
+      _cancelRequested = false;
+      _taskProgress = const _ToGoProgress(
         phase: 'preparing',
         message: 'wtg_step_preparing',
         progress: 0,
@@ -333,56 +407,134 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         ..add(tr(context, 'wtg_step_preparing'));
     });
 
-    final localeCode = localeCodeFromLocale(Localizations.localeOf(context));
-    await LogCenterService().logToGo('[DeploymentPlan] ${plan.toJson()}');
-    if (!mounted) return;
     var success = false;
+    DiskOperationLock? operationLock;
     try {
-      success = await ElevationService.runTask(
-        ElevatedTaskSpec(
-          kind: _isLinux
-              ? ElevatedTaskKind.linuxToGo
-              : ElevatedTaskKind.windowsToGo,
+      await LogCenterService().logToGo('[DeploymentPlan] ${plan.toJson()}');
+      if (!mounted) return;
+      operationLock = await DiskOperationLock.tryAcquire(disk.diskNumber);
+      if (Platform.isWindows && operationLock == null) {
+        _updateTaskProgress(
+          const _ToGoProgress(
+            phase: 'failed',
+            message: 'safety_disk_busy',
+            progress: 0,
+          ),
+        );
+        return;
+      }
+
+      if (_isLinux) {
+        final service = ref.read(bootableUsbServiceProvider);
+        _activeLinuxService = service;
+        if (_cancelRequested) service.cancel();
+        success = await service.createLinuxIsoUsb(
+          disk: disk,
+          isoPath: plan.imagePath,
+          kind: LinuxUsbKind.toGo,
+          deploymentPlan: plan,
+          onProgress: _onLinuxProgress,
+        );
+        if (!success && service.isCancelled) {
+          _updateTaskProgress(
+            _ToGoProgress(
+              phase: 'failed',
+              message: 'deploy_cancel_requested',
+              progress: _taskProgress?.progress ?? 0,
+            ),
+          );
+        }
+      } else {
+        final service = ref.read(wtgServiceProvider);
+        _activeWtgService = service;
+        if (_cancelRequested) service.cancel();
+        success = await service.createWtg(
           disk: disk,
           isoPath: plan.imagePath,
           imageIndex: plan.imageIndex,
-          localeCode: localeCode,
+          driveLetter: disk.driveLetters.isEmpty ? '' : disk.driveLetters.first,
           deploymentPlan: plan,
-        ),
-        controller: controller,
-        onProgress: (progress) {
-          if (!mounted) return;
-          setState(() {
-            _taskProgress = progress;
-            final message = _localizedOrRaw(progress.message.split('\n').first);
-            if (_progressLog.isEmpty || _progressLog.last != message) {
-              _progressLog.add(message);
-            }
-          });
-        },
-      );
+          onProgress: _onWtgProgress,
+        );
+        if (!success && service.isCancelled) {
+          _updateTaskProgress(
+            _ToGoProgress(
+              phase: 'failed',
+              message: 'deploy_cancel_requested',
+              progress: _taskProgress?.progress ?? 0,
+            ),
+          );
+        }
+      }
     } catch (error) {
+      _updateTaskProgress(
+        _ToGoProgress(
+          phase: 'failed',
+          message: 'creator_error\n$error',
+          progress: _taskProgress?.progress ?? 0,
+        ),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_localizedOrRaw(error.toString()))),
         );
       }
     } finally {
+      await operationLock?.release();
+      _executionStopwatch.stop();
       if (mounted) {
         setState(() {
           _running = false;
           _finished = true;
           _success = success;
-          _taskController = null;
+          _activeWtgService = null;
+          _activeLinuxService = null;
         });
       }
     }
   }
 
-  Future<void> _cancel() async {
-    await _taskController?.cancel();
+  void _onWtgProgress(WtgProgress progress) {
+    _updateTaskProgress(
+      _ToGoProgress.fromWtg(
+        progress,
+        elapsedSeconds: _executionStopwatch.elapsed.inSeconds,
+      ),
+    );
+  }
+
+  void _onLinuxProgress(CreateProgress progress) {
+    _updateTaskProgress(
+      _ToGoProgress.fromLinux(
+        progress,
+        elapsedSeconds: _executionStopwatch.elapsed.inSeconds,
+      ),
+    );
+  }
+
+  void _updateTaskProgress(_ToGoProgress progress) {
     if (!mounted) return;
-    setState(() => _progressLog.add(tr(context, 'deploy_cancel_requested')));
+    setState(() {
+      _taskProgress = progress;
+      final message = _localizedOrRaw(progress.message.split('\n').first);
+      if (_progressLog.isEmpty || _progressLog.last != message) {
+        _progressLog.add(message);
+      }
+    });
+  }
+
+  void _cancel() {
+    if (_cancelRequested) return;
+    if (_isLinux) {
+      _activeLinuxService?.cancel();
+    } else {
+      _activeWtgService?.cancel();
+    }
+    if (!mounted) return;
+    setState(() {
+      _cancelRequested = true;
+      _progressLog.add(tr(context, 'deploy_cancel_requested'));
+    });
   }
 
   void _reset() {
@@ -396,8 +548,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _running = false;
       _finished = false;
       _taskProgress = null;
+      _cancelRequested = false;
       _progressLog.clear();
     });
+    _executionStopwatch.reset();
     _loadDisks();
   }
 
@@ -948,43 +1102,63 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Card(
-              child: ExpansionTile(
-                leading: const Icon(Icons.drive_file_rename_outline),
-                title: Text(tr(context, 'deploy_volume_identity')),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextField(
-                      controller: _volumeLabelController,
-                      maxLength: 32,
-                      decoration: InputDecoration(
-                        labelText: tr(context, 'deploy_volume_label'),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.image_outlined),
-                    title: Text(tr(context, 'deploy_custom_icon')),
-                    subtitle: Text(
-                      _customIconPath.isEmpty
-                          ? tr(context, 'deploy_custom_icon_desc')
-                          : _customIconPath,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: IconButton(
-                      onPressed: _pickIcon,
-                      icon: const Icon(Icons.folder_open),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
+          const SizedBox(height: 12),
+          _buildVolumeIdentityCard(),
           _buildCompatibilityNotices(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVolumeIdentityCard() {
+    final hasCustomIcon = _customIconPath.trim().isNotEmpty;
+    return Card(
+      child: ExpansionTile(
+        leading: const Icon(Icons.drive_file_rename_outline),
+        title: Text(tr(context, 'deploy_volume_identity')),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              key: const Key('wtg-volume-label'),
+              controller: _volumeLabelController,
+              maxLength: 32,
+              decoration: InputDecoration(
+                labelText: tr(context, 'deploy_volume_label'),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.image_outlined),
+            title: Text(tr(context, 'deploy_custom_icon')),
+            subtitle: Text(
+              hasCustomIcon
+                  ? _customIconPath
+                  : tr(context, 'deploy_custom_icon_default'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasCustomIcon)
+                  IconButton(
+                    key: const Key('wtg-icon-clear'),
+                    tooltip: tr(context, 'deploy_clear_custom_icon'),
+                    onPressed: () => setState(() => _customIconPath = ''),
+                    icon: const Icon(Icons.close),
+                  ),
+                IconButton(
+                  key: const Key('wtg-icon-picker'),
+                  tooltip: tr(context, 'deploy_custom_icon'),
+                  onPressed: _pickIcon,
+                  icon: const Icon(Icons.folder_open),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1025,6 +1199,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                   plan.driverDirectory.isEmpty
                       ? tr(context, 'deploy_none')
                       : plan.driverDirectory,
+                ),
+                _summaryRow('deploy_volume_label', plan.customVolumeLabel),
+                _summaryRow(
+                  'deploy_custom_icon',
+                  plan.customIconPath.trim().isEmpty
+                      ? tr(context, 'deploy_custom_icon_default')
+                      : p.basename(plan.customIconPath),
                 ),
                 _summaryRow(
                   'deploy_summary_options',
@@ -1317,8 +1498,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     if (!_finished)
                       OutlinedButton.icon(
                         onPressed:
-                            progress?.cancellable == true &&
-                                _taskController?.cancelRequested != true
+                            progress?.cancellable == true && !_cancelRequested
                             ? _cancel
                             : null,
                         icon: const Icon(Icons.stop_circle_outlined),
@@ -1473,9 +1653,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   String _phaseLabel(String phase) {
     final key = switch (phase) {
       'preparing' => 'wtg_step_preparing',
-      'partitioningDisk' || 'partitioning' => 'wtg_step_partitioning',
+      'cleaningDisk' ||
+      'creatingPartitions' ||
+      'formatting' ||
+      'partitioningDisk' ||
+      'partitioning' => 'wtg_step_partitioning',
       'mountingIso' => 'wtg_step_mounting',
-      'applyingImage' => 'wtg_step_applying',
+      'applyingImage' ||
+      'copyingFiles' ||
+      'splittingWim' => 'wtg_step_applying',
       'writingBootFiles' => 'wtg_step_boot',
       'verifying' => 'wtg_step_verifying',
       'complete' => 'step_complete',

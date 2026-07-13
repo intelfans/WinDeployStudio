@@ -1,5 +1,7 @@
 #include <windows.h>
+#include <cfgmgr32.h>
 #include <ntddscsi.h>
+#include <setupapi.h>
 #include <winioctl.h>
 
 #include <algorithm>
@@ -17,6 +19,9 @@
 #include <utility>
 #include <vector>
 
+#pragma comment(lib, "cfgmgr32.lib")
+#pragma comment(lib, "setupapi.lib")
+
 namespace {
 
 constexpr DWORD kNvmeHealthLogPage = 0x02;
@@ -31,11 +36,35 @@ constexpr std::size_t kMaximumDescriptorTextLength = 512;
 constexpr std::size_t kMaximumIdentifierLength = 256;
 constexpr std::size_t kMaximumWorkerOutputLength = 64 * 1024;
 constexpr std::size_t kMaximumStorageCountersSize = 64 * 1024;
+constexpr std::size_t kAtaSmartDataSize = 512;
+constexpr std::size_t kAtaSmartAttributeOffset = 2;
+constexpr std::size_t kAtaSmartAttributeSize = 12;
+constexpr std::size_t kAtaSmartAttributeCount = 30;
+constexpr std::uint8_t kAtaSmartCommand = 0xB0;
+constexpr std::uint8_t kAtaSmartReadDataFeature = 0xD0;
+constexpr std::uint8_t kAtaSmartReadThresholdsFeature = 0xD1;
+constexpr std::uint8_t kAtaSmartCylinderLow = 0x4F;
+constexpr std::uint8_t kAtaSmartCylinderHigh = 0xC2;
+constexpr std::uint8_t kAtaSmartPrimaryDevice = 0xA0;
+constexpr std::uint8_t kAtaSmartSecondaryDevice = 0xB0;
+constexpr DWORD kAtaSmartTimeoutSeconds = 1;
+constexpr ULONGLONG kUsbBridgeFallbackStartBudgetMilliseconds = 500;
+constexpr ULONGLONG kUsbBridgeSecondTargetBudgetMilliseconds = 1500;
 constexpr int kDiskNotPresentExitCode = 3;
 constexpr DWORD kIntelRstNvmeControlCode = static_cast<DWORD>(
     CTL_CODE(0xf000u, 0xA02u, METHOD_BUFFERED, FILE_ANY_ACCESS));
 constexpr DWORD kIntelVrocNvmeControlCode = static_cast<DWORD>(
     CTL_CODE(0xe000u, 0x800u, METHOD_BUFFERED, FILE_ANY_ACCESS));
+constexpr ULONG kIntelNvmeMiniportTimeoutSeconds = 2;
+
+// Keep this local rather than relying on a GUID definition from a system
+// library. It is the documented disk device-interface class GUID.
+const GUID kDiskDeviceInterfaceGuid = {
+    0x53f56307L,
+    0xb6bf,
+    0x11d0,
+    {0x94, 0xf2, 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b},
+};
 
 #pragma pack(push, 1)
 // Intel RST exposes NVMe health data through a documented-by-driver miniport
@@ -80,6 +109,17 @@ static_assert(sizeof(SRB_IO_CONTROL) == 0x1c,
 static_assert(sizeof(IntelRstNvmePayload) == 0x88,
               "Unexpected Intel RST NVMe payload ABI.");
 
+struct AtaPassThroughWithBuffer {
+  ATA_PASS_THROUGH_EX pass_through;
+  std::array<std::uint8_t, kAtaSmartDataSize> data;
+};
+
+struct ScsiPassThroughWithBuffer {
+  SCSI_PASS_THROUGH pass_through;
+  std::array<std::uint8_t, 32> sense;
+  std::array<std::uint8_t, kAtaSmartDataSize> data;
+};
+
 class ScopedHandle {
  public:
   explicit ScopedHandle(HANDLE handle = nullptr) : handle_(handle) {}
@@ -121,10 +161,33 @@ class ScopedHandle {
   HANDLE handle_;
 };
 
+class ScopedDeviceInfoSet {
+ public:
+  explicit ScopedDeviceInfoSet(HDEVINFO value = INVALID_HANDLE_VALUE)
+      : value_(value) {}
+
+  ~ScopedDeviceInfoSet() {
+    if (valid()) {
+      SetupDiDestroyDeviceInfoList(value_);
+    }
+  }
+
+  ScopedDeviceInfoSet(const ScopedDeviceInfoSet&) = delete;
+  ScopedDeviceInfoSet& operator=(const ScopedDeviceInfoSet&) = delete;
+
+  bool valid() const { return value_ != INVALID_HANDLE_VALUE; }
+
+  HDEVINFO get() const { return value_; }
+
+ private:
+  HDEVINFO value_;
+};
+
 struct NvmeHealthData {
   bool available = false;
   std::string reason =
       "The device or storage driver does not expose NVMe health data.";
+  std::optional<std::string> reason_code;
   std::string source = "Windows NVMe protocol query";
   DWORD windows_error = ERROR_SUCCESS;
   std::optional<int> temperature_celsius;
@@ -138,6 +201,18 @@ struct NvmeHealthData {
   std::uint8_t critical_warning = 0;
 };
 
+struct AtaSmartData {
+  bool available = false;
+  std::string reason = "ATA SMART data is not available for this disk.";
+  std::optional<std::string> reason_code;
+  std::string source = "ATA SMART pass-through";
+  DWORD windows_error = ERROR_SUCCESS;
+  bool threshold_data_available = false;
+  std::optional<int> temperature_celsius;
+  std::optional<int> wear_percent;
+  std::optional<std::string> power_on_hours;
+};
+
 struct DiskTopology {
   std::optional<DWORD> device_type;
   std::optional<DWORD> device_number;
@@ -145,6 +220,12 @@ struct DiskTopology {
   std::optional<bool> media_removable;
   std::optional<bool> media_hotplug;
   std::optional<bool> device_hotplug;
+};
+
+struct UsbBridgeIdentity {
+  std::uint16_t vendor_id = 0;
+  std::uint16_t product_id = 0;
+  std::string instance_id;
 };
 
 struct DiskReport {
@@ -173,6 +254,7 @@ struct DiskReport {
   std::optional<std::string> partition_style;
   std::optional<std::string> operational_status;
   std::optional<std::string> pnp_device_id;
+  std::optional<UsbBridgeIdentity> usb_bridge_identity;
   std::string device_path;
   std::vector<std::string> drive_letters;
   std::optional<bool> is_system;
@@ -182,7 +264,10 @@ struct DiskReport {
   std::optional<bool> is_removable;
   std::string reliability_unavailable_reason =
       "The storage driver did not expose supported reliability counters.";
+  std::optional<std::string> reliability_unavailable_reason_code;
+  std::optional<DWORD> reliability_unavailable_windows_error;
   NvmeHealthData nvme;
+  AtaSmartData ata_smart;
   DiskTopology topology;
   std::vector<std::string> warnings;
 };
@@ -541,6 +626,185 @@ HANDLE OpenPhysicalDiskForReadOnlyQuery(const std::wstring& path,
   return INVALID_HANDLE_VALUE;
 }
 
+HANDLE OpenPhysicalDiskForPassThrough(const std::wstring& path,
+                                     DWORD* error_code) {
+  // Windows gates ATA and SCSI pass-through IOCTLs behind both read and write
+  // handle access. The requests below only issue SMART read commands and do
+  // not lock, dismount, format, or write to the disk.
+  const HANDLE disk = CreateFileW(
+      path.c_str(), GENERIC_READ | GENERIC_WRITE,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (disk == INVALID_HANDLE_VALUE) {
+    *error_code = GetLastError();
+    return INVALID_HANDLE_VALUE;
+  }
+  *error_code = ERROR_SUCCESS;
+  return disk;
+}
+
+std::optional<std::wstring> DeviceInstanceId(DEVINST device_instance) {
+  ULONG length = 0;
+  if (CM_Get_Device_ID_Size(&length, device_instance, 0) != CR_SUCCESS ||
+      length == 0) {
+    return std::nullopt;
+  }
+
+  std::vector<wchar_t> buffer(static_cast<std::size_t>(length) + 1, L'\0');
+  if (CM_Get_Device_IDW(device_instance, buffer.data(), length + 1, 0) !=
+      CR_SUCCESS) {
+    return std::nullopt;
+  }
+  return std::wstring(buffer.data());
+}
+
+std::string NarrowDeviceInstanceId(std::wstring_view value) {
+  std::string result;
+  result.reserve(value.size());
+  for (const wchar_t character : value) {
+    result.push_back(character <= 0x7f ? static_cast<char>(character) : '?');
+  }
+  return result;
+}
+
+std::optional<std::uint16_t> ParseHexWord(std::wstring_view value,
+                                          std::size_t offset) {
+  if (offset > value.size() || value.size() - offset < 4) {
+    return std::nullopt;
+  }
+
+  std::uint16_t parsed = 0;
+  for (std::size_t index = 0; index < 4; ++index) {
+    const wchar_t character = value[offset + index];
+    unsigned int digit = 0;
+    if (character >= L'0' && character <= L'9') {
+      digit = static_cast<unsigned int>(character - L'0');
+    } else if (character >= L'A' && character <= L'F') {
+      digit = static_cast<unsigned int>(character - L'A' + 10);
+    } else {
+      return std::nullopt;
+    }
+    parsed = static_cast<std::uint16_t>((parsed << 4U) | digit);
+  }
+  return parsed;
+}
+
+std::optional<UsbBridgeIdentity> UsbBridgeIdentityFromAncestry(
+    DEVINST device_instance) {
+  // Disk device instances usually sit below USBSTOR. Walk toward the USB
+  // parent because the disk node itself does not normally contain the VID/PID.
+  DEVINST current = device_instance;
+  for (int depth = 0; depth < 8; ++depth) {
+    const auto instance_id = DeviceInstanceId(current);
+    if (instance_id.has_value()) {
+      std::wstring normalized = *instance_id;
+      std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                     [](wchar_t character) {
+                       return static_cast<wchar_t>(
+                           std::towupper(static_cast<wint_t>(character)));
+                     });
+      constexpr std::wstring_view kVidMarker = L"USB\\VID_";
+      constexpr std::wstring_view kPidMarker = L"&PID_";
+      const std::size_t vid_offset = normalized.find(kVidMarker);
+      const std::size_t pid_offset = normalized.find(kPidMarker);
+      if (vid_offset != std::wstring::npos && pid_offset != std::wstring::npos) {
+        const auto vendor_id =
+            ParseHexWord(normalized, vid_offset + kVidMarker.size());
+        const auto product_id =
+            ParseHexWord(normalized, pid_offset + kPidMarker.size());
+        if (vendor_id.has_value() && product_id.has_value()) {
+          return UsbBridgeIdentity{
+              *vendor_id,
+              *product_id,
+              NarrowDeviceInstanceId(*instance_id),
+          };
+        }
+      }
+    }
+
+    DEVINST parent = 0;
+    if (CM_Get_Parent(&parent, current, 0) != CR_SUCCESS) {
+      break;
+    }
+    current = parent;
+  }
+  return std::nullopt;
+}
+
+struct DiskDeviceIdentity {
+  std::string pnp_device_id;
+  std::optional<UsbBridgeIdentity> usb_bridge;
+};
+
+std::optional<DiskDeviceIdentity> QueryDiskDeviceIdentity(DWORD disk_number) {
+  ScopedDeviceInfoSet device_set(SetupDiGetClassDevsW(
+      &kDiskDeviceInterfaceGuid, nullptr, nullptr,
+      DIGCF_PRESENT | DIGCF_DEVICEINTERFACE));
+  if (!device_set.valid()) {
+    return std::nullopt;
+  }
+
+  for (DWORD index = 0;; ++index) {
+    SP_DEVICE_INTERFACE_DATA interface_data{};
+    interface_data.cbSize = sizeof(interface_data);
+    if (SetupDiEnumDeviceInterfaces(device_set.get(), nullptr,
+                                    &kDiskDeviceInterfaceGuid, index,
+                                    &interface_data) == FALSE) {
+      if (GetLastError() == ERROR_NO_MORE_ITEMS) {
+        break;
+      }
+      continue;
+    }
+
+    DWORD required_size = 0;
+    SetupDiGetDeviceInterfaceDetailW(device_set.get(), &interface_data,
+                                     nullptr, 0, &required_size, nullptr);
+    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER ||
+        required_size < sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W)) {
+      continue;
+    }
+
+    std::vector<std::uint8_t> detail_buffer(required_size, 0);
+    auto* detail = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA_W*>(
+        detail_buffer.data());
+    detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
+    SP_DEVINFO_DATA device_info{};
+    device_info.cbSize = sizeof(device_info);
+    if (SetupDiGetDeviceInterfaceDetailW(
+            device_set.get(), &interface_data, detail, required_size, nullptr,
+            &device_info) == FALSE) {
+      continue;
+    }
+
+    ScopedHandle interface_handle(CreateFileW(
+        detail->DevicePath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    if (!interface_handle.valid()) {
+      continue;
+    }
+
+    STORAGE_DEVICE_NUMBER number{};
+    DWORD returned = 0;
+    DWORD error_code = ERROR_SUCCESS;
+    if (!DeviceIoControlQuery(interface_handle.get(),
+                              IOCTL_STORAGE_GET_DEVICE_NUMBER, nullptr, 0,
+                              &number, static_cast<DWORD>(sizeof(number)),
+                              &returned, &error_code) ||
+        returned < sizeof(number) || number.DeviceNumber != disk_number) {
+      continue;
+    }
+    const auto device_instance_id = DeviceInstanceId(device_info.DevInst);
+    if (!device_instance_id.has_value()) {
+      return std::nullopt;
+    }
+    return DiskDeviceIdentity{
+        NarrowDeviceInstanceId(*device_instance_id),
+        UsbBridgeIdentityFromAncestry(device_info.DevInst),
+    };
+  }
+  return std::nullopt;
+}
+
 bool IsMissingPhysicalDriveError(DWORD error_code) {
   return error_code == ERROR_FILE_NOT_FOUND || error_code == ERROR_PATH_NOT_FOUND ||
          error_code == ERROR_INVALID_NAME;
@@ -816,6 +1080,8 @@ void PopulateReadOnlyFlag(HANDLE disk, DiskReport* report) {
       returned >= sizeof(attributes)) {
     report->is_read_only =
         (attributes.Attributes & DISK_ATTRIBUTE_READ_ONLY) != 0;
+    report->is_offline =
+        (attributes.Attributes & DISK_ATTRIBUTE_OFFLINE) != 0;
   } else {
     AddQueryWarning(report, "Disk attributes", error_code == ERROR_SUCCESS
                                            ? ERROR_INVALID_DATA
@@ -859,6 +1125,7 @@ void PopulateNvmeHealthFromLog(const std::uint8_t* data,
       DecimalFromLittleEndian(data + 160, 16);
   health->available = true;
   health->reason.clear();
+  health->reason_code.reset();
   health->windows_error = ERROR_SUCCESS;
 }
 
@@ -960,6 +1227,998 @@ void PopulateNvmeHealth(HANDLE disk, NvmeHealthData* health) {
   health->windows_error = all_namespaces_error != ERROR_SUCCESS
       ? all_namespaces_error
       : (adapter_error == ERROR_SUCCESS ? device_error : adapter_error);
+}
+
+bool IsPlausibleUsbNvmeHealthLog(
+    const std::array<std::uint8_t, kNvmeHealthLogSize>& data) {
+  if (!HasNonZeroBytes(data.data(), data.size())) {
+    return false;
+  }
+  // Critical-warning bits 6 and 7 are reserved by the NVMe health-log ABI.
+  // This rejects common bridge error pages before they reach the UI parser.
+  if ((data[0] & 0xC0U) != 0) {
+    return false;
+  }
+  const std::uint16_t temperature_kelvin = ReadUint16(data.data() + 1);
+  return temperature_kelvin == 0 ||
+         (temperature_kelvin >= 100U && temperature_kelvin <= 1000U);
+}
+
+bool IsValidScsiPassThroughResponse(const ScsiPassThroughWithBuffer& request,
+                                    DWORD returned, DWORD request_size,
+                                    DWORD* error_code) {
+  if (request.pass_through.ScsiStatus != 0) {
+    *error_code = ERROR_IO_DEVICE;
+    return false;
+  }
+  constexpr std::size_t kDataOffset =
+      offsetof(ScsiPassThroughWithBuffer, data);
+  if (returned != 0 &&
+      (returned < kDataOffset || returned > request_size)) {
+    *error_code = ERROR_INVALID_DATA;
+    return false;
+  }
+  return true;
+}
+
+bool QueryJMicronUsbNvmeHealth(HANDLE disk, NvmeHealthData* health,
+                               DWORD* error_code) {
+  // JMicron uses a bridge control envelope. The data-out request describes
+  // the read-only NVMe Get Log Page command; it does not write user or NVMe
+  // namespace data. Only VID 152D reaches this function.
+  ScsiPassThroughWithBuffer request{};
+  request.pass_through.Length = sizeof(SCSI_PASS_THROUGH);
+  request.pass_through.SenseInfoLength =
+      static_cast<UCHAR>(request.sense.size());
+  request.pass_through.DataIn = SCSI_IOCTL_DATA_OUT;
+  request.pass_through.DataTransferLength =
+      static_cast<ULONG>(request.data.size());
+  request.pass_through.TimeOutValue = kAtaSmartTimeoutSeconds;
+  request.pass_through.DataBufferOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, data));
+  request.pass_through.SenseInfoOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, sense));
+  request.pass_through.CdbLength = 12;
+  request.pass_through.Cdb[0] = 0xA1;
+  request.pass_through.Cdb[1] = 0x80;
+  request.pass_through.Cdb[4] = 0x02;
+  request.data[0] = 'N';
+  request.data[1] = 'V';
+  request.data[2] = 'M';
+  request.data[3] = 'E';
+  request.data[8] = 0x02;   // NVMe Admin Get Log Page.
+  request.data[10] = 0x56;
+  request.data[12] = 0xFF;  // All namespaces.
+  request.data[13] = 0xFF;
+  request.data[14] = 0xFF;
+  request.data[15] = 0xFF;
+  request.data[0x21] = 0x40;
+  request.data[0x22] = 0x7A;
+  request.data[0x30] = 0x02;  // SMART / Health log.
+  request.data[0x32] = 0x7F;  // 512-byte transfer length.
+
+  constexpr DWORD kRequestSize = static_cast<DWORD>(sizeof(request));
+  DWORD returned = 0;
+  if (!DeviceIoControlQuery(disk, IOCTL_SCSI_PASS_THROUGH, &request,
+                            kRequestSize, &request, kRequestSize, &returned,
+                            error_code) ||
+      !IsValidScsiPassThroughResponse(request, returned, kRequestSize,
+                                      error_code)) {
+    return false;
+  }
+
+  request = {};
+  request.pass_through.Length = sizeof(SCSI_PASS_THROUGH);
+  request.pass_through.SenseInfoLength =
+      static_cast<UCHAR>(request.sense.size());
+  request.pass_through.DataIn = SCSI_IOCTL_DATA_IN;
+  request.pass_through.DataTransferLength =
+      static_cast<ULONG>(request.data.size());
+  request.pass_through.TimeOutValue = kAtaSmartTimeoutSeconds;
+  request.pass_through.DataBufferOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, data));
+  request.pass_through.SenseInfoOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, sense));
+  request.pass_through.CdbLength = 12;
+  request.pass_through.Cdb[0] = 0xA1;
+  request.pass_through.Cdb[1] = 0x82;
+  request.pass_through.Cdb[4] = 0x02;
+  returned = 0;
+  if (!DeviceIoControlQuery(disk, IOCTL_SCSI_PASS_THROUGH, &request,
+                            kRequestSize, &request, kRequestSize, &returned,
+                            error_code) ||
+      !IsValidScsiPassThroughResponse(request, returned, kRequestSize,
+                                      error_code) ||
+      !IsPlausibleUsbNvmeHealthLog(request.data)) {
+    if (*error_code == ERROR_SUCCESS) {
+      *error_code = ERROR_INVALID_DATA;
+    }
+    return false;
+  }
+
+  PopulateNvmeHealthFromLog(request.data.data(),
+                            "JMicron USB-NVMe bridge protocol", health);
+  *error_code = health->windows_error;
+  return health->available;
+}
+
+bool QueryRealtekUsbNvmeHealth(HANDLE disk, NvmeHealthData* health,
+                               DWORD* error_code) {
+  // Realtek's single-drive USB-NVMe tunnel exposes Get Log Page as a
+  // data-in-only CDB. RAID mode switching is deliberately not implemented.
+  ScsiPassThroughWithBuffer request{};
+  request.pass_through.Length = sizeof(SCSI_PASS_THROUGH);
+  request.pass_through.SenseInfoLength =
+      static_cast<UCHAR>(request.sense.size());
+  request.pass_through.DataIn = SCSI_IOCTL_DATA_IN;
+  request.pass_through.DataTransferLength =
+      static_cast<ULONG>(request.data.size());
+  request.pass_through.TimeOutValue = kAtaSmartTimeoutSeconds;
+  request.pass_through.DataBufferOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, data));
+  request.pass_through.SenseInfoOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, sense));
+  request.pass_through.CdbLength = 16;
+  request.pass_through.Cdb[0] = 0xE4;
+  request.pass_through.Cdb[1] = 0x00;
+  request.pass_through.Cdb[2] = 0x02;  // 512-byte read length.
+  request.pass_through.Cdb[3] = 0x02;  // NVMe Get Log Page.
+
+  constexpr DWORD kRequestSize = static_cast<DWORD>(sizeof(request));
+  DWORD returned = 0;
+  if (!DeviceIoControlQuery(disk, IOCTL_SCSI_PASS_THROUGH, &request,
+                            kRequestSize, &request, kRequestSize, &returned,
+                            error_code) ||
+      !IsValidScsiPassThroughResponse(request, returned, kRequestSize,
+                                      error_code) ||
+      !IsPlausibleUsbNvmeHealthLog(request.data)) {
+    if (*error_code == ERROR_SUCCESS) {
+      *error_code = ERROR_INVALID_DATA;
+    }
+    return false;
+  }
+
+  PopulateNvmeHealthFromLog(request.data.data(),
+                            "Realtek USB-NVMe bridge protocol", health);
+  *error_code = health->windows_error;
+  return health->available;
+}
+
+void PopulateUsbBridgeNvmeHealth(const std::wstring& device_path,
+                                 DiskReport* report) {
+  if (!report->usb_bridge_identity.has_value() ||
+      report->bus_type.value_or("") != "USB") {
+    return;
+  }
+
+  const std::uint16_t vendor_id = report->usb_bridge_identity->vendor_id;
+  if (vendor_id != 0x152D && vendor_id != 0x0BDA) {
+    // ASMedia has no trustworthy PID allow-list in the CDI source. Do not
+    // issue its E6 private tunnel merely because a device claims its VID.
+    return;
+  }
+
+  DWORD open_error = ERROR_SUCCESS;
+  ScopedHandle pass_through(
+      OpenPhysicalDiskForPassThrough(device_path, &open_error));
+  if (!pass_through.valid()) {
+    report->nvme.source = "USB-NVMe bridge protocol";
+    report->nvme.reason =
+        "Windows denied access to the USB-NVMe bridge health interface.";
+    report->nvme.reason_code =
+        (open_error == ERROR_ACCESS_DENIED ||
+         open_error == ERROR_PRIVILEGE_NOT_HELD)
+            ? "administrator_required"
+            : "query_failed";
+    report->nvme.windows_error = open_error;
+    return;
+  }
+
+  DWORD error_code = ERROR_SUCCESS;
+  const bool succeeded = vendor_id == 0x152D
+      ? QueryJMicronUsbNvmeHealth(pass_through.get(), &report->nvme,
+                                  &error_code)
+      : QueryRealtekUsbNvmeHealth(pass_through.get(), &report->nvme,
+                                  &error_code);
+  if (succeeded) {
+    return;
+  }
+
+  report->nvme.source = vendor_id == 0x152D
+      ? "JMicron USB-NVMe bridge protocol"
+      : "Realtek USB-NVMe bridge protocol";
+  if (error_code == ERROR_ACCESS_DENIED ||
+      error_code == ERROR_PRIVILEGE_NOT_HELD) {
+    report->nvme.reason =
+        "Windows denied the USB-NVMe bridge health-log query.";
+    report->nvme.reason_code = "access_denied";
+  } else if (error_code == ERROR_INVALID_DATA) {
+    report->nvme.reason =
+        "The USB-NVMe bridge returned an invalid health-log response.";
+    report->nvme.reason_code = "protocol_response_invalid";
+  } else {
+    report->nvme.reason =
+        "The USB-NVMe bridge did not expose a supported health-log path.";
+    report->nvme.reason_code = "usb_bridge_unsupported";
+  }
+  report->nvme.windows_error = error_code;
+}
+
+enum class AtaSmartTransport {
+  kNone,
+  kAtaPassThrough,
+  kSatPassThrough,
+  kJMicronUsbPassThrough,
+  kIoDataUsbPassThrough,
+  kSunplusUsbPassThrough,
+  kCypressUsbPassThrough,
+  kLogitecUsbPassThrough,
+  kProlificUsbPassThrough,
+};
+
+enum class AtaSmartFailureKind {
+  kNotApplicable,
+  kAdministratorRequired,
+  kAccessDenied,
+  kUsbBridgeUnsupported,
+  kProtocolResponseInvalid,
+  kQueryFailed,
+};
+
+struct AtaSmartQueryFailure {
+  AtaSmartFailureKind kind = AtaSmartFailureKind::kQueryFailed;
+  DWORD windows_error = ERROR_GEN_FAILURE;
+};
+
+AtaSmartTransport AtaSmartTransportForBus(
+    const std::optional<std::string>& bus_type) {
+  if (!bus_type.has_value()) {
+    return AtaSmartTransport::kNone;
+  }
+  if (*bus_type == "ATA" || *bus_type == "SATA" ||
+      *bus_type == "ATAPI") {
+    return AtaSmartTransport::kAtaPassThrough;
+  }
+  // USB mass-storage and UASP devices are commonly surfaced by Windows as
+  // USB or SCSI disks. SAT-12 is the standard, read-only SMART route.
+  if (*bus_type == "USB" || *bus_type == "SCSI") {
+    return AtaSmartTransport::kSatPassThrough;
+  }
+  return AtaSmartTransport::kNone;
+}
+
+std::optional<AtaSmartTransport> UsbAtaTransportForBridge(
+    const std::optional<UsbBridgeIdentity>& bridge) {
+  if (!bridge.has_value()) {
+    return std::nullopt;
+  }
+
+  switch (bridge->vendor_id) {
+    case 0x152d:  // JMicron
+      return AtaSmartTransport::kJMicronUsbPassThrough;
+    case 0x04bb:  // IO-DATA; one enclosure family tunnels JMicron commands.
+      return bridge->product_id == 0x0122
+          ? AtaSmartTransport::kJMicronUsbPassThrough
+          : AtaSmartTransport::kIoDataUsbPassThrough;
+    case 0x04fc:  // Sunplus
+      return AtaSmartTransport::kSunplusUsbPassThrough;
+    case 0x04b4:  // Cypress
+      return AtaSmartTransport::kCypressUsbPassThrough;
+    case 0x0789:  // Logitec
+      // This product is explicitly excluded by CrystalDiskInfo because it
+      // does not use the Logitec ATA tunnel.
+      if (bridge->product_id == 0x00d9) {
+        return std::nullopt;
+      }
+      return AtaSmartTransport::kLogitecUsbPassThrough;
+    case 0x067b:  // Prolific
+      return AtaSmartTransport::kProlificUsbPassThrough;
+    default:
+      return std::nullopt;
+  }
+}
+
+std::string AtaSmartSource(AtaSmartTransport transport) {
+  switch (transport) {
+    case AtaSmartTransport::kAtaPassThrough:
+      return "ATA SMART read data via ATA pass-through";
+    case AtaSmartTransport::kSatPassThrough:
+      return "ATA SMART read data via SAT pass-through";
+    case AtaSmartTransport::kJMicronUsbPassThrough:
+      return "ATA SMART read data via JMicron USB bridge pass-through";
+    case AtaSmartTransport::kIoDataUsbPassThrough:
+      return "ATA SMART read data via IO-DATA USB bridge pass-through";
+    case AtaSmartTransport::kSunplusUsbPassThrough:
+      return "ATA SMART read data via Sunplus USB bridge pass-through";
+    case AtaSmartTransport::kCypressUsbPassThrough:
+      return "ATA SMART read data via Cypress USB bridge pass-through";
+    case AtaSmartTransport::kLogitecUsbPassThrough:
+      return "ATA SMART read data via Logitec USB bridge pass-through";
+    case AtaSmartTransport::kProlificUsbPassThrough:
+      return "ATA SMART read data via Prolific USB bridge pass-through";
+    case AtaSmartTransport::kNone:
+      return "ATA SMART pass-through";
+  }
+  return "ATA SMART pass-through";
+}
+
+bool IsUsbAtaSmartTransport(AtaSmartTransport transport) {
+  switch (transport) {
+    case AtaSmartTransport::kSatPassThrough:
+    case AtaSmartTransport::kJMicronUsbPassThrough:
+    case AtaSmartTransport::kIoDataUsbPassThrough:
+    case AtaSmartTransport::kSunplusUsbPassThrough:
+    case AtaSmartTransport::kCypressUsbPassThrough:
+    case AtaSmartTransport::kLogitecUsbPassThrough:
+    case AtaSmartTransport::kProlificUsbPassThrough:
+      return true;
+    case AtaSmartTransport::kNone:
+    case AtaSmartTransport::kAtaPassThrough:
+      return false;
+  }
+  return false;
+}
+
+bool IsAtaSmartAccessDeniedError(DWORD error_code) {
+  return error_code == ERROR_ACCESS_DENIED ||
+         error_code == ERROR_PRIVILEGE_NOT_HELD;
+}
+
+AtaSmartFailureKind AtaSmartFailureKindFor(AtaSmartTransport transport,
+                                           DWORD error_code,
+                                           bool opening_handle) {
+  if (IsAtaSmartAccessDeniedError(error_code)) {
+    return opening_handle ? AtaSmartFailureKind::kAdministratorRequired
+                          : AtaSmartFailureKind::kAccessDenied;
+  }
+  if (error_code == ERROR_INVALID_DATA) {
+    return AtaSmartFailureKind::kProtocolResponseInvalid;
+  }
+  if (IsUsbAtaSmartTransport(transport)) {
+    if (error_code == ERROR_INVALID_FUNCTION || error_code == ERROR_NOT_SUPPORTED ||
+        error_code == ERROR_INVALID_PARAMETER || error_code == ERROR_IO_DEVICE) {
+      return AtaSmartFailureKind::kUsbBridgeUnsupported;
+    }
+  }
+  return AtaSmartFailureKind::kQueryFailed;
+}
+
+int AtaSmartFailurePriority(AtaSmartFailureKind kind) {
+  switch (kind) {
+    case AtaSmartFailureKind::kAdministratorRequired:
+      return 6;
+    case AtaSmartFailureKind::kAccessDenied:
+      return 5;
+    case AtaSmartFailureKind::kUsbBridgeUnsupported:
+      return 4;
+    case AtaSmartFailureKind::kProtocolResponseInvalid:
+      return 3;
+    case AtaSmartFailureKind::kQueryFailed:
+      return 2;
+    case AtaSmartFailureKind::kNotApplicable:
+      return 1;
+  }
+  return 0;
+}
+
+void RecordAtaSmartFailure(AtaSmartTransport transport, DWORD error_code,
+                           bool opening_handle,
+                           AtaSmartQueryFailure* combined) {
+  const AtaSmartFailureKind kind =
+      AtaSmartFailureKindFor(transport, error_code, opening_handle);
+  if (AtaSmartFailurePriority(kind) >=
+      AtaSmartFailurePriority(combined->kind)) {
+    combined->kind = kind;
+    combined->windows_error = error_code;
+  }
+}
+
+std::string AtaSmartReasonCode(AtaSmartFailureKind kind,
+                               AtaSmartTransport transport) {
+  switch (kind) {
+    case AtaSmartFailureKind::kAdministratorRequired:
+      return "administrator_required";
+    case AtaSmartFailureKind::kAccessDenied:
+      return "access_denied";
+    case AtaSmartFailureKind::kUsbBridgeUnsupported:
+      return "usb_bridge_unsupported";
+    case AtaSmartFailureKind::kProtocolResponseInvalid:
+      return "protocol_response_invalid";
+    case AtaSmartFailureKind::kQueryFailed:
+      return "query_failed";
+    case AtaSmartFailureKind::kNotApplicable:
+      return transport == AtaSmartTransport::kNone ? "not_applicable"
+                                                    : "ata_smart_not_supported";
+  }
+  return "query_failed";
+}
+
+std::string AtaSmartUnavailableReason(AtaSmartTransport transport,
+                                      AtaSmartFailureKind kind) {
+  switch (kind) {
+    case AtaSmartFailureKind::kAdministratorRequired:
+      return "Windows denied access to the physical disk SMART interface. "
+             "Administrator permission is required for SMART pass-through.";
+    case AtaSmartFailureKind::kAccessDenied:
+      return "Windows denied the ATA SMART pass-through query for this "
+             "physical disk.";
+    case AtaSmartFailureKind::kUsbBridgeUnsupported:
+      return "The USB or SCSI bridge does not support this read-only ATA "
+             "SMART pass-through protocol.";
+    case AtaSmartFailureKind::kProtocolResponseInvalid:
+      return "The storage controller returned invalid ATA SMART data.";
+    case AtaSmartFailureKind::kQueryFailed:
+      return "Windows could not complete the read-only ATA SMART query.";
+    case AtaSmartFailureKind::kNotApplicable:
+      switch (transport) {
+        case AtaSmartTransport::kAtaPassThrough:
+          return "The ATA/SATA controller does not expose SMART read data.";
+        case AtaSmartTransport::kSatPassThrough:
+        case AtaSmartTransport::kJMicronUsbPassThrough:
+        case AtaSmartTransport::kIoDataUsbPassThrough:
+        case AtaSmartTransport::kSunplusUsbPassThrough:
+        case AtaSmartTransport::kCypressUsbPassThrough:
+        case AtaSmartTransport::kLogitecUsbPassThrough:
+        case AtaSmartTransport::kProlificUsbPassThrough:
+          return "The USB or SCSI bridge does not expose ATA SMART data "
+                 "through a supported read-only path.";
+        case AtaSmartTransport::kNone:
+          return "This storage bus does not expose ATA SMART through a "
+                 "supported read-only path.";
+      }
+  }
+  return "ATA SMART data is not available for this disk.";
+}
+
+bool IsPlausibleAtaSmartData(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& data) {
+  if (!HasNonZeroBytes(data.data(), data.size())) {
+    return false;
+  }
+
+  bool found_attribute = false;
+  bool found_normalized_value = false;
+  for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+    const std::size_t offset =
+        kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+    const std::uint8_t id = data[offset];
+    if (id == 0 || id == 0xFF) {
+      continue;
+    }
+    found_attribute = true;
+    if ((data[offset + 3] > 0 && data[offset + 3] < 0xFF) ||
+        (data[offset + 4] > 0 && data[offset + 4] < 0xFF)) {
+      found_normalized_value = true;
+    }
+  }
+  return found_attribute && found_normalized_value;
+}
+
+bool IsPlausibleAtaSmartThresholdData(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& data) {
+  if (!HasNonZeroBytes(data.data(), data.size())) {
+    return false;
+  }
+
+  for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+    const std::size_t offset =
+        kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+    if (data[offset] != 0 && data[offset] != 0xFF) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool IsPlausibleAtaSmartSector(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& data,
+    std::uint8_t feature) {
+  return feature == kAtaSmartReadThresholdsFeature
+      ? IsPlausibleAtaSmartThresholdData(data)
+      : IsPlausibleAtaSmartData(data);
+}
+
+bool QueryAtaSmartSectorWithAtaPassThrough(
+    HANDLE disk, std::uint8_t feature, std::uint8_t device,
+    std::array<std::uint8_t, kAtaSmartDataSize>* data,
+    DWORD* error_code) {
+  AtaPassThroughWithBuffer request{};
+  request.pass_through.Length = sizeof(ATA_PASS_THROUGH_EX);
+  request.pass_through.AtaFlags = ATA_FLAGS_DATA_IN;
+  request.pass_through.DataTransferLength =
+      static_cast<ULONG>(request.data.size());
+  request.pass_through.TimeOutValue = kAtaSmartTimeoutSeconds;
+  request.pass_through.DataBufferOffset =
+      static_cast<ULONG_PTR>(offsetof(AtaPassThroughWithBuffer, data));
+  // ATA_PASS_THROUGH_EX exposes task-file registers as the fixed ATA order:
+  // features, sector count, sector number, cylinder low/high, device, command.
+  request.pass_through.CurrentTaskFile[0] = feature;
+  request.pass_through.CurrentTaskFile[1] = 1;
+  request.pass_through.CurrentTaskFile[2] = 1;
+  request.pass_through.CurrentTaskFile[3] = kAtaSmartCylinderLow;
+  request.pass_through.CurrentTaskFile[4] = kAtaSmartCylinderHigh;
+  request.pass_through.CurrentTaskFile[5] = device;
+  request.pass_through.CurrentTaskFile[6] = kAtaSmartCommand;
+
+  constexpr std::size_t kDataOffset =
+      offsetof(AtaPassThroughWithBuffer, data);
+  constexpr DWORD kRequestSize = static_cast<DWORD>(
+      kDataOffset + kAtaSmartDataSize);
+  DWORD returned = 0;
+  if (!DeviceIoControlQuery(disk, IOCTL_ATA_PASS_THROUGH, &request,
+                            kRequestSize, &request, kRequestSize, &returned,
+                            error_code)) {
+    return false;
+  }
+  // Some miniports return zero bytes even after filling the fixed-size output
+  // buffer. Accept that documented quirk only when the returned SMART sector
+  // itself passes structural validation.
+  if ((returned != 0 && (returned < kDataOffset || returned > kRequestSize)) ||
+      !IsPlausibleAtaSmartSector(request.data, feature)) {
+    *error_code = ERROR_INVALID_DATA;
+    return false;
+  }
+  *data = request.data;
+  *error_code = ERROR_SUCCESS;
+  return true;
+}
+
+bool QueryAtaSmartSectorWithSatPassThrough(
+    HANDLE disk, std::uint8_t feature, std::uint8_t device,
+    std::array<std::uint8_t, kAtaSmartDataSize>* data,
+    DWORD* error_code) {
+  ScsiPassThroughWithBuffer request{};
+  request.pass_through.Length = sizeof(SCSI_PASS_THROUGH);
+  request.pass_through.SenseInfoLength =
+      static_cast<UCHAR>(request.sense.size());
+  request.pass_through.DataIn = SCSI_IOCTL_DATA_IN;
+  request.pass_through.DataTransferLength =
+      static_cast<ULONG>(request.data.size());
+  request.pass_through.TimeOutValue = kAtaSmartTimeoutSeconds;
+  request.pass_through.DataBufferOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, data));
+  request.pass_through.SenseInfoOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, sense));
+  request.pass_through.CdbLength = 12;
+  request.pass_through.Cdb[0] = 0xA1;  // ATA PASS THROUGH (12).
+  request.pass_through.Cdb[1] = 0x08;  // PIO data-in protocol.
+  request.pass_through.Cdb[2] = 0x0E;  // Data-in, block, sector-count length.
+  request.pass_through.Cdb[3] = feature;
+  request.pass_through.Cdb[4] = 1;
+  request.pass_through.Cdb[5] = 1;
+  request.pass_through.Cdb[6] = kAtaSmartCylinderLow;
+  request.pass_through.Cdb[7] = kAtaSmartCylinderHigh;
+  request.pass_through.Cdb[8] = device;
+  request.pass_through.Cdb[9] = kAtaSmartCommand;
+
+  constexpr std::size_t kDataOffset =
+      offsetof(ScsiPassThroughWithBuffer, data);
+  constexpr DWORD kRequestSize = static_cast<DWORD>(
+      kDataOffset + kAtaSmartDataSize);
+  DWORD returned = 0;
+  if (!DeviceIoControlQuery(disk, IOCTL_SCSI_PASS_THROUGH, &request,
+                            kRequestSize, &request, kRequestSize, &returned,
+                            error_code)) {
+    return false;
+  }
+  if (request.pass_through.ScsiStatus != 0 ||
+      (returned != 0 && (returned < kDataOffset || returned > kRequestSize)) ||
+      !IsPlausibleAtaSmartSector(request.data, feature)) {
+    *error_code = request.pass_through.ScsiStatus == 0 ? ERROR_INVALID_DATA
+                                                        : ERROR_IO_DEVICE;
+    return false;
+  }
+  *data = request.data;
+  *error_code = ERROR_SUCCESS;
+  return true;
+}
+
+bool QueryAtaSmartSectorWithUsbBridgeProfile(
+    HANDLE disk, AtaSmartTransport transport, std::uint8_t feature,
+    std::uint8_t device,
+    std::array<std::uint8_t, kAtaSmartDataSize>* data,
+    DWORD* error_code) {
+  // These layouts are derived from CrystalDiskInfo's MIT-licensed bridge
+  // compatibility table. Dispatch is restricted to a matching USB VID/PID,
+  // feature is limited to SMART READ DATA (D0) or READ THRESHOLDS (D1), and
+  // no SMART enable, mode-switch, or data-writing CDB is present here.
+  ScsiPassThroughWithBuffer request{};
+  request.pass_through.Length = sizeof(SCSI_PASS_THROUGH);
+  request.pass_through.SenseInfoLength =
+      static_cast<UCHAR>(request.sense.size());
+  request.pass_through.DataIn = SCSI_IOCTL_DATA_IN;
+  request.pass_through.DataTransferLength =
+      static_cast<ULONG>(request.data.size());
+  request.pass_through.TimeOutValue = kAtaSmartTimeoutSeconds;
+  request.pass_through.DataBufferOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, data));
+  request.pass_through.SenseInfoOffset =
+      static_cast<ULONG>(offsetof(ScsiPassThroughWithBuffer, sense));
+  switch (transport) {
+    case AtaSmartTransport::kJMicronUsbPassThrough:
+      request.pass_through.CdbLength = 12;
+      request.pass_through.Cdb[0] = 0xDF;
+      request.pass_through.Cdb[1] = 0x10;
+      request.pass_through.Cdb[2] = 0x00;
+      request.pass_through.Cdb[3] = 0x02;
+      request.pass_through.Cdb[4] = 0x00;
+      request.pass_through.Cdb[5] = feature;
+      request.pass_through.Cdb[6] = 0x01;
+      request.pass_through.Cdb[7] = 0x01;
+      request.pass_through.Cdb[8] = kAtaSmartCylinderLow;
+      request.pass_through.Cdb[9] = kAtaSmartCylinderHigh;
+      request.pass_through.Cdb[10] = device;
+      request.pass_through.Cdb[11] = kAtaSmartCommand;
+      break;
+    case AtaSmartTransport::kIoDataUsbPassThrough:
+      request.pass_through.CdbLength = 12;
+      request.pass_through.Cdb[0] = 0xE3;
+      request.pass_through.Cdb[2] = feature;
+      request.pass_through.Cdb[5] = kAtaSmartCylinderLow;
+      request.pass_through.Cdb[6] = kAtaSmartCylinderHigh;
+      request.pass_through.Cdb[7] = device;
+      request.pass_through.Cdb[8] = kAtaSmartCommand;
+      break;
+    case AtaSmartTransport::kSunplusUsbPassThrough:
+      request.pass_through.CdbLength = 12;
+      request.pass_through.Cdb[0] = 0xF8;
+      request.pass_through.Cdb[2] = 0x22;
+      request.pass_through.Cdb[3] = 0x10;
+      request.pass_through.Cdb[4] = 0x01;
+      request.pass_through.Cdb[5] = feature;
+      request.pass_through.Cdb[6] = 0x01;
+      request.pass_through.Cdb[7] =
+          feature == kAtaSmartReadThresholdsFeature ? 0x01 : 0x00;
+      request.pass_through.Cdb[8] = kAtaSmartCylinderLow;
+      request.pass_through.Cdb[9] = kAtaSmartCylinderHigh;
+      request.pass_through.Cdb[10] = device;
+      request.pass_through.Cdb[11] = kAtaSmartCommand;
+      break;
+    case AtaSmartTransport::kCypressUsbPassThrough:
+      request.pass_through.CdbLength = 16;
+      request.pass_through.Cdb[0] = 0x24;
+      request.pass_through.Cdb[1] = 0x24;
+      request.pass_through.Cdb[3] = 0xBE;
+      request.pass_through.Cdb[4] = 0x01;
+      request.pass_through.Cdb[6] = feature;
+      request.pass_through.Cdb[9] = kAtaSmartCylinderLow;
+      request.pass_through.Cdb[10] = kAtaSmartCylinderHigh;
+      request.pass_through.Cdb[11] = device;
+      request.pass_through.Cdb[12] = kAtaSmartCommand;
+      break;
+    case AtaSmartTransport::kLogitecUsbPassThrough:
+      request.pass_through.CdbLength = 10;
+      request.pass_through.Cdb[0] = 0xE0;
+      request.pass_through.Cdb[2] = feature;
+      request.pass_through.Cdb[5] = kAtaSmartCylinderLow;
+      request.pass_through.Cdb[6] = kAtaSmartCylinderHigh;
+      request.pass_through.Cdb[7] = device;
+      request.pass_through.Cdb[8] = kAtaSmartCommand;
+      request.pass_through.Cdb[9] = 0x4C;
+      break;
+    case AtaSmartTransport::kProlificUsbPassThrough:
+      request.pass_through.CdbLength = 16;
+      request.pass_through.Cdb[0] = 0xD8;
+      request.pass_through.Cdb[1] = 0x15;
+      request.pass_through.Cdb[3] = feature;
+      request.pass_through.Cdb[4] = 0x06;
+      request.pass_through.Cdb[5] = 0x7B;
+      request.pass_through.Cdb[8] = 0x02;
+      request.pass_through.Cdb[10] = 0x01;
+      request.pass_through.Cdb[11] =
+          feature == kAtaSmartReadThresholdsFeature ? 0x01 : 0x00;
+      request.pass_through.Cdb[12] = kAtaSmartCylinderLow;
+      request.pass_through.Cdb[13] = kAtaSmartCylinderHigh;
+      request.pass_through.Cdb[14] = device;
+      request.pass_through.Cdb[15] = kAtaSmartCommand;
+      break;
+    case AtaSmartTransport::kNone:
+    case AtaSmartTransport::kAtaPassThrough:
+    case AtaSmartTransport::kSatPassThrough:
+      *error_code = ERROR_NOT_SUPPORTED;
+      return false;
+  }
+
+  constexpr std::size_t kDataOffset =
+      offsetof(ScsiPassThroughWithBuffer, data);
+  constexpr DWORD kRequestSize = static_cast<DWORD>(
+      kDataOffset + kAtaSmartDataSize);
+  DWORD returned = 0;
+  if (!DeviceIoControlQuery(disk, IOCTL_SCSI_PASS_THROUGH, &request,
+                            kRequestSize, &request, kRequestSize, &returned,
+                            error_code)) {
+    return false;
+  }
+  if (request.pass_through.ScsiStatus != 0 ||
+      (returned != 0 && (returned < kDataOffset || returned > kRequestSize)) ||
+      !IsPlausibleAtaSmartSector(request.data, feature)) {
+    *error_code = request.pass_through.ScsiStatus == 0 ? ERROR_INVALID_DATA
+                                                        : ERROR_IO_DEVICE;
+    return false;
+  }
+  *data = request.data;
+  *error_code = ERROR_SUCCESS;
+  return true;
+}
+
+bool QueryAtaSmartSector(HANDLE disk, AtaSmartTransport transport,
+                         std::uint8_t feature, std::uint8_t device,
+                         std::array<std::uint8_t, kAtaSmartDataSize>* data,
+                         DWORD* error_code) {
+  // Keep every pass-through request in this helper read-only by construction.
+  // No caller can use this generic transport routine for SMART enable/disable
+  // or a vendor command.
+  if (feature != kAtaSmartReadDataFeature &&
+      feature != kAtaSmartReadThresholdsFeature) {
+    *error_code = ERROR_INVALID_PARAMETER;
+    return false;
+  }
+  switch (transport) {
+    case AtaSmartTransport::kAtaPassThrough:
+      return QueryAtaSmartSectorWithAtaPassThrough(disk, feature, device, data,
+                                                    error_code);
+    case AtaSmartTransport::kSatPassThrough:
+      return QueryAtaSmartSectorWithSatPassThrough(disk, feature, device, data,
+                                                    error_code);
+    case AtaSmartTransport::kJMicronUsbPassThrough:
+    case AtaSmartTransport::kIoDataUsbPassThrough:
+    case AtaSmartTransport::kSunplusUsbPassThrough:
+    case AtaSmartTransport::kCypressUsbPassThrough:
+    case AtaSmartTransport::kLogitecUsbPassThrough:
+    case AtaSmartTransport::kProlificUsbPassThrough:
+      return QueryAtaSmartSectorWithUsbBridgeProfile(
+          disk, transport, feature, device, data, error_code);
+    case AtaSmartTransport::kNone:
+      *error_code = ERROR_NOT_SUPPORTED;
+      return false;
+  }
+  *error_code = ERROR_NOT_SUPPORTED;
+  return false;
+}
+
+bool QueryAtaSmartSectorForTargets(
+    HANDLE disk, AtaSmartTransport transport, std::uint8_t feature,
+    const std::array<std::uint8_t, 2>& targets, std::size_t target_count,
+    ULONGLONG started, ULONGLONG first_target_budget_milliseconds,
+    ULONGLONG second_target_budget_milliseconds,
+    std::array<std::uint8_t, kAtaSmartDataSize>* data,
+    std::uint8_t* selected_device, AtaSmartQueryFailure* failure) {
+  target_count = std::min(target_count, targets.size());
+  for (std::size_t index = 0; index < target_count; ++index) {
+    const ULONGLONG elapsed = GetTickCount64() - started;
+    const ULONGLONG budget = index == 0 ? first_target_budget_milliseconds
+                                        : second_target_budget_milliseconds;
+    if (budget != 0 && elapsed > budget) {
+      break;
+    }
+
+    DWORD error_code = ERROR_SUCCESS;
+    if (QueryAtaSmartSector(disk, transport, feature, targets[index], data,
+                            &error_code)) {
+      *selected_device = targets[index];
+      return true;
+    }
+    RecordAtaSmartFailure(transport, error_code, false, failure);
+  }
+  return false;
+}
+
+std::optional<std::string> AtaSmartRawValue(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& data,
+    std::uint8_t requested_id) {
+  for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+    const std::size_t offset =
+        kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+    if (data[offset] == requested_id) {
+      return DecimalFromLittleEndian(data.data() + offset + 5, 6);
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<int> AtaSmartTemperatureCelsius(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& data) {
+  for (const std::uint8_t id : {static_cast<std::uint8_t>(0xC2),
+                                static_cast<std::uint8_t>(0xBE)}) {
+    for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+      const std::size_t offset =
+          kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+      if (data[offset] != id) {
+        continue;
+      }
+      const int value = static_cast<int>(data[offset + 5]);
+      if (value > 0 && value <= 125) {
+        return value;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<int> AtaSmartWearUsedPercent(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& data) {
+  // These standardized-in-practice SSD attributes report a normalized
+  // remaining-life value. The app's existing field is wear *used*.
+  for (const std::uint8_t id : {static_cast<std::uint8_t>(0xE7),
+                                static_cast<std::uint8_t>(0xE8),
+                                static_cast<std::uint8_t>(0xE9),
+                                static_cast<std::uint8_t>(0xCA)}) {
+    for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+      const std::size_t offset =
+          kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+      if (data[offset] != id) {
+        continue;
+      }
+      const int remaining = static_cast<int>(data[offset + 3]);
+      if (remaining >= 0 && remaining <= 100) {
+        return 100 - remaining;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::uint8_t> AtaSmartThresholdForAttribute(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& thresholds,
+    std::uint8_t requested_id) {
+  for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+    const std::size_t offset =
+        kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+    if (thresholds[offset] == requested_id) {
+      return thresholds[offset + 1];
+    }
+  }
+  return std::nullopt;
+}
+
+void PopulateAtaSmartHealthFromThresholds(
+    const std::array<std::uint8_t, kAtaSmartDataSize>& attributes,
+    const std::array<std::uint8_t, kAtaSmartDataSize>& thresholds,
+    DiskReport* report) {
+  if (report->health.has_value()) {
+    return;
+  }
+
+  bool found_prefailure_threshold = false;
+  bool threshold_failure = false;
+  for (std::size_t index = 0; index < kAtaSmartAttributeCount; ++index) {
+    const std::size_t offset =
+        kAtaSmartAttributeOffset + index * kAtaSmartAttributeSize;
+    const std::uint8_t id = attributes[offset];
+    const std::uint16_t flags =
+        static_cast<std::uint16_t>(attributes[offset + 1]) |
+        (static_cast<std::uint16_t>(attributes[offset + 2]) << 8U);
+    if (id == 0 || (flags & 0x0001U) == 0) {
+      continue;
+    }
+    const auto threshold = AtaSmartThresholdForAttribute(thresholds, id);
+    if (!threshold.has_value() || *threshold == 0) {
+      continue;
+    }
+    found_prefailure_threshold = true;
+    if (attributes[offset + 3] <= *threshold) {
+      threshold_failure = true;
+      break;
+    }
+  }
+  if (found_prefailure_threshold) {
+    report->health = threshold_failure ? "failure_predicted"
+                                       : "no_failure_predicted";
+    report->health_source = "ATA SMART threshold comparison";
+  }
+}
+
+void SyncReliabilityUnavailableReasonFromAtaSmart(DiskReport* report) {
+  report->reliability_unavailable_reason = report->ata_smart.reason;
+  report->reliability_unavailable_reason_code = report->ata_smart.reason_code;
+  if (report->ata_smart.windows_error == ERROR_SUCCESS) {
+    report->reliability_unavailable_windows_error.reset();
+  } else {
+    report->reliability_unavailable_windows_error =
+        report->ata_smart.windows_error;
+  }
+}
+
+void PopulateAtaSmartReport(const std::wstring& device_path,
+                            DiskReport* report) {
+  const AtaSmartTransport transport = AtaSmartTransportForBus(report->bus_type);
+  report->ata_smart.source = AtaSmartSource(transport);
+  if (transport == AtaSmartTransport::kNone) {
+    report->ata_smart.reason = AtaSmartUnavailableReason(
+        transport, AtaSmartFailureKind::kNotApplicable);
+    report->ata_smart.reason_code = AtaSmartReasonCode(
+        AtaSmartFailureKind::kNotApplicable, transport);
+    SyncReliabilityUnavailableReasonFromAtaSmart(report);
+    return;
+  }
+
+  DWORD open_error = ERROR_SUCCESS;
+  ScopedHandle pass_through(
+      OpenPhysicalDiskForPassThrough(device_path, &open_error));
+  if (!pass_through.valid()) {
+    const AtaSmartFailureKind failure_kind =
+        AtaSmartFailureKindFor(transport, open_error, true);
+    report->ata_smart.reason =
+        AtaSmartUnavailableReason(transport, failure_kind);
+    report->ata_smart.reason_code =
+        AtaSmartReasonCode(failure_kind, transport);
+    report->ata_smart.windows_error = open_error;
+    SyncReliabilityUnavailableReasonFromAtaSmart(report);
+    return;
+  }
+
+  const ULONGLONG started = GetTickCount64();
+  const std::array<std::uint8_t, 2> targets = {
+      kAtaSmartPrimaryDevice,
+      kAtaSmartSecondaryDevice,
+  };
+  std::array<std::uint8_t, kAtaSmartDataSize> attributes{};
+  AtaSmartQueryFailure failure;
+  AtaSmartTransport successful_transport = transport;
+  std::uint8_t selected_device = kAtaSmartPrimaryDevice;
+  const std::size_t standard_target_count =
+      transport == AtaSmartTransport::kSatPassThrough ? targets.size() : 1;
+  bool data_available = QueryAtaSmartSectorForTargets(
+      pass_through.get(), transport, kAtaSmartReadDataFeature, targets,
+      standard_target_count, started, 0, 0, &attributes, &selected_device,
+      &failure);
+
+  // Some known USB bridges expose ATA SMART only through their manufacturer
+  // CDB. The identity comes from the parent USB node, not a model-name guess;
+  // unknown bridges remain on standard SAT only. Do not spend the worker
+  // budget after a slow standard SAT failure.
+  const auto bridge_transport =
+      UsbAtaTransportForBridge(report->usb_bridge_identity);
+  if (!data_available && transport == AtaSmartTransport::kSatPassThrough &&
+      !IsAtaSmartAccessDeniedError(failure.windows_error) &&
+      GetTickCount64() - started <= kUsbBridgeFallbackStartBudgetMilliseconds &&
+      bridge_transport.has_value()) {
+    successful_transport = *bridge_transport;
+    data_available = QueryAtaSmartSectorForTargets(
+        pass_through.get(), successful_transport, kAtaSmartReadDataFeature,
+        targets, targets.size(), started, kUsbBridgeFallbackStartBudgetMilliseconds,
+        kUsbBridgeSecondTargetBudgetMilliseconds, &attributes, &selected_device,
+        &failure);
+  }
+
+  if (!data_available) {
+    report->ata_smart.reason =
+        AtaSmartUnavailableReason(successful_transport, failure.kind);
+    report->ata_smart.reason_code =
+        AtaSmartReasonCode(failure.kind, successful_transport);
+    report->ata_smart.windows_error = failure.windows_error;
+    SyncReliabilityUnavailableReasonFromAtaSmart(report);
+    return;
+  }
+
+  report->ata_smart.available = true;
+  report->ata_smart.reason.clear();
+  report->ata_smart.reason_code.reset();
+  report->ata_smart.source = AtaSmartSource(successful_transport);
+  report->ata_smart.windows_error = ERROR_SUCCESS;
+  report->reliability_unavailable_reason =
+      "ATA SMART data did not include this reliability metric.";
+  report->reliability_unavailable_reason_code.reset();
+  report->reliability_unavailable_windows_error.reset();
+
+  report->ata_smart.temperature_celsius =
+      AtaSmartTemperatureCelsius(attributes);
+  report->ata_smart.wear_percent = AtaSmartWearUsedPercent(attributes);
+  report->ata_smart.power_on_hours = AtaSmartRawValue(attributes, 0x09);
+
+  // A threshold read is only needed when Windows did not already supply a
+  // health prediction. Skip it after a slow initial SMART response so an
+  // uncooperative bridge cannot consume the worker's per-disk deadline.
+  if (!report->health.has_value() && GetTickCount64() - started <= 250) {
+    std::array<std::uint8_t, kAtaSmartDataSize> thresholds{};
+    DWORD threshold_error = ERROR_SUCCESS;
+    if (QueryAtaSmartSector(pass_through.get(), successful_transport,
+                            kAtaSmartReadThresholdsFeature, selected_device,
+                            &thresholds, &threshold_error)) {
+      report->ata_smart.threshold_data_available = true;
+      PopulateAtaSmartHealthFromThresholds(attributes, thresholds, report);
+    }
+  }
 }
 
 void PopulateStorageCounters(HANDLE disk, DiskReport* report) {
@@ -1137,7 +2396,7 @@ void PopulateIntelRstNvmeHealth(HANDLE disk, NvmeHealthData* health) {
   IntelRstNvmePassThrough request{};
   request.srb.HeaderLength = sizeof(SRB_IO_CONTROL);
   std::memcpy(request.srb.Signature, "IntelNvm", sizeof(request.srb.Signature));
-  request.srb.Timeout = 10;
+  request.srb.Timeout = kIntelNvmeMiniportTimeoutSeconds;
   request.srb.ControlCode = kIntelRstNvmeControlCode;
   request.srb.Length =
       static_cast<ULONG>(sizeof(request) - sizeof(SRB_IO_CONTROL));
@@ -1193,7 +2452,7 @@ void PopulateIntelVrocNvmeHealth(HANDLE disk, NvmeHealthData* health) {
   IntelVrocNvmePassThrough request{};
   request.srb.HeaderLength = sizeof(SRB_IO_CONTROL);
   std::memcpy(request.srb.Signature, "NvmeRAID", sizeof(request.srb.Signature));
-  request.srb.Timeout = 10;
+  request.srb.Timeout = kIntelNvmeMiniportTimeoutSeconds;
   request.srb.ControlCode = kIntelVrocNvmeControlCode;
   request.srb.Length =
       static_cast<ULONG>(sizeof(request) - sizeof(SRB_IO_CONTROL));
@@ -1208,6 +2467,10 @@ void PopulateIntelVrocNvmeHealth(HANDLE disk, NvmeHealthData* health) {
   request.command[0] = 0x02;  // NVMe Admin Get Log Page.
   request.command[1] = 0xffffffff;  // All namespaces.
   request.command[10] = 0x007f0002;  // SMART / Health log, 512 bytes.
+  // Intel VROC requires this buffer-present marker even though the command
+  // itself is device-to-host. This mirrors the VROC miniport ABI used by
+  // CrystalDiskInfo and does not alter device state.
+  request.data[0] = TRUE;
 
   DWORD returned = 0;
   if (DeviceIoControl(miniport.get(), IOCTL_SCSI_MINIPORT, &request,
@@ -1222,6 +2485,31 @@ void PopulateIntelVrocNvmeHealth(HANDLE disk, NvmeHealthData* health) {
   }
   PopulateNvmeHealthFromLog(request.data.data(),
                             "Intel VROC NVMe miniport protocol", health);
+}
+
+bool MentionsNvme(const std::optional<std::string>& value) {
+  if (!value.has_value()) {
+    return false;
+  }
+  return value->find("NVMe") != std::string::npos ||
+         value->find("NVME") != std::string::npos ||
+         value->find("nvme") != std::string::npos;
+}
+
+bool IsIntelRaidNvmeCandidate(const DiskReport& report) {
+  if (!report.bus_type.has_value()) {
+    return false;
+  }
+  if (*report.bus_type == "RAID") {
+    return true;
+  }
+  // Some VROC versions surface member NVMe disks as non-removable SCSI
+  // devices. Restrict that compatibility path to models which explicitly
+  // identify as NVMe so normal USB/SCSI disks never receive Intel miniport
+  // requests.
+  return *report.bus_type == "SCSI" &&
+         !report.is_removable.value_or(false) &&
+         (MentionsNvme(report.model) || MentionsNvme(report.product_id));
 }
 
 std::vector<std::string> FindDriveLettersForDisk(DWORD disk_number) {
@@ -1340,6 +2628,10 @@ std::string BuildDiskReportJson(const DiskReport& report) {
   AppendOptionalBool(output, report.is_removable);
   output << ",\"reliabilityUnavailableReason\":";
   AppendJsonString(output, report.reliability_unavailable_reason);
+  output << ",\"reliabilityUnavailableReasonCode\":";
+  AppendOptionalString(output, report.reliability_unavailable_reason_code);
+  output << ",\"reliabilityUnavailableWindowsError\":";
+  AppendOptionalDword(output, report.reliability_unavailable_windows_error);
   output << ",\"topology\":{";
   output << "\"deviceType\":";
   AppendOptionalDword(output, report.topology.device_type);
@@ -1364,6 +2656,12 @@ std::string BuildDiskReportJson(const DiskReport& report) {
   } else {
     AppendJsonString(output, report.nvme.reason);
   }
+  output << ",\"reasonCode\":";
+  if (report.nvme.available) {
+    output << "null";
+  } else {
+    AppendOptionalString(output, report.nvme.reason_code);
+  }
   output << ",\"windowsError\":";
   if (report.nvme.windows_error == ERROR_SUCCESS) {
     output << "null";
@@ -1387,6 +2685,38 @@ std::string BuildDiskReportJson(const DiskReport& report) {
   output << ",\"mediaAndDataIntegrityErrors\":";
   AppendOptionalString(output, report.nvme.media_and_data_integrity_errors);
   output << '}';
+  output << ",\"ataSmart\":{";
+  output << "\"available\":"
+         << (report.ata_smart.available ? "true" : "false");
+  output << ",\"source\":";
+  AppendJsonString(output, report.ata_smart.source);
+  output << ",\"reason\":";
+  if (report.ata_smart.available) {
+    output << "null";
+  } else {
+    AppendJsonString(output, report.ata_smart.reason);
+  }
+  output << ",\"reasonCode\":";
+  if (report.ata_smart.available) {
+    output << "null";
+  } else {
+    AppendOptionalString(output, report.ata_smart.reason_code);
+  }
+  output << ",\"windowsError\":";
+  if (report.ata_smart.windows_error == ERROR_SUCCESS) {
+    output << "null";
+  } else {
+    output << report.ata_smart.windows_error;
+  }
+  output << ",\"thresholdDataAvailable\":"
+         << (report.ata_smart.threshold_data_available ? "true" : "false");
+  output << ",\"temperatureCelsius\":";
+  AppendOptionalInt(output, report.ata_smart.temperature_celsius);
+  output << ",\"wearPercent\":";
+  AppendOptionalInt(output, report.ata_smart.wear_percent);
+  output << ",\"powerOnHours\":";
+  AppendOptionalString(output, report.ata_smart.power_on_hours);
+  output << '}';
   output << ",\"warnings\":";
   AppendJsonStringArray(output, report.warnings);
   output << '}';
@@ -1407,10 +2737,11 @@ DiskReport CollectDiskReport(DWORD disk_number, bool* present) {
   DiskReport report;
   report.disk_number = disk_number;
   report.device_path = "\\\\.\\PhysicalDrive" + std::to_string(disk_number);
+  const std::wstring physical_path =
+      L"\\\\.\\PhysicalDrive" + std::to_wstring(disk_number);
 
   DWORD open_error = ERROR_SUCCESS;
-  const HANDLE disk = OpenPhysicalDiskForReadOnlyQuery(
-      L"\\\\.\\PhysicalDrive" + std::to_wstring(disk_number), &open_error);
+  const HANDLE disk = OpenPhysicalDiskForReadOnlyQuery(physical_path, &open_error);
   if (disk == INVALID_HANDLE_VALUE) {
     if (IsMissingPhysicalDriveError(open_error)) {
       report.present = false;
@@ -1433,6 +2764,11 @@ DiskReport CollectDiskReport(DWORD disk_number, bool* present) {
   PopulateTopology(disk, &report);
   PopulatePartitionStyle(disk, &report);
   PopulateReadOnlyFlag(disk, &report);
+  if (const auto identity = QueryDiskDeviceIdentity(disk_number);
+      identity.has_value()) {
+    report.pnp_device_id = identity->pnp_device_id;
+    report.usb_bridge_identity = identity->usb_bridge;
+  }
   PopulateStorageCounters(disk, &report);
   PopulatePredictFailure(disk, &report);
 
@@ -1443,16 +2779,21 @@ DiskReport CollectDiskReport(DWORD disk_number, bool* present) {
   }
 
   PopulateNvmeHealth(disk, &report.nvme);
-  if (!report.nvme.available && report.bus_type.has_value() &&
-      *report.bus_type == "RAID") {
+  const bool intel_raid_nvme_candidate = IsIntelRaidNvmeCandidate(report);
+  if (!report.nvme.available && intel_raid_nvme_candidate) {
     PopulateIntelRstNvmeHealth(disk, &report.nvme);
     if (!report.nvme.available) {
       PopulateIntelVrocNvmeHealth(disk, &report.nvme);
     }
   }
+  if (!report.nvme.available && !intel_raid_nvme_candidate) {
+    PopulateUsbBridgeNvmeHealth(physical_path, &report);
+  }
   if (report.nvme.available) {
     report.health = report.nvme.critical_warning == 0 ? "healthy" : "warning";
     report.health_source = report.nvme.source;
+  } else if (!intel_raid_nvme_candidate) {
+    PopulateAtaSmartReport(physical_path, &report);
   }
   CloseHandle(disk);
 

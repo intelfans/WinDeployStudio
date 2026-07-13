@@ -285,7 +285,6 @@ enum BootRepairRollbackStatus { notRequired, succeeded, failed }
 
 class BootRepairResult {
   final bool success;
-  final bool elevationCancelled;
   final String messageKey;
   final String backupPath;
   final bool existingBcdBackedUp;
@@ -300,7 +299,6 @@ class BootRepairResult {
 
   const BootRepairResult({
     required this.success,
-    required this.elevationCancelled,
     required this.messageKey,
     required this.backupPath,
     required this.existingBcdBackedUp,
@@ -327,14 +325,12 @@ class BootRepairResult {
             Map<String, dynamic>.from(verificationRaw),
           )
         : null;
-    final elevationCancelled = response['elevationCancelled'] == true;
     final rollbackAttempted = response['rollbackAttempted'] == true;
     final rollbackSucceeded =
         rollbackAttempted && response['rollbackSucceeded'] == true;
     final operationCancelled = response['operationCancelled'] == true;
     final operationTimedOut = response['operationTimedOut'] == true;
     final success =
-        !elevationCancelled &&
         !operationCancelled &&
         !operationTimedOut &&
         !rollbackAttempted &&
@@ -342,8 +338,7 @@ class BootRepairResult {
         verification?.passed == true;
     return BootRepairResult(
       success: success,
-      elevationCancelled: elevationCancelled,
-      messageKey: elevationCancelled
+      messageKey: operationCancelled
           ? 'boot_repair_result_cancelled'
           : success
           ? 'boot_repair_result_success'

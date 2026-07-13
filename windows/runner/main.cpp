@@ -5,25 +5,18 @@
 #include "flutter_window.h"
 #include "utils.h"
 
-int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
-                      _In_ wchar_t *command_line, _In_ int show_command) {
-  const std::wstring command_line_value =
-      command_line == nullptr ? L"" : command_line;
-  const bool is_elevated_task =
-      command_line_value.find(L"--elevated-task=") != std::wstring::npos;
-  HANDLE single_instance_mutex = nullptr;
-  if (!is_elevated_task) {
-    single_instance_mutex =
-        ::CreateMutex(nullptr, TRUE, L"Local\\WinDeployStudio.SingleInstance");
-    if (single_instance_mutex == nullptr ||
-        ::GetLastError() == ERROR_ALREADY_EXISTS) {
-      if (single_instance_mutex != nullptr) {
-        ::CloseHandle(single_instance_mutex);
-      }
-      ::MessageBox(nullptr, L"WinDeploy Studio is already running.",
-                   L"WinDeploy Studio", MB_OK | MB_ICONINFORMATION);
-      return EXIT_SUCCESS;
+int APIENTRY wWinMain(_In_ HINSTANCE /*instance*/, _In_opt_ HINSTANCE /*prev*/,
+                      _In_ wchar_t * /*command_line*/, _In_ int /*show_command*/) {
+  HANDLE single_instance_mutex =
+      ::CreateMutex(nullptr, TRUE, L"Local\\WinDeployStudio.SingleInstance");
+  if (single_instance_mutex == nullptr ||
+      ::GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (single_instance_mutex != nullptr) {
+      ::CloseHandle(single_instance_mutex);
     }
+    ::MessageBox(nullptr, L"WinDeploy Studio is already running.",
+                 L"WinDeploy Studio", MB_OK | MB_ICONINFORMATION);
+    return EXIT_SUCCESS;
   }
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
