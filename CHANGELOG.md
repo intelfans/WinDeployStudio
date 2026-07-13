@@ -2,6 +2,25 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## Unreleased
+
+### Linux To Go and Licensing
+
+- Added a separate Debian Live Linux To Go profile: x64 UEFI, `boot=live`, a
+  patchable GRUB entry, an NTFS-capable initrd, and the Debian
+  `persistence` / `/persistence.conf` contract are now validated before any
+  destructive operation.
+- Kept Ubuntu/casper and Debian persistence layouts separate. Casper uses
+  `writable` / `persistent`; Debian uses `persistence` with `/ union` in
+  `persistence.conf`.
+- Removed the previously bundled Google/AOSP `mke2fs.exe` from source, release
+  output, and installer packaging. Its complete corresponding GPLv2 source and
+  static build inputs were not available to this project.
+- Disabled persistent Linux To Go creation until a reproducible, fully
+  license-compliant ext4 creator can be distributed with its source package.
+- Added explicit third-party, README, installer, and localized UI notices for
+  this distribution gate.
+
 ## v2.0.0
 
 ### New Features

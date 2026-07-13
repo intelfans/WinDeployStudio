@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,7 @@ enum LinuxToGoImageFamily { casper, debianLive }
 /// The persistence layout required by an image family.
 enum LinuxToGoPersistenceStrategy {
   casperWritableImage,
-  debianPersistencePartition,
+  debianPersistenceImage,
 }
 
 /// The boot configuration syntax that a creator can safely modify.
@@ -33,7 +34,7 @@ enum LinuxToGoImageIssue {
   missingLivePayload,
   noPatchableBootConfig,
   bootFileTooLarge,
-  debianLiveUnsupported,
+  debianLiveMissingNtfsSupport,
   unknownLayout,
 }
 
@@ -52,8 +53,8 @@ extension LinuxToGoImageIssueLocalization on LinuxToGoImageIssue {
     LinuxToGoImageIssue.noPatchableBootConfig =>
       'linux_togo_boot_config_unsupported',
     LinuxToGoImageIssue.bootFileTooLarge => 'linux_togo_boot_file_too_large',
-    LinuxToGoImageIssue.debianLiveUnsupported =>
-      'linux_togo_debian_live_unsupported',
+    LinuxToGoImageIssue.debianLiveMissingNtfsSupport =>
+      'linux_togo_debian_live_missing_ntfs_support',
     LinuxToGoImageIssue.unknownLayout => 'linux_togo_unsupported_iso',
   };
 }
@@ -167,6 +168,8 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
   static const String _efiBootRelativePath = 'EFI/BOOT/BOOTX64.EFI';
   static const String _casperKernelRelativePath = 'casper/vmlinuz';
   static const String _casperInitrdRelativePath = 'casper/initrd';
+  static const String _debianKernelRelativePath = 'live/vmlinuz';
+  static const String _debianInitrdRelativePath = 'live/initrd.img';
   static const List<String> _grubConfigPaths = [
     'boot/grub/grub.cfg',
     'boot/grub/loopback.cfg',
@@ -228,9 +231,7 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
 
       final scan = await _scanFiles(mountedRoot);
       if (await _looksLikeDebianLive(mountedRoot, scan)) {
-        return const LinuxToGoImageInspection.unsupported(
-          LinuxToGoImageIssue.debianLiveUnsupported,
-        );
+        return _inspectDebianLive(mountedRoot: mountedRoot, scan: scan);
       }
 
       final kernel = File(p.join(mountedRoot, _casperKernelRelativePath));
@@ -357,9 +358,82 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
       p.join(mountedRoot, 'live', 'vmlinuz'),
     );
     final hasInitrd = await _isRegularFile(
-      p.join(mountedRoot, 'live', 'initrd.img'),
+      p.join(mountedRoot, _debianInitrdRelativePath),
     );
-    return hasKernel || hasInitrd;
+    return hasPayload || hasKernel || hasInitrd;
+  }
+
+  static Future<LinuxToGoImageInspection> _inspectDebianLive({
+    required String mountedRoot,
+    required _LinuxToGoFileScan scan,
+  }) async {
+    final kernel = File(p.join(mountedRoot, _debianKernelRelativePath));
+    final initrd = File(p.join(mountedRoot, _debianInitrdRelativePath));
+    if (!await _isRegularFile(kernel.path)) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingKernel,
+      );
+    }
+    if (!await _isRegularFile(initrd.path)) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingInitrd,
+      );
+    }
+    if (!await _isRegularFile(p.join(mountedRoot, _efiBootRelativePath))) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingX64Efi,
+      );
+    }
+
+    final livePayloads = scan.livePayloads
+        .where(
+          (payload) => payload.relativePath.toLowerCase().startsWith('live/'),
+        )
+        .toList(growable: false);
+    if (livePayloads.isEmpty) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingLivePayload,
+      );
+    }
+    if (scan.largestBootFileBytes > _fat32MaxFileBytes) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.bootFileTooLarge,
+      );
+    }
+
+    final patchableConfigs = await _findPatchableDebianGrubConfigs(mountedRoot);
+    if (patchableConfigs.isEmpty) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.noPatchableBootConfig,
+      );
+    }
+
+    // The Live filesystem is deliberately stored on NTFS so a FAT32 boot
+    // partition never needs to carry a multi-gigabyte squashfs payload. The
+    // selected initrd must contain both an NTFS implementation and live-boot
+    // content before we permit a destructive operation. We fail closed for
+    // compressed/opaque initrds and malformed CPIO archives.
+    if (!await _debianInitrdProvidesNtfsSupport(initrd)) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.debianLiveMissingNtfsSupport,
+      );
+    }
+
+    return LinuxToGoImageInspection.supported(
+      LinuxToGoSupportedImage(
+        family: LinuxToGoImageFamily.debianLive,
+        persistenceStrategy:
+            LinuxToGoPersistenceStrategy.debianPersistenceImage,
+        efiBootRelativePath: _efiBootRelativePath,
+        kernelRelativePath: _debianKernelRelativePath,
+        initrdRelativePath: _debianInitrdRelativePath,
+        patchableBootConfigs: patchableConfigs,
+        livePayloads: livePayloads,
+        totalContentBytes: scan.totalContentBytes,
+        bootContentBytes: scan.bootContentBytes,
+        supportsDriverStaging: false,
+      ),
+    );
   }
 
   static Future<List<LinuxToGoBootConfig>> _findPatchableCasperGrubConfigs(
@@ -385,6 +459,113 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
     }
     return configs;
   }
+
+  static Future<List<LinuxToGoBootConfig>> _findPatchableDebianGrubConfigs(
+    String mountedRoot,
+  ) async {
+    final configs = <LinuxToGoBootConfig>[];
+    final liveEntry = RegExp(
+      r'^\s*linux(efi)?\s+.*\/live\/vmlinuz(?:\s|$)',
+      caseSensitive: false,
+      multiLine: true,
+    );
+    final liveBootArgument = RegExp(
+      r'(^|\s)boot=live(?:\s|$)',
+      caseSensitive: false,
+    );
+    for (final relativePath in _grubConfigPaths) {
+      final file = File(p.join(mountedRoot, relativePath));
+      if (!await _isRegularFile(file.path)) continue;
+      final text = await file.readAsString();
+      final hasPatchableEntry = text
+          .replaceAll('\r\n', '\n')
+          .split('\n')
+          .any(
+            (line) =>
+                liveEntry.hasMatch(line) && liveBootArgument.hasMatch(line),
+          );
+      if (!hasPatchableEntry) continue;
+      configs.add(
+        LinuxToGoBootConfig(
+          relativePath: relativePath,
+          syntax: LinuxToGoBootConfigSyntax.grub,
+        ),
+      );
+    }
+    return configs;
+  }
+
+  static Future<bool> _debianInitrdProvidesNtfsSupport(File initrd) async {
+    // Debian live-build uses an uncompressed newc archive for the supported
+    // profile. Parse entries instead of searching arbitrary bytes so a string
+    // in compressed data cannot mistakenly approve a destructive write.
+    RandomAccessFile? handle;
+    try {
+      handle = await initrd.open(mode: FileMode.read);
+      final length = await handle.length();
+      var offset = 0;
+      var hasNtfsSupport = false;
+      var hasLiveBoot = false;
+      while (offset + 110 <= length) {
+        await handle.setPosition(offset);
+        final header = await handle.read(110);
+        if (header.length != 110 ||
+            ascii.decode(header.sublist(0, 6)) != '070701') {
+          return false;
+        }
+        final fileSize = _parseNewcHex(header, 54);
+        final nameSize = _parseNewcHex(header, 94);
+        if (fileSize == null || nameSize == null || nameSize <= 1) {
+          return false;
+        }
+        final nameOffset = offset + 110;
+        if (nameOffset + nameSize > length) return false;
+        await handle.setPosition(nameOffset);
+        final nameBytes = await handle.read(nameSize);
+        if (nameBytes.length != nameSize || nameBytes.last != 0) return false;
+        final name = ascii
+            .decode(
+              nameBytes.sublist(0, nameBytes.length - 1),
+              allowInvalid: true,
+            )
+            .toLowerCase();
+        if (name == 'trailer!!!') return hasNtfsSupport && hasLiveBoot;
+
+        hasNtfsSupport =
+            hasNtfsSupport ||
+            name.contains('ntfs3.ko') ||
+            name.contains('ntfs.ko') ||
+            name.contains('ntfs-3g') ||
+            name.contains('mount.ntfs');
+        hasLiveBoot =
+            hasLiveBoot ||
+            name.contains('live-boot') ||
+            name.contains('scripts/live') ||
+            name.contains('/live/boot');
+
+        final dataOffset = _alignNewc(nameOffset + nameSize);
+        final nextOffset = _alignNewc(dataOffset + fileSize);
+        if (nextOffset <= offset || nextOffset > length) return false;
+        offset = nextOffset;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    } finally {
+      await handle?.close();
+    }
+  }
+
+  static int? _parseNewcHex(List<int> header, int offset) {
+    if (offset + 8 > header.length) return null;
+    final value = int.tryParse(
+      ascii.decode(header.sublist(offset, offset + 8), allowInvalid: true),
+      radix: 16,
+    );
+    return value == null || value < 0 ? null : value;
+  }
+
+  static int _alignNewc(int value) => (value + 3) & ~3;
 
   static Future<bool> _isRegularFile(String path) async =>
       await FileSystemEntity.type(path, followLinks: false) ==

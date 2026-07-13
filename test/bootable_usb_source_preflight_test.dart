@@ -132,7 +132,7 @@ void main() {
           linuxToGoImagePreflightProvider.overrideWithValue(
             const _StaticLinuxToGoImagePreflight(
               LinuxToGoImageInspection.unsupported(
-                LinuxToGoImageIssue.debianLiveUnsupported,
+                LinuxToGoImageIssue.debianLiveMissingNtfsSupport,
               ),
             ),
           ),
@@ -157,7 +157,10 @@ void main() {
 
       expect(created, isFalse);
       expect(safety.checkCalls, 0);
-      expect(updates.single.message, 'linux_togo_debian_live_unsupported');
+      expect(
+        updates.single.message,
+        'linux_togo_debian_live_missing_ntfs_support',
+      );
     },
   );
 }

@@ -1,5 +1,20 @@
 # Third-Party Notices
 
+## e2fsprogs Status
+
+This release does **not** redistribute e2fsprogs, `mke2fs.exe`, Cygwin, or an
+ext4-creation component. Linux To Go persistence is disabled until the project
+can ship a reproducible component together with its complete corresponding
+source and all required notices.
+
+The source tree retains the protocol implementation and a compliance checklist
+only. It contains no e2fsprogs code. See
+[`tools/e2fsprogs/README.md`](tools/e2fsprogs/README.md) for the release gate.
+
+For reference, the e2fsprogs `mke2fs` utility is GPL-2.0-only. Any future
+binary distribution must include the exact GPLv2 obligations; a generic AOSP or
+upstream URL is not a substitute for complete corresponding source.
+
 ## CrystalDiskInfo
 
 Portions of the disk diagnostics bridge-compatibility logic were derived from

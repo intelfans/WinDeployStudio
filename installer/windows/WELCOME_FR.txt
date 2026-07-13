@@ -16,8 +16,8 @@ Fonctionnalités principales :
     Créer un support Windows ou écrire une image Linux ISOHybrid amorçable
     
   🚀 Environnements To Go
-    Créer des environnements Windows portables ou Linux persistants à partir
-    d’images Live x64 Ubuntu/casper compatibles
+    Créer des environnements Windows portables et valider les dispositions
+    Ubuntu/casper et Debian Live x64 ; la création Linux persistante est désactivée
     
   📊 Test natif des disques
     Mesurer l'écriture séquentielle, 4K, multithread et soutenue

@@ -14,7 +14,7 @@ GitHub プロフィール: https://github.com/intelfans
 GitHub リポジトリ: https://github.com/intelfans/WinDeployStudio
 
 第三者ツールに関するお知らせ:
-Linux To Go には、ext4 永続化イメージを作成するために e2fsprogs/AOSP 由来の mke2fs.exe ユーティリティが同梱されています。これは別個のコマンドラインツールとして実行されます。詳細はインストール先フォルダーの tools\e2fsprogs\README.md を参照してください。
+このリリースには、GPLv2 が求める完全な対応ソースパッケージがまだないため、ext4 作成ツールは同梱されていません。永続化 Linux To Go の作成は無効です。インストール先の THIRD_PARTY_NOTICES.md と tools\e2fsprogs\README.md を参照してください。
 
 特別感謝
 

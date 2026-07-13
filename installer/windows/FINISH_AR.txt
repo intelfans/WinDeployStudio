@@ -14,7 +14,7 @@
 مستودع GitHub: https://github.com/intelfans/WinDeployStudio
 
 ملاحظة حول أداة خارجية:
-يتضمن Linux To Go أداة mke2fs.exe المرفقة من e2fsprogs/AOSP لإنشاء صور استمرارية ext4. يتم تشغيلها كأداة سطر أوامر منفصلة. راجع tools\e2fsprogs\README.md في مجلد التثبيت للتفاصيل.
+لا يتضمن هذا الإصدار أداة لإنشاء ext4 لأن حزمة المصدر المطابق الكاملة التي تتطلبها GPLv2 ليست متاحة بعد. إنشاء Linux To Go الدائم معطّل. راجع THIRD_PARTY_NOTICES.md وtools\e2fsprogs\README.md في مجلد التثبيت.
 
 شكر خاص
 

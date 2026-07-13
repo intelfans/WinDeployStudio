@@ -14,7 +14,7 @@ GitHub 프로필: https://github.com/intelfans
 GitHub 저장소: https://github.com/intelfans/WinDeployStudio
 
 타사 도구 안내:
-Linux To Go에는 ext4 지속성 이미지를 만들기 위한 e2fsprogs/AOSP 기반 mke2fs.exe 유틸리티가 포함되어 있습니다. 이 도구는 별도의 명령줄 도구로 실행됩니다. 자세한 내용은 설치 폴더의 tools\e2fsprogs\README.md를 확인하세요.
+이 릴리스에는 GPLv2가 요구하는 완전한 대응 소스 패키지가 아직 없어 ext4 생성 도구가 포함되어 있지 않습니다. 영구 Linux To Go 생성은 비활성화되어 있습니다. 설치 폴더의 THIRD_PARTY_NOTICES.md와 tools\e2fsprogs\README.md를 확인하세요.
 
 특별 감사
 

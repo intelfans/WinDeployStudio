@@ -16,8 +16,8 @@ Hauptfunktionen:
     Windows-Medien erstellen oder bootfähige Linux-ISOHybrid-Images schreiben
     
   🚀 To Go-Umgebungen
-    Portable Windows-Umgebungen oder persistente Linux-Umgebungen aus
-    unterstützten x64-Ubuntu-/casper-Live-Images erstellen
+    Portable Windows-Umgebungen erstellen und x64-Ubuntu/casper- sowie
+    Debian-Live-Layouts prüfen; persistente Linux-Erstellung ist deaktiviert
     
   📊 Nativer Laufwerkstest
     Sequenzielle, 4K-, Multithread- und Dauerschreibtests

@@ -240,6 +240,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           _iso = iso;
           _imageIndex = inspection.canCreate ? 1 : null;
           _linuxToGoInspection = inspection;
+          if (inspection.canCreate &&
+              inspection.image?.supportsDriverStaging != true) {
+            _driverDirectory = '';
+          }
         });
         if (!inspection.canCreate) {
           final messageKey =
@@ -375,7 +379,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       ntfsUefiSupport: !_isLinux && _bootMode != DeploymentBootMode.legacyBios,
       preferredSystemLetter: _isLinux ? '' : _systemLetter,
       preferredBootLetter: _isLinux ? '' : _bootLetter,
-      driverDirectory: _driverDirectory,
+      driverDirectory:
+          _isLinux && _linuxToGoInspection?.image?.supportsDriverStaging != true
+          ? ''
+          : _driverDirectory,
       customIconPath: _customIconPath,
       customVolumeLabel: _volumeLabelController.text.trim(),
     );
@@ -393,7 +400,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       0 =>
         _iso != null &&
             (_isLinux
-                ? _linuxToGoInspection?.canCreate == true
+                ? _linuxToGoInspection?.canCreate == true &&
+                      BootableUsbService
+                          .linuxPersistenceToolDistributionApproved
                 : _imageIndex != null),
       1 => _disk != null && _diskSafety?.isSafe == true,
       2 => DeploymentCompatibility.evaluate(_plan).canDeploy,
@@ -799,12 +808,19 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   Widget _buildLinuxToGoInspectionBanner(LinuxToGoImageInspection inspection) {
-    final supported = inspection.canCreate;
+    final layoutSupported = inspection.canCreate;
+    final supported =
+        layoutSupported &&
+        BootableUsbService.linuxPersistenceToolDistributionApproved;
     final colorScheme = Theme.of(context).colorScheme;
     final color = supported ? colorScheme.primary : colorScheme.error;
-    final messageKey = supported
-        ? 'linux_togo_image_supported'
-        : inspection.messageKey ?? 'linux_togo_unsupported_iso';
+    final messageKey = !layoutSupported
+        ? inspection.messageKey ?? 'linux_togo_unsupported_iso'
+        : !BootableUsbService.linuxPersistenceToolDistributionApproved
+        ? 'linux_togo_mke2fs_missing'
+        : inspection.image?.family == LinuxToGoImageFamily.debianLive
+        ? 'linux_togo_debian_image_supported'
+        : 'linux_togo_image_supported';
 
     return Semantics(
       key: const Key('ltg-image-inspection'),
@@ -1039,6 +1055,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   Widget _buildAdvancedStep() {
     final plan = _plan;
+    final canStageLinuxDrivers =
+        !_isLinux || _linuxToGoInspection?.image?.supportsDriverStaging == true;
     return _stepContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1095,26 +1113,27 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     (value) => _enableNetFx3 = value,
                   ),
                 ],
-                ListTile(
-                  leading: const Icon(Icons.folder_copy_outlined),
-                  title: Text(tr(context, 'deploy_driver_directory')),
-                  subtitle: Text(
-                    _driverDirectory.isEmpty
-                        ? tr(
-                            context,
-                            _isLinux
-                                ? 'deploy_linux_driver_desc'
-                                : 'deploy_windows_driver_desc',
-                          )
-                        : _driverDirectory,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                if (canStageLinuxDrivers)
+                  ListTile(
+                    leading: const Icon(Icons.folder_copy_outlined),
+                    title: Text(tr(context, 'deploy_driver_directory')),
+                    subtitle: Text(
+                      _driverDirectory.isEmpty
+                          ? tr(
+                              context,
+                              _isLinux
+                                  ? 'deploy_linux_driver_desc'
+                                  : 'deploy_windows_driver_desc',
+                            )
+                          : _driverDirectory,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      onPressed: _pickDriverDirectory,
+                      icon: const Icon(Icons.folder_open),
+                    ),
                   ),
-                  trailing: IconButton(
-                    onPressed: _pickDriverDirectory,
-                    icon: const Icon(Icons.folder_open),
-                  ),
-                ),
               ],
             ),
           ),

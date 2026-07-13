@@ -57,26 +57,29 @@ final bootableUsbServiceProvider = Provider<BootableUsbService>((ref) {
 
 class BootableUsbService {
   static const String _linuxToGoIconFileName = '.wds-drive.ico';
-  static const String _trustedMke2fsSha256 =
-      'BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A';
-  static const String _trustedMke2fsVersion = 'mke2fs 1.47.2 (1-Jan-2025)';
-  static const String _trustedMke2fsLibraryVersion =
-      'android-platform-15.0.0_r5-314-ga1f793f6b';
+  static const String _casperPersistenceFileName = 'writable';
+  static const String _casperPersistenceVolumeLabel = 'writable';
+  static const String _debianPersistenceFileName = 'persistence';
+  static const String _debianPersistenceVolumeLabel = 'persistence';
+  static const String _debianPersistenceConfiguration = '/ union\n';
+
+  static const bool linuxPersistenceToolDistributionApproved = false;
 
   @visibleForTesting
-  static String trustedMke2fsPathForResolvedExecutable(
-    String resolvedExecutable,
-  ) => p.join(
-    File(resolvedExecutable).parent.path,
-    'tools',
-    'e2fsprogs',
-    'mke2fs.exe',
-  );
+  static String linuxToGoPersistenceFileNameForFamily(
+    LinuxToGoImageFamily family,
+  ) => switch (family) {
+    LinuxToGoImageFamily.casper => _casperPersistenceFileName,
+    LinuxToGoImageFamily.debianLive => _debianPersistenceFileName,
+  };
 
   @visibleForTesting
-  static bool isTrustedMke2fsVersionOutput(String output) =>
-      output.contains(_trustedMke2fsVersion) &&
-      output.contains(_trustedMke2fsLibraryVersion);
+  static String linuxToGoPersistenceArgumentForFamily(
+    LinuxToGoImageFamily family,
+  ) => switch (family) {
+    LinuxToGoImageFamily.casper => 'persistent',
+    LinuxToGoImageFamily.debianLive => 'persistence',
+  };
 
   final Ref ref;
   final List<String> _log = [];
@@ -1075,6 +1078,19 @@ class BootableUsbService {
         );
       }
 
+      if (stagingBundle != null && !freshImage.supportsDriverStaging) {
+        _logLine(
+          'Linux To Go image family ${freshImage.family.name} does not '
+          'support the casper first-boot staging contract.',
+        );
+        return const _LinuxRawWriteResult(
+          success: false,
+          error:
+              'The selected Linux To Go image does not support first-boot driver staging.',
+          failureMessageKey: 'linux_togo_driver_staging_unsupported',
+        );
+      }
+
       final diskBytes = await _getDiskSizeBytes(diskNumber);
       if (diskBytes == null) {
         return const _LinuxRawWriteResult(
@@ -1339,6 +1355,7 @@ class BootableUsbService {
       final persistenceResult = await _createPersistenceImage(
         targetDrive: bootDrive,
         sizeMb: persistenceSizeMb,
+        image: freshImage,
       );
       if (!persistenceResult.success) {
         return persistenceResult;
@@ -1803,10 +1820,14 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     required String liveMediaArgument,
     required bool enableFirstBootStaging,
   }) async {
-    if (image.family != LinuxToGoImageFamily.casper ||
-        image.persistenceStrategy !=
-            LinuxToGoPersistenceStrategy.casperWritableImage) {
+    if (!_isSupportedLinuxToGoPersistenceStrategy(image)) {
       _logLine('Unsupported Linux To Go persistence strategy.');
+      return false;
+    }
+    if (enableFirstBootStaging && !image.supportsDriverStaging) {
+      _logLine(
+        'This Linux To Go image family does not support driver staging.',
+      );
       return false;
     }
 
@@ -1817,6 +1838,12 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       '$escapedKernelPath(?:\\s|\$)',
       caseSensitive: false,
     );
+    final requiresLiveBoot = image.family == LinuxToGoImageFamily.debianLive;
+    final liveBootPattern = RegExp(
+      r'(^|\s)boot=live(?:\s|$)',
+      caseSensitive: false,
+    );
+    final persistenceArgument = _linuxToGoPersistenceArgument(image);
 
     for (final config in image.patchableBootConfigs) {
       if (config.syntax != LinuxToGoBootConfigSyntax.grub) continue;
@@ -1842,18 +1869,20 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
               r'^\s*linux(efi)?\s+',
               caseSensitive: false,
             ).hasMatch(line);
-            if (!isLinuxLine || !kernelPattern.hasMatch(line)) {
+            if (!isLinuxLine ||
+                !kernelPattern.hasMatch(line) ||
+                (requiresLiveBoot && !liveBootPattern.hasMatch(line))) {
               return line;
             }
 
             foundPatchableEntry = true;
             var updated = line;
-            final persistentPattern = RegExp(
-              r'(^|\s)persistent(\s|$)',
+            final persistencePattern = RegExp(
+              '(^|\\s)${RegExp.escape(persistenceArgument)}(\\s|\$)',
               caseSensitive: false,
             );
-            if (!persistentPattern.hasMatch(updated)) {
-              updated = _insertGrubKernelArgument(updated, 'persistent');
+            if (!persistencePattern.hasMatch(updated)) {
+              updated = _insertGrubKernelArgument(updated, persistenceArgument);
             }
 
             final liveMediaPattern = RegExp(
@@ -1908,10 +1937,58 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     return '$line $argument';
   }
 
+  static bool _isSupportedLinuxToGoPersistenceStrategy(
+    LinuxToGoSupportedImage image,
+  ) =>
+      (image.family == LinuxToGoImageFamily.casper &&
+          image.persistenceStrategy ==
+              LinuxToGoPersistenceStrategy.casperWritableImage) ||
+      (image.family == LinuxToGoImageFamily.debianLive &&
+          image.persistenceStrategy ==
+              LinuxToGoPersistenceStrategy.debianPersistenceImage);
+
+  static String _linuxToGoPersistenceFileName(LinuxToGoSupportedImage image) =>
+      switch (image.persistenceStrategy) {
+        LinuxToGoPersistenceStrategy.casperWritableImage =>
+          _casperPersistenceFileName,
+        LinuxToGoPersistenceStrategy.debianPersistenceImage =>
+          _debianPersistenceFileName,
+      };
+
+  static String _linuxToGoPersistenceVolumeLabel(
+    LinuxToGoSupportedImage image,
+  ) => switch (image.persistenceStrategy) {
+    LinuxToGoPersistenceStrategy.casperWritableImage =>
+      _casperPersistenceVolumeLabel,
+    LinuxToGoPersistenceStrategy.debianPersistenceImage =>
+      _debianPersistenceVolumeLabel,
+  };
+
+  static String _linuxToGoPersistenceArgument(LinuxToGoSupportedImage image) =>
+      switch (image.persistenceStrategy) {
+        LinuxToGoPersistenceStrategy.casperWritableImage => 'persistent',
+        LinuxToGoPersistenceStrategy.debianPersistenceImage => 'persistence',
+      };
+
+  static String? _linuxToGoPersistenceConfiguration(
+    LinuxToGoSupportedImage image,
+  ) => switch (image.persistenceStrategy) {
+    LinuxToGoPersistenceStrategy.casperWritableImage => null,
+    LinuxToGoPersistenceStrategy.debianPersistenceImage =>
+      _debianPersistenceConfiguration,
+  };
+
   Future<_LinuxRawWriteResult> _createPersistenceImage({
     required String targetDrive,
     required int sizeMb,
+    required LinuxToGoSupportedImage image,
   }) async {
+    if (!_isSupportedLinuxToGoPersistenceStrategy(image)) {
+      return const _LinuxRawWriteResult(
+        success: false,
+        error: 'Unsupported Linux To Go persistence strategy.',
+      );
+    }
     final mke2fs = await _findMke2fs();
     if (mke2fs == null) {
       return const _LinuxRawWriteResult(
@@ -1922,101 +1999,94 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     }
 
     final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
-    final image = File(p.join(root, 'writable'));
-    _logLine('Creating Linux persistence image: ${image.path}, ${sizeMb}MB');
+    final fileName = _linuxToGoPersistenceFileName(image);
+    final volumeLabel = _linuxToGoPersistenceVolumeLabel(image);
+    final configuration = _linuxToGoPersistenceConfiguration(image);
+    final persistenceImage = File(p.join(root, fileName));
+    _logLine(
+      'Creating Linux persistence image: ${persistenceImage.path}, '
+      '${sizeMb}MB, label=$volumeLabel',
+    );
 
-    if (await image.exists()) {
-      await image.delete();
+    if (await persistenceImage.exists()) {
+      await persistenceImage.delete();
     }
 
-    final raf = await image.open(mode: FileMode.write);
+    final raf = await persistenceImage.open(mode: FileMode.write);
     try {
       await raf.truncate(sizeMb * 1024 * 1024);
     } finally {
       await raf.close();
     }
 
-    final result = await _runLinuxUtility(mke2fs, [
-      '-t',
-      'ext4',
-      '-F',
-      '-L',
-      'writable',
-      image.path,
-    ], timeout: const Duration(minutes: 5));
+    Directory? seedDirectory;
+    try {
+      final arguments = <String>['-t', 'ext4', '-F', '-L', volumeLabel];
+      if (configuration != null) {
+        seedDirectory = await Directory.systemTemp.createTemp(
+          'wds_ltg_persistence_',
+        );
+        await File(
+          p.join(seedDirectory.path, 'persistence.conf'),
+        ).writeAsString(configuration, encoding: utf8, flush: true);
+        arguments
+          ..add('-d')
+          ..add(seedDirectory.path);
+      }
+      arguments.add(persistenceImage.path);
 
-    _logLine('mke2fs exit: ${result.exitCode}');
-    if (result.stdout.toString().trim().isNotEmpty) {
-      _logLine('mke2fs stdout: ${result.stdout}');
-    }
-    if (result.stderr.toString().trim().isNotEmpty) {
-      _logLine('mke2fs stderr: ${result.stderr}');
-    }
-
-    if (result.exitCode != 0) {
-      return _LinuxRawWriteResult(
-        success: false,
-        error: result.stderr.toString().trim().isNotEmpty
-            ? result.stderr.toString().trim()
-            : 'mke2fs failed with exit code ${result.exitCode}.',
+      final result = await _runLinuxUtility(
+        mke2fs,
+        arguments,
+        timeout: const Duration(minutes: 5),
       );
-    }
 
-    return const _LinuxRawWriteResult(success: true);
+      _logLine('mke2fs exit: ${result.exitCode}');
+      if (result.stdout.toString().trim().isNotEmpty) {
+        _logLine('mke2fs stdout: ${result.stdout}');
+      }
+      if (result.stderr.toString().trim().isNotEmpty) {
+        _logLine('mke2fs stderr: ${result.stderr}');
+      }
+
+      if (result.exitCode != 0) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error: result.stderr.toString().trim().isNotEmpty
+              ? result.stderr.toString().trim()
+              : 'mke2fs failed with exit code ${result.exitCode}.',
+        );
+      }
+
+      final verified = await _verifyExt4PersistenceImage(
+        persistenceImage,
+        expectedVolumeLabel: volumeLabel,
+        expectedConfiguration: configuration,
+      );
+      if (!verified) {
+        return _LinuxRawWriteResult(
+          success: false,
+          error:
+              'The ext4 $fileName persistence image did not pass post-create verification.',
+        );
+      }
+      return const _LinuxRawWriteResult(success: true);
+    } finally {
+      if (seedDirectory != null && await seedDirectory.exists()) {
+        await seedDirectory.delete(recursive: true);
+      }
+    }
   }
 
   Future<String?> _findMke2fs() async {
-    final candidate = trustedMke2fsPathForResolvedExecutable(
-      Platform.resolvedExecutable,
-    );
-    try {
-      final file = File(candidate);
-      if (await FileSystemEntity.type(candidate, followLinks: false) !=
-          FileSystemEntityType.file) {
-        _logLine('Trusted mke2fs not found at: $candidate');
-        return null;
-      }
-      final resolved = await file.resolveSymbolicLinks();
-      if (p.normalize(resolved).toLowerCase() !=
-          p.normalize(candidate).toLowerCase()) {
-        _logLine('Trusted mke2fs path resolves through a link: $candidate');
-        return null;
-      }
-
-      final digest = (await sha256.bind(file.openRead()).first)
-          .toString()
-          .toUpperCase();
-      if (digest != _trustedMke2fsSha256) {
-        _logLine(
-          'Trusted mke2fs SHA-256 mismatch: expected '
-          '$_trustedMke2fsSha256, actual $digest',
-        );
-        return null;
-      }
-
-      final versionResult = await Process.run(candidate, const [
-        '-V',
-      ]).timeout(const Duration(seconds: 10));
-      final versionOutput = '${versionResult.stdout}\n${versionResult.stderr}'
-          .trim();
-      if (versionResult.exitCode != 0 ||
-          !isTrustedMke2fsVersionOutput(versionOutput)) {
-        _logLine(
-          'Trusted mke2fs version check failed '
-          '(exit ${versionResult.exitCode}): $versionOutput',
-        );
-        return null;
-      }
-
+    if (!linuxPersistenceToolDistributionApproved) {
       _logLine(
-        'Using trusted mke2fs: $candidate '
-        '(SHA-256 $digest; $_trustedMke2fsVersion)',
+        'No compliant mke2fs distribution is available. Linux To Go '
+        'persistence is disabled until its complete corresponding source and '
+        'reproducible build inputs can be shipped with the binary.',
       );
-      return candidate;
-    } catch (error) {
-      _logLine('Trusted mke2fs validation failed: $error');
-      return null;
     }
+    return null;
   }
 
   Future<_LinuxRawWriteResult> _verifyLinuxToGoCopies({
@@ -2126,10 +2196,12 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     LinuxDriverStagingBundle? stagingBundle,
   }) async {
     try {
-      if (image.family != LinuxToGoImageFamily.casper ||
-          image.persistenceStrategy !=
-              LinuxToGoPersistenceStrategy.casperWritableImage) {
+      if (!_isSupportedLinuxToGoPersistenceStrategy(image)) {
         _logLine('Linux To Go verify failed: unsupported persistence strategy');
+        return false;
+      }
+      if (stagingBundle != null && !image.supportsDriverStaging) {
+        _logLine('Linux To Go verify failed: unsupported driver staging');
         return false;
       }
 
@@ -2158,21 +2230,22 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       final liveBootx64 = File(p.join(liveRoot, image.efiBootRelativePath));
       final bootKernel = File(p.join(bootRoot, image.kernelRelativePath));
       final bootInitrd = File(p.join(bootRoot, image.initrdRelativePath));
-      final writable = File(p.join(bootRoot, 'writable'));
+      final persistenceImage = File(
+        p.join(bootRoot, _linuxToGoPersistenceFileName(image)),
+      );
+      final persistenceArgument = _linuxToGoPersistenceArgument(image);
+      final persistenceConfiguration = _linuxToGoPersistenceConfiguration(
+        image,
+      );
 
       if (!await bootx64.exists() || !await liveBootx64.exists()) {
         _logLine('Linux To Go verify failed: BOOTx64.EFI missing');
         return false;
       }
       if (!await bootKernel.exists() || !await bootInitrd.exists()) {
-        _logLine('Linux To Go verify failed: casper kernel or initrd missing');
+        _logLine('Linux To Go verify failed: Live kernel or initrd missing');
         return false;
       }
-      final persistentPattern = RegExp(r'(^|\s)persistent(\s|$)');
-      final liveMediaPattern = RegExp(
-        '(^|\\s)${RegExp.escape(liveMediaArgument)}(\\s|\$)',
-        caseSensitive: false,
-      );
       final bootConfigTexts = <String>[];
       final liveConfigTexts = <String>[];
       for (final config in image.patchableBootConfigs) {
@@ -2191,10 +2264,18 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         }
         final bootText = await bootConfig.readAsString();
         final liveText = await liveConfig.readAsString();
-        if (!persistentPattern.hasMatch(bootText) ||
-            !persistentPattern.hasMatch(liveText) ||
-            !liveMediaPattern.hasMatch(bootText) ||
-            !liveMediaPattern.hasMatch(liveText)) {
+        if (!_hasPatchedLinuxToGoBootEntry(
+              bootText,
+              image: image,
+              persistenceArgument: persistenceArgument,
+              liveMediaArgument: liveMediaArgument,
+            ) ||
+            !_hasPatchedLinuxToGoBootEntry(
+              liveText,
+              image: image,
+              persistenceArgument: persistenceArgument,
+              liveMediaArgument: liveMediaArgument,
+            )) {
           _logLine(
             'Linux To Go verify failed: required boot args missing from '
             '${config.relativePath}',
@@ -2255,22 +2336,13 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         }
       }
 
-      if (!await writable.exists() ||
-          await writable.length() < 16 * 1024 * 1024) {
-        _logLine('Linux To Go verify failed: writable image missing');
+      if (!await _verifyExt4PersistenceImage(
+        persistenceImage,
+        expectedVolumeLabel: _linuxToGoPersistenceVolumeLabel(image),
+        expectedConfiguration: persistenceConfiguration,
+      )) {
+        _logLine('Linux To Go verify failed: persistence image invalid');
         return false;
-      }
-
-      final raf = await writable.open();
-      try {
-        await raf.setPosition(1080);
-        final magic = await raf.read(2);
-        if (magic.length != 2 || magic[0] != 0x53 || magic[1] != 0xEF) {
-          _logLine('Linux To Go verify failed: ext4 magic missing');
-          return false;
-        }
-      } finally {
-        await raf.close();
       }
 
       return true;
@@ -2278,6 +2350,194 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       _logLine('Linux To Go verify error: $e');
       return false;
     }
+  }
+
+  static bool _hasPatchedLinuxToGoBootEntry(
+    String content, {
+    required LinuxToGoSupportedImage image,
+    required String persistenceArgument,
+    required String liveMediaArgument,
+  }) {
+    final kernelPattern = RegExp(
+      '${RegExp.escape('/${image.kernelRelativePath}')}(?:\\s|\$)',
+      caseSensitive: false,
+    );
+    final persistencePattern = RegExp(
+      '(^|\\s)${RegExp.escape(persistenceArgument)}(\\s|\$)',
+      caseSensitive: false,
+    );
+    final liveMediaPattern = RegExp(
+      '(^|\\s)${RegExp.escape(liveMediaArgument)}(\\s|\$)',
+      caseSensitive: false,
+    );
+    final liveBootPattern = RegExp(
+      r'(^|\s)boot=live(?:\s|$)',
+      caseSensitive: false,
+    );
+    return content.replaceAll('\r\n', '\n').split('\n').any((line) {
+      final isLinuxLine = RegExp(
+        r'^\s*linux(efi)?\s+',
+        caseSensitive: false,
+      ).hasMatch(line);
+      return isLinuxLine &&
+          kernelPattern.hasMatch(line) &&
+          (image.family != LinuxToGoImageFamily.debianLive ||
+              liveBootPattern.hasMatch(line)) &&
+          persistencePattern.hasMatch(line) &&
+          liveMediaPattern.hasMatch(line);
+    });
+  }
+
+  Future<bool> _verifyExt4PersistenceImage(
+    File image, {
+    required String expectedVolumeLabel,
+    required String? expectedConfiguration,
+  }) async {
+    RandomAccessFile? handle;
+    try {
+      if (!await image.exists() || await image.length() < 16 * 1024 * 1024) {
+        return false;
+      }
+      handle = await image.open(mode: FileMode.read);
+      final superblock = await _readExact(handle, 1024, 1024);
+      if (superblock == null || _littleEndian16(superblock, 0x38) != 0xef53) {
+        return false;
+      }
+
+      final labelBytes = superblock.sublist(0x78, 0x78 + 16);
+      final labelEnd = labelBytes.indexOf(0);
+      final actualLabel = ascii.decode(
+        labelEnd < 0 ? labelBytes : labelBytes.sublist(0, labelEnd),
+        allowInvalid: true,
+      );
+      if (actualLabel != expectedVolumeLabel) return false;
+      if (expectedConfiguration == null) return true;
+
+      final layout = _Ext4Layout.fromSuperblock(superblock);
+      if (layout == null) return false;
+      final root = await _readExt4Inode(handle, layout, 2);
+      if (root == null || !root.isDirectory) return false;
+      final configurationInode = await _findExt4DirectoryEntry(
+        handle,
+        layout,
+        root,
+        'persistence.conf',
+      );
+      if (configurationInode == null) return false;
+      final configuration = await _readExt4File(
+        handle,
+        layout,
+        configurationInode,
+      );
+      return configuration != null &&
+          utf8.decode(configuration, allowMalformed: true) ==
+              expectedConfiguration;
+    } catch (error) {
+      _logLine('ext4 persistence verification failed: $error');
+      return false;
+    } finally {
+      await handle?.close();
+    }
+  }
+
+  static Future<List<int>?> _readExact(
+    RandomAccessFile handle,
+    int offset,
+    int length,
+  ) async {
+    await handle.setPosition(offset);
+    final bytes = await handle.read(length);
+    return bytes.length == length ? bytes : null;
+  }
+
+  static int _littleEndian16(List<int> bytes, int offset) =>
+      bytes[offset] | (bytes[offset + 1] << 8);
+
+  static int _littleEndian32(List<int> bytes, int offset) =>
+      bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24);
+
+  static Future<_Ext4Inode?> _readExt4Inode(
+    RandomAccessFile handle,
+    _Ext4Layout layout,
+    int inodeNumber,
+  ) async {
+    if (inodeNumber <= 0) return null;
+    final inodeIndex = inodeNumber - 1;
+    final group = inodeIndex ~/ layout.inodesPerGroup;
+    final groupDescriptor = await _readExact(
+      handle,
+      layout.groupDescriptorOffset + group * layout.groupDescriptorSize,
+      layout.groupDescriptorSize,
+    );
+    if (groupDescriptor == null) return null;
+    final inodeTableBlock = _littleEndian32(groupDescriptor, 8);
+    if (inodeTableBlock <= 0) return null;
+    final indexInGroup = inodeIndex % layout.inodesPerGroup;
+    final inodeOffset =
+        inodeTableBlock * layout.blockSize + indexInGroup * layout.inodeSize;
+    final bytes = await _readExact(handle, inodeOffset, layout.inodeSize);
+    if (bytes == null) return null;
+    return _Ext4Inode.fromBytes(bytes);
+  }
+
+  static Future<_Ext4Inode?> _findExt4DirectoryEntry(
+    RandomAccessFile handle,
+    _Ext4Layout layout,
+    _Ext4Inode directory,
+    String expectedName,
+  ) async {
+    final content = await _readExt4File(handle, layout, directory);
+    if (content == null) return null;
+    var offset = 0;
+    while (offset + 8 <= content.length) {
+      final inodeNumber = _littleEndian32(content, offset);
+      final recordLength = _littleEndian16(content, offset + 4);
+      final nameLength = content[offset + 6];
+      if (recordLength < 8 ||
+          recordLength % 4 != 0 ||
+          offset + recordLength > content.length ||
+          nameLength > recordLength - 8) {
+        return null;
+      }
+      if (inodeNumber != 0) {
+        final name = ascii.decode(
+          content.sublist(offset + 8, offset + 8 + nameLength),
+          allowInvalid: true,
+        );
+        if (name == expectedName) {
+          return _readExt4Inode(handle, layout, inodeNumber);
+        }
+      }
+      offset += recordLength;
+    }
+    return null;
+  }
+
+  static Future<List<int>?> _readExt4File(
+    RandomAccessFile handle,
+    _Ext4Layout layout,
+    _Ext4Inode inode,
+  ) async {
+    if (inode.size < 0 || inode.size > 16 * 1024 * 1024) return null;
+    final blocks = inode.dataBlocks(layout.blockSize);
+    if (blocks == null) return null;
+    final remaining = inode.size;
+    final result = <int>[];
+    for (final block in blocks) {
+      if (result.length >= remaining) break;
+      final bytes = await _readExact(
+        handle,
+        block * layout.blockSize,
+        layout.blockSize,
+      );
+      if (bytes == null) return null;
+      final bytesNeeded = remaining - result.length;
+      result.addAll(bytes.take(bytesNeeded));
+    }
+    return result.length == remaining ? result : null;
   }
 
   Future<bool> _partitionMatchesLinuxToGoLayout({
@@ -4401,4 +4661,143 @@ class _LinuxToGoDriveLetters {
     required this.bootLetter,
     required this.liveLetter,
   });
+}
+
+class _Ext4Layout {
+  final int blockSize;
+  final int inodeSize;
+  final int inodesPerGroup;
+  final int groupDescriptorOffset;
+  final int groupDescriptorSize;
+
+  const _Ext4Layout({
+    required this.blockSize,
+    required this.inodeSize,
+    required this.inodesPerGroup,
+    required this.groupDescriptorOffset,
+    required this.groupDescriptorSize,
+  });
+
+  static _Ext4Layout? fromSuperblock(List<int> superblock) {
+    if (superblock.length < 1024) return null;
+    final logBlockSize = _BootableUsbExt4Codec.littleEndian32(superblock, 0x18);
+    if (logBlockSize > 2) return null;
+    final blockSize = 1024 << logBlockSize;
+    final inodeSize = _BootableUsbExt4Codec.littleEndian16(superblock, 0x58);
+    final inodesPerGroup = _BootableUsbExt4Codec.littleEndian32(
+      superblock,
+      0x28,
+    );
+    final descriptorSize = _BootableUsbExt4Codec.littleEndian16(
+      superblock,
+      0xfe,
+    );
+    if (inodeSize < 128 ||
+        inodeSize > blockSize ||
+        inodesPerGroup <= 0 ||
+        descriptorSize < 32 ||
+        descriptorSize > blockSize) {
+      return null;
+    }
+    return _Ext4Layout(
+      blockSize: blockSize,
+      inodeSize: inodeSize,
+      inodesPerGroup: inodesPerGroup,
+      groupDescriptorOffset: (blockSize == 1024 ? 2 : 1) * blockSize,
+      groupDescriptorSize: descriptorSize,
+    );
+  }
+}
+
+class _Ext4Inode {
+  static const int _extentFlag = 0x00080000;
+  final int mode;
+  final int size;
+  final int flags;
+  final List<int> blockData;
+
+  const _Ext4Inode({
+    required this.mode,
+    required this.size,
+    required this.flags,
+    required this.blockData,
+  });
+
+  bool get isDirectory => (mode & 0xf000) == 0x4000;
+
+  static _Ext4Inode? fromBytes(List<int> bytes) {
+    if (bytes.length < 100) return null;
+    return _Ext4Inode(
+      mode: _BootableUsbExt4Codec.littleEndian16(bytes, 0),
+      size: _BootableUsbExt4Codec.littleEndian32(bytes, 4),
+      flags: _BootableUsbExt4Codec.littleEndian32(bytes, 0x20),
+      blockData: bytes.sublist(0x28, 0x28 + 60),
+    );
+  }
+
+  List<int>? dataBlocks(int blockSize) {
+    if (size == 0) return const [];
+    if ((flags & _extentFlag) == 0) {
+      final blocks = <int>[];
+      for (var index = 0; index < 12; index++) {
+        final block = _BootableUsbExt4Codec.littleEndian32(
+          blockData,
+          index * 4,
+        );
+        if (block == 0) break;
+        blocks.add(block);
+      }
+      return _hasEnoughBlocks(blocks, blockSize) ? blocks : null;
+    }
+
+    if (_BootableUsbExt4Codec.littleEndian16(blockData, 0) != 0xf30a ||
+        _BootableUsbExt4Codec.littleEndian16(blockData, 6) != 0) {
+      return null;
+    }
+    final entries = _BootableUsbExt4Codec.littleEndian16(blockData, 2);
+    final maximumEntries = _BootableUsbExt4Codec.littleEndian16(blockData, 4);
+    if (entries <= 0 || entries > maximumEntries || 12 + entries * 12 > 60) {
+      return null;
+    }
+
+    final blocks = <int>[];
+    for (var entry = 0; entry < entries; entry++) {
+      final offset = 12 + entry * 12;
+      final rawLength = _BootableUsbExt4Codec.littleEndian16(
+        blockData,
+        offset + 4,
+      );
+      final length = rawLength & 0x7fff;
+      final startHigh = _BootableUsbExt4Codec.littleEndian16(
+        blockData,
+        offset + 6,
+      );
+      final startLow = _BootableUsbExt4Codec.littleEndian32(
+        blockData,
+        offset + 8,
+      );
+      final start = (startHigh << 32) | startLow;
+      if (length <= 0 || rawLength != length || start <= 0) return null;
+      for (var block = 0; block < length; block++) {
+        blocks.add(start + block);
+      }
+    }
+    return _hasEnoughBlocks(blocks, blockSize) ? blocks : null;
+  }
+
+  bool _hasEnoughBlocks(List<int> blocks, int blockSize) =>
+      blocks.length * blockSize >= size;
+}
+
+class _BootableUsbExt4Codec {
+  const _BootableUsbExt4Codec._();
+
+  static int littleEndian16(List<int> bytes, int offset) =>
+      bytes[offset] | (bytes[offset + 1] << 8);
+
+  static int littleEndian32(List<int> bytes, int offset) =>
+      bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24);
 }

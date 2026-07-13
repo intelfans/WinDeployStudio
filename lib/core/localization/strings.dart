@@ -178,11 +178,11 @@ const _en = <String, String>{
   'linux_togo_mount_preflight_failed':
       'The Linux image could not be inspected. The target disk was not changed.',
   'linux_togo_unsupported_iso':
-      'Persistent Linux To Go currently supports x64 Ubuntu and compatible casper-based Live images. Use Install Media for other distributions.',
+      'Persistent Linux To Go supports verified x64 Ubuntu/casper and Debian Live layouts. Use Install Media for other distributions.',
   'linux_togo_mke2fs_missing':
-      'The bundled Linux persistence component is missing. Reinstall WinDeploy Studio. The target disk was not changed.',
+      'This build does not include a compliant Linux persistence component. The target disk was not changed.',
   'linux_togo_boot_config_unsupported':
-      'This casper image has no supported GRUB entry for enabling persistence. The target disk was not changed.',
+      'This Live image has no supported GRUB entry for enabling persistence. The target disk was not changed.',
   'linux_togo_boot_file_too_large':
       'This image has a required boot file larger than FAT32 can store. The target disk was not changed.',
   'bench_error_helper_missing':
@@ -1114,11 +1114,11 @@ const _zh = <String, String>{
   'linux_not_isohybrid': '此 ISO 不是可启动的 ISOHybrid 镜像，目标磁盘未被修改。',
   'linux_togo_mount_preflight_failed': '无法检查此 Linux 镜像，目标磁盘未被修改。',
   'linux_togo_unsupported_iso':
-      '持久化 Linux To Go 目前支持 x64 Ubuntu 及兼容的 casper Live 镜像。其他发行版请使用“安装盘”功能。',
+      '持久化 Linux To Go 支持经过验证的 x64 Ubuntu/casper 和 Debian Live 布局。其他发行版请使用“安装盘”功能。',
   'linux_togo_mke2fs_missing':
-      '内置的 Linux 持久化组件缺失。请重新安装 WinDeploy Studio，目标磁盘未被修改。',
+      '此构建未包含符合许可证要求的 Linux 持久化组件，目标磁盘未被修改。',
   'linux_togo_boot_config_unsupported':
-      '此 casper 镜像没有可用于启用持久化的受支持 GRUB 启动项，目标磁盘未被修改。',
+      '此 Live 镜像没有可用于启用持久化的受支持 GRUB 启动项，目标磁盘未被修改。',
   'linux_togo_boot_file_too_large': '此镜像包含超过 FAT32 单文件容量上限的必要启动文件，目标磁盘未被修改。',
   'bench_error_helper_missing': '缺少原生磁盘测试组件，请重新安装应用。',
   'bench_error_cleanup_failed':
@@ -1937,11 +1937,11 @@ const _ru = <String, String>{
   'linux_togo_mount_preflight_failed':
       'Не удалось проверить образ Linux. Целевой диск не изменен.',
   'linux_togo_unsupported_iso':
-      'Linux To Go с постоянным хранилищем сейчас поддерживает x64-образы Ubuntu и совместимые Live-образы на базе casper. Для других дистрибутивов используйте создание установочного носителя.',
+      'Linux To Go с постоянным хранилищем поддерживает проверенные x64-разметки Ubuntu/casper и Debian Live. Для других дистрибутивов используйте создание установочного носителя.',
   'linux_togo_mke2fs_missing':
-      'Встроенный компонент постоянного хранения Linux отсутствует. Переустановите WinDeploy Studio. Целевой диск не изменён.',
+      'Эта сборка не содержит компонента постоянного хранения Linux, соответствующего лицензионным требованиям. Целевой диск не изменён.',
   'linux_togo_boot_config_unsupported':
-      'В этом образе casper нет поддерживаемой записи GRUB для включения постоянного хранения. Целевой диск не изменён.',
+      'В этом Live-образе нет поддерживаемой записи GRUB для включения постоянного хранения. Целевой диск не изменён.',
   'linux_togo_boot_file_too_large':
       'В образе есть обязательный загрузочный файл, превышающий допустимый для FAT32 размер. Целевой диск не изменён.',
   'bench_error_helper_missing':
@@ -2855,11 +2855,11 @@ const _fr = <String, String>{
   'linux_togo_mount_preflight_failed':
       'L’image Linux n’a pas pu être inspectée. Le disque cible n’a pas été modifié.',
   'linux_togo_unsupported_iso':
-      'Linux To Go persistant prend actuellement en charge Ubuntu x64 et les images Live compatibles basées sur casper. Pour les autres distributions, utilisez le créateur de support d’installation.',
+      'Linux To Go persistant prend en charge les dispositions x64 Ubuntu/casper et Debian Live vérifiées. Pour les autres distributions, utilisez le créateur de support d’installation.',
   'linux_togo_mke2fs_missing':
-      'Le composant de persistance Linux fourni est manquant. Réinstallez WinDeploy Studio. Le disque cible n’a pas été modifié.',
+      'Cette version ne contient pas de composant de persistance Linux conforme aux exigences de licence. Le disque cible n’a pas été modifié.',
   'linux_togo_boot_config_unsupported':
-      'Cette image casper ne contient aucune entrée GRUB prise en charge pour activer la persistance. Le disque cible n’a pas été modifié.',
+      'Cette image Live ne contient aucune entrée GRUB prise en charge pour activer la persistance. Le disque cible n’a pas été modifié.',
   'linux_togo_boot_file_too_large':
       'Cette image contient un fichier de démarrage requis trop volumineux pour FAT32. Le disque cible n’a pas été modifié.',
   'bench_error_helper_missing':
@@ -3781,11 +3781,11 @@ const _ja = <String, String>{
   'linux_togo_mount_preflight_failed':
       'Linux イメージを確認できませんでした。対象ディスクは変更されていません。',
   'linux_togo_unsupported_iso':
-      '永続化 Linux To Go は現在、x64 Ubuntu および互換性のある casper ベースの Live イメージに対応しています。その他のディストリビューションにはインストールメディア作成機能を使用してください。',
+      '永続化 Linux To Go は、検証済みの x64 Ubuntu/casper および Debian Live レイアウトに対応しています。その他のディストリビューションにはインストールメディア作成機能を使用してください。',
   'linux_togo_mke2fs_missing':
-      '同梱の Linux 永続化コンポーネントが見つかりません。WinDeploy Studio を再インストールしてください。対象ディスクは変更されていません。',
+      'このビルドにはライセンス要件を満たす Linux 永続化コンポーネントが含まれていません。対象ディスクは変更されていません。',
   'linux_togo_boot_config_unsupported':
-      'この casper イメージには、永続化を有効にできる対応 GRUB エントリがありません。対象ディスクは変更されていません。',
+      'この Live イメージには、永続化を有効にできる対応 GRUB エントリがありません。対象ディスクは変更されていません。',
   'linux_togo_boot_file_too_large':
       'このイメージには FAT32 の単一ファイル上限を超える必須の起動ファイルがあります。対象ディスクは変更されていません。',
   'bench_error_helper_missing': 'ネイティブのディスクテストコンポーネントがありません。アプリを再インストールしてください。',
@@ -4623,11 +4623,11 @@ const _zhTW = <String, String>{
   'linux_not_isohybrid': '此 ISO 不是可開機的 ISOHybrid 映像，目標磁碟未被修改。',
   'linux_togo_mount_preflight_failed': '無法檢查此 Linux 映像，目標磁碟未被修改。',
   'linux_togo_unsupported_iso':
-      '持久化 Linux To Go 目前支援 x64 Ubuntu 及相容的 casper Live 映像。其他發行版請使用「安裝盤」功能。',
+      '持久化 Linux To Go 支援經過驗證的 x64 Ubuntu/casper 和 Debian Live 配置。其他發行版請使用「安裝盤」功能。',
   'linux_togo_mke2fs_missing':
-      '內建的 Linux 持久化元件遺失。請重新安裝 WinDeploy Studio，目標磁碟未被修改。',
+      '此建置未包含符合授權要求的 Linux 持久化元件，目標磁碟未被修改。',
   'linux_togo_boot_config_unsupported':
-      '此 casper 映像沒有可用來啟用持久化的受支援 GRUB 啟動項，目標磁碟未被修改。',
+      '此 Live 映像沒有可用來啟用持久化的受支援 GRUB 啟動項，目標磁碟未被修改。',
   'linux_togo_boot_file_too_large': '此映像包含超過 FAT32 單一檔案容量上限的必要開機檔案，目標磁碟未被修改。',
   'bench_error_helper_missing': '缺少原生磁碟測試元件，請重新安裝應用程式。',
   'bench_error_cleanup_failed':
@@ -5447,11 +5447,11 @@ const _es = <String, String>{
   'linux_togo_mount_preflight_failed':
       'No se pudo inspeccionar la imagen de Linux. El disco de destino no se modificó.',
   'linux_togo_unsupported_iso':
-      'Linux To Go persistente admite actualmente Ubuntu x64 e imágenes Live compatibles basadas en casper. Para otras distribuciones, usa el creador de medios de instalación.',
+      'Linux To Go persistente admite diseños verificados de Ubuntu/casper x64 y Debian Live. Para otras distribuciones, usa el creador de medios de instalación.',
   'linux_togo_mke2fs_missing':
-      'Falta el componente integrado de persistencia de Linux. Reinstala WinDeploy Studio. El disco de destino no se modificó.',
+      'Esta compilación no incluye un componente de persistencia Linux que cumpla los requisitos de licencia. El disco de destino no se modificó.',
   'linux_togo_boot_config_unsupported':
-      'Esta imagen casper no tiene una entrada de GRUB compatible para habilitar la persistencia. El disco de destino no se modificó.',
+      'Esta imagen Live no tiene una entrada de GRUB compatible para habilitar la persistencia. El disco de destino no se modificó.',
   'linux_togo_boot_file_too_large':
       'Esta imagen contiene un archivo de arranque necesario que supera el límite de un solo archivo de FAT32. El disco de destino no se modificó.',
   'bench_error_helper_missing':
@@ -6361,11 +6361,11 @@ const _ar = <String, String>{
   'linux_togo_mount_preflight_failed':
       'تعذر فحص صورة Linux. لم يتغير القرص الهدف.',
   'linux_togo_unsupported_iso':
-      'يدعم Linux To Go الدائم حالياً Ubuntu بمعمارية x64 وصور Live المتوافقة المبنية على casper. استخدم إنشاء وسيط التثبيت للتوزيعات الأخرى.',
+      'يدعم Linux To Go الدائم تخطيطات Ubuntu/casper وDebian Live التي تم التحقق منها بمعمارية x64. استخدم إنشاء وسيط التثبيت للتوزيعات الأخرى.',
   'linux_togo_mke2fs_missing':
-      'مكوّن الاستمرارية المرفق لـ Linux مفقود. أعد تثبيت WinDeploy Studio. لم يتغير القرص الهدف.',
+      'لا يتضمن هذا الإصدار مكوّن استمرارية Linux متوافقاً مع متطلبات الترخيص. لم يتغير القرص الهدف.',
   'linux_togo_boot_config_unsupported':
-      'لا تحتوي صورة casper هذه على إدخال GRUB مدعوم لتفعيل الاستمرارية. لم يتغير القرص الهدف.',
+      'لا تحتوي صورة Live هذه على إدخال GRUB مدعوم لتفعيل الاستمرارية. لم يتغير القرص الهدف.',
   'linux_togo_boot_file_too_large':
       'تتضمن هذه الصورة ملف إقلاع مطلوباً يتجاوز حد حجم الملف الواحد في FAT32. لم يتغير القرص الهدف.',
   'bench_error_helper_missing':
@@ -7244,11 +7244,11 @@ const _pt = <String, String>{
   'linux_togo_mount_preflight_failed':
       'Não foi possível inspecionar a imagem do Linux. O disco de destino não foi alterado.',
   'linux_togo_unsupported_iso':
-      'O Linux To Go persistente atualmente oferece suporte ao Ubuntu x64 e a imagens Live compatíveis baseadas em casper. Para outras distribuições, use o criador de mídia de instalação.',
+      'O Linux To Go persistente oferece suporte a layouts verificados do Ubuntu/casper x64 e Debian Live. Para outras distribuições, use o criador de mídia de instalação.',
   'linux_togo_mke2fs_missing':
-      'O componente integrado de persistência do Linux está ausente. Reinstale o WinDeploy Studio. O disco de destino não foi alterado.',
+      'Esta compilação não inclui um componente de persistência Linux que atenda aos requisitos de licença. O disco de destino não foi alterado.',
   'linux_togo_boot_config_unsupported':
-      'Esta imagem casper não possui uma entrada GRUB compatível para ativar a persistência. O disco de destino não foi alterado.',
+      'Esta imagem Live não possui uma entrada GRUB compatível para ativar a persistência. O disco de destino não foi alterado.',
   'linux_togo_boot_file_too_large':
       'Esta imagem contém um arquivo de inicialização necessário maior que o limite de arquivo único do FAT32. O disco de destino não foi alterado.',
   'bench_error_helper_missing':
@@ -8158,11 +8158,11 @@ const _de = <String, String>{
   'linux_togo_mount_preflight_failed':
       'Das Linux-Abbild konnte nicht geprüft werden. Der Zieldatenträger wurde nicht verändert.',
   'linux_togo_unsupported_iso':
-      'Linux To Go mit Persistenz unterstützt derzeit Ubuntu x64 und kompatible casper-basierte Live-Abbilder. Verwenden Sie für andere Distributionen den Installationsmedien-Ersteller.',
+      'Linux To Go mit Persistenz unterstützt geprüfte x64-Ubuntu/casper- und Debian-Live-Layouts. Verwenden Sie für andere Distributionen den Installationsmedien-Ersteller.',
   'linux_togo_mke2fs_missing':
-      'Die mitgelieferte Linux-Persistenzkomponente fehlt. Installieren Sie WinDeploy Studio erneut. Der Zieldatenträger wurde nicht verändert.',
+      'Dieser Build enthält keine Linux-Persistenzkomponente, die die Lizenzanforderungen erfüllt. Der Zieldatenträger wurde nicht verändert.',
   'linux_togo_boot_config_unsupported':
-      'Dieses casper-Abbild enthält keinen unterstützten GRUB-Eintrag zum Aktivieren der Persistenz. Der Zieldatenträger wurde nicht verändert.',
+      'Dieses Live-Abbild enthält keinen unterstützten GRUB-Eintrag zum Aktivieren der Persistenz. Der Zieldatenträger wurde nicht verändert.',
   'linux_togo_boot_file_too_large':
       'Dieses Abbild enthält eine erforderliche Startdatei, die das Einzeldatelimit von FAT32 überschreitet. Der Zieldatenträger wurde nicht verändert.',
   'bench_error_helper_missing':
@@ -9088,11 +9088,11 @@ const _ko = <String, String>{
   'linux_togo_mount_preflight_failed':
       'Linux 이미지를 검사할 수 없습니다. 대상 디스크는 변경되지 않았습니다.',
   'linux_togo_unsupported_iso':
-      '영구 저장 Linux To Go는 현재 x64 Ubuntu 및 호환되는 casper 기반 Live 이미지를 지원합니다. 다른 배포판은 설치 미디어 만들기를 사용하세요.',
+      '영구 저장 Linux To Go는 검증된 x64 Ubuntu/casper 및 Debian Live 레이아웃을 지원합니다. 다른 배포판은 설치 미디어 만들기를 사용하세요.',
   'linux_togo_mke2fs_missing':
-      '내장 Linux 영구 저장 구성 요소가 없습니다. WinDeploy Studio를 다시 설치하세요. 대상 디스크는 변경되지 않았습니다.',
+      '이 빌드에는 라이선스 요구 사항을 충족하는 Linux 영구 저장 구성 요소가 포함되어 있지 않습니다. 대상 디스크는 변경되지 않았습니다.',
   'linux_togo_boot_config_unsupported':
-      '이 casper 이미지에는 영구 저장을 활성화할 수 있는 지원되는 GRUB 항목이 없습니다. 대상 디스크는 변경되지 않았습니다.',
+      '이 Live 이미지에는 영구 저장을 활성화할 수 있는 지원되는 GRUB 항목이 없습니다. 대상 디스크는 변경되지 않았습니다.',
   'linux_togo_boot_file_too_large':
       '이 이미지에는 FAT32의 단일 파일 제한을 초과하는 필수 부팅 파일이 있습니다. 대상 디스크는 변경되지 않았습니다.',
   'bench_error_helper_missing': '네이티브 디스크 테스트 구성 요소가 없습니다. 앱을 다시 설치하세요.',

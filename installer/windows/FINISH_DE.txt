@@ -14,7 +14,7 @@ GitHub-Profil: https://github.com/intelfans
 GitHub-Repository: https://github.com/intelfans/WinDeployStudio
 
 Hinweis zu Drittanbieter-Tools:
-Linux To Go enthält das mitgelieferte Tool mke2fs.exe aus e2fsprogs/AOSP zum Erstellen von ext4-Persistenzabbildern. Es wird als separates Befehlszeilentool ausgeführt. Details finden Sie unter tools\e2fsprogs\README.md im Installationsverzeichnis.
+Diese Version enthält kein ext4-Erstellungstool, da das von GPLv2 verlangte vollständige entsprechende Quellpaket noch nicht verfügbar ist. Die Erstellung persistenter Linux-To-Go-Umgebungen ist deaktiviert. Details finden Sie in THIRD_PARTY_NOTICES.md und tools\e2fsprogs\README.md im Installationsverzeichnis.
 
 Besonderer Dank
 

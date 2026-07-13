@@ -145,7 +145,7 @@ void main() {
   });
 
   testWidgets(
-    'Linux To Go explains an unsupported image before Next is enabled',
+    'Linux To Go explains an unsafe Debian Live image before Next is enabled',
     (tester) async {
       await _setSurface(tester, const Size(1000, 760));
       final originalPicker = FilePickerPlatform.instance;
@@ -168,7 +168,7 @@ void main() {
           linuxToGoImagePreflightProvider.overrideWithValue(
             const _StaticLinuxToGoImagePreflight(
               LinuxToGoImageInspection.unsupported(
-                LinuxToGoImageIssue.debianLiveUnsupported,
+                LinuxToGoImageIssue.debianLiveMissingNtfsSupport,
               ),
             ),
           ),
@@ -185,7 +185,9 @@ void main() {
 
       expect(find.byKey(const Key('ltg-image-inspection')), findsOneWidget);
       expect(
-        find.text(trByCode('zh', 'linux_togo_debian_live_unsupported')),
+        find.text(
+          trByCode('zh', 'linux_togo_debian_live_missing_ntfs_support'),
+        ),
         findsWidgets,
       );
       final next = tester.widget<FilledButton>(
@@ -209,7 +211,9 @@ void main() {
         'linux_togo_missing_live_kernel',
         'linux_togo_missing_live_initrd',
         'linux_togo_missing_live_payload',
-        'linux_togo_debian_live_unsupported',
+        'linux_togo_debian_live_missing_ntfs_support',
+        'linux_togo_debian_image_supported',
+        'linux_togo_driver_staging_unsupported',
       ]) {
         final localized = trByCode(code, key);
         expect(localized, isNotEmpty, reason: '$code/$key is empty');

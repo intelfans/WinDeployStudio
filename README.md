@@ -9,7 +9,7 @@ Windows desktop toolkit for Windows/Linux installation media, portable To Go wor
 
 ## Overview
 
-WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, persistent Linux To Go for x64 Ubuntu/casper-compatible Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
+WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for x64 Ubuntu/casper and Debian Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
 
 The project is distributed under the MIT License.
 
@@ -24,13 +24,13 @@ The project is distributed under the MIT License.
 
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
-  - Create persistent Linux To Go workspaces from x64 Ubuntu and compatible casper-based Live ISOs.
-  - Classify Linux To Go images when selected and again immediately before erasing the target. The accepted layout requires x64 UEFI, casper kernel/initrd and Live payloads, plus a GRUB entry that can safely receive the persistence arguments.
-  - Recognize Debian Live separately and direct it to Linux installation media until its distinct persistence protocol is implemented; other unsupported distributions are never presented as compatible Linux To Go images.
+  - Validate persistent Linux To Go layouts for x64 Ubuntu/casper and Debian Live ISOs. Creation is intentionally unavailable in this release until a fully reproducible, license-compliant ext4 creator is bundled.
+  - Classify Linux To Go images when selected and again immediately before erasing the target. Ubuntu/casper requires x64 UEFI, casper kernel/initrd, Live payloads, and a patchable GRUB entry. Debian additionally requires `boot=live`, an NTFS-capable initrd, and its own `persistence` / `persistence.conf` protocol.
+  - Reject unsupported distributions and unsafe Debian Live layouts before the target disk is changed; use Linux installation media for images outside the validated profiles.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing.
   - Configure local-disk visibility, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, VHD/VHDX drive-letter repair, .NET Framework 3.5, and deployment drive letters where supported. UEFI deployments automatically use an NTFS Windows volume with a separate FAT32 EFI partition.
-  - Optionally inject Windows INF drivers offline. Supported Ubuntu/casper Linux To Go images can stage vetted Linux packages, matching kernel modules, or explicit scripts for first boot; this does not add support for arbitrary distributions.
+  - Optionally inject Windows INF drivers offline. When a compliant persistence creator is restored, supported Ubuntu/casper Linux To Go images can stage vetted Linux packages, matching kernel modules, or explicit scripts for first boot; this does not add support for arbitrary distributions.
   - Build a separate Windows boot partition and verify BCD, virtual-disk binding, and fallback UEFI boot files.
   - Revalidate disk identity, capacity, model, and bus type before destructive operations, preferring a reliable hardware serial number and failing closed when no stable identity is available.
   - During image application, the progress panel shows reliable elapsed time only.
@@ -132,7 +132,7 @@ The Installation Media creator supports both Windows installation media and raw 
 
 ### 4. To Go Workspaces
 
-The To Go area creates portable Windows workspaces or persistent Ubuntu/casper Live environments on external drives. It emphasizes safer disk selection, an explicit confirmation summary, reliable elapsed-time progress, and a lightweight waiting game during long image-application steps.
+The To Go area creates portable Windows workspaces and validates supported Linux To Go layouts before any destructive action. It emphasizes safer disk selection, an explicit confirmation summary, reliable elapsed-time progress, and a lightweight waiting game during long image-application steps.
 
 <table>
   <tr>
@@ -282,17 +282,17 @@ Windows, Microsoft, Sysinternals, Intel, and other product names, trademarks, lo
 
 ## Third-Party Tools
 
-Linux To Go uses the bundled `mke2fs.exe` command-line utility to create the ext4 `writable` persistence image. The bundled binary is from e2fsprogs / Android Open Source Project references, reports `mke2fs 1.47.2 (1-Jan-2025)` and `android-platform-15.0.0_r5-314-ga1f793f6b`, and has SHA-256 `BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A`.
+The current release does not redistribute `mke2fs.exe`, e2fsprogs, Cygwin, or any other ext4 creator. A previously evaluated Google/AOSP `mke2fs.exe` was removed because this project did not possess its complete corresponding source, all statically linked dependencies, and reproducible build inputs required for GPLv2 redistribution.
 
-For modern Ubuntu images, Linux To Go uses a separate FAT32 boot/persistence partition and an NTFS Live-data partition. GRUB loads the signed Ubuntu boot files from FAT32, then casper opens the complete Live image from the NTFS volume. This supports individual squashfs files larger than 4 GiB while keeping the ext4 `writable` persistence image on FAT32 where casper can discover it reliably. WinDeploy Studio classifies the selected image and repeats the check immediately before erasing the target: a compatible LTG image must provide x64 UEFI, casper kernel/initrd, Live filesystem payloads, and a patchable GRUB entry. Debian Live is recognized but deliberately kept on the Linux-install-media path until its separate `persistence` / `persistence.conf` protocol is fully implemented.
+The Linux To Go creator retains separate layout contracts for future compliant tooling: Ubuntu/casper uses a FAT32 boot/persistence partition, an NTFS Live-data partition, an ext4 `writable` image, and the `persistent` boot argument. Debian Live uses an ext4 `persistence` image containing `/persistence.conf` with `/ union`, plus the `persistence` boot argument. Both profiles use `live-media=/dev/disk/by-uuid/...` for the NTFS Live data partition and reject images that do not prove the required boot contract.
 
-`mke2fs.exe` is invoked as a separate executable and is not linked into the MIT-licensed WinDeploy Studio application binary. See [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) for details.
+Any future bundled ext4 tool must remain a separate command-line component and ship with its exact corresponding source, build scripts, static dependency notices, license texts, an immutable source URL, and a real three-year source offer. See [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Roadmap
 
 The implemented portions of the original items 4-9 are documented above and are no longer roadmap promises. The remaining work is:
 
-- Extend persistent Linux To Go beyond the currently validated x64 Ubuntu/casper-compatible Live images. WinDeploy Studio does not yet support arbitrary distributions for Linux To Go.
+- Restore Linux To Go creation only after shipping a reproducible, license-compliant ext4 creator, then validate it with real boot and persistence tests for the supported x64 Ubuntu/casper and Debian Live profiles. WinDeploy Studio does not support arbitrary Linux distributions for Linux To Go.
 - Expand offline Windows optional-feature selection beyond the currently implemented .NET Framework 3.5 path.
 - Add update-source selection with Oracle Cloud as the recommended high-speed source and GitHub Releases as the fallback. GitHub is currently the only update source.
 
@@ -313,7 +313,7 @@ MIT License. See [LICENSE](LICENSE).
 
 # WinDeploy Studio 中文说明
 
-WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Windows 安装盘、Linux ISOHybrid 写盘、Windows To Go、基于 x64 Ubuntu / casper 兼容 Live 镜像的持久化 Linux To Go、原生磁盘测试、镜像资源、工具箱、日志查看和 AI 辅助排障等场景。
+WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Windows 安装盘、Linux ISOHybrid 写盘、Windows To Go、x64 Ubuntu/casper 与 Debian Live 的严格 Linux To Go 布局预检、原生磁盘测试、镜像资源、工具箱、日志查看和 AI 辅助排障等场景。
 
 ## 核心功能
 
@@ -326,13 +326,13 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。
-  - 使用 x64 Ubuntu 或兼容的 casper Live ISO 创建持久化 Linux To Go。
-  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；受支持布局必须同时具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可安全注入持久化参数的 GRUB 启动项。
-  - Debian Live 会被单独识别，在其独立持久化协议完成前引导至 Linux 安装盘；其他不受支持发行版绝不会被标示为可用的 Linux To Go 镜像。
+  - 验证 x64 Ubuntu/casper 与 Debian Live 的持久化 Linux To Go 布局。本发行版在提供完全可复现、许可证合规的 ext4 创建工具前，刻意不开放创建功能。
+  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；Ubuntu/casper 布局必须具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可安全注入持久化参数的 GRUB 启动项。Debian 还必须具备 `boot=live`、支持 NTFS 的 initrd 与独立的 `persistence` / `persistence.conf` 协议。
+  - 不受支持的发行版与不安全的 Debian Live 布局会在修改目标磁盘前被拒绝；验证范围外的镜像请使用 Linux 安装盘。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
   - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。
   - 在支持的组合中配置本地磁盘可见性、OOBE/Audit、WinRE、UASP、CompactOS、WIMBoot、VHD/VHDX 盘符修复、.NET Framework 3.5 和部署盘符。UEFI 部署会自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区。
-  - 可选离线注入 Windows INF 驱动。受支持的 Ubuntu/casper Linux To Go 可暂存经过校验的 Linux 软件包、匹配内核模块或显式脚本，在首次启动时处理；这不代表支持任意发行版。
+  - 可选离线注入 Windows INF 驱动。待恢复合规的持久化创建工具后，受支持的 Ubuntu/casper Linux To Go 可暂存经过校验的 Linux 软件包、匹配内核模块或显式脚本，在首次启动时处理；这不代表支持任意发行版。
   - 为 Windows To Go 创建独立启动分区，并验证 BCD、虚拟磁盘绑定和 UEFI 回退启动文件。
   - 在清盘前重新核验磁盘号、容量、型号与总线类型，优先使用可靠硬件序列号；无法建立稳定物理身份时拒绝清盘。
   - 应用镜像阶段只显示可靠的已用时间。
@@ -423,7 +423,7 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 ### 4. To Go 工作环境
 
-To Go 区域用于在外接磁盘上创建 Windows 工作空间，或创建可保存更改的 Ubuntu/casper Live 环境。它强调更安全的磁盘选择、写入前摘要、可靠的已用时间进度，以及在长时间应用镜像时用于等待的小型 UI 游戏。
+To Go 区域用于在外接磁盘上创建 Windows 工作空间，并在任何破坏性操作前验证受支持的 Linux To Go 布局。它强调更安全的磁盘选择、写入前摘要、可靠的已用时间进度，以及在长时间应用镜像时用于等待的小型 UI 游戏。
 
 <table>
   <tr>
@@ -571,17 +571,17 @@ WinDeploy Studio 基于 MIT License 分发。
 
 ## 第三方工具说明
 
-Linux To Go 使用随程序内置的 `mke2fs.exe` 命令行工具创建 ext4 `writable` 持久化镜像。该二进制文件来源参考 e2fsprogs / Android Open Source Project，版本信息为 `mke2fs 1.47.2 (1-Jan-2025)` 和 `android-platform-15.0.0_r5-314-ga1f793f6b`，SHA-256 为 `BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A`。
+当前发行版不会再分发 `mke2fs.exe`、e2fsprogs、Cygwin 或其他 ext4 创建工具。此前评估过的 Google/AOSP `mke2fs.exe` 已被移除，因为本项目没有持有 GPLv2 再分发所需的完整对应源码、全部静态链接依赖和可复现构建输入。
 
-针对现代 Ubuntu 镜像，Linux To Go 采用独立的 FAT32 启动/持久化分区和 NTFS Live 数据分区。GRUB 从 FAT32 加载 Ubuntu 的签名启动文件，随后由 casper 从 NTFS 卷读取完整 Live 镜像，因此可以容纳超过 4 GiB 的单个 squashfs 文件；ext4 `writable` 持久化镜像仍保存在 FAT32 上，确保 casper 能够可靠识别。WinDeploy Studio 会在选择镜像时分类检查，并在清除目标磁盘前再次复核：兼容 LTG 必须具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可修改的 GRUB 启动项。Debian Live 会被明确识别，但在其独立的 `persistence` / `persistence.conf` 协议完整实现前，仍会引导至 Linux 安装盘。
+Linux To Go 创建器为未来合规工具保留了两套独立布局契约：Ubuntu/casper 使用 FAT32 启动/持久化分区、NTFS Live 数据分区、ext4 `writable` 镜像与 `persistent` 启动参数；Debian Live 使用包含 `/persistence.conf`（内容为 `/ union`）的 ext4 `persistence` 镜像和 `persistence` 启动参数。两类布局都会用 `live-media=/dev/disk/by-uuid/...` 指向 NTFS Live 数据分区，并拒绝无法证明所需启动契约的镜像。
 
-WinDeploy Studio 以独立进程调用 `mke2fs.exe`，并未将其链接进基于 MIT License 授权的主程序二进制文件。详见 [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md)。
+未来如需随程序内置 ext4 工具，它必须保持为独立命令行组件，并同时提供精确对应源码、构建脚本、静态依赖声明、许可证文本、不可变源码 URL 和真实的三年源码提供承诺。详见 [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 未来规划
 
 原规划④-⑨中已经落地的部分已写入上方“核心功能”，不再作为未来承诺。当前真实未完成项为：
 
-- 将持久化 Linux To Go 扩展到目前已验证的 x64 Ubuntu / casper 兼容 Live 镜像之外；WinDeploy Studio 当前不支持任意发行版的 Linux To Go。
+- 在提供可复现、许可证合规的 ext4 创建工具后恢复 Linux To Go 创建功能，并对受支持的 x64 Ubuntu/casper 与 Debian Live 配置执行真实启动和持久化测试。WinDeploy Studio 不支持任意 Linux 发行版的 Linux To Go。
 - 将离线 Windows 可选功能扩展到当前已实现的 .NET Framework 3.5 之外。
 - 加入更新源选择：甲骨文云作为推荐高速源，GitHub Releases 作为备用源；当前只有 GitHub 更新源。
 

@@ -115,9 +115,17 @@ endif()
 
 set(WDS_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools")
 if(EXISTS "${WDS_TOOLS_DIR}")
+  # Do not accidentally redistribute an ext4 tool without its full GPLv2
+  # corresponding source package and reproducible build inputs. The source
+  # tree ships the compliance note only; any future approved tool must add an
+  # explicit, audited packaging rule here.
+  install(CODE "file(REMOVE \"${CMAKE_INSTALL_PREFIX}/tools/e2fsprogs/mke2fs.exe\")"
+    COMPONENT Runtime)
   install(DIRECTORY "${WDS_TOOLS_DIR}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-    COMPONENT Runtime)
+    COMPONENT Runtime
+    REGEX "/e2fsprogs/.*\\.(exe|dll)$" EXCLUDE
+    )
 endif()
 
 # Copy the native assets provided by the build.dart from all packages.

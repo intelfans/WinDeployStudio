@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -78,24 +80,44 @@ void main() {
     expect(result.messageKey, 'linux_togo_boot_config_unsupported');
   });
 
-  test('identifies a Debian Live layout and explicitly rejects it', () async {
-    await _writeFile(p.join(testRoot.path, 'live', 'vmlinuz'), [1]);
-    await _writeFile(p.join(testRoot.path, 'live', 'initrd.img'), [2]);
-    await _writeFile(p.join(testRoot.path, 'live', 'filesystem.squashfs'), [
-      3,
-      4,
-      5,
-    ]);
-    await _writeFile(p.join(testRoot.path, 'EFI', 'BOOT', 'BOOTX64.EFI'), [6]);
+  test(
+    'accepts a structurally valid Debian Live root with NTFS support',
+    () async {
+      await _writeDebianLayout(testRoot);
 
-    final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
-      testRoot.path,
-    );
+      final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
+        testRoot.path,
+      );
 
-    expect(result.status, LinuxToGoImageStatus.unsupported);
-    expect(result.issue, LinuxToGoImageIssue.debianLiveUnsupported);
-    expect(result.messageKey, 'linux_togo_debian_live_unsupported');
-  });
+      expect(result.status, LinuxToGoImageStatus.supported);
+      expect(result.canCreate, isTrue);
+      final image = result.image;
+      expect(image, isNotNull);
+      expect(image!.family, LinuxToGoImageFamily.debianLive);
+      expect(
+        image.persistenceStrategy,
+        LinuxToGoPersistenceStrategy.debianPersistenceImage,
+      );
+      expect(image.kernelRelativePath, 'live/vmlinuz');
+      expect(image.initrdRelativePath, 'live/initrd.img');
+      expect(image.supportsDriverStaging, isFalse);
+    },
+  );
+
+  test(
+    'rejects Debian Live when the initrd cannot expose NTFS support',
+    () async {
+      await _writeDebianLayout(testRoot, includeNtfsSupport: false);
+
+      final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
+        testRoot.path,
+      );
+
+      expect(result.status, LinuxToGoImageStatus.unsupported);
+      expect(result.issue, LinuxToGoImageIssue.debianLiveMissingNtfsSupport);
+      expect(result.messageKey, 'linux_togo_debian_live_missing_ntfs_support');
+    },
+  );
 
   test(
     'recognizes a Windows installer before classifying Linux layouts',
@@ -145,6 +167,29 @@ Future<void> _writeCasperLayout(
   }
 }
 
+Future<void> _writeDebianLayout(
+  Directory root, {
+  bool includeNtfsSupport = true,
+}) async {
+  await _writeFile(p.join(root.path, 'live', 'vmlinuz'), [1]);
+  await _writeFile(
+    p.join(root.path, 'live', 'initrd.img'),
+    _newcArchive({
+      'scripts/live': const [],
+      if (includeNtfsSupport)
+        'usr/lib/modules/test/kernel/fs/ntfs3/ntfs3.ko.xz': const [],
+    }),
+  );
+  await _writeFile(p.join(root.path, 'live', 'filesystem.squashfs'), [3]);
+  await _writeText(
+    p.join(root.path, 'boot', 'grub', 'grub.cfg'),
+    'menuentry "Live" {\n'
+    '  linux /live/vmlinuz boot=live components ---\n'
+    '}\n',
+  );
+  await _writeFile(p.join(root.path, 'EFI', 'BOOT', 'BOOTX64.EFI'), [6]);
+}
+
 Future<void> _writeWindowsInstallerLayout(Directory root) async {
   final header = List<int>.filled(0xD0, 0);
   header.setRange(0, 8, const [0x4d, 0x53, 0x57, 0x49, 0x4d, 0, 0, 0]);
@@ -164,4 +209,42 @@ Future<void> _writeText(String path, String text) async {
   final file = File(path);
   await file.parent.create(recursive: true);
   await file.writeAsString(text, flush: true);
+}
+
+List<int> _newcArchive(Map<String, List<int>> entries) {
+  final result = BytesBuilder(copy: false);
+  var inode = 1;
+  void addEntry(String name, List<int> data) {
+    final nameBytes = ascii.encode(name);
+    String hex(int value) => value.toRadixString(16).padLeft(8, '0');
+    final header = StringBuffer('070701')
+      ..write(hex(inode++))
+      ..write(hex(0x81a4))
+      ..write(hex(0))
+      ..write(hex(0))
+      ..write(hex(1))
+      ..write(hex(0))
+      ..write(hex(data.length))
+      ..write(hex(0))
+      ..write(hex(0))
+      ..write(hex(0))
+      ..write(hex(0))
+      ..write(hex(nameBytes.length + 1))
+      ..write(hex(0));
+    result.add(ascii.encode(header.toString()));
+    result
+      ..add(nameBytes)
+      ..addByte(0);
+    while (result.length % 4 != 0) {
+      result.addByte(0);
+    }
+    result.add(data);
+    while (result.length % 4 != 0) {
+      result.addByte(0);
+    }
+  }
+
+  entries.forEach(addEntry);
+  addEntry('TRAILER!!!', const []);
+  return result.takeBytes();
 }

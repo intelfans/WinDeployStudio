@@ -16,8 +16,8 @@ WinDeploy Studio をお選びいただきありがとうございます！
     Windows メディアを作成、または起動可能な Linux ISOHybrid を書き込み
     
   🚀 To Go 環境
-    ポータブル Windows 環境、または対応する x64 Ubuntu/casper Live
-    イメージから永続化 Linux 環境を作成
+    ポータブル Windows 環境を作成し、x64 Ubuntu/casper と Debian Live の
+    レイアウトを検証します。永続化 Linux の作成は現在無効です
     
   📊 ネイティブドライブテスト
     シーケンシャル、4K、マルチスレッド、持続書き込みを測定

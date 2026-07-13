@@ -16,8 +16,8 @@ WinDeploy Studio를 선택해 주셔서 감사합니다!
     Windows 설치 미디어를 만들거나 부팅 가능한 Linux ISOHybrid 이미지 쓰기
     
   🚀 To Go 환경
-    휴대용 Windows 환경 또는 지원되는 x64 Ubuntu/casper Live 이미지
-    기반의 영구 Linux 환경 생성
+    휴대용 Windows 환경을 만들고 x64 Ubuntu/casper 및 Debian Live 레이아웃을
+    검증합니다. 영구 Linux 생성은 현재 비활성화되어 있습니다
     
   📊 네이티브 드라이브 테스트
     순차, 4K, 멀티스레드 및 지속 쓰기 성능 측정
