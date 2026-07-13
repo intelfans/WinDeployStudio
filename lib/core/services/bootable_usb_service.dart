@@ -12,6 +12,7 @@ import 'disk_safety_service.dart';
 import 'in_memory_powershell.dart';
 import 'linux_driver_staging_service.dart';
 import 'linux_media_preflight.dart';
+import 'linux_togo_image_preflight.dart';
 import 'windows_iso_preflight.dart';
 import '../../features/deployment/models/deployment_plan.dart';
 import '../../features/logs/services/log_center_service.dart';
@@ -55,7 +56,6 @@ final bootableUsbServiceProvider = Provider<BootableUsbService>((ref) {
 });
 
 class BootableUsbService {
-  static const int _fat32MaxFileBytes = 0xFFFFFFFF;
   static const String _linuxToGoIconFileName = '.wds-drive.ico';
   static const String _trustedMke2fsSha256 =
       'BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A';
@@ -686,6 +686,42 @@ class BootableUsbService {
       return false;
     }
 
+    if (kind == LinuxUsbKind.toGo) {
+      final imageInspection = await ref
+          .read(linuxToGoImagePreflightProvider)
+          .inspect(isoPath);
+      if (!imageInspection.canCreate) {
+        final messageKey =
+            imageInspection.messageKey ?? 'linux_togo_unsupported_iso';
+        _logLine(
+          'Linux To Go image preflight rejected the source before disk access: '
+          '$messageKey${imageInspection.diagnostic == null ? '' : ' (${imageInspection.diagnostic})'}',
+        );
+        _notify(
+          onProgress,
+          CreateProgress(
+            step: CreateStep.failed,
+            message: messageKey,
+            error: imageInspection.diagnostic,
+          ),
+        );
+        return false;
+      }
+
+      // Validate the bundled persistence tool before doing any target-disk
+      // work. Source compatibility and local tool availability are separate.
+      if (await _findMke2fs() == null) {
+        _notify(
+          onProgress,
+          const CreateProgress(
+            step: CreateStep.failed,
+            message: 'linux_togo_mke2fs_missing',
+          ),
+        );
+        return false;
+      }
+    }
+
     final logCenter = LogCenterService();
     await logCenter.logUsb('$modeName 创建开始 | 磁盘: $diskNumber | ISO: $isoPath');
 
@@ -787,19 +823,6 @@ class BootableUsbService {
               step: CreateStep.failed,
               message: 'deploy_compat_invalid_icon\n$error',
               error: error,
-            ),
-          );
-          return false;
-        }
-        final preflight = await _validateLinuxToGoIso(isoPath);
-        if (!preflight.success) {
-          _logLine('Linux To Go preflight failed: ${preflight.error}');
-          _notify(
-            onProgress,
-            CreateProgress(
-              step: CreateStep.failed,
-              message: preflight.error ?? 'linux_togo_unsupported_iso',
-              error: preflight.error,
             ),
           );
           return false;
@@ -1037,18 +1060,18 @@ class BootableUsbService {
     try {
       // The source can change while driver staging runs. Refresh both source
       // classifications here, before this method can clean the target disk.
-      final freshPreflight = await _refreshLinuxToGoPreflightBeforeErase(
-        isoPath,
-      );
-      if (!freshPreflight.success) {
+      final freshInspection = await _refreshLinuxToGoImageBeforeErase(isoPath);
+      final freshImage = freshInspection.image;
+      if (!freshInspection.canCreate || freshImage == null) {
         _logLine(
           'Linux To Go preflight failed immediately before erase: '
-          '${freshPreflight.error}',
+          '${freshInspection.messageKey ?? freshInspection.diagnostic}',
         );
         return _LinuxRawWriteResult(
           success: false,
-          error: freshPreflight.error,
-          failureMessageKey: freshPreflight.error,
+          error: freshInspection.diagnostic,
+          failureMessageKey:
+              freshInspection.messageKey ?? 'linux_togo_unsupported_iso',
         );
       }
 
@@ -1065,11 +1088,11 @@ class BootableUsbService {
           ? 0
           : ((stagingBundle.totalBytes + mib - 1) ~/ mib) + 16;
       final dataRequiredMb =
-          ((freshPreflight.totalContentBytes + mib - 1) ~/ mib) +
+          ((freshImage.totalContentBytes + mib - 1) ~/ mib) +
           stagingContentMb +
           256;
       final bootContentMb =
-          ((freshPreflight.bootContentBytes + mib - 1) ~/ mib) + 128;
+          ((freshImage.bootContentBytes + mib - 1) ~/ mib) + 128;
       final minimumPersistenceMb = stagingBundle == null
           ? 512
           : _maxInt(
@@ -1268,7 +1291,7 @@ class BootableUsbService {
           mountPoint: mountPoint,
           bootDrive: bootDrive,
           liveDrive: liveDrive,
-          preflight: freshPreflight,
+          image: freshImage,
         );
         if (!copied.success) return copied;
       } finally {
@@ -1286,11 +1309,13 @@ class BootableUsbService {
 
       final bootPatched = await _patchLinuxPersistenceBootConfigs(
         bootDrive,
+        image: freshImage,
         liveMediaArgument: liveMediaArgument,
         enableFirstBootStaging: stagingBundle != null,
       );
       final livePatched = await _patchLinuxPersistenceBootConfigs(
         liveDrive,
+        image: freshImage,
         liveMediaArgument: liveMediaArgument,
         enableFirstBootStaging: stagingBundle != null,
       );
@@ -1361,7 +1386,7 @@ class BootableUsbService {
         liveVolumeLabel: volumeIdentity.label,
         liveMediaArgument: liveMediaArgument,
         expectedIcon: volumeIdentity.icon,
-        preflight: freshPreflight,
+        image: freshImage,
         stagingBundle: stagingBundle,
       );
       if (!verified) {
@@ -1379,126 +1404,7 @@ class BootableUsbService {
     }
   }
 
-  Future<_LinuxToGoPreflight> _validateLinuxToGoIso(String isoPath) async {
-    final mke2fs = await _findMke2fs();
-    if (mke2fs == null) {
-      return const _LinuxToGoPreflight(
-        success: false,
-        error: 'linux_togo_mke2fs_missing',
-      );
-    }
-
-    final mountPoint = await _mountIso(isoPath);
-    if (mountPoint == null) {
-      return const _LinuxToGoPreflight(
-        success: false,
-        error: 'linux_togo_mount_preflight_failed',
-      );
-    }
-
-    try {
-      final root = mountPoint.endsWith(r'\') ? mountPoint : '$mountPoint\\';
-      final hasCasperKernel = await File(
-        p.join(root, 'casper', 'vmlinuz'),
-      ).exists();
-      final hasCasperInitrd = await File(
-        p.join(root, 'casper', 'initrd'),
-      ).exists();
-      final grubConfigs = <File>[
-        File(p.join(root, 'boot', 'grub', 'grub.cfg')),
-        File(p.join(root, 'boot', 'grub', 'loopback.cfg')),
-      ];
-      var hasGrub = false;
-      for (final file in grubConfigs) {
-        if (await file.exists()) {
-          hasGrub = true;
-          break;
-        }
-      }
-      final hasEfi = await File(
-        p.join(root, 'EFI', 'BOOT', 'BOOTX64.EFI'),
-      ).exists();
-      if (!hasCasperKernel || !hasCasperInitrd || !hasGrub || !hasEfi) {
-        return const _LinuxToGoPreflight(
-          success: false,
-          error: 'linux_togo_unsupported_iso',
-        );
-      }
-
-      var hasPatchableCasperEntry = false;
-      for (final file in grubConfigs) {
-        if (!await file.exists()) continue;
-        final text = await file.readAsString();
-        if (RegExp(
-          r'^\s*linux(efi)?\s+.*\/casper\/vmlinuz(?:\s|$)',
-          caseSensitive: false,
-          multiLine: true,
-        ).hasMatch(text)) {
-          hasPatchableCasperEntry = true;
-          break;
-        }
-      }
-      if (!hasPatchableCasperEntry) {
-        return const _LinuxToGoPreflight(
-          success: false,
-          error: 'linux_togo_boot_config_unsupported',
-        );
-      }
-
-      var totalContentBytes = 0;
-      var bootContentBytes = 0;
-      var largestBootFileBytes = 0;
-      final livePayloads = <_LinuxToGoPayload>[];
-      await for (final entity in Directory(
-        root,
-      ).list(recursive: true, followLinks: false)) {
-        if (entity is! File) continue;
-        final length = await entity.length();
-        totalContentBytes += length;
-        final relativePath = p.relative(entity.path, from: root);
-        final extension = p.extension(relativePath).toLowerCase();
-        final isLivePayload = extension == '.squashfs' || extension == '.ext2';
-        if (isLivePayload) {
-          livePayloads.add(
-            _LinuxToGoPayload(relativePath: relativePath, sizeBytes: length),
-          );
-          continue;
-        }
-
-        bootContentBytes += length;
-        if (length > largestBootFileBytes) largestBootFileBytes = length;
-      }
-
-      if (livePayloads.isEmpty) {
-        return const _LinuxToGoPreflight(
-          success: false,
-          error: 'linux_togo_unsupported_iso',
-        );
-      }
-      if (largestBootFileBytes > _fat32MaxFileBytes) {
-        return const _LinuxToGoPreflight(
-          success: false,
-          error: 'linux_togo_boot_file_too_large',
-        );
-      }
-
-      _logLine(
-        'Linux To Go preflight: content=$totalContentBytes, '
-        'boot=$bootContentBytes, live payloads=${livePayloads.length}, '
-        'largest live=${livePayloads.map((item) => item.sizeBytes).fold<int>(0, _maxInt)}',
-      );
-      return _LinuxToGoPreflight(
-        success: true,
-        totalContentBytes: totalContentBytes,
-        bootContentBytes: bootContentBytes,
-        livePayloads: livePayloads,
-      );
-    } finally {
-      await _unmountIso(isoPath);
-    }
-  }
-
-  Future<_LinuxToGoPreflight> _refreshLinuxToGoPreflightBeforeErase(
+  Future<LinuxToGoImageInspection> _refreshLinuxToGoImageBeforeErase(
     String isoPath,
   ) async {
     final windowsSourceInspection = await ref
@@ -1509,12 +1415,22 @@ class BootableUsbService {
         'Linux To Go preflight rejected a Windows installation layout '
         'immediately before erase.',
       );
-      return const _LinuxToGoPreflight(
-        success: false,
-        error: 'creator_windows_iso_in_linux_mode',
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.windowsInstaller,
       );
     }
-    return _validateLinuxToGoIso(isoPath);
+    final inspection = await ref
+        .read(linuxToGoImagePreflightProvider)
+        .inspect(isoPath);
+    if (inspection.canCreate && inspection.image != null) {
+      final image = inspection.image!;
+      _logLine(
+        'Linux To Go image preflight: family=${image.family.name}, '
+        'content=${image.totalContentBytes}, boot=${image.bootContentBytes}, '
+        'live payloads=${image.livePayloads.length}',
+      );
+    }
+    return inspection;
   }
 
   Future<bool> _isIsoHybridImage(String isoPath) async {
@@ -1883,21 +1799,32 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
 
   Future<bool> _patchLinuxPersistenceBootConfigs(
     String targetDrive, {
+    required LinuxToGoSupportedImage image,
     required String liveMediaArgument,
     required bool enableFirstBootStaging,
   }) async {
+    if (image.family != LinuxToGoImageFamily.casper ||
+        image.persistenceStrategy !=
+            LinuxToGoPersistenceStrategy.casperWritableImage) {
+      _logLine('Unsupported Linux To Go persistence strategy.');
+      return false;
+    }
+
     final root = targetDrive.endsWith(r'\') ? targetDrive : '$targetDrive\\';
-    final configFiles = <File>[
-      File(p.join(root, 'boot', 'grub', 'grub.cfg')),
-      File(p.join(root, 'boot', 'grub', 'loopback.cfg')),
-    ];
+    var foundPatchableEntry = false;
+    final escapedKernelPath = RegExp.escape('/${image.kernelRelativePath}');
+    final kernelPattern = RegExp(
+      '$escapedKernelPath(?:\\s|\$)',
+      caseSensitive: false,
+    );
 
-    var foundBootConfig = false;
-    var foundCasperEntry = false;
-
-    for (final file in configFiles) {
-      if (!await file.exists()) continue;
-      foundBootConfig = true;
+    for (final config in image.patchableBootConfigs) {
+      if (config.syntax != LinuxToGoBootConfigSyntax.grub) continue;
+      final file = File(p.join(root, config.relativePath));
+      if (!await file.exists()) {
+        _logLine('Approved boot config is missing after copy: ${file.path}');
+        return false;
+      }
 
       await Process.run('attrib', ['-R', file.path]).timeout(
         const Duration(seconds: 10),
@@ -1915,15 +1842,11 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
               r'^\s*linux(efi)?\s+',
               caseSensitive: false,
             ).hasMatch(line);
-            if (!isLinuxLine ||
-                !RegExp(
-                  r'\/casper\/vmlinuz(?:\s|$)',
-                  caseSensitive: false,
-                ).hasMatch(line)) {
+            if (!isLinuxLine || !kernelPattern.hasMatch(line)) {
               return line;
             }
 
-            foundCasperEntry = true;
+            foundPatchableEntry = true;
             var updated = line;
             final persistentPattern = RegExp(
               r'(^|\s)persistent(\s|$)',
@@ -1974,7 +1897,7 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       }
     }
 
-    return foundBootConfig && foundCasperEntry;
+    return foundPatchableEntry;
   }
 
   String _insertGrubKernelArgument(String line, String argument) {
@@ -2100,7 +2023,7 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     required String mountPoint,
     required String bootDrive,
     required String liveDrive,
-    required _LinuxToGoPreflight preflight,
+    required LinuxToGoSupportedImage image,
   }) async {
     try {
       final sourceRoot = mountPoint.endsWith(r'\')
@@ -2171,14 +2094,14 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         }
       }
 
-      if (verifiedLiveBytes != preflight.totalContentBytes ||
-          verifiedBootBytes != preflight.bootContentBytes) {
+      if (verifiedLiveBytes != image.totalContentBytes ||
+          verifiedBootBytes != image.bootContentBytes) {
         return _LinuxRawWriteResult(
           success: false,
           error:
               'Linux To Go copy size verification failed: '
-              'live=$verifiedLiveBytes/${preflight.totalContentBytes}, '
-              'boot=$verifiedBootBytes/${preflight.bootContentBytes}.',
+              'live=$verifiedLiveBytes/${image.totalContentBytes}, '
+              'boot=$verifiedBootBytes/${image.bootContentBytes}.',
         );
       }
 
@@ -2199,10 +2122,17 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     required String liveVolumeLabel,
     required String liveMediaArgument,
     required _VolumeIconPayload? expectedIcon,
-    required _LinuxToGoPreflight preflight,
+    required LinuxToGoSupportedImage image,
     LinuxDriverStagingBundle? stagingBundle,
   }) async {
     try {
+      if (image.family != LinuxToGoImageFamily.casper ||
+          image.persistenceStrategy !=
+              LinuxToGoPersistenceStrategy.casperWritableImage) {
+        _logLine('Linux To Go verify failed: unsupported persistence strategy');
+        return false;
+      }
+
       final bootMatches = await _partitionMatchesLinuxToGoLayout(
         drive: bootDrive,
         expectedLabel: 'WDS_LTG',
@@ -2224,12 +2154,10 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
 
       final bootRoot = bootDrive.endsWith(r'\') ? bootDrive : '$bootDrive\\';
       final liveRoot = liveDrive.endsWith(r'\') ? liveDrive : '$liveDrive\\';
-      final bootx64 = File(p.join(bootRoot, 'EFI', 'BOOT', 'BOOTx64.EFI'));
-      final liveBootx64 = File(p.join(liveRoot, 'EFI', 'BOOT', 'BOOTx64.EFI'));
-      final bootGrub = File(p.join(bootRoot, 'boot', 'grub', 'grub.cfg'));
-      final liveGrub = File(p.join(liveRoot, 'boot', 'grub', 'grub.cfg'));
-      final bootKernel = File(p.join(bootRoot, 'casper', 'vmlinuz'));
-      final bootInitrd = File(p.join(bootRoot, 'casper', 'initrd'));
+      final bootx64 = File(p.join(bootRoot, image.efiBootRelativePath));
+      final liveBootx64 = File(p.join(liveRoot, image.efiBootRelativePath));
+      final bootKernel = File(p.join(bootRoot, image.kernelRelativePath));
+      final bootInitrd = File(p.join(bootRoot, image.initrdRelativePath));
       final writable = File(p.join(bootRoot, 'writable'));
 
       if (!await bootx64.exists() || !await liveBootx64.exists()) {
@@ -2240,24 +2168,41 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         _logLine('Linux To Go verify failed: casper kernel or initrd missing');
         return false;
       }
-      if (!await bootGrub.exists() || !await liveGrub.exists()) {
-        _logLine('Linux To Go verify failed: GRUB config missing');
-        return false;
-      }
-
-      final bootGrubText = await bootGrub.readAsString();
-      final liveGrubText = await liveGrub.readAsString();
       final persistentPattern = RegExp(r'(^|\s)persistent(\s|$)');
       final liveMediaPattern = RegExp(
         '(^|\\s)${RegExp.escape(liveMediaArgument)}(\\s|\$)',
         caseSensitive: false,
       );
-      if (!persistentPattern.hasMatch(bootGrubText) ||
-          !persistentPattern.hasMatch(liveGrubText) ||
-          !liveMediaPattern.hasMatch(bootGrubText) ||
-          !liveMediaPattern.hasMatch(liveGrubText)) {
-        _logLine('Linux To Go verify failed: required boot args missing');
-        return false;
+      final bootConfigTexts = <String>[];
+      final liveConfigTexts = <String>[];
+      for (final config in image.patchableBootConfigs) {
+        if (config.syntax != LinuxToGoBootConfigSyntax.grub) {
+          _logLine('Linux To Go verify failed: unsupported boot config syntax');
+          return false;
+        }
+        final bootConfig = File(p.join(bootRoot, config.relativePath));
+        final liveConfig = File(p.join(liveRoot, config.relativePath));
+        if (!await bootConfig.exists() || !await liveConfig.exists()) {
+          _logLine(
+            'Linux To Go verify failed: approved GRUB config missing: '
+            '${config.relativePath}',
+          );
+          return false;
+        }
+        final bootText = await bootConfig.readAsString();
+        final liveText = await liveConfig.readAsString();
+        if (!persistentPattern.hasMatch(bootText) ||
+            !persistentPattern.hasMatch(liveText) ||
+            !liveMediaPattern.hasMatch(bootText) ||
+            !liveMediaPattern.hasMatch(liveText)) {
+          _logLine(
+            'Linux To Go verify failed: required boot args missing from '
+            '${config.relativePath}',
+          );
+          return false;
+        }
+        bootConfigTexts.add(bootText);
+        liveConfigTexts.add(liveText);
       }
 
       if (stagingBundle != null) {
@@ -2265,8 +2210,8 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
           LinuxDriverStagingService.bootMarkerArgument,
           LinuxDriverStagingService.systemdWantsArgument,
         ]) {
-          if (!bootGrubText.contains(argument) ||
-              !liveGrubText.contains(argument)) {
+          if (bootConfigTexts.any((text) => !text.contains(argument)) ||
+              liveConfigTexts.any((text) => !text.contains(argument))) {
             _logLine(
               'Linux To Go verify failed: staging boot argument missing: '
               '$argument',
@@ -2291,7 +2236,7 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         return false;
       }
 
-      for (final payload in preflight.livePayloads) {
+      for (final payload in image.livePayloads) {
         final liveFile = File(p.join(liveRoot, payload.relativePath));
         if (!await liveFile.exists() ||
             await liveFile.length() != payload.sizeBytes) {
@@ -4431,32 +4376,6 @@ class _LinuxRawWriteResult {
     this.failureMessageKey,
     this.cancelled = false,
     this.verificationFailed = false,
-  });
-}
-
-class _LinuxToGoPreflight {
-  final bool success;
-  final String? error;
-  final int totalContentBytes;
-  final int bootContentBytes;
-  final List<_LinuxToGoPayload> livePayloads;
-
-  const _LinuxToGoPreflight({
-    required this.success,
-    this.error,
-    this.totalContentBytes = 0,
-    this.bootContentBytes = 0,
-    this.livePayloads = const [],
-  });
-}
-
-class _LinuxToGoPayload {
-  final String relativePath;
-  final int sizeBytes;
-
-  const _LinuxToGoPayload({
-    required this.relativePath,
-    required this.sizeBytes,
   });
 }
 

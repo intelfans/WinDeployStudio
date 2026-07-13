@@ -12,6 +12,7 @@ import '../../../core/localization/strings.dart';
 import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
+import '../../../core/services/linux_togo_image_preflight.dart';
 import '../../../core/services/wtg_service.dart';
 import '../../../core/services/windows_iso_preflight.dart';
 import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
@@ -100,6 +101,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   int? _imageIndex;
   bool _loadingImage = false;
   String _imageStatus = '';
+  LinuxToGoImageInspection? _linuxToGoInspection;
 
   List<DiskInfo> _disks = const [];
   DiskInfo? _disk;
@@ -184,6 +186,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _iso = null;
       _images = const [];
       _imageIndex = null;
+      _linuxToGoInspection = null;
       _deploymentMode = DeploymentMode.direct;
       _bootMode = DeploymentBootMode.uefiGpt;
       _compactOs = false;
@@ -201,14 +204,18 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         _isLinux ? 'wtg_linux_select_iso' : 'wtg_select_iso',
       ),
     );
-    final path = result?.files.single.path;
+    if (result == null) return;
+    final pickedFile = result.files.single;
+    final path = pickedFile.path;
     if (path == null || !mounted) return;
 
     setState(() {
       _loadingImage = true;
       _imageStatus = tr(context, 'wtg_parsing_iso');
+      _iso = null;
       _images = const [];
       _imageIndex = null;
+      _linuxToGoInspection = null;
     });
 
     try {
@@ -219,18 +226,28 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         if (windowsLayout.isValid) {
           throw StateError('wtg_windows_iso_in_linux_mode');
         }
-        final file = File(path);
+        final inspection = await ref
+            .read(linuxToGoImagePreflightProvider)
+            .inspect(path);
         final iso = IsoMetadata(
           filePath: path,
           fileName: p.basename(path),
-          fileSize: await file.length(),
+          fileSize: pickedFile.size,
           windowsVersion: 'Linux ISOHybrid',
         );
         if (!mounted) return;
         setState(() {
           _iso = iso;
-          _imageIndex = 1;
+          _imageIndex = inspection.canCreate ? 1 : null;
+          _linuxToGoInspection = inspection;
         });
+        if (!inspection.canCreate) {
+          final messageKey =
+              inspection.messageKey ?? 'linux_togo_unsupported_iso';
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(_localizedOrRaw(messageKey))));
+        }
       } else {
         final windowsLayout = await ref
             .read(windowsIsoPreflightProvider)
@@ -373,7 +390,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   bool _canContinue() {
     return switch (_step) {
-      0 => _iso != null && (_isLinux || _imageIndex != null),
+      0 =>
+        _iso != null &&
+            (_isLinux
+                ? _linuxToGoInspection?.canCreate == true
+                : _imageIndex != null),
       1 => _disk != null && _diskSafety?.isSafe == true,
       2 => DeploymentCompatibility.evaluate(_plan).canDeploy,
       3 => DeploymentCompatibility.evaluate(_plan).canDeploy,
@@ -543,6 +564,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _iso = null;
       _images = const [];
       _imageIndex = null;
+      _linuxToGoInspection = null;
       _disk = null;
       _diskSafety = null;
       _running = false;
@@ -724,7 +746,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             subtitle: _iso == null
                 ? tr(context, 'deploy_image_none')
                 : '${_iso!.displaySize}  •  ${_iso!.windowsVersion ?? ''}',
-            selected: _iso != null,
+            selected: _isLinux
+                ? _linuxToGoInspection?.canCreate == true
+                : _iso != null,
             trailing: FilledButton.tonalIcon(
               onPressed: _loadingImage ? null : _pickIso,
               icon: const Icon(Icons.folder_open),
@@ -732,6 +756,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             ),
             stackTrailingNarrowly: true,
           ),
+          if (_isLinux && _linuxToGoInspection != null) ...[
+            const SizedBox(height: 12),
+            _buildLinuxToGoInspectionBanner(_linuxToGoInspection!),
+          ],
           if (_loadingImage) ...[
             const SizedBox(height: 12),
             LinearProgressIndicator(semanticsLabel: _imageStatus),
@@ -766,6 +794,40 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             }),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildLinuxToGoInspectionBanner(LinuxToGoImageInspection inspection) {
+    final supported = inspection.canCreate;
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = supported ? colorScheme.primary : colorScheme.error;
+    final messageKey = supported
+        ? 'linux_togo_image_supported'
+        : inspection.messageKey ?? 'linux_togo_unsupported_iso';
+
+    return Semantics(
+      key: const Key('ltg-image-inspection'),
+      liveRegion: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              supported ? Icons.verified_outlined : Icons.error_outline,
+              color: color,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(_localizedOrRaw(messageKey))),
+          ],
+        ),
       ),
     );
   }

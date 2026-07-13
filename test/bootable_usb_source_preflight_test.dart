@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/bootable_usb_service.dart';
 import 'package:win_deploy_studio/core/services/disk_safety_service.dart';
+import 'package:win_deploy_studio/core/services/linux_togo_image_preflight.dart';
 import 'package:win_deploy_studio/core/services/windows_iso_preflight.dart';
 import 'package:win_deploy_studio/features/deployment/models/deployment_plan.dart';
 
@@ -115,6 +116,50 @@ void main() {
     expect(safety.checkCalls, 0);
     expect(updates.single.message, 'creator_windows_iso_in_linux_mode');
   });
+
+  test(
+    'Linux To Go rejects an unsupported persistence layout before disk access',
+    () async {
+      final safety = _CountingDiskSafetyService();
+      final container = ProviderContainer(
+        overrides: [
+          diskSafetyServiceProvider.overrideWithValue(safety),
+          windowsIsoPreflightProvider.overrideWithValue(
+            _StaticWindowsIsoPreflight(
+              const WindowsIsoLayoutInspection.invalid('Linux layout'),
+            ),
+          ),
+          linuxToGoImagePreflightProvider.overrideWithValue(
+            const _StaticLinuxToGoImagePreflight(
+              LinuxToGoImageInspection.unsupported(
+                LinuxToGoImageIssue.debianLiveUnsupported,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final updates = <CreateProgress>[];
+
+      final created = await container
+          .read(bootableUsbServiceProvider)
+          .createLinuxIsoUsb(
+            disk: _disk,
+            isoPath: r'C:\images\debian-live.iso',
+            kind: LinuxUsbKind.toGo,
+            deploymentPlan: const DeploymentPlan(
+              platform: DeploymentPlatform.linux,
+              purpose: DeploymentPurpose.toGo,
+              imagePath: r'C:\images\debian-live.iso',
+            ),
+            onProgress: updates.add,
+          );
+
+      expect(created, isFalse);
+      expect(safety.checkCalls, 0);
+      expect(updates.single.message, 'linux_togo_debian_live_unsupported');
+    },
+  );
 }
 
 const _disk = DiskInfo(
@@ -135,6 +180,15 @@ class _StaticWindowsIsoPreflight implements WindowsIsoPreflight {
   @override
   Future<WindowsIsoLayoutInspection> inspect(String isoPath) async =>
       inspection;
+}
+
+class _StaticLinuxToGoImagePreflight implements LinuxToGoImagePreflight {
+  const _StaticLinuxToGoImagePreflight(this.inspection);
+
+  final LinuxToGoImageInspection inspection;
+
+  @override
+  Future<LinuxToGoImageInspection> inspect(String isoPath) async => inspection;
 }
 
 class _CountingDiskSafetyService extends DiskSafetyService {

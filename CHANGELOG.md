@@ -17,6 +17,8 @@ All notable changes to WinDeploy Studio are documented here.
 
 ### Improvements
 
+- Added typed Linux To Go image classification at selection time and immediately before erase. The workflow now explicitly validates x64 casper Live layouts and reports missing EFI, kernel, initrd, payload, or patchable-GRUB requirements.
+- Debian Live layouts are recognized and clearly routed to Linux installation media until their separate persistence protocol is implemented; unsupported distributions can no longer appear selectable for Linux To Go.
 - Expanded the native benchmark protocol with sequential and 4K random reads, mixed read/write scenarios, IOPS, latency percentiles, and cache-behavior analysis while retaining unbuffered, write-through I/O.
 - Added compatibility blockers for unsupported deployment combinations, including Windows 7 VHDX, Windows 7 native VHD outside Enterprise/Ultimate, x86 Windows 7 UEFI, WIMBoot outside direct Windows 8.1 deployment, CompactOS outside Windows 10/11, and virtual disks below 32 GB.
 - Added a dedicated responsive deployment shell and clearer top-level navigation for advanced deployment and disk-management workflows.

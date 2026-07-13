@@ -25,6 +25,8 @@ The project is distributed under the MIT License.
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
   - Create persistent Linux To Go workspaces from x64 Ubuntu and compatible casper-based Live ISOs.
+  - Classify Linux To Go images when selected and again immediately before erasing the target. The accepted layout requires x64 UEFI, casper kernel/initrd and Live payloads, plus a GRUB entry that can safely receive the persistence arguments.
+  - Recognize Debian Live separately and direct it to Linux installation media until its distinct persistence protocol is implemented; other unsupported distributions are never presented as compatible Linux To Go images.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing.
   - Configure local-disk visibility, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, VHD/VHDX drive-letter repair, .NET Framework 3.5, and deployment drive letters where supported. UEFI deployments automatically use an NTFS Windows volume with a separate FAT32 EFI partition.
@@ -282,7 +284,7 @@ Windows, Microsoft, Sysinternals, Intel, and other product names, trademarks, lo
 
 Linux To Go uses the bundled `mke2fs.exe` command-line utility to create the ext4 `writable` persistence image. The bundled binary is from e2fsprogs / Android Open Source Project references, reports `mke2fs 1.47.2 (1-Jan-2025)` and `android-platform-15.0.0_r5-314-ga1f793f6b`, and has SHA-256 `BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A`.
 
-For modern Ubuntu images, Linux To Go uses a separate FAT32 boot/persistence partition and an NTFS Live-data partition. GRUB loads the signed Ubuntu boot files from FAT32, then casper opens the complete Live image from the NTFS volume. This supports individual squashfs files larger than 4 GiB while keeping the ext4 `writable` persistence image on FAT32 where casper can discover it reliably. Before erasing the target disk, WinDeploy Studio verifies the bundled persistence component, patchable GRUB entries, required boot files, file-size limits, and available capacity.
+For modern Ubuntu images, Linux To Go uses a separate FAT32 boot/persistence partition and an NTFS Live-data partition. GRUB loads the signed Ubuntu boot files from FAT32, then casper opens the complete Live image from the NTFS volume. This supports individual squashfs files larger than 4 GiB while keeping the ext4 `writable` persistence image on FAT32 where casper can discover it reliably. WinDeploy Studio classifies the selected image and repeats the check immediately before erasing the target: a compatible LTG image must provide x64 UEFI, casper kernel/initrd, Live filesystem payloads, and a patchable GRUB entry. Debian Live is recognized but deliberately kept on the Linux-install-media path until its separate `persistence` / `persistence.conf` protocol is fully implemented.
 
 `mke2fs.exe` is invoked as a separate executable and is not linked into the MIT-licensed WinDeploy Studio application binary. See [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) for details.
 
@@ -325,6 +327,8 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。
   - 使用 x64 Ubuntu 或兼容的 casper Live ISO 创建持久化 Linux To Go。
+  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；受支持布局必须同时具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可安全注入持久化参数的 GRUB 启动项。
+  - Debian Live 会被单独识别，在其独立持久化协议完成前引导至 Linux 安装盘；其他不受支持发行版绝不会被标示为可用的 Linux To Go 镜像。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
   - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。
   - 在支持的组合中配置本地磁盘可见性、OOBE/Audit、WinRE、UASP、CompactOS、WIMBoot、VHD/VHDX 盘符修复、.NET Framework 3.5 和部署盘符。UEFI 部署会自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区。
@@ -569,7 +573,7 @@ WinDeploy Studio 基于 MIT License 分发。
 
 Linux To Go 使用随程序内置的 `mke2fs.exe` 命令行工具创建 ext4 `writable` 持久化镜像。该二进制文件来源参考 e2fsprogs / Android Open Source Project，版本信息为 `mke2fs 1.47.2 (1-Jan-2025)` 和 `android-platform-15.0.0_r5-314-ga1f793f6b`，SHA-256 为 `BE42ABB5D1651C8766E230E7AF834BD8E0F2085857CCB483463F58BA5AD65E1A`。
 
-针对现代 Ubuntu 镜像，Linux To Go 采用独立的 FAT32 启动/持久化分区和 NTFS Live 数据分区。GRUB 从 FAT32 加载 Ubuntu 的签名启动文件，随后由 casper 从 NTFS 卷读取完整 Live 镜像，因此可以容纳超过 4 GiB 的单个 squashfs 文件；ext4 `writable` 持久化镜像仍保存在 FAT32 上，确保 casper 能够可靠识别。清除目标磁盘前，WinDeploy Studio 会检查内置持久化组件、可修改的 GRUB 启动项、必要启动文件、文件大小限制和可用容量。
+针对现代 Ubuntu 镜像，Linux To Go 采用独立的 FAT32 启动/持久化分区和 NTFS Live 数据分区。GRUB 从 FAT32 加载 Ubuntu 的签名启动文件，随后由 casper 从 NTFS 卷读取完整 Live 镜像，因此可以容纳超过 4 GiB 的单个 squashfs 文件；ext4 `writable` 持久化镜像仍保存在 FAT32 上，确保 casper 能够可靠识别。WinDeploy Studio 会在选择镜像时分类检查，并在清除目标磁盘前再次复核：兼容 LTG 必须具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可修改的 GRUB 启动项。Debian Live 会被明确识别，但在其独立的 `persistence` / `persistence.conf` 协议完整实现前，仍会引导至 Linux 安装盘。
 
 WinDeploy Studio 以独立进程调用 `mke2fs.exe`，并未将其链接进基于 MIT License 授权的主程序二进制文件。详见 [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md)。
 

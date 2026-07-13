@@ -11,6 +11,7 @@ import 'package:win_deploy_studio/app/theme.dart';
 import 'package:win_deploy_studio/core/localization/strings.dart';
 import 'package:win_deploy_studio/core/services/disk_safety_service.dart';
 import 'package:win_deploy_studio/core/services/iso_parse_service.dart';
+import 'package:win_deploy_studio/core/services/linux_togo_image_preflight.dart';
 import 'package:win_deploy_studio/core/services/wtg_service.dart';
 import 'package:win_deploy_studio/core/services/windows_iso_preflight.dart';
 import 'package:win_deploy_studio/features/mirror/screens/mirror_screen.dart';
@@ -132,7 +133,8 @@ void main() {
     await tester.tap(find.byKey(const Key('wtg-platform-linux-label')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(trByCode('zh', 'creator_select_btn')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(
       find.text(trByCode('zh', 'wtg_windows_iso_in_linux_mode')),
@@ -142,6 +144,58 @@ void main() {
     _expectNoFlutterExceptions(tester);
   });
 
+  testWidgets(
+    'Linux To Go explains an unsupported image before Next is enabled',
+    (tester) async {
+      await _setSurface(tester, const Size(1000, 760));
+      final originalPicker = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = _SingleFilePicker(
+        r'C:\test\debian-live.iso',
+      );
+      addTearDown(() => FilePickerPlatform.instance = originalPicker);
+
+      await _pumpApp(
+        tester,
+        const WtgScreen(),
+        locale: const Locale('zh'),
+        overrides: [
+          diskSafetyServiceProvider.overrideWithValue(_NoDisksService()),
+          windowsIsoPreflightProvider.overrideWithValue(
+            _StaticWindowsIsoPreflight(
+              const WindowsIsoLayoutInspection.invalid('Linux layout'),
+            ),
+          ),
+          linuxToGoImagePreflightProvider.overrideWithValue(
+            const _StaticLinuxToGoImagePreflight(
+              LinuxToGoImageInspection.unsupported(
+                LinuxToGoImageIssue.debianLiveUnsupported,
+              ),
+            ),
+          ),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('wtg-platform-linux-label')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(trByCode('zh', 'creator_select_btn')));
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const Key('ltg-image-inspection')),
+      );
+
+      expect(find.byKey(const Key('ltg-image-inspection')), findsOneWidget);
+      expect(
+        find.text(trByCode('zh', 'linux_togo_debian_live_unsupported')),
+        findsWidgets,
+      );
+      final next = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, trByCode('zh', 'creator_next')),
+      );
+      expect(next.onPressed, isNull);
+      _expectNoFlutterExceptions(tester);
+    },
+  );
+
   test('To Go ISO mismatch keys exist in every supported locale', () {
     for (final code in supportedLocaleCodes) {
       final missing = trByCode(code, 'translation_missing');
@@ -149,6 +203,13 @@ void main() {
         'wtg_invalid_windows_iso',
         'wtg_windows_iso_in_linux_mode',
         'linux_togo_unsupported_iso',
+        'linux_togo_image_supported',
+        'linux_togo_source_not_regular_file',
+        'linux_togo_missing_x64_efi',
+        'linux_togo_missing_live_kernel',
+        'linux_togo_missing_live_initrd',
+        'linux_togo_missing_live_payload',
+        'linux_togo_debian_live_unsupported',
       ]) {
         final localized = trByCode(code, key);
         expect(localized, isNotEmpty, reason: '$code/$key is empty');
@@ -286,6 +347,15 @@ class _StaticWindowsIsoPreflight implements WindowsIsoPreflight {
   @override
   Future<WindowsIsoLayoutInspection> inspect(String isoPath) async =>
       inspection;
+}
+
+class _StaticLinuxToGoImagePreflight implements LinuxToGoImagePreflight {
+  const _StaticLinuxToGoImagePreflight(this.inspection);
+
+  final LinuxToGoImageInspection inspection;
+
+  @override
+  Future<LinuxToGoImageInspection> inspect(String isoPath) async => inspection;
 }
 
 class _SingleFilePicker extends FilePickerPlatform {
