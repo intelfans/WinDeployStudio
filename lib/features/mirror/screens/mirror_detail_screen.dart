@@ -4,12 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/mirror_speed_test_service.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 import '../../../shared/widgets/app_page.dart';
+import '../../../shared/webview/download_manager.dart';
+import '../../../shared/webview/download_panel.dart';
 import '../models/mirror_models.dart';
+import '../providers/mirror_provider.dart';
 import '../providers/mirror_source_provider.dart';
 import '../providers/recent_mirrors_provider.dart';
 import '../services/recent_mirrors_service.dart';
@@ -34,7 +40,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   void initState() {
     super.initState();
     unawaited(_recordRecentMirror());
-    if (!widget.item.isOfficialMicrosoft) {
+    if (!widget.item.isOfficialMicrosoft && widget.item.hasGlobalMirror) {
       _runSpeedTest();
     }
   }
@@ -87,7 +93,8 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
                 primary: _buildInfoSection(context, locale),
                 secondary: Column(
                   children: [
-                    if (!widget.item.isOfficialMicrosoft) ...[
+                    if (!widget.item.isOfficialMicrosoft &&
+                        widget.item.hasGlobalMirror) ...[
                       _buildSpeedTestCard(context),
                       SizedBox(height: tokens.itemSpacing),
                     ],
@@ -109,6 +116,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   Widget _buildHeader(BuildContext context, Locale locale) {
     final name = widget.item.getName(locale);
     final type = widget.item.getType(locale);
+    final size = widget.item.getSize(locale);
     final trustBadge = widget.item.isOfficialMicrosoft
         ? tr(context, 'mirror_badge_official')
         : widget.item.isCommunityImage
@@ -132,7 +140,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
           if (widget.item.version != null) _Tag(widget.item.version!),
           if (widget.item.build != null) _Tag(widget.item.build!),
           if (widget.item.architecture != null) _Tag(widget.item.architecture!),
-          if (widget.item.size != null) _Tag(widget.item.size!),
+          if (size != null) _Tag(size),
         ],
       ),
     );
@@ -351,6 +359,8 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
   Widget _buildDownloadSection(BuildContext context, Locale locale) {
     final theme = Theme.of(context);
+    final size = widget.item.getSize(locale);
+    final knownImage = _knownImageFor(locale);
     final description = widget.item.isOfficialMicrosoft
         ? tr(context, 'mirror_desc_official')
         : widget.item.isCommunityImage
@@ -375,10 +385,15 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               Text(description, style: theme.textTheme.bodySmall),
               const SizedBox(height: 12),
             ],
-            if (widget.item.size != null)
-              _InfoRow(tr(context, 'detail_size'), widget.item.size!),
+            if (size != null) _InfoRow(tr(context, 'detail_size'), size),
             if (widget.item.architecture != null)
               _InfoRow(tr(context, 'detail_arch'), widget.item.architecture!),
+            if (knownImage != null) ...[
+              const SizedBox(height: 14),
+              _ChecksumValue(label: 'SHA-256', value: knownImage.sha256),
+              const SizedBox(height: 10),
+              _ChecksumValue(label: 'MD5', value: knownImage.md5),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -394,7 +409,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: () {
                   final url = widget.item.isOfficialMicrosoft
-                      ? widget.item.downloadUrl
+                      ? widget.item.downloadUrlFor(locale)
                       : ref
                             .read(mirrorSourceProvider.notifier)
                             .resolveUrl(widget.item);
@@ -413,9 +428,18 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     );
   }
 
+  KnownImage? _knownImageFor(Locale locale) {
+    final data = ref.watch(mirrorProvider).data;
+    if (data == null) return null;
+    for (final image in data.knownImagesForLocale(locale)) {
+      if (image.id == widget.item.id) return image;
+    }
+    return null;
+  }
+
   Future<void> _openDownload(BuildContext context, Locale locale) async {
     if (widget.item.isOfficialMicrosoft) {
-      await _openOfficialDownload(context);
+      await _openOfficialDownload(context, locale);
       return;
     }
 
@@ -425,21 +449,18 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     }
 
     final name = widget.item.getName(locale);
+    final hasChina = widget.item.hasChinaMirror;
+    final hasGlobal = widget.item.hasGlobalMirror;
     final sourceNotifier = ref.read(mirrorSourceProvider.notifier);
     var sourceState = ref.read(mirrorSourceProvider);
 
-    if (sourceState.geo == null) {
+    if (sourceState.geo == null && hasChina && hasGlobal) {
       await sourceNotifier.detectGeo();
       if (!context.mounted) {
         return;
       }
       sourceState = ref.read(mirrorSourceProvider);
     }
-
-    final hasChina =
-        widget.item.chinaUrl != null && widget.item.chinaUrl!.isNotEmpty;
-    final hasGlobal =
-        widget.item.globalUrl != null && widget.item.globalUrl!.isNotEmpty;
 
     if (!hasChina && !hasGlobal) {
       await _openResolvedDownload(
@@ -451,7 +472,13 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       return;
     }
 
-    final suggestedMirror = sourceState.isChina ? 'china' : 'global';
+    final suggestedMirror = hasChina && !hasGlobal
+        ? 'china'
+        : hasGlobal && !hasChina
+        ? 'global'
+        : sourceState.isChina
+        ? 'china'
+        : 'global';
     final selectedMirror = await showDialog<String>(
       context: context,
       builder: (ctx) => _MirrorSelectionDialog(
@@ -476,7 +503,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     } else if (selectedMirror == 'global') {
       url = widget.item.globalUrl!;
       mirrorLabel = tr(context, 'mirror_global_title');
-      mirrorLogName = 'GoFile';
+      mirrorLogName = 'Global Mirror';
     } else {
       return;
     }
@@ -538,7 +565,10 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     return confirmed == true;
   }
 
-  Future<void> _openOfficialDownload(BuildContext context) async {
+  Future<void> _openOfficialDownload(
+    BuildContext context,
+    Locale locale,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -571,7 +601,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       'Method=SystemBrowser',
     );
 
-    final uri = Uri.parse(widget.item.downloadUrl);
+    final uri = Uri.parse(widget.item.downloadUrlFor(locale));
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -600,7 +630,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       'Category=${widget.item.categoryLogName}\n'
       'Image=$name\n'
       'Mirror=${mirrorLogName ?? mirrorLabel}\n'
-      'Status=Started',
+      'Status=SourceSelected',
     );
 
     await logCenter.logDownload(
@@ -608,16 +638,106 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       'Selected=$mirrorLabel Image=$name URL=$url',
     );
 
-    if (context.mounted) {
-      await WebviewHelper.openUrl(context, url, title: name);
+    if (!context.mounted) return;
+
+    if (_isSourceForgeUrl(url)) {
+      await _startSourceForgeDownload(
+        context: context,
+        name: name,
+        url: url,
+        logCenter: logCenter,
+        mirrorLogName: mirrorLogName ?? mirrorLabel,
+      );
+      return;
+    }
+
+    await WebviewHelper.openUrl(context, url, title: name);
+    await logCenter.logDownload(
+      '[Download]\n'
+      'Category=${widget.item.categoryLogName}\n'
+      'Image=$name\n'
+      'Mirror=${mirrorLogName ?? mirrorLabel}\n'
+      'Status=PageOpened',
+    );
+  }
+
+  bool _isSourceForgeUrl(String url) {
+    final host = Uri.tryParse(url)?.host.toLowerCase();
+    return host == 'sourceforge.net' ||
+        host == 'www.sourceforge.net' ||
+        host == 'downloads.sourceforge.net' ||
+        (host?.endsWith('.dl.sourceforge.net') ?? false);
+  }
+
+  Future<void> _startSourceForgeDownload({
+    required BuildContext context,
+    required String name,
+    required String url,
+    required LogCenterService logCenter,
+    required String mirrorLogName,
+  }) async {
+    final fileName = _downloadFileName(url, name);
+    final savePath = await FilePicker.saveFile(
+      dialogTitle: tr(context, 'webview_save_title'),
+      fileName: fileName,
+      type: FileType.any,
+    );
+    if (savePath == null || !context.mounted) {
       await logCenter.logDownload(
         '[Download]\n'
         'Category=${widget.item.categoryLogName}\n'
         'Image=$name\n'
-        'Mirror=${mirrorLogName ?? mirrorLabel}\n'
-        'Status=PageOpened',
+        'Mirror=$mirrorLogName\n'
+        'Status=Cancelled',
       );
+      return;
     }
+
+    await DownloadManager().startDownload(
+      url: url,
+      fileName: p.basename(savePath),
+      savePath: savePath,
+    );
+    await logCenter.logDownload(
+      '[Download]\n'
+      'Category=${widget.item.categoryLogName}\n'
+      'Image=$name\n'
+      'Mirror=$mirrorLogName\n'
+      'Status=Started\n'
+      'Path=$savePath',
+    );
+    if (context.mounted) _showDownloadProgress(context);
+  }
+
+  void _showDownloadProgress(BuildContext context) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: Colors.transparent,
+        constraints: const BoxConstraints(maxWidth: 420),
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              child: DownloadPanel(onDownloadCurrentPage: () {}),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _downloadFileName(String url, String fallbackName) {
+    final uri = Uri.tryParse(url);
+    final lastSegment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
+    final decoded = Uri.decodeComponent(lastSegment).trim();
+    if (decoded.contains('.') && !decoded.endsWith('.')) return decoded;
+    final safeName = fallbackName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    return '$safeName.iso';
   }
 
   IconData _catIcon(String category) {
@@ -678,7 +798,10 @@ class _Tag extends StatelessWidget {
         ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+      child: AppCompactLabel(
+        label,
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
     );
   }
 }
@@ -725,6 +848,49 @@ class _InfoRow extends StatelessWidget {
                   ),
                 ],
               ),
+      ),
+    );
+  }
+}
+
+class _ChecksumValue extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ChecksumValue({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.48),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.7)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w600,
+              height: 1.45,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -974,7 +1140,7 @@ class _MirrorOption extends StatelessWidget {
                                   .withValues(alpha: 0.3),
                             ),
                           ),
-                          child: Text(
+                          child: AppCompactLabel(
                             tag!,
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: tagColor ?? colorScheme.primary,

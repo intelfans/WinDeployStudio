@@ -33,14 +33,19 @@ class MirrorSourceNotifier extends StateNotifier<MirrorSourceState> {
   }
 
   String resolveUrl(MirrorItem item) {
-    final url = state.isChina
+    final useChinaMirror =
+        item.hasChinaMirror && (state.isChina || !item.hasGlobalMirror);
+    final url = useChinaMirror
         ? (item.chinaUrl ?? item.downloadUrl)
-        : (item.globalUrl ?? item.downloadUrl);
+        : (item.globalUrl ?? item.chinaUrl ?? item.downloadUrl);
+    final sourceLabel = trCurrent(
+      useChinaMirror ? 'mirror_china_title' : 'mirror_global_title',
+    );
 
     LogCenterService().logSystem(
       '[MirrorSource] Mirror=${item.id} '
       'Country=${state.geo?.countryCode ?? "N/A"} '
-      'Selected=${state.sourceLabel} '
+      'Selected=$sourceLabel '
       'URL=$url',
     );
 

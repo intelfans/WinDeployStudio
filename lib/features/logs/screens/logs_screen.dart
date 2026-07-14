@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../app/typography.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 import '../../../shared/widgets/app_page.dart';
 import '../models/log_category.dart';
 import '../services/log_center_service.dart';
@@ -469,7 +470,7 @@ class _TimeChip extends StatelessWidget {
     final selected = value == groupValue;
     final colorScheme = Theme.of(context).colorScheme;
     return ChoiceChip(
-      label: Text(label),
+      label: AppCompactLabel(label),
       selected: selected,
       onSelected: (_) => onSelected(value),
       selectedColor: colorScheme.primaryContainer,

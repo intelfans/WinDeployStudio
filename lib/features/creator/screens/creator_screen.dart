@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
+import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/bootable_usb_service.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
@@ -50,11 +51,31 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   String _parseStepText = '';
   int _parsePercent = 0;
   String? _isoSelectionErrorKey;
+  KnownIsoVerification? _knownIsoVerification;
+  int _knownIsoVerificationRequest = 0;
+  Locale? _knownIsoVerificationLocale;
 
   @override
   void initState() {
     super.initState();
     _detectDisks();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final locale = Localizations.localeOf(context);
+    if (_knownIsoVerificationLocale == locale) return;
+    _knownIsoVerificationLocale = locale;
+
+    final iso = _selectedIso;
+    if (_isLinuxMode || iso == null) {
+      _knownIsoVerification = null;
+      return;
+    }
+    final request = ++_knownIsoVerificationRequest;
+    _knownIsoVerification = null;
+    unawaited(_verifyKnownWindowsIso(iso.filePath, request, locale));
   }
 
   @override
@@ -82,6 +103,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       _parseStepText = '';
       _parsePercent = 0;
       _isoSelectionErrorKey = null;
+      _knownIsoVerification = null;
+      _knownIsoVerificationRequest++;
     });
   }
 
@@ -127,11 +150,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       if (!mounted) return;
 
       final selectedLinuxMode = _isLinuxMode;
+      final verificationRequest = ++_knownIsoVerificationRequest;
       setState(() {
         _isParsing = true;
         _parseStepText = tr(context, 'creator_parsing');
         _parsePercent = 0;
         _isoSelectionErrorKey = null;
+        _knownIsoVerification = null;
       });
 
       final isoService = ref.read(isoParseServiceProvider);
@@ -222,6 +247,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _currentStep = 1;
         _isoSelectionErrorKey = null;
       });
+      unawaited(
+        _verifyKnownWindowsIso(
+          metadata.filePath,
+          verificationRequest,
+          Localizations.localeOf(context),
+        ),
+      );
       final logCenter = LogCenterService();
       await logCenter.logIso(
         'ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"} | 构建: ${metadata.buildNumber ?? "未知"}',
@@ -239,6 +271,25 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       _isParsing = false;
       _isoSelectionErrorKey = messageKey;
     });
+  }
+
+  Future<void> _verifyKnownWindowsIso(
+    String filePath,
+    int request,
+    Locale locale,
+  ) async {
+    final verification = await ref
+        .read(knownIsoVerificationServiceProvider)
+        .verify(filePath, locale);
+    if (!mounted ||
+        request != _knownIsoVerificationRequest ||
+        _isLinuxMode ||
+        _selectedIso?.filePath != filePath ||
+        Localizations.localeOf(context) != locale ||
+        verification == null) {
+      return;
+    }
+    setState(() => _knownIsoVerification = verification);
   }
 
   void _cancelParsing() {
@@ -668,7 +719,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
-                _IsoInfoCard(iso: _selectedIso!),
+                _IsoInfoCard(
+                  iso: _selectedIso!,
+                  verification: _knownIsoVerification,
+                ),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => setState(() => _currentStep = 1),
@@ -690,7 +744,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_selectedIso != null) ...[
-          _IsoInfoCard(iso: _selectedIso!),
+          _IsoInfoCard(iso: _selectedIso!, verification: _knownIsoVerification),
           const SizedBox(height: 16),
         ],
         Row(
@@ -1358,7 +1412,9 @@ class _IsoSelectionError extends StatelessWidget {
 
 class _IsoInfoCard extends StatelessWidget {
   final IsoMetadata iso;
-  const _IsoInfoCard({required this.iso});
+  final KnownIsoVerification? verification;
+
+  const _IsoInfoCard({required this.iso, this.verification});
 
   @override
   Widget build(BuildContext context) {
@@ -1397,6 +1453,31 @@ class _IsoInfoCard extends StatelessWidget {
                       Text(iso.displaySize, style: theme.textTheme.bodySmall),
                     ],
                   ),
+                  if (verification != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.verified_rounded,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '${tr(context, 'known_iso_verified')}: ${verification!.image.getName(Localizations.localeOf(context))}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

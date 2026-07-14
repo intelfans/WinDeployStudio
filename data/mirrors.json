@@ -1,5 +1,5 @@
 {
-  "lastUpdate": "2026-06-22",
+  "lastUpdate": "2026-07-14",
   "items": [
     {
       "id": "official-win10",
@@ -171,8 +171,9 @@
           "ディスク使用量が比較的多い"
         ]
       },
-      "downloadUrl": "https://www.microsoft.com/en-us/software-download/windows10",
-      "size": "6.68 GB"
+      "downloadUrl": "https://www.microsoft.com/zh-cn/software-download/windows10",
+      "chinaUrl": "https://www.microsoft.com/zh-cn/software-download/windows10",
+      "globalUrl": "https://www.microsoft.com/zh-cn/software-download/windows10"
     },
     {
       "id": "official-win11",
@@ -333,8 +334,9 @@
           "ディスク使用量が多い"
         ]
       },
-      "downloadUrl": "https://www.microsoft.com/en-au/software-download/windows11",
-      "size": "7.96 GB"
+      "downloadUrl": "https://www.microsoft.com/en-us/software-download/windows11",
+      "chinaUrl": "https://www.microsoft.com/zh-cn/software-download/windows11",
+      "globalUrl": "https://www.microsoft.com/en-us/software-download/windows11"
     },
     {
       "id": "tiny10",
@@ -443,75 +445,75 @@
           "非官方系统",
           "部分组件被移除",
           "某些软件可能无法运行",
-          "建议安装字体包"
+          "仅提供英文版；安装后请手动切换显示语言和时区，并安装 CJK 字体包。"
         ],
         "zh_TW": [
           "非官方系統",
           "部分元件已移除",
           "某些軟體可能無法執行",
-          "建議安裝字體包"
+          "僅提供英文版；安裝後請手動切換顯示語言和時區，並安裝 CJK 字型套件。"
         ],
         "en": [
           "Unofficial system",
           "Some components are removed",
           "Some software may not work",
-          "Font pack recommended"
+          "English build only; after installation, manually change the display language and time zone, then install the CJK font pack."
         ],
         "fr": [
           "Système non officiel",
           "Certains composants sont supprimés",
           "Certains logiciels peuvent ne pas fonctionner",
-          "Pack de polices recommandé"
+          "Version anglaise uniquement ; après l’installation, modifiez manuellement la langue d’affichage et le fuseau horaire, puis installez le pack de polices CJK."
         ],
         "de": [
           "Inoffizielles System",
           "Einige Komponenten wurden entfernt",
           "Manche Programme funktionieren möglicherweise nicht",
-          "Schriftpaket empfohlen"
+          "Nur englische Version; ändern Sie nach der Installation die Anzeigesprache und Zeitzone manuell und installieren Sie anschließend das CJK-Schriftpaket."
         ],
         "es": [
           "Sistema no oficial",
           "Algunos componentes fueron eliminados",
           "Algunos programas pueden no funcionar",
-          "Se recomienda el paquete de fuentes"
+          "Solo se ofrece la versión en inglés; después de instalarla, cambia manualmente el idioma de visualización y la zona horaria, e instala el paquete de fuentes CJK."
         ],
         "pt": [
           "Sistema não oficial",
           "Alguns componentes foram removidos",
           "Alguns programas podem não funcionar",
-          "Pacote de fontes recomendado"
+          "Apenas a versão em inglês é fornecida; após a instalação, altere manualmente o idioma de exibição e o fuso horário e instale o pacote de fontes CJK."
         ],
         "ru": [
           "Неофициальная система",
           "Некоторые компоненты удалены",
           "Некоторые программы могут не работать",
-          "Рекомендуется пакет шрифтов"
+          "Доступна только английская сборка; после установки вручную измените язык интерфейса и часовой пояс, затем установите пакет шрифтов CJK."
         ],
         "ar": [
           "نظام غير رسمي",
           "تمت إزالة بعض المكونات",
           "قد لا تعمل بعض البرامج",
-          "يوصى بحزمة الخطوط"
+          "يتوفر إصدار باللغة الإنجليزية فقط؛ بعد التثبيت، غيّر لغة العرض والمنطقة الزمنية يدويًا، ثم ثبّت حزمة خطوط CJK."
         ],
         "ko": [
           "비공식 시스템",
           "일부 구성 요소가 제거됨",
           "일부 소프트웨어가 작동하지 않을 수 있음",
-          "글꼴 팩 권장"
+          "영문 빌드만 제공됩니다. 설치 후 표시 언어와 표준 시간대를 수동으로 변경하고 CJK 글꼴 팩을 설치하세요."
         ],
         "ja": [
           "非公式システム",
           "一部のコンポーネントが削除済み",
           "一部のソフトが動作しない場合あり",
-          "フォントパック推奨"
+          "英語版のみ提供されます。インストール後に表示言語とタイムゾーンを手動で変更し、CJK フォントパックをインストールしてください。"
         ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-NRSKh",
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-NRSKh",
       "size": "3.58 GB",
       "needsFontPack": true,
-      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-NRSKh",
-      "globalUrl": "https://gofile.io/d/cd488a"
+      "fontPackUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-NRSKh",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/TinyOS/Tiny10_22H2.iso"
     },
     {
       "id": "tiny11",
@@ -619,65 +621,65 @@
         "zh": [
           "非官方系统",
           "可能缺少 CJK 字体",
-          "强烈建议安装字体包"
+          "仅提供英文版；安装后请手动切换显示语言和时区，并安装 CJK 字体包。"
         ],
         "zh_TW": [
           "非官方系統",
           "可能缺少 CJK 字體",
-          "強烈建議安裝字體包"
+          "僅提供英文版；安裝後請手動切換顯示語言和時區，並安裝 CJK 字型套件。"
         ],
         "en": [
           "Unofficial system",
           "CJK fonts may be missing",
-          "Font pack strongly recommended"
+          "English build only; after installation, manually change the display language and time zone, then install the CJK font pack."
         ],
         "fr": [
           "Système non officiel",
           "Les polices CJK peuvent manquer",
-          "Pack de polices fortement recommandé"
+          "Version anglaise uniquement ; après l’installation, modifiez manuellement la langue d’affichage et le fuseau horaire, puis installez le pack de polices CJK."
         ],
         "de": [
           "Inoffizielles System",
           "CJK-Schriften können fehlen",
-          "Schriftpaket dringend empfohlen"
+          "Nur englische Version; ändern Sie nach der Installation die Anzeigesprache und Zeitzone manuell und installieren Sie anschließend das CJK-Schriftpaket."
         ],
         "es": [
           "Sistema no oficial",
           "Pueden faltar fuentes CJK",
-          "Paquete de fuentes muy recomendado"
+          "Solo se ofrece la versión en inglés; después de instalarla, cambia manualmente el idioma de visualización y la zona horaria, e instala el paquete de fuentes CJK."
         ],
         "pt": [
           "Sistema não oficial",
           "Fontes CJK podem estar ausentes",
-          "Pacote de fontes altamente recomendado"
+          "Apenas a versão em inglês é fornecida; após a instalação, altere manualmente o idioma de exibição e o fuso horário e instale o pacote de fontes CJK."
         ],
         "ru": [
           "Неофициальная система",
           "Могут отсутствовать шрифты CJK",
-          "Настоятельно рекомендуется пакет шрифтов"
+          "Доступна только английская сборка; после установки вручную измените язык интерфейса и часовой пояс, затем установите пакет шрифтов CJK."
         ],
         "ar": [
           "نظام غير رسمي",
           "قد تكون خطوط CJK مفقودة",
-          "يوصى بشدة بحزمة الخطوط"
+          "يتوفر إصدار باللغة الإنجليزية فقط؛ بعد التثبيت، غيّر لغة العرض والمنطقة الزمنية يدويًا، ثم ثبّت حزمة خطوط CJK."
         ],
         "ko": [
           "비공식 시스템",
           "CJK 글꼴이 없을 수 있음",
-          "글꼴 팩 강력 권장"
+          "영문 빌드만 제공됩니다. 설치 후 표시 언어와 표준 시간대를 수동으로 변경하고 CJK 글꼴 팩을 설치하세요."
         ],
         "ja": [
           "非公式システム",
           "CJK フォントが不足する場合あり",
-          "フォントパックを強く推奨"
+          "英語版のみ提供されます。インストール後に表示言語とタイムゾーンを手動で変更し、CJK フォントパックをインストールしてください。"
         ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-uMR0h",
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-uMR0h",
       "size": "5.14 GB",
       "needsFontPack": true,
-      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-uMR0h",
-      "globalUrl": "https://gofile.io/d/cd488a"
+      "fontPackUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-uMR0h",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/TinyOS/Tiny11_25H2.iso"
     },
     {
       "id": "xlite10",
@@ -785,75 +787,75 @@
           "非官方系统",
           "可能缺少部分组件",
           "建议提前备份数据",
-          "建议安装字体包"
+          "仅提供英文版；安装后请手动切换显示语言和时区，并安装 CJK 字体包。"
         ],
         "zh_TW": [
           "非官方系統",
           "可能缺少部分元件",
           "建議先備份資料",
-          "建議安裝字體包"
+          "僅提供英文版；安裝後請手動切換顯示語言和時區，並安裝 CJK 字型套件。"
         ],
         "en": [
           "Unofficial system",
           "Some components may be missing",
           "Back up data first",
-          "Font pack recommended"
+          "English build only; after installation, manually change the display language and time zone, then install the CJK font pack."
         ],
         "fr": [
           "Système non officiel",
           "Certains composants peuvent manquer",
           "Sauvegarde préalable recommandée",
-          "Pack de polices recommandé"
+          "Version anglaise uniquement ; après l’installation, modifiez manuellement la langue d’affichage et le fuseau horaire, puis installez le pack de polices CJK."
         ],
         "de": [
           "Inoffizielles System",
           "Einige Komponenten können fehlen",
           "Daten vorher sichern",
-          "Schriftpaket empfohlen"
+          "Nur englische Version; ändern Sie nach der Installation die Anzeigesprache und Zeitzone manuell und installieren Sie anschließend das CJK-Schriftpaket."
         ],
         "es": [
           "Sistema no oficial",
           "Pueden faltar algunos componentes",
           "Haz una copia de seguridad antes",
-          "Se recomienda el paquete de fuentes"
+          "Solo se ofrece la versión en inglés; después de instalarla, cambia manualmente el idioma de visualización y la zona horaria, e instala el paquete de fuentes CJK."
         ],
         "pt": [
           "Sistema não oficial",
           "Alguns componentes podem estar ausentes",
           "Faça backup dos dados antes",
-          "Pacote de fontes recomendado"
+          "Apenas a versão em inglês é fornecida; após a instalação, altere manualmente o idioma de exibição e o fuso horário e instale o pacote de fontes CJK."
         ],
         "ru": [
           "Неофициальная система",
           "Некоторые компоненты могут отсутствовать",
           "Сначала сделайте резервную копию данных",
-          "Рекомендуется пакет шрифтов"
+          "Доступна только английская сборка; после установки вручную измените язык интерфейса и часовой пояс, затем установите пакет шрифтов CJK."
         ],
         "ar": [
           "نظام غير رسمي",
           "قد تكون بعض المكونات مفقودة",
           "انسخ بياناتك احتياطيًا أولًا",
-          "يوصى بحزمة الخطوط"
+          "يتوفر إصدار باللغة الإنجليزية فقط؛ بعد التثبيت، غيّر لغة العرض والمنطقة الزمنية يدويًا، ثم ثبّت حزمة خطوط CJK."
         ],
         "ko": [
           "비공식 시스템",
           "일부 구성 요소가 없을 수 있음",
           "먼저 데이터를 백업하세요",
-          "글꼴 팩 권장"
+          "영문 빌드만 제공됩니다. 설치 후 표시 언어와 표준 시간대를 수동으로 변경하고 CJK 글꼴 팩을 설치하세요."
         ],
         "ja": [
           "非公式システム",
           "一部のコンポーネントが不足する場合あり",
           "事前にデータをバックアップしてください",
-          "フォントパック推奨"
+          "英語版のみ提供されます。インストール後に表示言語とタイムゾーンを手動で変更し、CJK フォントパックをインストールしてください。"
         ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-1ZRKh",
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-1ZRKh",
       "size": "3.78 GB",
       "needsFontPack": true,
-      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-1ZRKh",
-      "globalUrl": "https://gofile.io/d/atygX7"
+      "fontPackUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-1ZRKh",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/Windows%20X-Lite/WindowsX-Lite_10.iso"
     },
     {
       "id": "xlite11",
@@ -960,65 +962,65 @@
         "zh": [
           "非官方系统",
           "可能缺少部分功能",
-          "强烈建议安装字体包"
+          "仅提供英文版；安装后请手动切换显示语言和时区，并安装 CJK 字体包。"
         ],
         "zh_TW": [
           "非官方系統",
           "可能缺少部分功能",
-          "強烈建議安裝字體包"
+          "僅提供英文版；安裝後請手動切換顯示語言和時區，並安裝 CJK 字型套件。"
         ],
         "en": [
           "Unofficial system",
           "Some features may be missing",
-          "Font pack strongly recommended"
+          "English build only; after installation, manually change the display language and time zone, then install the CJK font pack."
         ],
         "fr": [
           "Système non officiel",
           "Certaines fonctions peuvent manquer",
-          "Pack de polices fortement recommandé"
+          "Version anglaise uniquement ; après l’installation, modifiez manuellement la langue d’affichage et le fuseau horaire, puis installez le pack de polices CJK."
         ],
         "de": [
           "Inoffizielles System",
           "Einige Funktionen können fehlen",
-          "Schriftpaket dringend empfohlen"
+          "Nur englische Version; ändern Sie nach der Installation die Anzeigesprache und Zeitzone manuell und installieren Sie anschließend das CJK-Schriftpaket."
         ],
         "es": [
           "Sistema no oficial",
           "Pueden faltar algunas funciones",
-          "Paquete de fuentes muy recomendado"
+          "Solo se ofrece la versión en inglés; después de instalarla, cambia manualmente el idioma de visualización y la zona horaria, e instala el paquete de fuentes CJK."
         ],
         "pt": [
           "Sistema não oficial",
           "Algumas funções podem estar ausentes",
-          "Pacote de fontes altamente recomendado"
+          "Apenas a versão em inglês é fornecida; após a instalação, altere manualmente o idioma de exibição e o fuso horário e instale o pacote de fontes CJK."
         ],
         "ru": [
           "Неофициальная система",
           "Некоторые функции могут отсутствовать",
-          "Настоятельно рекомендуется пакет шрифтов"
+          "Доступна только английская сборка; после установки вручную измените язык интерфейса и часовой пояс, затем установите пакет шрифтов CJK."
         ],
         "ar": [
           "نظام غير رسمي",
           "قد تكون بعض الميزات مفقودة",
-          "يوصى بشدة بحزمة الخطوط"
+          "يتوفر إصدار باللغة الإنجليزية فقط؛ بعد التثبيت، غيّر لغة العرض والمنطقة الزمنية يدويًا، ثم ثبّت حزمة خطوط CJK."
         ],
         "ko": [
           "비공식 시스템",
           "일부 기능이 없을 수 있음",
-          "글꼴 팩 강력 권장"
+          "영문 빌드만 제공됩니다. 설치 후 표시 언어와 표준 시간대를 수동으로 변경하고 CJK 글꼴 팩을 설치하세요."
         ],
         "ja": [
           "非公式システム",
           "一部の機能が不足する場合あり",
-          "フォントパックを強く推奨"
+          "英語版のみ提供されます。インストール後に表示言語とタイムゾーンを手動で変更し、CJK フォントパックをインストールしてください。"
         ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-UMR0h",
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-UMR0h",
       "size": "3.67 GB",
       "needsFontPack": true,
-      "fontPackUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-UMR0h",
-      "globalUrl": "https://gofile.io/d/atygX7"
+      "fontPackUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h",
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-UMR0h",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/Windows%20X-Lite/WindowsX-Lite_11.iso"
     },
     {
       "id": "starvalleyx",
@@ -1167,11 +1169,10 @@
           "事前にデータをバックアップしてください"
         ]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-Vyt0h",
       "size": "9.64 GB",
       "needsFontPack": false,
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-Vyt0h",
-      "globalUrl": "https://gofile.io/d/Cxz53k"
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-Vyt0h"
     },
     {
       "id": "ltsc-win10-enterprise",
@@ -1203,9 +1204,13 @@
       },
       "version": "Windows 10",
       "build": "Enterprise LTSC",
-      "size": "x64 ISO",
+      "size": {
+        "zh": "4.70 GB",
+        "zh_TW": "4.70 GB",
+        "en": "4.56 GB"
+      },
       "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-WkS0h",
-      "globalUrl": "https://gofile.io/d/GuBVGQ",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/LTSC/Enterprise/Windows%2010%20Enterprise%20LTSC.iso",
       "audience": {
         "zh": "适合 IT 技术人员、实验室环境、离线部署、长期维护设备和需要稳定更新节奏的高级用户。",
         "zh_TW": "適合 IT 技術人員、實驗室環境、離線部署、長期維護設備，以及需要穩定更新節奏的進階使用者。",
@@ -1289,57 +1294,57 @@
       },
       "notes": {
         "zh": [
-          "仅提供简体中文版本（123 云盘）和英文版（GoFile）。",
+          "仅提供简体中文版本（123 云盘）和英文版（Global Mirror）。",
           "不适合想要最新 Windows 功能、Microsoft Store 体验或频繁功能更新的用户。",
           "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
         ],
         "zh_TW": [
-          "僅提供簡體中文版本（123 雲盤）和英文版（GoFile）。",
+          "僅提供簡體中文版本（123 雲盤）和英文版（Global Mirror）。",
           "不適合想要最新 Windows 功能、Microsoft Store 體驗或頻繁功能更新的使用者。",
           "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
         ],
         "en": [
-          "Simplified Chinese is provided via 123 Cloud; English is provided via GoFile.",
+          "Simplified Chinese is provided via 123 Cloud; English is provided via Global Mirror.",
           "Not ideal if you want the newest Windows features, Microsoft Store-centric workflows, or frequent feature updates.",
           "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
         ],
         "fr": [
-          "Le chinois simplifié est fourni via 123 Cloud ; l’anglais est fourni via GoFile.",
+          "Le chinois simplifié est fourni via 123 Cloud ; l’anglais est fourni via Global Mirror.",
           "Peu adapté si vous voulez les dernières fonctionnalités Windows, les usages centrés sur Microsoft Store ou des mises à jour fonctionnelles fréquentes.",
           "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
         ],
         "de": [
-          "Vereinfachtes Chinesisch wird über 123 Cloud bereitgestellt; Englisch über GoFile.",
+          "Vereinfachtes Chinesisch wird über 123 Cloud bereitgestellt; Englisch über Global Mirror.",
           "Nicht ideal, wenn Sie die neuesten Windows-Funktionen, Microsoft-Store-zentrierte Abläufe oder häufige Funktionsupdates wünschen.",
           "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
         ],
         "es": [
-          "El chino simplificado se proporciona mediante 123 Cloud; el inglés mediante GoFile.",
+          "El chino simplificado se proporciona mediante 123 Cloud; el inglés mediante Global Mirror.",
           "No es ideal si quieres las funciones más recientes de Windows, flujos centrados en Microsoft Store o actualizaciones de funciones frecuentes.",
           "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
         ],
         "pt": [
-          "O chinês simplificado é fornecido pelo 123 Cloud; o inglês é fornecido pelo GoFile.",
+          "O chinês simplificado é fornecido pelo 123 Cloud; o inglês é fornecido pelo Global Mirror.",
           "Não é ideal se você deseja os recursos mais recentes do Windows, fluxos centrados na Microsoft Store ou atualizações frequentes de recursos.",
           "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
         ],
         "ru": [
-          "Упрощенный китайский доступен через 123 Cloud; английский через GoFile.",
+          "Упрощенный китайский доступен через 123 Cloud; английский через Global Mirror.",
           "Не лучший вариант, если нужны новейшие функции Windows, сценарии вокруг Microsoft Store или частые функциональные обновления.",
           "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
         ],
         "ar": [
-          "تتوفر الصينية المبسطة عبر 123 Cloud، والإنجليزية عبر GoFile.",
+          "تتوفر الصينية المبسطة عبر 123 Cloud، والإنجليزية عبر Global Mirror.",
           "ليس مثاليًا إذا كنت تريد أحدث ميزات Windows أو سير عمل يركز على Microsoft Store أو تحديثات ميزات متكررة.",
           "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
         ],
         "ko": [
-          "중국어 간체는 123 Cloud로 제공되며 영어는 GoFile로 제공됩니다.",
+          "중국어 간체는 123 Cloud로 제공되며 영어는 Global Mirror로 제공됩니다.",
           "최신 Windows 기능, Microsoft Store 중심 흐름, 잦은 기능 업데이트를 원하는 경우에는 적합하지 않습니다.",
           "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
         ],
         "ja": [
-          "簡体字中国語版は 123 Cloud、英語版は GoFile で提供されます。",
+          "簡体字中国語版は 123 Cloud、英語版は Global Mirror で提供されます。",
           "最新の Windows 機能、Microsoft Store 中心の利用、頻繁な機能更新を求める場合には向きません。",
           "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
         ]
@@ -1391,9 +1396,13 @@
       },
       "version": "Windows 11",
       "build": "Enterprise LTSC",
-      "size": "x64 ISO",
+      "size": {
+        "zh": "4.92 GB",
+        "zh_TW": "4.92 GB",
+        "en": "4.77 GB"
+      },
       "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-3g4Kh",
-      "globalUrl": "https://gofile.io/d/Kh3ivv",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/LTSC/Enterprise/Windows%2011%20Enterprise%20LTSC.iso",
       "audience": {
         "zh": "适合想使用 Windows 11 平台，同时又希望减少功能变动、长期保持部署环境稳定的高级用户和技术人员。",
         "zh_TW": "適合想使用 Windows 11 平台，同時又希望減少功能變動、長期保持部署環境穩定的進階使用者和技術人員。",
@@ -1477,57 +1486,57 @@
       },
       "notes": {
         "zh": [
-          "仅提供简体中文版本（123 云盘）和英文版（GoFile）。",
+          "仅提供简体中文版本（123 云盘）和英文版（Global Mirror）。",
           "Windows 11 LTSC 仍可能有硬件和 TPM/安全启动相关要求，部署前请自行验证。",
           "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
         ],
         "zh_TW": [
-          "僅提供簡體中文版本（123 雲盤）和英文版（GoFile）。",
+          "僅提供簡體中文版本（123 雲盤）和英文版（Global Mirror）。",
           "Windows 11 LTSC 仍可能有硬體、TPM 與安全啟動相關要求，部署前請自行驗證。",
           "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
         ],
         "en": [
-          "Simplified Chinese is provided via 123 Cloud; English is provided via GoFile.",
+          "Simplified Chinese is provided via 123 Cloud; English is provided via Global Mirror.",
           "Windows 11 LTSC may still involve hardware, TPM, and Secure Boot considerations. Verify before deployment.",
           "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
         ],
         "fr": [
-          "Le chinois simplifié est fourni via 123 Cloud ; l’anglais est fourni via GoFile.",
+          "Le chinois simplifié est fourni via 123 Cloud ; l’anglais est fourni via Global Mirror.",
           "Windows 11 LTSC peut encore impliquer des contraintes matérielles, TPM et Secure Boot. Vérifiez avant le déploiement.",
           "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
         ],
         "de": [
-          "Vereinfachtes Chinesisch wird über 123 Cloud bereitgestellt; Englisch über GoFile.",
+          "Vereinfachtes Chinesisch wird über 123 Cloud bereitgestellt; Englisch über Global Mirror.",
           "Windows 11 LTSC kann weiterhin Hardware-, TPM- und Secure-Boot-Aspekte betreffen. Vor der Bereitstellung prüfen.",
           "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
         ],
         "es": [
-          "El chino simplificado se proporciona mediante 123 Cloud; el inglés mediante GoFile.",
+          "El chino simplificado se proporciona mediante 123 Cloud; el inglés mediante Global Mirror.",
           "Windows 11 LTSC aún puede implicar consideraciones de hardware, TPM y arranque seguro. Verifícalo antes del despliegue.",
           "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
         ],
         "pt": [
-          "O chinês simplificado é fornecido pelo 123 Cloud; o inglês é fornecido pelo GoFile.",
+          "O chinês simplificado é fornecido pelo 123 Cloud; o inglês é fornecido pelo Global Mirror.",
           "O Windows 11 LTSC ainda pode envolver requisitos de hardware, TPM e Inicialização Segura. Verifique antes da implantação.",
           "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
         ],
         "ru": [
-          "Упрощенный китайский доступен через 123 Cloud; английский через GoFile.",
+          "Упрощенный китайский доступен через 123 Cloud; английский через Global Mirror.",
           "Windows 11 LTSC все еще может требовать внимания к оборудованию, TPM и Secure Boot. Проверьте перед развертыванием.",
           "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
         ],
         "ar": [
-          "تتوفر الصينية المبسطة عبر 123 Cloud، والإنجليزية عبر GoFile.",
+          "تتوفر الصينية المبسطة عبر 123 Cloud، والإنجليزية عبر Global Mirror.",
           "قد يتطلب Windows 11 LTSC مراعاة العتاد وTPM والإقلاع الآمن. تحقق قبل النشر.",
           "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
         ],
         "ko": [
-          "중국어 간체는 123 Cloud로 제공되며 영어는 GoFile로 제공됩니다.",
+          "중국어 간체는 123 Cloud로 제공되며 영어는 Global Mirror로 제공됩니다.",
           "Windows 11 LTSC는 하드웨어, TPM, 보안 부팅 관련 사항을 여전히 고려해야 할 수 있습니다. 배포 전에 확인하세요.",
           "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
         ],
         "ja": [
-          "簡体字中国語版は 123 Cloud、英語版は GoFile で提供されます。",
+          "簡体字中国語版は 123 Cloud、英語版は Global Mirror で提供されます。",
           "Windows 11 LTSC でもハードウェア、TPM、セキュアブートに関する確認が必要な場合があります。展開前に検証してください。",
           "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
         ]
@@ -1579,9 +1588,9 @@
       },
       "version": "Windows 10",
       "build": "IoT Enterprise LTSC",
-      "size": "x64 ISO",
+      "size": "4.52 GB",
       "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh",
-      "globalUrl": "https://gofile.io/d/Cshncs",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/LTSC/iot/Windows%2010%20iot%20LTSC.iso",
       "audience": {
         "zh": "适合嵌入式设备、专用终端、离线设备、长期运行环境，以及想要更长生命周期的极客用户。",
         "zh_TW": "適合嵌入式設備、專用終端、離線設備、長期運作環境，以及想要更長生命週期的極客使用者。",
@@ -1665,57 +1674,68 @@
       },
       "notes": {
         "zh": [
-          "IoT 版仅提供英文版；123 云盘和 GoFile 均为英文版。",
+          "IoT 版仅提供英文版；123 云盘和 Global Mirror 均为英文版。",
+          "安装后请手动切换显示语言和时区，并安装 CJK 字体包。",
           "IoT 授权和用途更偏专用设备，请自行确认授权合规性。",
           "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
         ],
         "zh_TW": [
-          "IoT 版僅提供英文版；123 雲盤和 GoFile 均為英文版。",
+          "IoT 版僅提供英文版；123 雲盤和 Global Mirror 均為英文版。",
+          "安裝後請手動切換顯示語言和時區，並安裝 CJK 字型套件。",
           "IoT 授權和用途更偏專用設備，請自行確認授權合規性。",
           "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
         ],
         "en": [
-          "IoT editions are English-only here; both 123 Cloud and GoFile provide the English build.",
+          "IoT editions are English-only here; both 123 Cloud and Global Mirror provide the English build.",
+          "After installation, manually change the display language and time zone, then install the CJK font pack.",
           "IoT licensing and usage are oriented toward dedicated devices. Confirm license compliance yourself.",
           "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
         ],
         "fr": [
-          "Les éditions IoT sont uniquement en anglais ici ; 123 Cloud et GoFile fournissent tous deux la version anglaise.",
+          "Les éditions IoT sont uniquement en anglais ici ; 123 Cloud et Global Mirror fournissent tous deux la version anglaise.",
+          "Après l’installation, modifiez manuellement la langue d’affichage et le fuseau horaire, puis installez le pack de polices CJK.",
           "La licence et l’usage IoT sont orientés vers les appareils dédiés. Vérifiez vous-même la conformité de licence.",
           "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
         ],
         "de": [
-          "IoT-Editionen sind hier nur auf Englisch verfügbar; 123 Cloud und GoFile stellen beide die englische Build bereit.",
+          "IoT-Editionen sind hier nur auf Englisch verfügbar; 123 Cloud und Global Mirror stellen beide die englische Build bereit.",
+          "Ändern Sie nach der Installation die Anzeigesprache und Zeitzone manuell und installieren Sie anschließend das CJK-Schriftpaket.",
           "IoT-Lizenzierung und -Nutzung sind auf dedizierte Geräte ausgerichtet. Prüfen Sie die Lizenzkonformität selbst.",
           "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
         ],
         "es": [
-          "Las ediciones IoT aquí solo están en inglés; tanto 123 Cloud como GoFile proporcionan la compilación en inglés.",
+          "Las ediciones IoT aquí solo están en inglés; tanto 123 Cloud como Global Mirror proporcionan la compilación en inglés.",
+          "Después de la instalación, cambia manualmente el idioma de visualización y la zona horaria, e instala el paquete de fuentes CJK.",
           "La licencia y el uso de IoT están orientados a dispositivos dedicados. Confirma tú mismo el cumplimiento de licencia.",
           "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
         ],
         "pt": [
-          "As edições IoT aqui são somente em inglês; tanto o 123 Cloud quanto o GoFile fornecem a build em inglês.",
+          "As edições IoT aqui são somente em inglês; tanto o 123 Cloud quanto o Global Mirror fornecem a build em inglês.",
+          "Após a instalação, altere manualmente o idioma de exibição e o fuso horário e instale o pacote de fontes CJK.",
           "O licenciamento e o uso IoT são voltados a dispositivos dedicados. Confirme você mesmo a conformidade da licença.",
           "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
         ],
         "ru": [
-          "Редакции IoT здесь доступны только на английском; и 123 Cloud, и GoFile предоставляют английскую сборку.",
+          "Редакции IoT здесь доступны только на английском; и 123 Cloud, и Global Mirror предоставляют английскую сборку.",
+          "После установки вручную измените язык интерфейса и часовой пояс, затем установите пакет шрифтов CJK.",
           "Лицензирование и использование IoT ориентированы на специализированные устройства. Самостоятельно проверьте лицензионное соответствие.",
           "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
         ],
         "ar": [
-          "إصدارات IoT هنا باللغة الإنجليزية فقط؛ يوفر كل من 123 Cloud وGoFile الإصدار الإنجليزي.",
+          "إصدارات IoT هنا باللغة الإنجليزية فقط؛ يوفر كل من 123 Cloud وGlobal Mirror الإصدار الإنجليزي.",
+          "بعد التثبيت، غيّر لغة العرض والمنطقة الزمنية يدويًا، ثم ثبّت حزمة خطوط CJK.",
           "ترخيص واستخدام IoT موجهان للأجهزة المخصصة. تحقق بنفسك من الامتثال للترخيص.",
           "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
         ],
         "ko": [
-          "여기서 IoT 에디션은 영어만 제공됩니다. 123 Cloud와 GoFile 모두 영어 빌드입니다.",
+          "여기서 IoT 에디션은 영어만 제공됩니다. 123 Cloud와 Global Mirror 모두 영어 빌드입니다.",
+          "설치 후 표시 언어와 표준 시간대를 수동으로 변경하고 CJK 글꼴 팩을 설치하세요.",
           "IoT 라이선스와 사용 목적은 전용 장치에 맞춰져 있습니다. 라이선스 준수 여부를 직접 확인하세요.",
           "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
         ],
         "ja": [
-          "ここでの IoT エディションは英語版のみです。123 Cloud と GoFile のどちらも英語版を提供します。",
+          "ここでの IoT エディションは英語版のみです。123 Cloud と Global Mirror のどちらも英語版を提供します。",
+          "インストール後に表示言語とタイムゾーンを手動で変更し、CJK フォントパックをインストールしてください。",
           "IoT のライセンスと用途は専用デバイス向けです。ライセンス遵守はご自身で確認してください。",
           "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
         ]
@@ -1735,7 +1755,9 @@
         "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
         "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
       },
-      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh"
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-dmMKh",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h"
     },
     {
       "id": "ltsc-win11-iot",
@@ -1767,9 +1789,9 @@
       },
       "version": "Windows 11",
       "build": "IoT Enterprise LTSC",
-      "size": "x64 ISO",
+      "size": "4.79 GB",
       "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h",
-      "globalUrl": "https://gofile.io/d/Oag1zR",
+      "globalUrl": "https://downloads.sourceforge.net/project/windeploystudio/Extended%20Files/LTSC/iot/Windows%2011%20iot%20LTSC.iso",
       "audience": {
         "zh": "适合新硬件上的长期专用系统、游戏/展示终端、实验室设备，以及需要 Windows 11 平台和更长生命周期的高级用户。",
         "zh_TW": "適合新硬體上的長期專用系統、遊戲/展示終端、實驗室設備，以及需要 Windows 11 平台和更長生命週期的進階使用者。",
@@ -1853,57 +1875,68 @@
       },
       "notes": {
         "zh": [
-          "IoT 版仅提供英文版；123 云盘和 GoFile 均为英文版。",
+          "IoT 版仅提供英文版；123 云盘和 Global Mirror 均为英文版。",
+          "安装后请手动切换显示语言和时区，并安装 CJK 字体包。",
           "Windows 11 IoT LTSC 仍需关注硬件、驱动、TPM 和安全启动兼容性。",
           "这些镜像不是 WinDeploy Studio 修改或官方分发的 Microsoft ISO。"
         ],
         "zh_TW": [
-          "IoT 版僅提供英文版；123 雲盤和 GoFile 均為英文版。",
+          "IoT 版僅提供英文版；123 雲盤和 Global Mirror 均為英文版。",
+          "安裝後請手動切換顯示語言和時區，並安裝 CJK 字型套件。",
           "Windows 11 IoT LTSC 仍需注意硬體、驅動、TPM 和安全啟動相容性。",
           "這些映像不是 WinDeploy Studio 修改或官方分發的 Microsoft ISO。"
         ],
         "en": [
-          "IoT editions are English-only here; both 123 Cloud and GoFile provide the English build.",
+          "IoT editions are English-only here; both 123 Cloud and Global Mirror provide the English build.",
+          "After installation, manually change the display language and time zone, then install the CJK font pack.",
           "Windows 11 IoT LTSC still requires attention to hardware, drivers, TPM, and Secure Boot compatibility.",
           "These images are not modified by WinDeploy Studio and are not official Microsoft ISO distribution by this app."
         ],
         "fr": [
-          "Les éditions IoT sont uniquement en anglais ici ; 123 Cloud et GoFile fournissent tous deux la version anglaise.",
+          "Les éditions IoT sont uniquement en anglais ici ; 123 Cloud et Global Mirror fournissent tous deux la version anglaise.",
+          "Après l’installation, modifiez manuellement la langue d’affichage et le fuseau horaire, puis installez le pack de polices CJK.",
           "Windows 11 IoT LTSC exige encore de vérifier la compatibilité matérielle, les pilotes, le TPM et Secure Boot.",
           "Ces images ne sont pas modifiées par WinDeploy Studio et ne constituent pas une distribution officielle d’ISO Microsoft par l’application."
         ],
         "de": [
-          "IoT-Editionen sind hier nur auf Englisch verfügbar; 123 Cloud und GoFile stellen beide die englische Build bereit.",
+          "IoT-Editionen sind hier nur auf Englisch verfügbar; 123 Cloud und Global Mirror stellen beide die englische Build bereit.",
+          "Ändern Sie nach der Installation die Anzeigesprache und Zeitzone manuell und installieren Sie anschließend das CJK-Schriftpaket.",
           "Windows 11 IoT LTSC erfordert weiterhin Aufmerksamkeit bei Hardware, Treibern, TPM und Secure-Boot-Kompatibilität.",
           "Diese Abbilder werden von WinDeploy Studio nicht verändert und sind keine offizielle Microsoft-ISO-Verteilung durch diese App."
         ],
         "es": [
-          "Las ediciones IoT aquí solo están en inglés; tanto 123 Cloud como GoFile proporcionan la compilación en inglés.",
+          "Las ediciones IoT aquí solo están en inglés; tanto 123 Cloud como Global Mirror proporcionan la compilación en inglés.",
+          "Después de la instalación, cambia manualmente el idioma de visualización y la zona horaria, e instala el paquete de fuentes CJK.",
           "Windows 11 IoT LTSC aún requiere atención a la compatibilidad de hardware, controladores, TPM y arranque seguro.",
           "Estas imágenes no son modificadas por WinDeploy Studio y no son distribución oficial de ISO de Microsoft por parte de la aplicación."
         ],
         "pt": [
-          "As edições IoT aqui são somente em inglês; tanto o 123 Cloud quanto o GoFile fornecem a build em inglês.",
+          "As edições IoT aqui são somente em inglês; tanto o 123 Cloud quanto o Global Mirror fornecem a build em inglês.",
+          "Após a instalação, altere manualmente o idioma de exibição e o fuso horário e instale o pacote de fontes CJK.",
           "O Windows 11 IoT LTSC ainda exige atenção à compatibilidade de hardware, drivers, TPM e Inicialização Segura.",
           "Estas imagens não são modificadas pelo WinDeploy Studio e não são distribuição oficial de ISO da Microsoft pelo aplicativo."
         ],
         "ru": [
-          "Редакции IoT здесь доступны только на английском; и 123 Cloud, и GoFile предоставляют английскую сборку.",
+          "Редакции IoT здесь доступны только на английском; и 123 Cloud, и Global Mirror предоставляют английскую сборку.",
+          "После установки вручную измените язык интерфейса и часовой пояс, затем установите пакет шрифтов CJK.",
           "Windows 11 IoT LTSC все еще требует внимания к совместимости оборудования, драйверов, TPM и Secure Boot.",
           "Эти образы не изменяются WinDeploy Studio и не являются официальным распространением ISO Microsoft этим приложением."
         ],
         "ar": [
-          "إصدارات IoT هنا باللغة الإنجليزية فقط؛ يوفر كل من 123 Cloud وGoFile الإصدار الإنجليزي.",
+          "إصدارات IoT هنا باللغة الإنجليزية فقط؛ يوفر كل من 123 Cloud وGlobal Mirror الإصدار الإنجليزي.",
+          "بعد التثبيت، غيّر لغة العرض والمنطقة الزمنية يدويًا، ثم ثبّت حزمة خطوط CJK.",
           "لا يزال Windows 11 IoT LTSC يتطلب الانتباه إلى توافق العتاد والتعريفات وTPM والإقلاع الآمن.",
           "هذه الصور لا يعدلها WinDeploy Studio وليست توزيعًا رسميًا لملفات ISO من Microsoft بواسطة التطبيق."
         ],
         "ko": [
-          "여기서 IoT 에디션은 영어만 제공됩니다. 123 Cloud와 GoFile 모두 영어 빌드입니다.",
+          "여기서 IoT 에디션은 영어만 제공됩니다. 123 Cloud와 Global Mirror 모두 영어 빌드입니다.",
+          "설치 후 표시 언어와 표준 시간대를 수동으로 변경하고 CJK 글꼴 팩을 설치하세요.",
           "Windows 11 IoT LTSC는 하드웨어, 드라이버, TPM, 보안 부팅 호환성에 여전히 주의해야 합니다.",
           "이 이미지는 WinDeploy Studio에서 수정하지 않았으며 앱이 Microsoft 공식 ISO를 배포하는 것이 아닙니다."
         ],
         "ja": [
-          "ここでの IoT エディションは英語版のみです。123 Cloud と GoFile のどちらも英語版を提供します。",
+          "ここでの IoT エディションは英語版のみです。123 Cloud と Global Mirror のどちらも英語版を提供します。",
+          "インストール後に表示言語とタイムゾーンを手動で変更し、CJK フォントパックをインストールしてください。",
           "Windows 11 IoT LTSC でもハードウェア、ドライバー、TPM、セキュアブート互換性に注意が必要です。",
           "これらのイメージは WinDeploy Studio によって改変されたものではなく、このアプリによる Microsoft 公式 ISO の配布でもありません。"
         ]
@@ -1923,7 +1956,9 @@
         "ko": "배포, 장기 유지 관리, 고급 사용 시나리오를 위한 LTSC 이미지 리소스입니다.",
         "ja": "展開、長期保守、高度な利用シナリオ向けの LTSC イメージリソースです。"
       },
-      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h"
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-aVt0h",
+      "needsFontPack": true,
+      "fontPackUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h"
     },
     {
       "id": "font-pack",
@@ -1952,11 +1987,68 @@
         "zh": ["需要手动安装", "建议为所有用户安装"],
         "zh_TW": ["需要手動安裝", "建議為所有使用者安裝"]
       },
-      "downloadUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "size": "244 MB",
+      "downloadUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h",
+      "size": "244.83 MB",
       "needsFontPack": false,
-      "chinaUrl": "https://1842249449.share.123865.com/123pan/Z4L0Td-7MR0h",
-      "globalUrl": "https://gofile.io/d/dzQLam"
+      "chinaUrl": "https://1842249449.share.123pan.cn/123pan/Z4L0Td-7MR0h"
+    }
+  ],
+  "knownImages": [
+    {
+      "id": "tiny10",
+      "name": {"zh": "Tiny10", "en": "Tiny10"},
+      "sha256": "a11116c0645d892d6a5a7c585ecc1fa13aa66f8c7cc6b03bf1f27bd16860cc35",
+      "md5": "893f0df3bb42f3a4d63ed3632ac47d59"
+    },
+    {
+      "id": "tiny11",
+      "name": {"zh": "Tiny11", "en": "Tiny11"},
+      "sha256": "92484f2b7f707e42383294402a9eabbadeaa5ede80ac633390ae7f3537e36275",
+      "md5": "6c0eca7293783aac080e9f8717c4dcb7"
+    },
+    {
+      "id": "xlite10",
+      "name": {"zh": "Windows X-Lite 10", "en": "Windows X-Lite 10"},
+      "sha256": "d2e47d6a91d5ef3441e69ba25f363d50317940b4cc91c2fd5f5ed1b1ebfd6d2c",
+      "md5": "f2bd1ebb4d782a98ff5aafda36357efb"
+    },
+    {
+      "id": "xlite11",
+      "name": {"zh": "Windows X-Lite 11", "en": "Windows X-Lite 11"},
+      "sha256": "1656aad50bc882de828585113e9231a951ce76b6baf3cd77709430cb35da5a7f",
+      "md5": "2b56980fe97484b5d0a23129148a0c77"
+    },
+    {
+      "id": "starvalleyx",
+      "name": {"zh": "StarValleyX", "en": "StarValleyX"},
+      "sha256": "c47c30b2fc4dcdaf01944631866aed7e9c740aaacd079e57ea939c64b4cf0350",
+      "md5": "6a13ccb0cd594d1f955cdd2d676edd54"
+    },
+    {
+      "id": "ltsc-win10-enterprise",
+      "name": {"zh": "Windows 10 企业版 LTSC", "zh_TW": "Windows 10 企業版 LTSC", "en": "Windows 10 Enterprise LTSC"},
+      "sha256": "c90a6df8997bf49e56b9673982f3e80745058723a707aef8f22998ae6479597d",
+      "md5": "b5a7be560dbd73619945129e52be1b5f",
+      "visibleLocales": ["en", "fr", "de", "es", "pt", "ru", "ar", "ko", "ja"]
+    },
+    {
+      "id": "ltsc-win11-enterprise",
+      "name": {"zh": "Windows 11 企业版 LTSC", "zh_TW": "Windows 11 企業版 LTSC", "en": "Windows 11 Enterprise LTSC"},
+      "sha256": "157d8365a517c40afeb3106fdd74d0836e1025debbc343f2080e1a8687607f51",
+      "md5": "60c6f86bf378892648cfb5524b9416e2",
+      "visibleLocales": ["en", "fr", "de", "es", "pt", "ru", "ar", "ko", "ja"]
+    },
+    {
+      "id": "ltsc-win10-iot",
+      "name": {"zh": "Windows 10 IoT 企业版 LTSC", "zh_TW": "Windows 10 IoT 企業版 LTSC", "en": "Windows 10 IoT Enterprise LTSC"},
+      "sha256": "a0334f31ea7a3e6932b9ad7206608248f0bd40698bfb8fc65f14fc5e4976c160",
+      "md5": "2463b19beac328290e6a8adcedb7533a"
+    },
+    {
+      "id": "ltsc-win11-iot",
+      "name": {"zh": "Windows 11 IoT 企业版 LTSC", "zh_TW": "Windows 11 IoT 企業版 LTSC", "en": "Windows 11 IoT Enterprise LTSC"},
+      "sha256": "4f59662a96fc1da48c1b415d6c369d08af55ddd64e8f1c84e0166d9e50405d7a",
+      "md5": "66608a96a4f2d73b4a1d054e76e6eae4"
     }
   ]
 }

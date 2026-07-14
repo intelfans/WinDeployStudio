@@ -41,6 +41,22 @@ void main() {
     _expectNoFlutterExceptions(tester);
   });
 
+  testWidgets('mirror category labels stay intact at desktop width', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpScreen(tester, const MirrorScreen());
+
+    final communityCategory = find.text('Community Editions');
+    expect(communityCategory, findsOneWidget);
+    final communityTitle = tester.widget<Text>(communityCategory);
+    expect(communityTitle.maxLines, 1);
+    expect(communityTitle.softWrap, isFalse);
+    _expectNoFlutterExceptions(tester);
+  });
+
   testWidgets('AI, logs, and tools screens do not overflow at narrow width', (
     tester,
   ) async {

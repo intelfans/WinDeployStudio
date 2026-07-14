@@ -2,18 +2,18 @@
   "use strict";
 
   const API_URL = "https://api.github.com/repos/intelfans/WinDeployStudio/releases?per_page=100";
-  const CACHE_KEY = "wds-pages-release-cache-v1";
+  const CACHE_KEY = "wds-pages-release-cache-v2";
   const CACHE_TTL = 6 * 60 * 60 * 1000;
+  const SNAPSHOT_PATH = "assets/data/releases-snapshot.json";
   const GITHUB_HOSTS = new Set([
     "github.com",
     "objects.githubusercontent.com",
     "release-assets.githubusercontent.com",
   ]);
 
-  // A small verified snapshot keeps the download page useful when the public
-  // GitHub API is temporarily rate-limited. Live API data always takes
-  // precedence when it is available.
-  const FALLBACK_RELEASES = [
+  // The local API snapshot contains the complete public release bodies. This
+  // compact list is used only when both the live API and snapshot are absent.
+  const LAST_RESORT_RELEASES = [
     {
       id: "fallback-v1.1.2",
       tag_name: "v1.1.2",
@@ -21,7 +21,7 @@
       published_at: "2026-07-01T14:52:36Z",
       prerelease: false,
       html_url: "https://github.com/intelfans/WinDeployStudio/releases/tag/v1.1.2",
-      body: "## New Features\n\n- Clearer community image download logging for Tiny, LTSC, 123, and GoFile selections.\n\n## Improvements\n\n- More reliable disk enumeration and diagnostics.\n- Safer temporary drive-letter selection for Windows To Go.\n- A cleaner Image Center warning flow.\n\n## Fixes\n\n- Corrected removable-disk partition metadata and several update, installer, and translation issues.",
+      body: "## New Features\n\n- Clearer community image download logging for Tiny, LTSC, 123, and global download selections.\n\n## Improvements\n\n- More reliable disk enumeration and diagnostics.\n- Safer temporary drive-letter selection for Windows To Go.\n- A cleaner Image Center warning flow.\n\n## Fixes\n\n- Corrected removable-disk partition metadata and several update, installer, and translation issues.",
       assets: [
         {
           name: "WinDeployStudio_Setup_1.1.2.exe",
@@ -118,24 +118,33 @@
     const cached = readCache();
     if (cached && Date.now() - cached.storedAt < CACHE_TTL) return cached.releases;
 
-    const headers = { Accept: "application/vnd.github+json" };
-    if (cached?.etag) headers["If-None-Match"] = cached.etag;
-    const response = await fetch(API_URL, { headers });
-    if (response.status === 304 && cached) {
-      cached.storedAt = Date.now();
-      writeCache(cached);
-      return cached.releases;
+    try {
+      const headers = { Accept: "application/vnd.github+json" };
+      if (cached?.etag) headers["If-None-Match"] = cached.etag;
+      const response = await fetch(API_URL, { headers });
+      if (response.status === 304 && cached) {
+        cached.storedAt = Date.now();
+        writeCache(cached);
+        return cached.releases;
+      }
+      if (!response.ok) throw new Error(`GitHub Releases returned ${response.status}`);
+      const body = await response.json();
+      if (!Array.isArray(body)) throw new Error("GitHub Releases returned an unexpected response.");
+      const visible = body.filter((release) => release && release.draft !== true);
+      writeCache({
+        storedAt: Date.now(),
+        etag: response.headers.get("etag") || "",
+        releases: visible,
+      });
+      return visible;
+    } catch (apiError) {
+      const root = window.WDS?.getRoot?.() || "./";
+      const response = await fetch(`${root}${SNAPSHOT_PATH}`, { cache: "no-cache" });
+      if (!response.ok) throw apiError;
+      const snapshot = await response.json();
+      if (!Array.isArray(snapshot)) throw apiError;
+      return snapshot.filter((release) => release && release.draft !== true);
     }
-    if (!response.ok) throw new Error(`GitHub Releases returned ${response.status}`);
-    const body = await response.json();
-    if (!Array.isArray(body)) throw new Error("GitHub Releases returned an unexpected response.");
-    const visible = body.filter((release) => release && release.draft !== true);
-    writeCache({
-      storedAt: Date.now(),
-      etag: response.headers.get("etag") || "",
-      releases: visible,
-    });
-    return visible;
   }
 
   function numericVersion(tagName) {
@@ -180,8 +189,7 @@
   function formatBytes(bytes) {
     const value = Number(bytes || 0);
     if (!value) return "--";
-    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} MB`;
-    return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   function formatDate(value) {
@@ -197,6 +205,39 @@
   function sha256(asset) {
     const match = String(asset?.digest || "").match(/^sha256:([a-f0-9]{64})$/i);
     return match ? match[1].toUpperCase() : "--";
+  }
+
+  function selectReleaseNotes(body) {
+    const content = String(body || "").trim();
+    if (!content) return content;
+
+    const language = window.WDS?.getLanguage?.() === "en" ? "en" : "zh";
+    const markedSections = {};
+    const marker = /<!--\s*wds:lang=(zh|en)\s*-->\s*([\s\S]*?)(?=<!--\s*wds:lang=(?:zh|en)\s*-->|$)/gi;
+    let match = marker.exec(content);
+    while (match) {
+      markedSections[match[1].toLowerCase()] = match[2].trim();
+      match = marker.exec(content);
+    }
+    if (markedSections[language]) return markedSections[language];
+
+    const sections = content
+      .split(/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/m)
+      .map((section) => section.trim())
+      .filter(Boolean);
+    if (sections.length < 2) return content;
+
+    const cjkCount = (section) => (section.match(/[\u3400-\u9FFF\uF900-\uFAFF]/g) || []).length;
+    const chinese = sections.find((section) => cjkCount(section) > 0);
+    const english = sections.find((section) => cjkCount(section) === 0);
+    return language === "zh" ? chinese || content : english || content;
+  }
+
+  // Historical GitHub release bodies mention the retired provider. Keep the
+  // site current even when notes come from a user's existing cache.
+  function sanitizeLegacyMirrorNames(body) {
+    const replacement = window.WDS?.getLanguage?.() === "en" ? "global download" : "国际下载";
+    return String(body || "").replace(/\bGoFile\b/gi, replacement);
   }
 
   function markdown(body) {
@@ -289,7 +330,7 @@
     heading.append(headingCopy, actions);
     panel.append(heading, metadataGrid(release, asset), sourceOptions(release, asset));
     const notes = element("section", "release-notes");
-    notes.append(element("h3", "", t("release_notes")), markdown(release.body));
+    notes.append(element("h3", "", t("release_notes")), markdown(selectReleaseNotes(sanitizeLegacyMirrorNames(release.body))));
     panel.append(notes);
     return panel;
   }
@@ -307,7 +348,7 @@
     const content = element("div", "release-record-content");
     content.append(metadataGrid(release, asset));
     const notes = element("section", "release-notes");
-    notes.append(element("h3", "", t("release_notes")), markdown(release.body));
+    notes.append(element("h3", "", t("release_notes")), markdown(selectReleaseNotes(sanitizeLegacyMirrorNames(release.body))));
     content.append(notes);
     const actions = element("div", "release-actions");
     actions.append(actionLink(t("release_open_github"), releaseLink(release)));
@@ -364,7 +405,7 @@
       window.WDS?.refreshIcons();
     } catch (error) {
       console.warn("Could not load GitHub Releases", error);
-      releases = FALLBACK_RELEASES;
+      releases = LAST_RESORT_RELEASES;
       updateHomeVersion(releases);
       renderDownloads(releases);
       window.WDS?.refreshIcons();

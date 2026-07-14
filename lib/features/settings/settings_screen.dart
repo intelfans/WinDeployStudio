@@ -12,6 +12,7 @@ import '../logs/services/log_center_service.dart';
 import '../update/models/update_models.dart';
 import '../update/providers/update_provider.dart';
 import '../update/screens/update_dialog.dart';
+import '../../shared/widgets/app_compact_label.dart';
 import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/special_thanks_section.dart';
 
@@ -484,7 +485,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 for (final tool in _builtWithTools)
                   Chip(
-                    label: Text(tool),
+                    label: AppCompactLabel(tool),
                     visualDensity: VisualDensity.compact,
                     side: BorderSide(color: colorScheme.outlineVariant),
                   ),

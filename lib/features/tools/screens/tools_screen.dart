@@ -5,6 +5,7 @@ import '../../../app/theme.dart';
 import '../../../app/typography.dart';
 import '../../../core/localization/strings.dart';
 import '../../../shared/webview/webview_helper.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 import '../../../shared/widgets/app_page.dart';
 import '../models/tool_models.dart';
 
@@ -605,7 +606,7 @@ class _SafetyBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
-      child: Text(
+      child: AppCompactLabel(
         tr(context, displayLevel.labelKey),
         style: TextStyle(
           fontSize: 11,
@@ -799,11 +800,9 @@ class _ToolCardState extends State<_ToolCard> {
                   color: widget.categoryColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
+                child: AppCompactLabel(
                   tag,
                   style: TextStyle(fontSize: 11, color: widget.categoryColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
           ],
@@ -1001,7 +1000,7 @@ class ToolDetailScreen extends StatelessWidget {
                     children: tool.tags
                         .map(
                           (tag) => Chip(
-                            label: Text(
+                            label: AppCompactLabel(
                               tag,
                               style: const TextStyle(fontSize: 12),
                             ),

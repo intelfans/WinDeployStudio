@@ -10,6 +10,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/ai_benchmark_strings.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 import '../../../shared/widgets/app_page.dart';
 import '../../benchmark_history/models/benchmark_history_models.dart';
 import '../../benchmark_history/services/benchmark_history_service.dart';
@@ -1045,7 +1046,7 @@ class _QuickActionChip extends StatelessWidget {
             ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
             : colorScheme.primary,
       ),
-      label: Text(
+      label: AppCompactLabel(
         label,
         style: TextStyle(
           fontSize: 12,

@@ -13,6 +13,7 @@ import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/linux_togo_image_preflight.dart';
+import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/wtg_service.dart';
 import '../../../core/services/windows_iso_preflight.dart';
 import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
@@ -102,6 +103,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   bool _loadingImage = false;
   String _imageStatus = '';
   LinuxToGoImageInspection? _linuxToGoInspection;
+  KnownIsoVerification? _knownIsoVerification;
+  int _knownIsoVerificationRequest = 0;
+  Locale? _knownIsoVerificationLocale;
 
   List<DiskInfo> _disks = const [];
   DiskInfo? _disk;
@@ -146,6 +150,23 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final locale = Localizations.localeOf(context);
+    if (_knownIsoVerificationLocale == locale) return;
+    _knownIsoVerificationLocale = locale;
+
+    final iso = _iso;
+    if (_isLinux || iso == null) {
+      _knownIsoVerification = null;
+      return;
+    }
+    final request = ++_knownIsoVerificationRequest;
+    _knownIsoVerification = null;
+    unawaited(_verifyKnownWindowsIso(iso.filePath, request, locale));
+  }
+
+  @override
   void dispose() {
     _virtualDiskNameController.dispose();
     _virtualDiskSizeController.dispose();
@@ -187,6 +208,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _images = const [];
       _imageIndex = null;
       _linuxToGoInspection = null;
+      _knownIsoVerification = null;
+      _knownIsoVerificationRequest++;
       _deploymentMode = DeploymentMode.direct;
       _bootMode = DeploymentBootMode.uefiGpt;
       _compactOs = false;
@@ -208,6 +231,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final pickedFile = result.files.single;
     final path = pickedFile.path;
     if (path == null || !mounted) return;
+    final selectedPlatform = _platform;
+    final verificationRequest = ++_knownIsoVerificationRequest;
 
     setState(() {
       _loadingImage = true;
@@ -216,6 +241,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _images = const [];
       _imageIndex = null;
       _linuxToGoInspection = null;
+      _knownIsoVerification = null;
     });
 
     try {
@@ -279,6 +305,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           _images = images;
           _imageIndex = images.first['index'] as int?;
         });
+        if (selectedPlatform == _ToGoPlatform.windows) {
+          unawaited(
+            _verifyKnownWindowsIso(
+              path,
+              verificationRequest,
+              Localizations.localeOf(context),
+            ),
+          );
+        }
       }
     } catch (error) {
       if (!mounted) return;
@@ -294,6 +329,25 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         });
       }
     }
+  }
+
+  Future<void> _verifyKnownWindowsIso(
+    String filePath,
+    int request,
+    Locale locale,
+  ) async {
+    final verification = await ref
+        .read(knownIsoVerificationServiceProvider)
+        .verify(filePath, locale);
+    if (!mounted ||
+        request != _knownIsoVerificationRequest ||
+        _isLinux ||
+        _iso?.filePath != filePath ||
+        Localizations.localeOf(context) != locale ||
+        verification == null) {
+      return;
+    }
+    setState(() => _knownIsoVerification = verification);
   }
 
   Future<void> _selectDisk(DiskInfo disk) async {
@@ -765,6 +819,25 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             ),
             stackTrailingNarrowly: true,
           ),
+          if (!_isLinux && _knownIsoVerification != null) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: LayoutBuilder(
+                builder: (context, constraints) => ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                  child: Chip(
+                    avatar: const Icon(Icons.verified_rounded, size: 18),
+                    label: Text(
+                      '${tr(context, 'known_iso_verified')}: ${_knownIsoVerification!.image.getName(Localizations.localeOf(context))}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (_isLinux && _linuxToGoInspection != null) ...[
             const SizedBox(height: 12),
             _buildLinuxToGoInspectionBanner(_linuxToGoInspection!),

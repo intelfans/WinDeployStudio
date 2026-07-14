@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/typography.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 import '../localization/disk_tools_localization.dart';
 import '../models/disk_diagnostic_models.dart';
 import '../services/secure_powershell_runner.dart';
@@ -805,7 +806,7 @@ class _StatusChip extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: colors.onSecondaryContainer),
           const SizedBox(width: 6),
-          Text(
+          AppCompactLabel(
             label,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: colors.onSecondaryContainer,

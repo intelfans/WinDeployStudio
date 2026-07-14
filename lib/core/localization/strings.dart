@@ -833,9 +833,9 @@ const _en = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'These Windows images are provided as third-party deployment resources.\n\nThey are not modified by WinDeploy Studio.\n\nAll Microsoft-related trademarks, names, and assets belong to their respective owners.\n\nWinDeploy Studio does not provide official Microsoft ISO distribution.\n\nUsers are responsible for ensuring compliance with software licensing agreements.',
   'mirror_ltsc_language_notice':
-      'LTSC language note: 123 Cloud provides the Simplified Chinese build; GoFile provides the English build.',
+      'LTSC language note: 123 Cloud provides the Simplified Chinese build; Global Mirror provides the English build.',
   'mirror_ltsc_iot_language_notice':
-      'IoT LTSC language note: only English builds are provided. Both 123 Cloud and GoFile links are English builds.',
+      'IoT LTSC language note: only English builds are provided. Both 123 Cloud and Global Mirror links are English builds.',
   'mirror_badge_official': 'Official Microsoft Source',
   'mirror_badge_community': 'Community Image',
   'mirror_desc_official': 'Download directly from Microsoft',
@@ -955,9 +955,9 @@ const _en = <String, String>{
   'mirror_china_title': 'China Mirror',
   'mirror_china_desc': '123 Cloud Drive · Stable · Recommended for China users',
   'mirror_china_tag': 'China',
-  'mirror_global_title': 'Global Mirror',
-  'mirror_global_desc': 'GoFile · Global access · No regional restriction',
-  'mirror_global_tag': 'Global',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · Global access · No regional restriction',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'Download',
   'mirror_default_desc': 'Direct download link',
   'nav_benchmark': 'Disk Test',
@@ -1115,8 +1115,7 @@ const _zh = <String, String>{
   'linux_togo_mount_preflight_failed': '无法检查此 Linux 镜像，目标磁盘未被修改。',
   'linux_togo_unsupported_iso':
       '持久化 Linux To Go 支持经过验证的 x64 Ubuntu/casper 和 Debian Live 布局。其他发行版请使用“安装盘”功能。',
-  'linux_togo_mke2fs_missing':
-      '此构建未包含符合许可证要求的 Linux 持久化组件，目标磁盘未被修改。',
+  'linux_togo_mke2fs_missing': '此构建未包含符合许可证要求的 Linux 持久化组件，目标磁盘未被修改。',
   'linux_togo_boot_config_unsupported':
       '此 Live 镜像没有可用于启用持久化的受支持 GRUB 启动项，目标磁盘未被修改。',
   'linux_togo_boot_file_too_large': '此镜像包含超过 FAT32 单文件容量上限的必要启动文件，目标磁盘未被修改。',
@@ -1696,9 +1695,10 @@ const _zh = <String, String>{
   'mirror_ltsc_disclaimer_title': '镜像来源免责声明',
   'mirror_ltsc_disclaimer_body':
       '这些 Windows 镜像作为第三方部署资源提供。\n\n它们并非由 WinDeploy Studio 修改。\n\n所有 Microsoft 相关商标、名称和资产均归其各自所有者所有。\n\nWinDeploy Studio 不提供 Microsoft 官方 ISO 分发。\n\n用户需自行确保遵守软件许可协议。',
-  'mirror_ltsc_language_notice': 'LTSC 语言提示：123 云盘提供简体中文版本，GoFile 提供英文版本。',
+  'mirror_ltsc_language_notice':
+      'LTSC 语言提示：123 云盘提供简体中文版本，Global Mirror 提供英文版本。',
   'mirror_ltsc_iot_language_notice':
-      'IoT LTSC 语言提示：仅提供英文版；123 云盘和 GoFile 链接均为英文版。',
+      'IoT LTSC 语言提示：仅提供英文版；123 云盘和 Global Mirror 链接均为英文版。',
   'mirror_badge_official': 'Microsoft 官方来源',
   'mirror_badge_community': '社区镜像',
   'mirror_desc_official': '直接从 Microsoft 下载',
@@ -1804,9 +1804,9 @@ const _zh = <String, String>{
   'mirror_china_title': '中国镜像',
   'mirror_china_desc': '123云盘 · 稳定 · 国内用户推荐',
   'mirror_china_tag': '国内',
-  'mirror_global_title': '全球镜像',
-  'mirror_global_desc': 'GoFile · 全球访问 · 无地区限制',
-  'mirror_global_tag': '国际',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · 全球访问 · 无地区限制',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': '下载',
   'mirror_default_desc': '直接下载链接',
   'nav_benchmark': '磁盘测试',
@@ -2573,9 +2573,9 @@ const _ru = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'Эти образы Windows предоставляются как сторонние ресурсы для развертывания.\n\nОни не изменяются WinDeploy Studio.\n\nВсе товарные знаки, названия и материалы Microsoft принадлежат их владельцам.\n\nWinDeploy Studio не распространяет официальные ISO-образы Microsoft.\n\nПользователи сами отвечают за соблюдение лицензионных соглашений.',
   'mirror_ltsc_language_notice':
-      'Языки LTSC: 123 Cloud предоставляет сборку на упрощенном китайском, GoFile предоставляет английскую сборку.',
+      'Языки LTSC: 123 Cloud предоставляет сборку на упрощенном китайском, Global Mirror предоставляет английскую сборку.',
   'mirror_ltsc_iot_language_notice':
-      'Языки IoT LTSC: доступны только английские сборки; ссылки 123 Cloud и GoFile ведут на английские сборки.',
+      'Языки IoT LTSC: доступны только английские сборки; ссылки 123 Cloud и Global Mirror ведут на английские сборки.',
   'mirror_badge_official': 'Официальный источник Microsoft',
   'mirror_badge_community': 'Образ сообщества',
   'mirror_desc_official': 'Скачивание напрямую с сайта Microsoft',
@@ -2688,10 +2688,10 @@ const _ru = <String, String>{
   'mirror_china_title': 'Китайское зеркало',
   'mirror_china_desc': '123 Cloud Drive · Стабильно · Рекомендуется для Китая',
   'mirror_china_tag': 'Китай',
-  'mirror_global_title': 'Глобальное зеркало',
+  'mirror_global_title': 'SourceForge',
   'mirror_global_desc':
-      'GoFile · Глобальный доступ · Без региональных ограничений',
-  'mirror_global_tag': 'Глобальное',
+      'SourceForge · Глобальный доступ · Без региональных ограничений',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'Скачать',
   'mirror_default_desc': 'Прямая ссылка для скачивания',
   'nav_benchmark': 'Тест диска',
@@ -3493,9 +3493,9 @@ const _fr = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'Ces images Windows sont fournies comme ressources de déploiement tierces.\n\nElles ne sont pas modifiées par WinDeploy Studio.\n\nToutes les marques, noms et ressources liés à Microsoft appartiennent à leurs propriétaires respectifs.\n\nWinDeploy Studio ne distribue pas d’ISO Microsoft officielles.\n\nLes utilisateurs sont responsables du respect des accords de licence logicielle.',
   'mirror_ltsc_language_notice':
-      'Langues LTSC : 123 Cloud fournit la version en chinois simplifié ; GoFile fournit la version anglaise.',
+      'Langues LTSC : 123 Cloud fournit la version en chinois simplifié ; Global Mirror fournit la version anglaise.',
   'mirror_ltsc_iot_language_notice':
-      'Langues IoT LTSC : seules les versions anglaises sont fournies ; les liens 123 Cloud et GoFile pointent tous deux vers des versions anglaises.',
+      'Langues IoT LTSC : seules les versions anglaises sont fournies ; les liens 123 Cloud et Global Mirror pointent tous deux vers des versions anglaises.',
   'mirror_badge_official': 'Source officielle Microsoft',
   'mirror_badge_community': 'Image communautaire',
   'mirror_desc_official': 'Téléchargement direct depuis Microsoft',
@@ -3613,9 +3613,10 @@ const _fr = <String, String>{
   'mirror_china_title': 'Miroir Chine',
   'mirror_china_desc': '123 Cloud Drive · Stable · Recommandé pour la Chine',
   'mirror_china_tag': 'Chine',
-  'mirror_global_title': 'Miroir Global',
-  'mirror_global_desc': 'GoFile · Accès global · Sans restriction régionale',
-  'mirror_global_tag': 'Global',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc':
+      'SourceForge · Accès global · Sans restriction régionale',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'Télécharger',
   'mirror_default_desc': 'Lien de téléchargement direct',
   'nav_benchmark': 'Test disque',
@@ -4381,9 +4382,9 @@ const _ja = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'これらの Windows イメージは、サードパーティの展開リソースとして提供されています。\n\nWinDeploy Studio によって改変されたものではありません。\n\nMicrosoft に関連する商標、名称、資産はすべて各所有者に帰属します。\n\nWinDeploy Studio は Microsoft 公式 ISO を配布しません。\n\nソフトウェアライセンス契約の遵守はユーザー自身の責任です。',
   'mirror_ltsc_language_notice':
-      'LTSC 言語メモ：123 Cloud は簡体字中国語版、GoFile は英語版を提供します。',
+      'LTSC 言語メモ：123 Cloud は簡体字中国語版、Global Mirror は英語版を提供します。',
   'mirror_ltsc_iot_language_notice':
-      'IoT LTSC 言語メモ：英語版のみ提供されます。123 Cloud と GoFile のリンクはいずれも英語版です。',
+      'IoT LTSC 言語メモ：英語版のみ提供されます。123 Cloud と Global Mirror のリンクはいずれも英語版です。',
   'mirror_badge_official': 'Microsoft 公式ソース',
   'mirror_badge_community': 'コミュニティイメージ',
   'mirror_desc_official': 'Microsoft から直接ダウンロード',
@@ -4490,9 +4491,9 @@ const _ja = <String, String>{
   'mirror_china_title': '中国ミラー',
   'mirror_china_desc': '123 Cloud Drive · 安定 · 中国ユーザー推奨',
   'mirror_china_tag': '中国',
-  'mirror_global_title': 'グローバルミラー',
-  'mirror_global_desc': 'GoFile · グローバルアクセス · 地域制限なし',
-  'mirror_global_tag': 'グローバル',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · グローバルアクセス · 地域制限なし',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'ダウンロード',
   'mirror_default_desc': '直接ダウンロードリンク',
   'nav_benchmark': 'ディスクテスト',
@@ -4624,8 +4625,7 @@ const _zhTW = <String, String>{
   'linux_togo_mount_preflight_failed': '無法檢查此 Linux 映像，目標磁碟未被修改。',
   'linux_togo_unsupported_iso':
       '持久化 Linux To Go 支援經過驗證的 x64 Ubuntu/casper 和 Debian Live 配置。其他發行版請使用「安裝盤」功能。',
-  'linux_togo_mke2fs_missing':
-      '此建置未包含符合授權要求的 Linux 持久化元件，目標磁碟未被修改。',
+  'linux_togo_mke2fs_missing': '此建置未包含符合授權要求的 Linux 持久化元件，目標磁碟未被修改。',
   'linux_togo_boot_config_unsupported':
       '此 Live 映像沒有可用來啟用持久化的受支援 GRUB 啟動項，目標磁碟未被修改。',
   'linux_togo_boot_file_too_large': '此映像包含超過 FAT32 單一檔案容量上限的必要開機檔案，目標磁碟未被修改。',
@@ -5206,9 +5206,10 @@ const _zhTW = <String, String>{
   'mirror_ltsc_disclaimer_title': '映像來源免責聲明',
   'mirror_ltsc_disclaimer_body':
       '這些 Windows 映像作為第三方部署資源提供。\n\n它們並非由 WinDeploy Studio 修改。\n\n所有 Microsoft 相關商標、名稱和資產均歸其各自所有者所有。\n\nWinDeploy Studio 不提供 Microsoft 官方 ISO 分發。\n\n使用者需自行確保遵守軟體授權協議。',
-  'mirror_ltsc_language_notice': 'LTSC 語言提示：123 雲盤提供簡體中文版本，GoFile 提供英文版本。',
+  'mirror_ltsc_language_notice':
+      'LTSC 語言提示：123 雲盤提供簡體中文版本，Global Mirror 提供英文版本。',
   'mirror_ltsc_iot_language_notice':
-      'IoT LTSC 語言提示：僅提供英文版；123 雲盤和 GoFile 連結均為英文版。',
+      'IoT LTSC 語言提示：僅提供英文版；123 雲盤和 Global Mirror 連結均為英文版。',
   'mirror_badge_official': 'Microsoft 官方來源',
   'mirror_badge_community': '社群映像',
   'mirror_desc_official': '直接從 Microsoft 下載',
@@ -5312,9 +5313,9 @@ const _zhTW = <String, String>{
   'mirror_china_title': '中國鏡像',
   'mirror_china_desc': '123雲端 · 穩定 · 國內用戶推薦',
   'mirror_china_tag': '國內',
-  'mirror_global_title': '全球鏡像',
-  'mirror_global_desc': 'GoFile · 全球訪問 · 無地區限制',
-  'mirror_global_tag': '國際',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · 全球訪問 · 無地區限制',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': '下載',
   'mirror_default_desc': '直接下載連結',
   'nav_benchmark': '磁碟測試',
@@ -6077,9 +6078,9 @@ const _es = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'Estas imágenes de Windows se proporcionan como recursos de despliegue de terceros.\n\nWinDeploy Studio no las modifica.\n\nTodas las marcas comerciales, nombres y recursos relacionados con Microsoft pertenecen a sus respectivos propietarios.\n\nWinDeploy Studio no distribuye ISO oficiales de Microsoft.\n\nLos usuarios son responsables de cumplir los acuerdos de licencia de software.',
   'mirror_ltsc_language_notice':
-      'Nota de idioma LTSC: 123 Cloud proporciona la compilación en chino simplificado; GoFile proporciona la compilación en inglés.',
+      'Nota de idioma LTSC: 123 Cloud proporciona la compilación en chino simplificado; Global Mirror proporciona la compilación en inglés.',
   'mirror_ltsc_iot_language_notice':
-      'Nota de idioma IoT LTSC: solo se proporcionan compilaciones en inglés. Los enlaces de 123 Cloud y GoFile son compilaciones en inglés.',
+      'Nota de idioma IoT LTSC: solo se proporcionan compilaciones en inglés. Los enlaces de 123 Cloud y Global Mirror son compilaciones en inglés.',
   'mirror_badge_official': 'Fuente oficial de Microsoft',
   'mirror_badge_community': 'Imagen de la comunidad',
   'mirror_desc_official': 'Descarga directamente desde Microsoft',
@@ -6191,9 +6192,10 @@ const _es = <String, String>{
   'mirror_china_title': 'Espejo China',
   'mirror_china_desc': '123 Cloud Drive · Estable · Recomendado para China',
   'mirror_china_tag': 'China',
-  'mirror_global_title': 'Espejo Global',
-  'mirror_global_desc': 'GoFile · Acceso global · Sin restricción regional',
-  'mirror_global_tag': 'Global',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc':
+      'SourceForge · Acceso global · Sin restricción regional',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'Descargar',
   'mirror_default_desc': 'Enlace de descarga directa',
   'nav_benchmark': 'Prueba de disco',
@@ -6977,9 +6979,9 @@ const _ar = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'تُقدَّم صور Windows هذه كموارد نشر من جهات خارجية.\n\nلم يتم تعديلها بواسطة WinDeploy Studio.\n\nكل العلامات التجارية والأسماء والأصول المرتبطة بـ Microsoft مملوكة لأصحابها.\n\nلا يوزع WinDeploy Studio ملفات ISO الرسمية من Microsoft.\n\nيتحمل المستخدمون مسؤولية الالتزام باتفاقيات ترخيص البرامج.',
   'mirror_ltsc_language_notice':
-      'ملاحظة لغة LTSC: يوفر 123 Cloud إصدار الصينية المبسطة، ويوفر GoFile الإصدار الإنجليزي.',
+      'ملاحظة لغة LTSC: يوفر 123 Cloud إصدار الصينية المبسطة، ويوفر Global Mirror الإصدار الإنجليزي.',
   'mirror_ltsc_iot_language_notice':
-      'ملاحظة لغة IoT LTSC: تتوفر الإصدارات الإنجليزية فقط؛ روابط 123 Cloud و GoFile كلاهما لإصدارات إنجليزية.',
+      'ملاحظة لغة IoT LTSC: تتوفر الإصدارات الإنجليزية فقط؛ روابط 123 Cloud و Global Mirror كلاهما لإصدارات إنجليزية.',
   'mirror_badge_official': 'مصدر Microsoft الرسمي',
   'mirror_badge_community': 'صورة مجتمع',
   'mirror_desc_official': 'تنزيل مباشر من Microsoft',
@@ -7085,9 +7087,9 @@ const _ar = <String, String>{
   'mirror_china_title': 'مرآة الصين',
   'mirror_china_desc': '123 Cloud Drive · مستقر · موصى به لمستخدمي الصين',
   'mirror_china_tag': 'الصين',
-  'mirror_global_title': 'المرآة العالمية',
-  'mirror_global_desc': 'GoFile · وصول عالمي · بدون قيود إقليمية',
-  'mirror_global_tag': 'عالمي',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · وصول عالمي · بدون قيود إقليمية',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'تنزيل',
   'mirror_default_desc': 'رابط تنزيل مباشر',
   'nav_benchmark': 'اختبار القرص',
@@ -7875,9 +7877,9 @@ const _pt = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'Estas imagens do Windows são fornecidas como recursos de implantação de terceiros.\n\nElas não são modificadas pelo WinDeploy Studio.\n\nTodas as marcas, nomes e ativos relacionados à Microsoft pertencem aos seus respectivos proprietários.\n\nO WinDeploy Studio não distribui ISOs oficiais da Microsoft.\n\nOs usuários são responsáveis por cumprir os contratos de licença de software.',
   'mirror_ltsc_language_notice':
-      'Nota de idioma LTSC: o 123 Cloud fornece a build em chinês simplificado; o GoFile fornece a build em inglês.',
+      'Nota de idioma LTSC: o 123 Cloud fornece a build em chinês simplificado; o Global Mirror fornece a build em inglês.',
   'mirror_ltsc_iot_language_notice':
-      'Nota de idioma IoT LTSC: somente builds em inglês são fornecidas. Os links do 123 Cloud e do GoFile são builds em inglês.',
+      'Nota de idioma IoT LTSC: somente builds em inglês são fornecidas. Os links do 123 Cloud e do Global Mirror são builds em inglês.',
   'mirror_badge_official': 'Fonte oficial da Microsoft',
   'mirror_badge_community': 'Imagem da comunidade',
   'mirror_desc_official': 'Baixe diretamente da Microsoft',
@@ -7989,9 +7991,9 @@ const _pt = <String, String>{
   'mirror_china_title': 'Espelho China',
   'mirror_china_desc': '123 Cloud Drive · Estável · Recomendado para China',
   'mirror_china_tag': 'China',
-  'mirror_global_title': 'Espelho Global',
-  'mirror_global_desc': 'GoFile · Acesso global · Sem restrição regional',
-  'mirror_global_tag': 'Global',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · Acesso global · Sem restrição regional',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'Baixar',
   'mirror_default_desc': 'Link de download direto',
   'nav_benchmark': 'Teste de disco',
@@ -8797,9 +8799,9 @@ const _de = <String, String>{
   'mirror_ltsc_disclaimer_body':
       'Diese Windows-Abbilder werden als Drittanbieter-Ressourcen für Bereitstellungen bereitgestellt.\n\nSie werden von WinDeploy Studio nicht verändert.\n\nAlle Microsoft-bezogenen Marken, Namen und Inhalte gehören ihren jeweiligen Eigentümern.\n\nWinDeploy Studio verteilt keine offiziellen Microsoft-ISOs.\n\nBenutzer sind selbst für die Einhaltung der Softwarelizenzverträge verantwortlich.',
   'mirror_ltsc_language_notice':
-      'LTSC-Sprachhinweis: 123 Cloud stellt die vereinfachte chinesische Build bereit; GoFile stellt die englische Build bereit.',
+      'LTSC-Sprachhinweis: 123 Cloud stellt die vereinfachte chinesische Build bereit; Global Mirror stellt die englische Build bereit.',
   'mirror_ltsc_iot_language_notice':
-      'IoT-LTSC-Sprachhinweis: Es werden nur englische Builds bereitgestellt. Die Links von 123 Cloud und GoFile führen beide zu englischen Builds.',
+      'IoT-LTSC-Sprachhinweis: Es werden nur englische Builds bereitgestellt. Die Links von 123 Cloud und Global Mirror führen beide zu englischen Builds.',
   'mirror_badge_official': 'Offizielle Microsoft-Quelle',
   'mirror_badge_community': 'Community-Abbild',
   'mirror_desc_official': 'Direkt von Microsoft herunterladen',
@@ -8916,10 +8918,10 @@ const _de = <String, String>{
   'mirror_china_title': 'China-Mirror',
   'mirror_china_desc': '123 Cloud Drive · Stabil · Empfohlen für China-Nutzer',
   'mirror_china_tag': 'China',
-  'mirror_global_title': 'Globaler Mirror',
+  'mirror_global_title': 'SourceForge',
   'mirror_global_desc':
-      'GoFile · Globaler Zugang · Keine regionale Einschränkung',
-  'mirror_global_tag': 'Global',
+      'SourceForge · Globaler Zugang · Keine regionale Einschränkung',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': 'Herunterladen',
   'mirror_default_desc': 'Direkter Download-Link',
   'nav_benchmark': 'Datenträger-Test',
@@ -9683,9 +9685,9 @@ const _ko = <String, String>{
   'mirror_ltsc_disclaimer_body':
       '이 Windows 이미지는 타사 배포 리소스로 제공됩니다.\n\nWinDeploy Studio에서 수정하지 않았습니다.\n\nMicrosoft 관련 상표, 이름, 자산은 각각의 소유자에게 있습니다.\n\nWinDeploy Studio는 Microsoft 공식 ISO를 배포하지 않습니다.\n\n사용자는 소프트웨어 라이선스 계약 준수에 대한 책임이 있습니다.',
   'mirror_ltsc_language_notice':
-      'LTSC 언어 안내: 123 Cloud는 중국어 간체 빌드를, GoFile은 영어 빌드를 제공합니다.',
+      'LTSC 언어 안내: 123 Cloud는 중국어 간체 빌드를, Global Mirror는 영어 빌드를 제공합니다.',
   'mirror_ltsc_iot_language_notice':
-      'IoT LTSC 언어 안내: 영어 빌드만 제공됩니다. 123 Cloud와 GoFile 링크 모두 영어 빌드입니다.',
+      'IoT LTSC 언어 안내: 영어 빌드만 제공됩니다. 123 Cloud와 Global Mirror 링크 모두 영어 빌드입니다.',
   'mirror_badge_official': 'Microsoft 공식 출처',
   'mirror_badge_community': '커뮤니티 이미지',
   'mirror_desc_official': 'Microsoft에서 직접 다운로드',
@@ -9789,9 +9791,9 @@ const _ko = <String, String>{
   'mirror_china_title': '중국 미러',
   'mirror_china_desc': '123 Cloud Drive · 안정적 · 중국 사용자 추천',
   'mirror_china_tag': '중국',
-  'mirror_global_title': '글로벌 미러',
-  'mirror_global_desc': 'GoFile · 전 세계 접근 · 지역 제한 없음',
-  'mirror_global_tag': '글로벌',
+  'mirror_global_title': 'SourceForge',
+  'mirror_global_desc': 'SourceForge · 전 세계 접근 · 지역 제한 없음',
+  'mirror_global_tag': 'SourceForge',
   'mirror_default_title': '다운로드',
   'mirror_default_desc': '직접 다운로드 링크',
   'nav_benchmark': '디스크 테스트',

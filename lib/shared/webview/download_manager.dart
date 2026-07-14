@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../core/services/sourceforge_download_resolver.dart';
 import '../../features/logs/services/log_center_service.dart';
 
 enum DownloadStatus { downloading, paused, completed, cancelled, error }
@@ -100,7 +101,12 @@ class DownloadManager extends ChangeNotifier {
           previousTotal > localLength &&
           resumeValidator != null;
       final resumeFrom = canResume ? localLength : 0;
-      final request = http.Request('GET', Uri.parse(item.url))
+      final resolvedUrl = await SourceForgeDownloadResolver.resolve(item.url);
+      if (item._transferId != transferId) {
+        client.close();
+        return;
+      }
+      final request = http.Request('GET', Uri.parse(resolvedUrl))
         ..headers['Accept-Encoding'] = 'identity';
       if (canResume) {
         request.headers['Range'] = 'bytes=$resumeFrom-';

@@ -843,6 +843,10 @@ p {
   font-size: 13px;
 }
 
+.source-option-single {
+  justify-content: center;
+}
+
 .release-history {
   display: grid;
   gap: 10px;
@@ -1078,6 +1082,11 @@ p {
   min-height: 84px;
   padding: 12px;
   background: var(--surface);
+}
+
+.dialog-grid > .checksum-fact {
+  min-height: 0;
+  grid-column: 1 / -1;
 }
 
 .dialog-grid dt {

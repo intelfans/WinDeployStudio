@@ -35,7 +35,7 @@ class MirrorItem {
   final Map<String, List<String>> _pros;
   final Map<String, List<String>> _notes;
   final String downloadUrl;
-  final String? size;
+  final Map<String, String>? _size;
   final bool needsFontPack;
   final String? fontPackUrl;
   final String? chinaUrl;
@@ -54,7 +54,7 @@ class MirrorItem {
     this._pros = const {},
     this._notes = const {},
     required this.downloadUrl,
-    this.size,
+    this._size,
     this.needsFontPack = false,
     this.fontPackUrl,
     this.chinaUrl,
@@ -94,6 +94,25 @@ class MirrorItem {
   List<String> getPros(Locale locale) => _localizeList(_pros, locale);
   List<String> getNotes(Locale locale) => _localizeList(_notes, locale);
 
+  String? getSize(Locale locale) {
+    final sizes = _size;
+    if (sizes == null || sizes.isEmpty) return null;
+
+    final code = _localeCode(locale);
+    return sizes[code] ??
+        sizes[locale.languageCode] ??
+        sizes['en'] ??
+        sizes['zh'] ??
+        sizes.values.first;
+  }
+
+  String downloadUrlFor(Locale locale) {
+    if (!isOfficialMicrosoftImage) return downloadUrl;
+    return locale.languageCode == 'zh'
+        ? chinaUrl ?? downloadUrl
+        : globalUrl ?? downloadUrl;
+  }
+
   bool get isOfficialMicrosoftImage =>
       category == 'Official Microsoft Images' ||
       category == 'Official Microsoft';
@@ -110,6 +129,8 @@ class MirrorItem {
       isFontPack;
   bool get isStarValleyX => id == 'starvalleyx';
   bool get isChineseOnlyResource => isStarValleyX || isFontPack;
+  bool get hasChinaMirror => chinaUrl?.trim().isNotEmpty ?? false;
+  bool get hasGlobalMirror => globalUrl?.trim().isNotEmpty ?? false;
   bool get requiresFontPack => needsFontPack && !isStarValleyX;
   bool get isIotLtsc => id.contains('iot');
 
@@ -189,7 +210,7 @@ class MirrorItem {
       pros: parseListMap(json['pros']) ?? {},
       notes: parseListMap(json['notes']) ?? {},
       downloadUrl: json['downloadUrl'] as String? ?? '',
-      size: json['size'] as String?,
+      size: parseStringMap(json['size']),
       needsFontPack: json['needsFontPack'] as bool? ?? false,
       fontPackUrl: json['fontPackUrl'] as String?,
       chinaUrl: json['chinaUrl'] as String?,
@@ -210,12 +231,84 @@ class MirrorItem {
     if (_pros.isNotEmpty) 'pros': _pros,
     if (_notes.isNotEmpty) 'notes': _notes,
     'downloadUrl': downloadUrl,
-    if (size != null) 'size': size,
+    if (_size != null) 'size': _size,
     'needsFontPack': needsFontPack,
     if (fontPackUrl != null) 'fontPackUrl': fontPackUrl,
     if (chinaUrl != null) 'chinaUrl': chinaUrl,
     if (globalUrl != null) 'globalUrl': globalUrl,
   };
+}
+
+/// A local ISO whose published checksums are known to the image library.
+///
+/// `visibleLocales` controls where an entry may be recognized. This keeps
+/// locale-specific downloads such as the Chinese Enterprise images from being
+/// identified in locales where their digest is not applicable.
+class KnownImage {
+  final String id;
+  final Map<String, String> name;
+  final String sha256;
+  final String md5;
+  final Set<String>? visibleLocales;
+
+  const KnownImage._({
+    required this.id,
+    required this.name,
+    required this.sha256,
+    required this.md5,
+    this.visibleLocales,
+  });
+
+  String getName(Locale locale) {
+    final code = normalizeLocaleCode(localeCodeFromLocale(locale));
+    return name[code] ??
+        name[locale.languageCode] ??
+        name['en'] ??
+        name['zh'] ??
+        id;
+  }
+
+  bool isVisibleInLocale(Locale locale) {
+    final allowedLocales = visibleLocales;
+    if (allowedLocales == null) return true;
+
+    final code = normalizeLocaleCode(localeCodeFromLocale(locale));
+    return allowedLocales.contains(code) ||
+        (code.contains('_') && allowedLocales.contains(locale.languageCode));
+  }
+
+  bool matches({required String sha256, required String md5}) {
+    final normalizedSha256 = this.sha256.trim().toLowerCase();
+    final normalizedMd5 = this.md5.trim().toLowerCase();
+    return (normalizedSha256.isNotEmpty &&
+            normalizedSha256 == sha256.trim().toLowerCase()) ||
+        (normalizedMd5.isNotEmpty && normalizedMd5 == md5.trim().toLowerCase());
+  }
+
+  factory KnownImage.fromJson(Map<String, dynamic> json) {
+    final rawName = json['name'];
+    final name = rawName is String
+        ? <String, String>{'zh': rawName, 'en': rawName}
+        : rawName is Map
+        ? rawName.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          )
+        : <String, String>{};
+    final rawVisibleLocales = json['visibleLocales'];
+    final visibleLocales = rawVisibleLocales is List
+        ? rawVisibleLocales
+              .map((value) => normalizeLocaleCode(value.toString()))
+              .toSet()
+        : null;
+
+    return KnownImage._(
+      id: json['id'] as String? ?? '',
+      name: name,
+      sha256: json['sha256'] as String? ?? '',
+      md5: json['md5'] as String? ?? '',
+      visibleLocales: visibleLocales,
+    );
+  }
 }
 
 class MirrorCategory {
@@ -235,18 +328,33 @@ class MirrorCategory {
 class MirrorListData {
   final String lastUpdate;
   final List<MirrorItem> items;
+  final List<KnownImage> knownImages;
 
-  const MirrorListData({required this.lastUpdate, required this.items});
+  const MirrorListData({
+    required this.lastUpdate,
+    required this.items,
+    this.knownImages = const [],
+  });
 
   factory MirrorListData.fromJson(Map<String, dynamic> json) {
     final itemsJson = json['items'] as List<dynamic>? ?? [];
+    final knownImagesJson = json['knownImages'] as List<dynamic>? ?? [];
     return MirrorListData(
       lastUpdate: json['lastUpdate'] as String? ?? '',
       items: itemsJson
           .map((e) => MirrorItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+      knownImages: knownImagesJson
+          .whereType<Map>()
+          .map((entry) => KnownImage.fromJson(Map<String, dynamic>.from(entry)))
+          .where((entry) => entry.id.isNotEmpty)
+          .toList(),
     );
   }
+
+  List<KnownImage> knownImagesForLocale(Locale locale) => knownImages
+      .where((entry) => entry.isVisibleInLocale(locale))
+      .toList(growable: false);
 
   List<MirrorCategory> categories(Locale locale) {
     final map = <String, List<MirrorItem>>{};

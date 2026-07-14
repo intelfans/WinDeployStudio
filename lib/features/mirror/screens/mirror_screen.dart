@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 import '../../../shared/widgets/app_page.dart';
 import '../providers/mirror_provider.dart';
 import '../models/mirror_models.dart';
@@ -157,7 +158,7 @@ class _MirrorScreenState extends ConsumerState<MirrorScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 200,
+              width: 252,
               child: Card(
                 child: ListView(
                   shrinkWrap: true,
@@ -291,36 +292,48 @@ class _CategoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      minLeadingWidth: 30,
       leading: Icon(icon, size: 20),
-      title: Text(label, style: theme.textTheme.bodyMedium),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      title: Tooltip(
+        message: label,
+        child: Text(
+          label,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+      subtitle: Row(
         children: [
-          Text(
+          AppCompactLabel(
             '$count',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          if (skillLevel != null)
+          if (skillLevel != null) ...[
+            const Spacer(),
             Tooltip(
               message: tr(context, skillLevel!.tooltipKey),
-              child: Text(
+              child: AppCompactLabel(
                 tr(context, skillLevel!.labelKey),
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: _skillColor(skillLevel!, theme.colorScheme),
+                  color: _skillColor(skillLevel!, colorScheme),
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
+          ],
         ],
       ),
       selected: isSelected,
-      selectedTileColor: theme.colorScheme.primaryContainer.withValues(
-        alpha: 0.3,
-      ),
+      selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       onTap: onTap,
     );
@@ -345,6 +358,7 @@ class _MirrorItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     final name = item.getName(locale);
     final type = item.getType(locale);
+    final size = item.getSize(locale);
     final badgeLabel = item.isOfficialMicrosoft
         ? tr(context, 'mirror_badge_official')
         : item.isCommunityImage
@@ -440,13 +454,10 @@ class _MirrorItemCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (type.isNotEmpty || item.size != null) ...[
+                    if (type.isNotEmpty || size != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        [
-                          if (type.isNotEmpty) type,
-                          if (item.size != null) item.size,
-                        ].join(' / '),
+                        [if (type.isNotEmpty) type, ?size].join(' / '),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -476,7 +487,7 @@ class _MirrorItemCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Text(
+      child: AppCompactLabel(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: color,

@@ -14,11 +14,9 @@ import 'web_loading_overlay.dart';
 const _chromeUA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
-const _externalBrowserPreferredHosts = <String>{
-  'gofile.io',
-  'www.gofile.io',
-  'cdn.gofile.io',
-};
+// Mirror downloads are resolved by DownloadManager before reaching this
+// widget. Keep SourceForge pages in the embedded WebView for other links.
+const _externalBrowserPreferredHosts = <String>{};
 
 class InAppWebview extends StatefulWidget {
   final String url;

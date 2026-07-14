@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../app/typography.dart';
 import '../../../core/localization/strings.dart';
+import '../../../shared/widgets/app_compact_label.dart';
 
 class WelcomeScreen extends StatelessWidget {
   final void Function(String) onSendPrompt;
@@ -104,7 +105,7 @@ class _AbilityChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Chip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+      label: AppCompactLabel(label, style: const TextStyle(fontSize: 12)),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
