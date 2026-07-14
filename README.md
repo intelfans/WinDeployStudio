@@ -24,17 +24,17 @@ The project is distributed under the MIT License.
 
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
-  - Validate persistent Linux To Go layouts for x64 Ubuntu/casper and Debian Live ISOs. Creation is intentionally unavailable in this release until a fully reproducible, license-compliant ext4 creator is bundled.
+  - Validate supported persistent Linux To Go layouts for x64 Ubuntu/casper and Debian Live ISOs before any disk is changed.
   - Classify Linux To Go images when selected and again immediately before erasing the target. Ubuntu/casper requires x64 UEFI, casper kernel/initrd, Live payloads, and a patchable GRUB entry. Debian additionally requires `boot=live`, an NTFS-capable initrd, and its own `persistence` / `persistence.conf` protocol.
   - Reject unsupported distributions and unsafe Debian Live layouts before the target disk is changed; use Linux installation media for images outside the validated profiles.
+  - Stop before modifying the target disk when the release does not include a required, compliant persistence component.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing.
   - Configure local-disk visibility, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, VHD/VHDX drive-letter repair, .NET Framework 3.5, and deployment drive letters where supported. UEFI deployments automatically use an NTFS Windows volume with a separate FAT32 EFI partition.
-  - Optionally inject Windows INF drivers offline. When a compliant persistence creator is restored, supported Ubuntu/casper Linux To Go images can stage vetted Linux packages, matching kernel modules, or explicit scripts for first boot; this does not add support for arbitrary distributions.
+  - Optionally inject Windows INF drivers offline.
   - Build a separate Windows boot partition and verify BCD, virtual-disk binding, and fallback UEFI boot files.
   - Revalidate disk identity, capacity, model, and bus type before destructive operations, preferring a reliable hardware serial number and failing closed when no stable identity is available.
   - During image application, the progress panel shows reliable elapsed time only.
-  - Includes a small UI-only waiting game during long image application steps.
 
 - **Native Drive Benchmark**
   - Uses unbuffered, write-through native Windows I/O instead of cached file-copy estimates.
@@ -53,7 +53,7 @@ The project is distributed under the MIT License.
 - **Image Center**
   - Separates **Official Microsoft Images**, **Community Editions**, and **Enterprise & LTSC Builds**.
   - Official Windows 10 and Windows 11 entries open Microsoft's official download pages in the system browser.
-  - Community images keep the existing mirror-based flow with China and Global mirror choices.
+  - Community images provide China and Global Mirror download choices where available.
   - Enterprise and LTSC entries are marked as expert-level deployment resources with clear source and language notices.
   - StarValleyX is shown only for Simplified Chinese and Traditional Chinese UI languages.
   - The CJK font pack is also Chinese-only. It is offered for Tiny10, Tiny11, and Windows X-Lite, never for StarValleyX.
@@ -74,9 +74,8 @@ The project is distributed under the MIT License.
   - Centralized logs for installation media creation, To Go workspaces, image operations, downloads, updates, AI, and errors.
   - Quick log browsing and folder access.
 
-- **Windows 11 Interface And Navigation**
+- **Interface And Navigation**
   - Uses one consistent Windows 11-inspired interface across supported Windows 10 and Windows 11 hosts.
-  - Keeps the Flutter theme, native title bar, and responsive deployment navigation visually aligned without exposing redundant style selectors.
   - Groups primary navigation with clear visual dividers; choosing a primary destination from Disk Tools or test-history secondary pages opens that destination rather than retaining the previous subpage.
 
 - **International UI**
@@ -279,25 +278,17 @@ lib/
 
 WinDeploy Studio does not provide Windows licenses, product keys, activation services, or authorization bypass mechanisms. Users are responsible for complying with all applicable software license agreements.
 
-Activation-related utilities are presented as third-party resources for educational, testing, troubleshooting, research, and system administration purposes. For production, commercial use, or long-term deployment, use valid licenses from the software vendor.
+The Toolbox provides links to independent third-party projects. Their downloads, licenses, terms, and support are controlled by their respective publishers. Check the publisher's terms before use.
 
 Windows, Microsoft, Sysinternals, Intel, and other product names, trademarks, logos, and external resources remain the property of their respective owners. WinDeploy Studio is not affiliated with Microsoft Corporation or Intel Corporation.
 
-## Third-Party Tools
+## Third-Party Notices
 
-The current release does not redistribute `mke2fs.exe`, e2fsprogs, Cygwin, or any other ext4 creator. A previously evaluated Google/AOSP `mke2fs.exe` was removed because this project did not possess its complete corresponding source, all statically linked dependencies, and reproducible build inputs required for GPLv2 redistribution.
+WinDeploy Studio is built with Flutter and the Dart packages declared in [pubspec.yaml](pubspec.yaml). Each package remains subject to its own license. The Toolbox links to external projects; it does not bundle their installers or provide support on behalf of their publishers.
 
-The Linux To Go creator retains separate layout contracts for future compliant tooling: Ubuntu/casper uses a FAT32 boot/persistence partition, an NTFS Live-data partition, an ext4 `writable` image, and the `persistent` boot argument. Debian Live uses an ext4 `persistence` image containing `/persistence.conf` with `/ union`, plus the `persistence` boot argument. Both profiles use `live-media=/dev/disk/by-uuid/...` for the NTFS Live data partition and reject images that do not prove the required boot contract.
+Disk diagnostics use an independently implemented, read-only compatibility layer informed by the public protocol layouts and compatibility behavior of CrystalDiskInfo. WinDeploy Studio does not include or redistribute CrystalDiskInfo, its bridge DLLs, or its diagnostic executables.
 
-Any future bundled ext4 tool must remain a separate command-line component and ship with its exact corresponding source, build scripts, static dependency notices, license texts, an immutable source URL, and a real three-year source offer. See [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Roadmap
-
-The implemented portions of the original items 4-9 are documented above and are no longer roadmap promises. The remaining work is:
-
-- Restore Linux To Go creation only after shipping a reproducible, license-compliant ext4 creator, then validate it with real boot and persistence tests for the supported x64 Ubuntu/casper and Debian Live profiles. WinDeploy Studio does not support arbitrary Linux distributions for Linux To Go.
-- Expand offline Windows optional-feature selection beyond the currently implemented .NET Framework 3.5 path.
-- Add update-source selection with Oracle Cloud as the recommended high-speed source and GitHub Releases as the fallback. GitHub is currently the only update source.
+The release does not redistribute `mke2fs.exe`, e2fsprogs, Cygwin, or another ext4-creation component. If a Linux To Go workflow requires that component and it is unavailable, the application stops before changing the selected disk. Full attribution and licensing notices are available in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Special Thanks
 
@@ -329,17 +320,17 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。
-  - 验证 x64 Ubuntu/casper 与 Debian Live 的持久化 Linux To Go 布局。本发行版在提供完全可复现、许可证合规的 ext4 创建工具前，刻意不开放创建功能。
+  - 在修改磁盘前验证 x64 Ubuntu/casper 与 Debian Live 的受支持持久化 Linux To Go 布局。
   - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；Ubuntu/casper 布局必须具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可安全注入持久化参数的 GRUB 启动项。Debian 还必须具备 `boot=live`、支持 NTFS 的 initrd 与独立的 `persistence` / `persistence.conf` 协议。
   - 不受支持的发行版与不安全的 Debian Live 布局会在修改目标磁盘前被拒绝；验证范围外的镜像请使用 Linux 安装盘。
+  - 当当前发行版未包含所需且合规的持久化组件时，会在修改目标磁盘前停止操作。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
   - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。
   - 在支持的组合中配置本地磁盘可见性、OOBE/Audit、WinRE、UASP、CompactOS、WIMBoot、VHD/VHDX 盘符修复、.NET Framework 3.5 和部署盘符。UEFI 部署会自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区。
-  - 可选离线注入 Windows INF 驱动。待恢复合规的持久化创建工具后，受支持的 Ubuntu/casper Linux To Go 可暂存经过校验的 Linux 软件包、匹配内核模块或显式脚本，在首次启动时处理；这不代表支持任意发行版。
+  - 可选离线注入 Windows INF 驱动。
   - 为 Windows To Go 创建独立启动分区，并验证 BCD、虚拟磁盘绑定和 UEFI 回退启动文件。
   - 在清盘前重新核验磁盘号、容量、型号与总线类型，优先使用可靠硬件序列号；无法建立稳定物理身份时拒绝清盘。
   - 应用镜像阶段只显示可靠的已用时间。
-  - 长时间写入时提供一个纯 UI 小游戏用于打发等待时间，不影响创建流程。
 
 - **原生磁盘测试**
   - 使用 Windows 原生无缓冲、写穿透 I/O，而不是容易受缓存影响的文件复制测速。
@@ -358,7 +349,7 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 - **镜像中心**
   - 区分 **Microsoft 官方镜像**、**社区版本** 与 **企业版 / LTSC 构建**。
   - Windows 10 / Windows 11 官方条目始终跳转 Microsoft 官方网站，并使用系统默认浏览器打开。
-  - 社区镜像继续保留中国镜像和全球镜像选择流程。
+  - 社区镜像在可用时提供中国镜像和 Global Mirror 下载选择。
   - 企业版与 LTSC 镜像标记为专家级部署资源，并提供清晰的来源与语言提示。
   - StarValleyX 仅在简体中文和繁体中文界面中显示。
   - CJK 字体包同样只在简体中文和繁体中文界面显示，仅向 Tiny10、Tiny11 和 Windows X-Lite 提供，不向 StarValleyX 提示。
@@ -379,9 +370,8 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
   - 汇总安装盘、随身系统、镜像、下载、更新、AI 和错误日志。
   - 支持分类查看和快速打开日志目录。
 
-- **Windows 11 界面与导航**
+- **界面与导航**
   - 在受支持的 Windows 10/11 主机上统一使用 Windows 11 风格界面。
-  - Flutter 主题、原生标题栏和响应式部署导航保持一致，不再提供没有必要的外观模式切换。
   - 左侧主导航用清晰的分隔线分组；从磁盘工具或测试历史等二级页面选择主导航时，会直接打开所选目标页，不再保留之前的二级页面。
 
 - **多语言**
@@ -573,23 +563,17 @@ WinDeploy Studio 基于 MIT License 分发。
 
 本项目不提供 Windows 授权、产品密钥、激活服务或绕过授权机制。用户需自行确保遵守 Microsoft 及其他软件厂商的许可协议。
 
+工具箱提供独立第三方项目的链接；其下载、许可证、使用条款和支持均由各自发布者负责。使用前请确认发布者的条款。
+
 第三方软件、商标、Logo 和外部资源归其各自所有者所有。WinDeploy Studio 与 Microsoft Corporation 或 Intel Corporation 无官方隶属关系。
 
 ## 第三方工具说明
 
-当前发行版不会再分发 `mke2fs.exe`、e2fsprogs、Cygwin 或其他 ext4 创建工具。此前评估过的 Google/AOSP `mke2fs.exe` 已被移除，因为本项目没有持有 GPLv2 再分发所需的完整对应源码、全部静态链接依赖和可复现构建输入。
+WinDeploy Studio 使用 Flutter 及 [pubspec.yaml](pubspec.yaml) 中声明的 Dart 软件包构建；各软件包仍受其各自许可证约束。工具箱仅提供外部项目链接，不捆绑其安装包，也不代表其发布者提供支持。
 
-Linux To Go 创建器为未来合规工具保留了两套独立布局契约：Ubuntu/casper 使用 FAT32 启动/持久化分区、NTFS Live 数据分区、ext4 `writable` 镜像与 `persistent` 启动参数；Debian Live 使用包含 `/persistence.conf`（内容为 `/ union`）的 ext4 `persistence` 镜像和 `persistence` 启动参数。两类布局都会用 `live-media=/dev/disk/by-uuid/...` 指向 NTFS Live 数据分区，并拒绝无法证明所需启动契约的镜像。
+磁盘诊断使用独立实现的只读兼容层，并参考 CrystalDiskInfo 的公开协议布局与兼容性行为。WinDeploy Studio 不包含或再分发 CrystalDiskInfo、其桥接 DLL 或诊断可执行文件。
 
-未来如需随程序内置 ext4 工具，它必须保持为独立命令行组件，并同时提供精确对应源码、构建脚本、静态依赖声明、许可证文本、不可变源码 URL 和真实的三年源码提供承诺。详见 [tools/e2fsprogs/README.md](tools/e2fsprogs/README.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-## 未来规划
-
-原规划④-⑨中已经落地的部分已写入上方“核心功能”，不再作为未来承诺。当前真实未完成项为：
-
-- 在提供可复现、许可证合规的 ext4 创建工具后恢复 Linux To Go 创建功能，并对受支持的 x64 Ubuntu/casper 与 Debian Live 配置执行真实启动和持久化测试。WinDeploy Studio 不支持任意 Linux 发行版的 Linux To Go。
-- 将离线 Windows 可选功能扩展到当前已实现的 .NET Framework 3.5 之外。
-- 加入更新源选择：甲骨文云作为推荐高速源，GitHub Releases 作为备用源；当前只有 GitHub 更新源。
+当前发行版不会再分发 `mke2fs.exe`、e2fsprogs、Cygwin 或其他 ext4 创建组件。若 Linux To Go 流程需要该组件而当前不可用，应用会在修改所选磁盘前停止操作。完整的署名与许可证说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 特别鸣谢
 

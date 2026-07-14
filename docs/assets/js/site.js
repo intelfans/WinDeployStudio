@@ -44,7 +44,7 @@
       download_band_action: "查看下载与更新说明",
       footer_copy: "面向 Windows 与 Linux 部署工作流的桌面工具。",
       footer_license: "MIT License",
-      footer_sourceforge: "SourceForge",
+      footer_global_mirror: "Global Mirror",
       downloads_eyebrow: "应用下载",
       downloads_title: "最新版与更新记录",
       downloads_copy: "版本信息和更新说明直接来自 GitHub Releases。下载前会展示文件大小和 SHA-256 摘要。",
@@ -56,9 +56,9 @@
       release_failed: "暂时无法读取发行信息。",
       release_open_github: "在 GitHub 查看",
       release_download_github: "从 GitHub 下载",
-      release_sourceforge: "SourceForge",
-      release_sourceforge_pending: "即将提供",
-      release_sourceforge_copy: "推荐下载源，文件映射准备中。",
+      release_global_mirror: "Global Mirror",
+      release_global_mirror_pending: "即将提供",
+      release_global_mirror_copy: "推荐下载源，文件映射准备中。",
       release_github_copy: "当前可用的备用下载源。",
       release_notes: "更新说明",
       release_no_notes: "该版本没有提供更新说明。",
@@ -152,7 +152,7 @@
       download_band_action: "Downloads and release notes",
       footer_copy: "A desktop toolkit for Windows and Linux deployment workflows.",
       footer_license: "MIT License",
-      footer_sourceforge: "SourceForge",
+      footer_global_mirror: "Global Mirror",
       downloads_eyebrow: "App downloads",
       downloads_title: "Latest builds and release history",
       downloads_copy: "Version data and release notes come directly from GitHub Releases. File size and SHA-256 are shown before download.",
@@ -164,9 +164,9 @@
       release_failed: "Release information is temporarily unavailable.",
       release_open_github: "View on GitHub",
       release_download_github: "Download from GitHub",
-      release_sourceforge: "SourceForge",
-      release_sourceforge_pending: "Coming soon",
-      release_sourceforge_copy: "Recommended source. File mapping is being prepared.",
+      release_global_mirror: "Global Mirror",
+      release_global_mirror_pending: "Coming soon",
+      release_global_mirror_copy: "Recommended source. File mapping is being prepared.",
       release_github_copy: "Available fallback download source.",
       release_notes: "Release notes",
       release_no_notes: "No release notes were provided for this version.",
@@ -328,7 +328,7 @@
             <p data-i18n="footer_copy">面向 Windows 与 Linux 部署工作流的桌面工具。</p>
             <div class="footer-links">
               <a href="https://github.com/intelfans/WinDeployStudio" target="_blank" rel="noreferrer">GitHub</a>
-              <a href="https://sourceforge.net/projects/windeploystudio/" target="_blank" rel="noreferrer" data-i18n="footer_sourceforge">SourceForge</a>
+              <a href="https://sourceforge.net/projects/windeploystudio/" target="_blank" rel="noreferrer" data-i18n="footer_global_mirror">Global Mirror</a>
               <a href="https://github.com/intelfans/WinDeployStudio/blob/main/LICENSE" target="_blank" rel="noreferrer" data-i18n="footer_license">MIT License</a>
             </div>
           </div>
@@ -506,8 +506,11 @@
     });
   }
 
+  const queryLanguage = new URLSearchParams(window.location.search).get("lang");
   const preferredTheme = localStorage.getItem(STORAGE.theme) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  const preferredLanguage = localStorage.getItem(STORAGE.language) || "zh";
+  const preferredLanguage = queryLanguage === "en" || queryLanguage === "zh"
+    ? queryLanguage
+    : localStorage.getItem(STORAGE.language) || "zh";
   document.documentElement.dataset.theme = preferredTheme === "dark" ? "dark" : "light";
   document.documentElement.lang = preferredLanguage === "en" ? "en" : "zh-CN";
 

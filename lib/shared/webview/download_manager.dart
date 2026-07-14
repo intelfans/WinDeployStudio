@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../../core/services/sourceforge_download_resolver.dart';
+import '../../core/services/global_mirror_download_resolver.dart';
 import '../../features/logs/services/log_center_service.dart';
 
 enum DownloadStatus { downloading, paused, completed, cancelled, error }
@@ -53,7 +53,7 @@ class DownloadManager extends ChangeNotifier {
   bool get hasActiveDownloads =>
       _items.any((i) => i.status == DownloadStatus.downloading);
 
-  Future<void> startDownload({
+  Future<DownloadItem> startDownload({
     required String url,
     required String fileName,
     required String savePath,
@@ -67,7 +67,10 @@ class DownloadManager extends ChangeNotifier {
     );
     _items.insert(0, item);
     notifyListeners();
-    await _doDownload(item);
+    // Starting a download must return immediately so callers can expose the
+    // progress panel while the mirror resolution and transfer continue.
+    unawaited(_doDownload(item));
+    return item;
   }
 
   Future<void> _doDownload(DownloadItem item) async {
@@ -101,7 +104,7 @@ class DownloadManager extends ChangeNotifier {
           previousTotal > localLength &&
           resumeValidator != null;
       final resumeFrom = canResume ? localLength : 0;
-      final resolvedUrl = await SourceForgeDownloadResolver.resolve(item.url);
+      final resolvedUrl = await GlobalMirrorDownloadResolver.resolve(item.url);
       if (item._transferId != transferId) {
         client.close();
         return;

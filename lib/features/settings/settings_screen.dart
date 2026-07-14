@@ -409,6 +409,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _launchUrl(AppConstants.githubRepository),
                     ),
                   ),
+                  _SettingsTile(
+                    icon: Icons.public_outlined,
+                    title: tr(context, 'mirror_global_title'),
+                    subtitle: AppConstants.globalMirrorRepository,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      onPressed: () =>
+                          _launchUrl(AppConstants.globalMirrorRepository),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

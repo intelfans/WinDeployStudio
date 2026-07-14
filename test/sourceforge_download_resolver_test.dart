@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:win_deploy_studio/core/services/sourceforge_download_resolver.dart';
+import 'package:win_deploy_studio/core/services/global_mirror_download_resolver.dart';
 
 void main() {
   final landingPage = Uri(
@@ -8,12 +8,12 @@ void main() {
     path: '/project/windeploystudio/Extended%20Files/TinyOS/Tiny10_22H2.iso',
   );
 
-  test('extracts a signed SourceForge URL from a meta refresh', () {
+  test('extracts a signed Global Mirror URL from a meta refresh', () {
     const html = '''
       <meta http-equiv="refresh" content="0; url=https://onboardcloud.dl.sourceforge.net/project/windeploystudio/Extended%20Files/TinyOS/Tiny10_22H2.iso?viasf=1&amp;fid=abc&amp;e=123&amp;st=signature">
     ''';
 
-    final result = SourceForgeDownloadResolver.extractDirectUrl(
+    final result = GlobalMirrorDownloadResolver.extractDirectUrl(
       html,
       baseUri: landingPage,
     );
@@ -31,7 +31,7 @@ void main() {
       </script>
     ''';
 
-    final result = SourceForgeDownloadResolver.extractDirectUrl(
+    final result = GlobalMirrorDownloadResolver.extractDirectUrl(
       html,
       baseUri: landingPage,
     );
@@ -41,12 +41,12 @@ void main() {
     expect(result.queryParameters['fid'], 'def');
   });
 
-  test('extracts a protocol-relative SourceForge mirror link', () {
+  test('extracts a protocol-relative Global Mirror mirror link', () {
     const html = '''
       <a href="//pilotfiber.dl.sourceforge.net/project/windeploystudio/file.iso?viasf=1">Download</a>
     ''';
 
-    final result = SourceForgeDownloadResolver.extractDirectUrl(
+    final result = GlobalMirrorDownloadResolver.extractDirectUrl(
       html,
       baseUri: landingPage,
     );
@@ -56,39 +56,39 @@ void main() {
     expect(result.host, 'pilotfiber.dl.sourceforge.net');
   });
 
-  test('does not accept a non-SourceForge download URL', () {
+  test('does not accept a non-Global Mirror download URL', () {
     const html = '''
       <meta http-equiv="refresh" content="0; url=https://example.invalid/file.iso">
       <a href="https://sourceforge.net/projects/windeploystudio/files/">Files</a>
     ''';
 
     expect(
-      SourceForgeDownloadResolver.extractDirectUrl(html, baseUri: landingPage),
+      GlobalMirrorDownloadResolver.extractDirectUrl(html, baseUri: landingPage),
       isNull,
     );
   });
 
-  test('recognizes only HTTPS SourceForge URLs as trusted', () {
+  test('recognizes only HTTPS Global Mirror URLs as trusted', () {
     expect(
-      SourceForgeDownloadResolver.isSourceForgeUrl(
+      GlobalMirrorDownloadResolver.isGlobalMirrorUrl(
         Uri.parse('https://sourceforge.net/projects/windeploystudio/files/'),
       ),
       isTrue,
     );
     expect(
-      SourceForgeDownloadResolver.isSourceForgeUrl(
+      GlobalMirrorDownloadResolver.isGlobalMirrorUrl(
         Uri.parse('https://onboardcloud.dl.sourceforge.net/project/file.iso'),
       ),
       isTrue,
     );
     expect(
-      SourceForgeDownloadResolver.isSourceForgeUrl(
+      GlobalMirrorDownloadResolver.isGlobalMirrorUrl(
         Uri.parse('http://downloads.sourceforge.net/project/file.iso'),
       ),
       isFalse,
     );
     expect(
-      SourceForgeDownloadResolver.isSourceForgeUrl(
+      GlobalMirrorDownloadResolver.isGlobalMirrorUrl(
         Uri.parse('https://example.invalid/file.iso'),
       ),
       isFalse,

@@ -42,6 +42,54 @@ class WebviewHelper {
     }
   }
 
+  static Future<void> openGlobalMirrorDownload(
+    BuildContext context, {
+    required InAppDownloadRequest request,
+  }) async {
+    if (!context.mounted) return;
+
+    final available = await isAvailable();
+    if (!context.mounted) return;
+
+    if (available) {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => InAppWebview(
+            url: 'about:blank',
+            title: request.imageName,
+            downloadRequest: request,
+          ),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(ctx, 'webview_not_available')),
+        content: Text(tr(ctx, 'webview_download_desc')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(tr(ctx, 'detail_cancel')),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              launchUrl(
+                Uri.parse(
+                  'https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/?form=MA13LH#download',
+                ),
+              );
+            },
+            child: Text(tr(ctx, 'webview_download')),
+          ),
+        ],
+      ),
+    );
+  }
+
   static void showDownloadDialog(BuildContext context, String url) {
     final downloadUrl =
         'https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/?form=MA13LH#download';

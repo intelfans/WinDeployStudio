@@ -30,9 +30,9 @@ class MirrorTestResult {
 
   String get recommendedSource {
     if (!china.online && !global.online) return '';
-    if (!china.online) return 'sourceforge';
+    if (!china.online) return 'global';
     if (!global.online) return 'china';
-    return china.latency <= global.latency ? 'china' : 'sourceforge';
+    return china.latency <= global.latency ? 'china' : 'global';
   }
 
   MirrorLatency get recommended =>
@@ -41,15 +41,15 @@ class MirrorTestResult {
 
 class MirrorSpeedTestService {
   static const _chinaTestUrl = 'https://www.123684.com';
-  static const _sourceForgeTestUrl =
+  static const _globalMirrorTestUrl =
       'https://sourceforge.net/projects/windeploystudio/files/';
   static const _timeout = Duration(seconds: 5);
   static const _cacheDuration = Duration(minutes: 30);
 
   static const _cacheKeyChinaLatency = 'mirror_china_latency';
-  static const _cacheKeyGlobalLatency = 'mirror_sourceforge_latency';
+  static const _cacheKeyGlobalLatency = 'mirror_global_latency';
   static const _cacheKeyChinaOnline = 'mirror_china_online';
-  static const _cacheKeyGlobalOnline = 'mirror_sourceforge_online';
+  static const _cacheKeyGlobalOnline = 'mirror_global_online';
   static const _cacheKeyTestTime = 'mirror_test_time';
 
   static MirrorTestResult? _cached;
@@ -67,7 +67,7 @@ class MirrorSpeedTestService {
 
     final results = await Future.wait([
       _testSource('ChinaMirror', _chinaTestUrl),
-      _testSource('SourceForge', _sourceForgeTestUrl),
+      _testSource('Global Mirror', _globalMirrorTestUrl),
     ]);
 
     final result = MirrorTestResult(china: results[0], global: results[1]);
@@ -137,7 +137,7 @@ class MirrorSpeedTestService {
           testTime: testTime,
         ),
         global: MirrorLatency(
-          source: 'SourceForge',
+          source: 'Global Mirror',
           online: globalOnline,
           latency: globalLatency,
           testTime: testTime,
@@ -165,7 +165,7 @@ class MirrorSpeedTestService {
   static void _logResult(MirrorTestResult result) {
     final reason = result.recommendedSource == 'china'
         ? 'LowerLatency'
-        : result.recommendedSource == 'sourceforge'
+        : result.recommendedSource == 'global'
         ? 'LowerLatency'
         : 'AllOffline';
 

@@ -153,6 +153,7 @@
         nonChineseOnly: true,
       },
       caution: { zh: "专家级资源。请确认组织许可、更新策略与部署要求。", en: "Expert-level resource. Confirm organizational licensing, update policy, and deployment requirements." },
+      languageNotice: { zh: "LTSC 语言提示：123 云盘提供简体中文版本，国际渠道提供英文版本。", en: "LTSC language note: 123 Cloud provides the Simplified Chinese build; International Channel provides the English build." },
     },
     {
       id: "ltsc-win11-enterprise",
@@ -173,6 +174,7 @@
         nonChineseOnly: true,
       },
       caution: { zh: "专家级资源。请确认组织许可、更新策略与部署要求。", en: "Expert-level resource. Confirm organizational licensing, update policy, and deployment requirements." },
+      languageNotice: { zh: "LTSC 语言提示：123 云盘提供简体中文版本，国际渠道提供英文版本。", en: "LTSC language note: 123 Cloud provides the Simplified Chinese build; International Channel provides the English build." },
     },
     {
       id: "ltsc-win10-iot",
@@ -192,6 +194,7 @@
         md5: "2463b19beac328290e6a8adcedb7533a",
       },
       caution: { zh: "专家级资源，仅提供英文版。首次启动后请手动切换系统语言和时区，并安装 CJK 字体包以正确显示中日韩文字。请确认设备适配、许可与使用范围。", en: "Expert-level resource. Confirm device suitability, licensing, and allowed use." },
+      languageNotice: { zh: "IoT LTSC 语言提示：仅提供英文版；123 云盘和国际渠道均为英文版。", en: "IoT LTSC language note: only English builds are provided; both 123 Cloud and International Channel provide the English build." },
     },
     {
       id: "ltsc-win11-iot",
@@ -211,6 +214,7 @@
         md5: "66608a96a4f2d73b4a1d054e76e6eae4",
       },
       caution: { zh: "专家级资源，仅提供英文版。首次启动后请手动切换系统语言和时区，并安装 CJK 字体包以正确显示中日韩文字。请确认设备适配、许可与使用范围。", en: "Expert-level resource. Confirm device suitability, licensing, and allowed use." },
+      languageNotice: { zh: "IoT LTSC 语言提示：仅提供英文版；123 云盘和国际渠道均为英文版。", en: "IoT LTSC language note: only English builds are provided; both 123 Cloud and International Channel provide the English build." },
     },
     {
       id: "font-pack",
@@ -339,7 +343,7 @@
     }
   }
 
-  function downloadSource(title, copy, href, primary = false) {
+  function downloadSource(title, copy, href, primary = false, appDownload = false) {
     const source = node("div", "source-option");
     if (title || copy) {
       const sourceCopy = node("div");
@@ -356,6 +360,7 @@
       action.href = safeUrl;
       action.target = "_blank";
       action.rel = "noreferrer";
+      if (appDownload) action.dataset.wdsDownload = "true";
       source.append(action);
     } else {
       const pending = node("button", "button button-secondary", t("image_download"));
@@ -370,24 +375,34 @@
     const sources = node("div", "download-sources");
     const officialLink = safeExternalUrl(item.officialLink?.[language()]);
     const chinaLink = language() === "zh" ? safeExternalUrl(item.chinaLink) : "";
+    const preferredSource = new URLSearchParams(window.location.search).get("source");
+    const internationalLink = safeExternalUrl(item.internationalLink);
+    const hasInternational = item.showInternationalDownload !== false && Boolean(internationalLink);
+    const addChina = (primary = false) => {
+      if (chinaLink) {
+        sources.append(downloadSource(t("image_123pan_link"), t("image_123pan_copy"), chinaLink, primary));
+      }
+    };
+    const addInternational = (primary = false) => {
+      if (hasInternational) {
+        sources.append(downloadSource(t("image_international_link"), t("image_international_copy"), internationalLink, primary, true));
+      }
+    };
 
     // Chinese official Windows images prioritize Microsoft's own download page.
     // Do not offer the international mirror for these entries.
     if (language() === "zh" && item.source === "official" && officialLink) {
       sources.append(downloadSource(t("image_microsoft_link"), t("image_microsoft_copy"), officialLink, true));
-      if (chinaLink) {
-        sources.append(downloadSource(t("image_123pan_link"), t("image_123pan_copy"), chinaLink));
-      }
+      addChina();
       return sources;
     }
 
-    if (chinaLink) {
-      sources.append(downloadSource(t("image_123pan_link"), t("image_123pan_copy"), chinaLink, true));
-    }
-
-    const internationalLink = safeExternalUrl(item.internationalLink);
-    if (!officialLink && item.showInternationalDownload !== false && internationalLink) {
-      sources.append(downloadSource(t("image_international_link"), t("image_international_copy"), internationalLink));
+    if (preferredSource === "global") {
+      addInternational(true);
+      addChina();
+    } else {
+      addChina(true);
+      addInternational();
     }
 
     if (officialLink) {
@@ -427,6 +442,8 @@
     body.append(facts);
     const caution = localized(item.caution);
     if (caution) body.append(node("div", "notice", caution));
+    const languageNotice = localized(item.languageNotice);
+    if (languageNotice) body.append(node("div", "notice image-language-notice", languageNotice));
     body.append(node("h3", "", t("image_download_sources")));
     body.append(downloadSources(item));
     content.append(body);

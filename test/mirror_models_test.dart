@@ -93,7 +93,7 @@ void main() {
     expect(english, hasLength(9));
   });
 
-  test('catalog uses direct SourceForge files and keeps excluded resources local',
+  test('catalog uses direct Global Mirror files and keeps excluded resources local',
       () async {
     final json = jsonDecode(await File('data/mirrors.json').readAsString())
         as Map<String, dynamic>;

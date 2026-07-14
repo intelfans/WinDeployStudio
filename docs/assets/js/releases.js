@@ -68,7 +68,7 @@
       published_at: "2026-06-25T12:14:46Z",
       prerelease: false,
       html_url: "https://github.com/intelfans/WinDeployStudio/releases/tag/v1.0.1",
-      body: "## Highlights\n\n- Added explicit China and Global mirror selection with clearer download control.",
+      body: "## Highlights\n\n- Added explicit China and Global Mirror selection with clearer download control.",
       assets: [{ name: "WinDeployStudio_Setup_1.0.1.exe", size: 50110717, digest: "sha256:60716648e24a6c9d15d96a6614e6bbfbc1ba64e76f6f60aecb00f91e567f3e4b", browser_download_url: "https://github.com/intelfans/WinDeployStudio/releases/download/v1.0.1/WinDeployStudio_Setup_1.0.1.exe" }],
     },
     {
@@ -237,7 +237,9 @@
   // site current even when notes come from a user's existing cache.
   function sanitizeLegacyMirrorNames(body) {
     const replacement = window.WDS?.getLanguage?.() === "en" ? "global download" : "国际下载";
-    return String(body || "").replace(/\bGoFile\b/gi, replacement);
+    return String(body || "")
+      .replace(/\bGoFile\b/gi, replacement)
+      .replace(/\bSourceForge\b(?!\.net)/gi, "Global Mirror");
   }
 
   function markdown(body) {
@@ -291,13 +293,13 @@
 
   function sourceOptions(release, asset) {
     const sources = element("div", "download-sources");
-    const sourceForge = element("div", "source-option");
-    const sourceForgeCopy = element("div");
-    sourceForgeCopy.append(element("h4", "", t("release_sourceforge")), element("p", "", t("release_sourceforge_copy")));
-    const pending = element("button", "button button-secondary", t("release_sourceforge_pending"));
+    const globalMirror = element("div", "source-option");
+    const globalMirrorCopy = element("div");
+    globalMirrorCopy.append(element("h4", "", t("release_global_mirror")), element("p", "", t("release_global_mirror_copy")));
+    const pending = element("button", "button button-secondary", t("release_global_mirror_pending"));
     pending.type = "button";
     pending.disabled = true;
-    sourceForge.append(sourceForgeCopy, pending);
+    globalMirror.append(globalMirrorCopy, pending);
 
     const github = element("div", "source-option");
     const githubCopy = element("div");
@@ -309,7 +311,7 @@
       unavailable.disabled = true;
       github.append(githubCopy, unavailable);
     }
-    sources.append(sourceForge, github);
+    sources.append(globalMirror, github);
     return sources;
   }
 
@@ -330,7 +332,7 @@
     heading.append(headingCopy, actions);
     panel.append(heading, metadataGrid(release, asset), sourceOptions(release, asset));
     const notes = element("section", "release-notes");
-    notes.append(element("h3", "", t("release_notes")), markdown(selectReleaseNotes(sanitizeLegacyMirrorNames(release.body))));
+    notes.append(element("h3", "", t("release_notes")), markdown(sanitizeLegacyMirrorNames(selectReleaseNotes(release.body))));
     panel.append(notes);
     return panel;
   }
@@ -348,7 +350,7 @@
     const content = element("div", "release-record-content");
     content.append(metadataGrid(release, asset));
     const notes = element("section", "release-notes");
-    notes.append(element("h3", "", t("release_notes")), markdown(selectReleaseNotes(sanitizeLegacyMirrorNames(release.body))));
+    notes.append(element("h3", "", t("release_notes")), markdown(sanitizeLegacyMirrorNames(selectReleaseNotes(release.body))));
     content.append(notes);
     const actions = element("div", "release-actions");
     actions.append(actionLink(t("release_open_github"), releaseLink(release)));

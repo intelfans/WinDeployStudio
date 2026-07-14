@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_windows/webview_windows.dart';
@@ -15,14 +16,34 @@ const _chromeUA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
 // Mirror downloads are resolved by DownloadManager before reaching this
-// widget. Keep SourceForge pages in the embedded WebView for other links.
+// widget. Keep Global Mirror pages in the embedded WebView for other links.
 const _externalBrowserPreferredHosts = <String>{};
+
+class InAppDownloadRequest {
+  const InAppDownloadRequest({
+    required this.url,
+    required this.fileName,
+    required this.imageName,
+    required this.mirrorLabel,
+  });
+
+  final String url;
+  final String fileName;
+  final String imageName;
+  final String mirrorLabel;
+}
 
 class InAppWebview extends StatefulWidget {
   final String url;
   final String? title;
+  final InAppDownloadRequest? downloadRequest;
 
-  const InAppWebview({super.key, required this.url, this.title});
+  const InAppWebview({
+    super.key,
+    required this.url,
+    this.title,
+    this.downloadRequest,
+  });
 
   @override
   State<InAppWebview> createState() => _InAppWebviewState();
@@ -43,7 +64,10 @@ class _InAppWebviewState extends State<InAppWebview> {
   Timer? _downloadPoller;
   bool _downloadInjected = false;
   bool _navFixInjected = false;
+  bool _checkingDownloads = false;
   String _currentUrl = '';
+  String? _managedDownloadId;
+  bool _managedDownloadStarted = false;
 
   int _consecutiveErrors = 0;
   static const _maxConsecutiveErrors = 2;
@@ -84,6 +108,7 @@ class _InAppWebviewState extends State<InAppWebview> {
         while (el && el.tagName) {
           if (el.tagName === 'A') {
             var href = el.getAttribute('href') || '';
+            if (el.dataset.wdsDownload === 'true') return href;
             if (el.hasAttribute('download')) return href;
             if (/\.(iso|img|wim|esd|zip|rar|7z|exe|msi|cab|gz|tar|tgz)(\?|$)/i.test(href)) return href;
           }
@@ -107,7 +132,9 @@ class _InAppWebviewState extends State<InAppWebview> {
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.url;
+    _currentUrl = widget.downloadRequest == null
+        ? widget.url
+        : 'win-deploy://global-mirror-download';
     _checkExternalPreferred();
   }
 
@@ -121,6 +148,10 @@ class _InAppWebviewState extends State<InAppWebview> {
   }
 
   Future<void> _checkExternalPreferred() async {
+    if (widget.downloadRequest != null) {
+      await _initWebview();
+      return;
+    }
     if (_isExternalPreferred(widget.url)) {
       _log('ExternalBrowserPreferred', url: widget.url);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -203,8 +234,17 @@ class _InAppWebviewState extends State<InAppWebview> {
         _log('WebMessageReceived', url: _currentUrl);
       });
 
-      await _controller.loadUrl(widget.url);
-      _startDownloadPolling();
+      final request = widget.downloadRequest;
+      if (request != null) {
+        await _controller.loadStringContent(
+          _buildDownloadProgressPage(request),
+        );
+        _onLoadComplete();
+        unawaited(_beginManagedDownload(request));
+      } else {
+        await _controller.loadUrl(widget.url);
+        _startDownloadPolling();
+      }
     } catch (e) {
       _log('ProcessFailed', url: widget.url, error: e.toString());
       if (mounted) {
@@ -238,34 +278,43 @@ class _InAppWebviewState extends State<InAppWebview> {
       _loadProgress = 1.0;
       _isLoading = false;
     });
+    // Install interception before the user can activate a download link.
+    unawaited(_checkForDownloadLink());
   }
 
   void _startDownloadPolling() {
-    _downloadPoller = Timer.periodic(const Duration(milliseconds: 500), (
-      _,
-    ) async {
-      if (!mounted) return;
-      try {
-        if (!_navFixInjected) {
-          final result = await _controller.executeScript(_navigationFixScript);
-          if (result == 'ok' || result == 'injected') _navFixInjected = true;
-        }
-        if (!_downloadInjected) {
-          final result = await _controller.executeScript(_downloadDetectScript);
-          if (result == 'ok' || result == 'injected') _downloadInjected = true;
-        }
-        if (_downloadInjected) {
-          final result = await _controller.executeScript(
-            '(function(){ var u = window.__wds_pending_download; window.__wds_pending_download = ""; return u || ""; })()',
-          );
-          if (result is String &&
-              result.isNotEmpty &&
-              result.startsWith('http')) {
-            _handleDownloadUrl(result);
-          }
-        }
-      } catch (_) {}
+    _downloadPoller = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      unawaited(_checkForDownloadLink());
     });
+  }
+
+  Future<void> _checkForDownloadLink() async {
+    if (!mounted || _checkingDownloads) return;
+    _checkingDownloads = true;
+    try {
+      if (!_navFixInjected) {
+        final result = await _controller.executeScript(_navigationFixScript);
+        if (result == 'ok' || result == 'injected') _navFixInjected = true;
+      }
+      if (!_downloadInjected) {
+        final result = await _controller.executeScript(_downloadDetectScript);
+        if (result == 'ok' || result == 'injected') _downloadInjected = true;
+      }
+      if (_downloadInjected) {
+        final result = await _controller.executeScript(
+          '(function(){ var u = window.__wds_pending_download; window.__wds_pending_download = ""; return u || ""; })()',
+        );
+        if (result is String &&
+            result.isNotEmpty &&
+            result.startsWith('http')) {
+          _handleDownloadUrl(result);
+        }
+      }
+    } catch (_) {
+      // A page may be navigating while the script is injected; polling retries.
+    } finally {
+      _checkingDownloads = false;
+    }
   }
 
   void _handleDownloadUrl(String url) {
@@ -301,9 +350,225 @@ class _InAppWebviewState extends State<InAppWebview> {
       fileName: p.basename(savePath),
       savePath: savePath,
     );
+    if (mounted) _showDownloadPanel();
+  }
+
+  Future<void> _beginManagedDownload(InAppDownloadRequest request) async {
+    if (_managedDownloadStarted) return;
+    _managedDownloadStarted = true;
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted) return;
+
+    await _setManagedDownloadState(
+      phase: _managedPrepareLabel(),
+      detail: _managedPrepareDetail(),
+      progress: 0,
+      indeterminate: true,
+    );
+    if (!mounted) return;
+    final savePath = await FilePicker.saveFile(
+      dialogTitle: tr(context, 'webview_save_title'),
+      fileName: request.fileName,
+      type: FileType.any,
+    );
+    if (!mounted) return;
+    if (savePath == null) {
+      await _setManagedDownloadState(
+        phase: tr(context, 'dl_cancelled'),
+        detail: _managedCancelledDetail(),
+        progress: 0,
+      );
+      return;
+    }
+
+    final item = await _downloadManager.startDownload(
+      url: request.url,
+      fileName: p.basename(savePath),
+      savePath: savePath,
+    );
+    _managedDownloadId = item.id;
+    _downloadManager.addListener(_onManagedDownloadChanged);
+    await _syncManagedDownloadState();
+    if (mounted) _showDownloadPanel();
+  }
+
+  void _onManagedDownloadChanged() {
+    unawaited(_syncManagedDownloadState());
+  }
+
+  Future<void> _syncManagedDownloadState() async {
+    final id = _managedDownloadId;
+    if (!mounted || id == null) return;
+    final item = _downloadManager.items
+        .where((entry) => entry.id == id)
+        .firstOrNull;
+    if (item == null) return;
+
+    final detail = item.totalBytes > 0
+        ? '${_formatDownloadBytes(item.receivedBytes)} / ${_formatDownloadBytes(item.totalBytes)}${item.speed.isEmpty ? '' : ' · ${item.speed}'}'
+        : _managedKeepOpenDetail();
+    final phase = switch (item.status) {
+      DownloadStatus.downloading => tr(context, 'webview_downloading'),
+      DownloadStatus.paused => tr(context, 'dl_paused'),
+      DownloadStatus.completed => tr(context, 'dl_done'),
+      DownloadStatus.cancelled => tr(context, 'dl_cancelled'),
+      DownloadStatus.error => tr(context, 'dl_failed'),
+    };
+    await _setManagedDownloadState(
+      phase: phase,
+      detail: item.status == DownloadStatus.error && item.error != null
+          ? item.error!
+          : detail,
+      progress: item.progress * 100,
+      indeterminate:
+          item.status == DownloadStatus.downloading && item.totalBytes <= 0,
+    );
+  }
+
+  Future<void> _setManagedDownloadState({
+    required String phase,
+    required String detail,
+    required double progress,
+    bool indeterminate = false,
+  }) async {
+    if (!mounted || widget.downloadRequest == null) return;
+    final payload = jsonEncode({
+      'phase': phase,
+      'detail': detail,
+      'progress': progress.clamp(0, 100),
+      'indeterminate': indeterminate,
+    });
+    try {
+      await _controller.executeScript(
+        'window.WDSDownload && window.WDSDownload.update($payload);',
+      );
+    } catch (_) {
+      // The page is still initializing or has already been closed.
+    }
+  }
+
+  String _formatDownloadBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  bool get _managedChinese =>
+      Localizations.localeOf(context).languageCode == 'zh';
+
+  String _managedPrepareLabel() =>
+      _managedChinese ? '正在准备下载' : 'Preparing download';
+
+  String _managedPrepareDetail() => _managedChinese
+      ? '选择保存位置后将开始传输。'
+      : 'Choose a save location to begin the transfer.';
+
+  String _managedKeepOpenDetail() => _managedChinese
+      ? '请保持 WinDeploy Studio 打开，下载会在此页面持续显示。'
+      : 'Keep WinDeploy Studio open while this page tracks the transfer.';
+
+  String _managedCancelledDetail() => _managedChinese
+      ? '未选择保存位置，下载未开始。'
+      : 'No save location was selected, so the download did not start.';
+
+  String _buildDownloadProgressPage(InAppDownloadRequest request) {
+    final escape = const HtmlEscape();
+    final chinese = _managedChinese;
+    final title = chinese ? '下载正在准备' : 'Your download is being prepared';
+    final message = chinese
+        ? '选择保存位置后，应用会直接建立下载并持续显示进度。'
+        : 'After you choose where to save it, the app will begin and track the download directly.';
+    final keepOpen = chinese
+        ? '请保持 WinDeploy Studio 打开。你可以在右上角暂停、继续或取消下载。'
+        : 'Keep WinDeploy Studio open. Use the download button in the top-right to pause, resume, or cancel.';
+    final fileLabel = chinese ? '准备下载的文件' : 'Preparing file';
+    final sourceLabel = chinese ? '下载渠道' : 'Download channel';
+    final initialState = chinese ? '等待选择保存位置' : 'Waiting for a save location';
+    return '''<!doctype html>
+<html lang="${chinese ? 'zh-CN' : 'en'}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #f4f7fb; color: #172033; display: grid; place-items: center; padding: 32px; }
+  main { width: min(720px, 100%); }
+  .surface { border: 1px solid #d8e0eb; border-radius: 18px; background: #ffffff; box-shadow: 0 18px 46px rgba(33, 51, 78, 0.12); overflow: hidden; }
+  .accent { height: 5px; background: #2e6ba7; }
+  .content { padding: clamp(32px, 7vw, 58px); text-align: center; }
+  .mark { width: 76px; height: 76px; margin: 0 auto 24px; border-radius: 22px; background: #dbeafe; color: #24578b; display: grid; place-items: center; font-size: 38px; font-weight: 300; }
+  .eyebrow { margin: 0 0 10px; color: #416b99; font-size: 13px; font-weight: 700; letter-spacing: 0; }
+  h1 { margin: 0; font-size: clamp(26px, 4vw, 34px); letter-spacing: 0; }
+  .lead { max-width: 510px; margin: 14px auto 30px; color: #59677b; font-size: 16px; line-height: 1.65; }
+  .file { display: grid; grid-template-columns: 1fr auto; gap: 16px; text-align: left; padding: 16px 18px; border: 1px solid #dce4ee; border-radius: 12px; background: #fbfcfe; }
+  .file-label { display: block; margin-bottom: 5px; color: #66758a; font-size: 12px; }
+  .file-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+  .channel { align-self: center; color: #24578b; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .progress { height: 8px; margin: 30px 0 12px; overflow: hidden; border-radius: 999px; background: #e4eaf2; }
+  .progress > span { display: block; width: 0%; height: 100%; border-radius: inherit; background: #2e6ba7; transition: width 220ms ease; }
+  .progress > span.indeterminate { width: 36%; animation: travel 1.15s ease-in-out infinite; }
+  @keyframes travel { 0% { transform: translateX(-120%); } 100% { transform: translateX(310%); } }
+  .status { display: flex; gap: 16px; justify-content: space-between; text-align: left; color: #526176; font-size: 14px; }
+  .status strong { color: #1c2b40; font-weight: 700; }
+  .notice { margin: 30px 0 0; padding-top: 22px; border-top: 1px solid #e2e8f0; color: #5d6c80; font-size: 13px; line-height: 1.6; }
+  @media (max-width: 540px) { body { padding: 16px; } .content { padding: 30px 22px; } .file { grid-template-columns: 1fr; gap: 8px; } .channel { justify-self: start; } .status { display: block; } .status strong { display: block; margin-top: 5px; } }
+</style>
+</head>
+<body>
+<main>
+  <section class="surface" aria-live="polite">
+    <div class="accent"></div>
+    <div class="content">
+      <div class="mark" aria-hidden="true">&#8595;</div>
+      <p class="eyebrow">${escape.convert(request.mirrorLabel)}</p>
+      <h1 id="phase">${escape.convert(title)}</h1>
+      <p class="lead">${escape.convert(message)}</p>
+      <div class="file">
+        <div><span class="file-label">${escape.convert(fileLabel)}</span><span class="file-name">${escape.convert(request.imageName)}</span></div>
+        <span class="channel">${escape.convert(sourceLabel)} · ${escape.convert(request.mirrorLabel)}</span>
+      </div>
+      <div class="progress"><span id="bar" class="indeterminate"></span></div>
+      <div class="status"><span id="detail">${escape.convert(initialState)}</span><strong id="percent">0%</strong></div>
+      <p class="notice">${escape.convert(keepOpen)}</p>
+    </div>
+  </section>
+</main>
+<script>
+  window.WDSDownload = {
+    update: function (data) {
+      var phase = document.getElementById('phase');
+      var detail = document.getElementById('detail');
+      var percent = document.getElementById('percent');
+      var bar = document.getElementById('bar');
+      phase.textContent = data.phase || '';
+      detail.textContent = data.detail || '';
+      var value = Math.max(0, Math.min(100, Number(data.progress) || 0));
+      percent.textContent = Math.round(value) + '%';
+      bar.style.width = value + '%';
+      bar.classList.toggle('indeterminate', Boolean(data.indeterminate));
+    }
+  };
+</script>
+</body>
+</html>''';
   }
 
   void _reload() {
+    if (widget.downloadRequest != null) {
+      unawaited(
+        _setManagedDownloadState(
+          phase: _managedPrepareLabel(),
+          detail: _managedPrepareDetail(),
+          progress: 0,
+          indeterminate: true,
+        ),
+      );
+      return;
+    }
     _isReloading = true;
     setState(() {
       _isLoading = true;
@@ -480,6 +745,7 @@ class _InAppWebviewState extends State<InAppWebview> {
   void dispose() {
     _timeoutTimer?.cancel();
     _downloadPoller?.cancel();
+    _downloadManager.removeListener(_onManagedDownloadChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -507,7 +773,29 @@ class _InAppWebviewState extends State<InAppWebview> {
                 ),
               ),
             )
-          else ...[
+          else if (widget.downloadRequest != null) ...[
+            ListenableBuilder(
+              listenable: _downloadManager,
+              builder: (context, _) {
+                final activeCount = _downloadManager.items
+                    .where((i) => i.status == DownloadStatus.downloading)
+                    .length;
+                return IconButton(
+                  key: _downloadBtnKey,
+                  icon: Badge(
+                    isLabelVisible: activeCount > 0,
+                    label: Text(
+                      '$activeCount',
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    child: const Icon(Icons.download_rounded),
+                  ),
+                  onPressed: _showDownloadPanel,
+                  tooltip: tr(context, 'webview_download_file'),
+                );
+              },
+            ),
+          ] else ...[
             IconButton(
               icon: const Icon(Icons.network_check_rounded),
               onPressed: _runNetworkDiag,

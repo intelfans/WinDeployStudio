@@ -4,16 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/mirror_speed_test_service.dart';
 import '../../../shared/widgets/app_compact_label.dart';
 import '../../../shared/widgets/app_page.dart';
-import '../../../shared/webview/download_manager.dart';
-import '../../../shared/webview/download_panel.dart';
+import '../../../shared/webview/in_app_webview.dart';
 import '../models/mirror_models.dart';
 import '../providers/mirror_provider.dart';
 import '../providers/mirror_source_provider.dart';
@@ -456,9 +453,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
 
     if (sourceState.geo == null && hasChina && hasGlobal) {
       await sourceNotifier.detectGeo();
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
       sourceState = ref.read(mirrorSourceProvider);
     }
 
@@ -488,81 +483,27 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         suggestedMirror: suggestedMirror,
       ),
     );
+    if (selectedMirror == null || !context.mounted) return;
 
-    if (selectedMirror == null || !context.mounted) {
-      return;
-    }
-
-    final String url;
-    final String mirrorLabel;
-    final String mirrorLogName;
     if (selectedMirror == 'china') {
-      url = widget.item.chinaUrl!;
-      mirrorLabel = tr(context, 'mirror_china_title');
-      mirrorLogName = '123';
-    } else if (selectedMirror == 'global') {
-      url = widget.item.globalUrl!;
-      mirrorLabel = tr(context, 'mirror_global_title');
-      mirrorLogName = 'Global Mirror';
-    } else {
+      await _openResolvedDownload(
+        context: context,
+        name: name,
+        url: widget.item.chinaUrl!,
+        mirrorLabel: tr(context, 'mirror_china_title'),
+        mirrorLogName: '123',
+      );
       return;
     }
-
-    final confirmed = await _confirmMirrorDownload(
-      context: context,
-      name: name,
-      mirrorLabel: mirrorLabel,
-    );
-    if (!confirmed || !context.mounted) return;
-
-    await _openResolvedDownload(
-      context: context,
-      name: name,
-      url: url,
-      mirrorLabel: mirrorLabel,
-      mirrorLogName: mirrorLogName,
-    );
-  }
-
-  Future<bool> _confirmMirrorDownload({
-    required BuildContext context,
-    required String name,
-    required String mirrorLabel,
-  }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr(ctx, 'mirror_download_confirm_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _InfoRow(tr(ctx, 'mirror_download_mirror'), name),
-            _InfoRow(tr(ctx, 'mirror_download_source'), mirrorLabel),
-            if (widget.item.isEnterpriseLtsc) ...[
-              const SizedBox(height: 12),
-              Text(
-                widget.item.isIotLtsc
-                    ? tr(ctx, 'mirror_ltsc_iot_language_notice')
-                    : tr(ctx, 'mirror_ltsc_language_notice'),
-                style: Theme.of(ctx).textTheme.bodySmall,
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(tr(ctx, 'detail_cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(tr(ctx, 'detail_download_btn')),
-          ),
-        ],
-      ),
-    );
-    return confirmed == true;
+    if (selectedMirror == 'global') {
+      await _openResolvedDownload(
+        context: context,
+        name: name,
+        url: widget.item.globalUrl!,
+        mirrorLabel: tr(context, 'mirror_global_title'),
+        mirrorLogName: 'Global Mirror',
+      );
+    }
   }
 
   Future<void> _openOfficialDownload(
@@ -619,34 +560,28 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
   }) async {
     await _recordRecentMirror();
     final logCenter = LogCenterService();
+    final logMirror = mirrorLogName ?? mirrorLabel;
     await logCenter.logDownload(
       '[CommunityDownload]\n'
       'Product=${widget.item.productLogName}\n'
-      'Mirror=${mirrorLogName ?? mirrorLabel}',
+      'Mirror=$logMirror',
     );
-
     await logCenter.logDownload(
       '[Download]\n'
       'Category=${widget.item.categoryLogName}\n'
       'Image=$name\n'
-      'Mirror=${mirrorLogName ?? mirrorLabel}\n'
+      'Mirror=$logMirror\n'
       'Status=SourceSelected',
     );
 
-    await logCenter.logDownload(
-      '[MirrorSource] Category=${widget.item.categoryLogName} '
-      'Selected=$mirrorLabel Image=$name URL=$url',
-    );
-
     if (!context.mounted) return;
-
-    if (_isSourceForgeUrl(url)) {
-      await _startSourceForgeDownload(
+    if (_isGlobalMirrorUrl(url)) {
+      await _openGlobalMirrorDownload(
         context: context,
         name: name,
         url: url,
+        mirrorLabel: mirrorLabel,
         logCenter: logCenter,
-        mirrorLogName: mirrorLogName ?? mirrorLabel,
       );
       return;
     }
@@ -656,12 +591,12 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
       '[Download]\n'
       'Category=${widget.item.categoryLogName}\n'
       'Image=$name\n'
-      'Mirror=${mirrorLogName ?? mirrorLabel}\n'
+      'Mirror=$logMirror\n'
       'Status=PageOpened',
     );
   }
 
-  bool _isSourceForgeUrl(String url) {
+  bool _isGlobalMirrorUrl(String url) {
     final host = Uri.tryParse(url)?.host.toLowerCase();
     return host == 'sourceforge.net' ||
         host == 'www.sourceforge.net' ||
@@ -669,62 +604,28 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         (host?.endsWith('.dl.sourceforge.net') ?? false);
   }
 
-  Future<void> _startSourceForgeDownload({
+  Future<void> _openGlobalMirrorDownload({
     required BuildContext context,
     required String name,
     required String url,
+    required String mirrorLabel,
     required LogCenterService logCenter,
-    required String mirrorLogName,
   }) async {
-    final fileName = _downloadFileName(url, name);
-    final savePath = await FilePicker.saveFile(
-      dialogTitle: tr(context, 'webview_save_title'),
-      fileName: fileName,
-      type: FileType.any,
-    );
-    if (savePath == null || !context.mounted) {
-      await logCenter.logDownload(
-        '[Download]\n'
-        'Category=${widget.item.categoryLogName}\n'
-        'Image=$name\n'
-        'Mirror=$mirrorLogName\n'
-        'Status=Cancelled',
-      );
-      return;
-    }
-
-    await DownloadManager().startDownload(
-      url: url,
-      fileName: p.basename(savePath),
-      savePath: savePath,
-    );
     await logCenter.logDownload(
       '[Download]\n'
       'Category=${widget.item.categoryLogName}\n'
       'Image=$name\n'
-      'Mirror=$mirrorLogName\n'
-      'Status=Started\n'
-      'Path=$savePath',
+      'Mirror=$mirrorLabel\n'
+      'Status=Preparing',
     );
-    if (context.mounted) _showDownloadProgress(context);
-  }
-
-  void _showDownloadProgress(BuildContext context) {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        backgroundColor: Colors.transparent,
-        constraints: const BoxConstraints(maxWidth: 420),
-        builder: (sheetContext) => SafeArea(
-          top: false,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-              child: DownloadPanel(onDownloadCurrentPage: () {}),
-            ),
-          ),
-        ),
+    if (!context.mounted) return;
+    await WebviewHelper.openGlobalMirrorDownload(
+      context,
+      request: InAppDownloadRequest(
+        url: url,
+        fileName: _downloadFileName(url, name),
+        imageName: name,
+        mirrorLabel: mirrorLabel,
       ),
     );
   }
@@ -903,21 +804,30 @@ class _FontPackWarning extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final message = Column(
+    final message = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          tr(context, 'fontpack_warning'),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: colorScheme.onTertiaryContainer,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          tr(context, 'fontpack_recommend'),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onTertiaryContainer,
+        Icon(Icons.info_outline, size: 20, color: colorScheme.tertiary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr(context, 'fontpack_warning'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onTertiaryContainer,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tr(context, 'fontpack_recommend'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onTertiaryContainer,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -928,11 +838,41 @@ class _FontPackWarning extends StatelessWidget {
       label: Text(tr(context, 'fontpack_download')),
     );
 
-    return AppInfoBox(
-      icon: Icons.info_outline,
-      color: colorScheme.tertiary,
-      actions: [button],
-      child: message,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiary.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(
+          AppVisualTokens.of(context).surfaceRadius,
+        ),
+        border: Border.all(
+          color: colorScheme.tertiary.withValues(alpha: 0.35),
+          width: AppVisualTokens.of(context).borderWidth,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 560) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                message,
+                const SizedBox(height: 12),
+                Align(alignment: Alignment.centerRight, child: button),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: message),
+              const SizedBox(width: 16),
+              button,
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -974,17 +914,17 @@ class _MirrorStatusRow extends StatelessWidget {
 }
 
 class _MirrorSelectionDialog extends StatelessWidget {
-  final String itemName;
-  final String? chinaUrl;
-  final String? globalUrl;
-  final String suggestedMirror;
-
   const _MirrorSelectionDialog({
     required this.itemName,
     this.chinaUrl,
     this.globalUrl,
     required this.suggestedMirror,
   });
+
+  final String itemName;
+  final String? chinaUrl;
+  final String? globalUrl;
+  final String suggestedMirror;
 
   @override
   Widget build(BuildContext context) {
@@ -1068,6 +1008,15 @@ class _MirrorSelectionDialog extends StatelessWidget {
 }
 
 class _MirrorOption extends StatelessWidget {
+  const _MirrorOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.tag,
+    this.tagColor,
+  });
+
   final IconData icon;
   final String title;
   final String subtitle;
@@ -1075,20 +1024,10 @@ class _MirrorOption extends StatelessWidget {
   final Color? tagColor;
   final VoidCallback onTap;
 
-  const _MirrorOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.tag,
-    this.tagColor,
-    required this.onTap,
-  });
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -1124,7 +1063,7 @@ class _MirrorOption extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (tag != null) ...[
+                      if (tag != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -1148,7 +1087,6 @@ class _MirrorOption extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ],
                     ],
                   ),
                   const SizedBox(height: 4),

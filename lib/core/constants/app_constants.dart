@@ -8,6 +8,8 @@ class AppConstants {
   static const String licenseName = 'MIT License';
   static const String githubRepository =
       'https://github.com/intelfans/WinDeployStudio';
+  static const String globalMirrorRepository =
+      'https://sourceforge.net/projects/windeploystudio/';
 
   // Download
   static const int maxConcurrentDownloads = 3;

@@ -4,24 +4,24 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-/// Resolves SourceForge landing and redirect URLs to a short-lived mirror URL.
+/// Resolves Global Mirror landing and redirect URLs to a short-lived mirror URL.
 ///
-/// SourceForge sometimes serves a file landing page before choosing a mirror.
+/// Global Mirror sometimes serves a file landing page before choosing a mirror.
 /// A browser understands that page, but an application download manager needs
 /// the actual `*.dl.sourceforge.net` attachment URL instead.
-class SourceForgeDownloadResolver {
+class GlobalMirrorDownloadResolver {
   static const _maxRedirects = 5;
   static const _requestTimeout = Duration(seconds: 15);
   static const _maxHtmlBytes = 512 * 1024;
 
-  /// Returns [url] unchanged unless it belongs to SourceForge.
+  /// Returns [url] unchanged unless it belongs to Global Mirror.
   ///
-  /// For SourceForge URLs, this follows only SourceForge redirects and parses
+  /// For Global Mirror URLs, this follows only Global Mirror redirects and parses
   /// a landing page for its current mirror URL. The returned mirror URL can be
   /// passed directly to a streaming download request.
   static Future<String> resolve(String url, {http.Client? client}) async {
     final initial = Uri.tryParse(url);
-    if (initial == null || !isSourceForgeUrl(initial)) return url;
+    if (initial == null || !isGlobalMirrorUrl(initial)) return url;
 
     final ownsClient = client == null;
     final requestClient = client ?? http.Client();
@@ -33,10 +33,10 @@ class SourceForgeDownloadResolver {
     }
   }
 
-  /// Whether [uri] is a SourceForge page or mirror URL trusted by this
+  /// Whether [uri] is a Global Mirror page or mirror URL trusted by this
   /// resolver. Keeping the redirect boundary here prevents a malicious page
   /// from redirecting the download manager to an unrelated host.
-  static bool isSourceForgeUrl(Uri uri) {
+  static bool isGlobalMirrorUrl(Uri uri) {
     if (uri.scheme != 'https') return false;
     final host = uri.host.toLowerCase();
     return host == 'sourceforge.net' || host.endsWith('.sourceforge.net');
@@ -50,10 +50,10 @@ class SourceForgeDownloadResolver {
         uri.host.toLowerCase().endsWith('.dl.sourceforge.net');
   }
 
-  /// Extracts a trusted SourceForge mirror URL from a SourceForge HTML page.
+  /// Extracts a trusted Global Mirror mirror URL from a Global Mirror HTML page.
   ///
   /// This method is intentionally pure so it can be regression-tested against
-  /// SourceForge's meta-refresh and JavaScript response formats.
+  /// Global Mirror's meta-refresh and JavaScript response formats.
   static Uri? extractDirectUrl(String html, {required Uri baseUri}) {
     final candidates = <String>[];
 
@@ -93,7 +93,7 @@ class SourceForgeDownloadResolver {
       candidates.add(match.group(1)!);
     }
 
-    // Some SourceForge pages embed the URL in a JSON payload rather than an
+    // Some Global Mirror pages embed the URL in a JSON payload rather than an
     // anchor or a location assignment.
     for (final match in RegExp(
       r'''(?:https?:)?//[^\s"'<>]+\.dl\.sourceforge\.net/[^\s"'<>]+''',
@@ -119,8 +119,8 @@ class SourceForgeDownloadResolver {
       redirectCount++
     ) {
       if (!seen.add(current.toString())) {
-        throw const SourceForgeDownloadResolutionException(
-          'SourceForge redirect loop',
+        throw const GlobalMirrorDownloadResolutionException(
+          'Global Mirror redirect loop',
         );
       }
       if (isDirectDownloadUrl(current)) return current;
@@ -130,18 +130,18 @@ class SourceForgeDownloadResolver {
         ..headers['Accept'] = 'text/html,application/xhtml+xml,*/*;q=0.8'
         ..headers['Accept-Encoding'] = 'identity'
         // This keeps a possible direct response small while checking whether
-        // SourceForge selected a mirror.
+        // Global Mirror selected a mirror.
         ..headers['Range'] = 'bytes=0-0'
-        ..headers['User-Agent'] = 'WinDeployStudio/2.0 SourceForge resolver';
+        ..headers['User-Agent'] = 'WinDeployStudio/2.0 Global Mirror resolver';
       final response = await client.send(request).timeout(_requestTimeout);
 
       final location = response.headers['location'];
       if (_isRedirect(response.statusCode) && location != null) {
         await _cancel(response);
         final next = _parseCandidate(location, current);
-        if (next == null || !isSourceForgeUrl(next)) {
-          throw const SourceForgeDownloadResolutionException(
-            'SourceForge returned an untrusted redirect',
+        if (next == null || !isGlobalMirrorUrl(next)) {
+          throw const GlobalMirrorDownloadResolutionException(
+            'Global Mirror returned an untrusted redirect',
           );
         }
         if (isDirectDownloadUrl(next)) return next;
@@ -162,19 +162,19 @@ class SourceForgeDownloadResolver {
         final html = await _readHtml(response);
         final next = extractDirectUrl(html, baseUri: current);
         if (next != null) return next;
-        throw const SourceForgeDownloadResolutionException(
-          'SourceForge did not provide a direct download URL',
+        throw const GlobalMirrorDownloadResolutionException(
+          'Global Mirror did not provide a direct download URL',
         );
       }
 
       await _cancel(response);
-      throw SourceForgeDownloadResolutionException(
-        'SourceForge returned HTTP ${response.statusCode}',
+      throw GlobalMirrorDownloadResolutionException(
+        'Global Mirror returned HTTP ${response.statusCode}',
       );
     }
 
-    throw const SourceForgeDownloadResolutionException(
-      'Too many SourceForge redirects',
+    throw const GlobalMirrorDownloadResolutionException(
+      'Too many Global Mirror redirects',
     );
   }
 
@@ -190,8 +190,8 @@ class SourceForgeDownloadResolver {
     await for (final chunk in response.stream) {
       buffer.add(chunk);
       if (buffer.length > _maxHtmlBytes) {
-        throw const SourceForgeDownloadResolutionException(
-          'SourceForge landing page is too large',
+        throw const GlobalMirrorDownloadResolutionException(
+          'Global Mirror landing page is too large',
         );
       }
     }
@@ -231,10 +231,10 @@ class SourceForgeDownloadResolver {
   }
 }
 
-class SourceForgeDownloadResolutionException implements Exception {
+class GlobalMirrorDownloadResolutionException implements Exception {
   final String message;
 
-  const SourceForgeDownloadResolutionException(this.message);
+  const GlobalMirrorDownloadResolutionException(this.message);
 
   @override
   String toString() => message;
