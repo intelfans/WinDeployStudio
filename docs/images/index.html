@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="WinDeploy Studio image download directory." />
+    <meta name="theme-color" content="#f5f5f7" />
+    <title>Images - WinDeploy Studio</title>
+    <link rel="icon" href="../assets/media/logo.png" />
+    <link rel="stylesheet" href="../assets/css/site.css" />
+  </head>
+  <body data-page="images" data-root="../">
+    <a class="skip-link" href="#main-content" data-i18n="skip_to_content">跳到主要内容</a>
+    <div id="site-header"></div>
+
+    <main id="main-content">
+      <section class="page-intro section-canvas" aria-labelledby="images-title">
+        <div class="content-width narrow-content">
+          <p class="eyebrow eyebrow-accent" data-i18n="images_eyebrow">镜像目录</p>
+          <h1 id="images-title" data-i18n="images_title">选择适合的部署镜像</h1>
+          <p data-i18n="images_copy">
+            参考应用内的镜像中心，按来源、用途和风险级别查看镜像。具体下载映射将在 SourceForge 文件目录完成后启用。
+          </p>
+        </div>
+      </section>
+
+      <section class="section section-surface" aria-labelledby="catalog-title">
+        <div class="content-width">
+          <div class="catalog-toolbar">
+            <div>
+              <p class="eyebrow eyebrow-accent" data-i18n="catalog_eyebrow">镜像库</p>
+              <h2 id="catalog-title" data-i18n="catalog_title">按来源和适用程度筛选</h2>
+            </div>
+            <div id="image-filters" class="filter-group" aria-label="Image filters"></div>
+          </div>
+          <div id="image-catalog" class="image-grid" aria-live="polite"></div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="image-dialog" class="image-dialog" aria-labelledby="image-dialog-title">
+      <div class="dialog-head">
+        <div>
+          <p id="image-dialog-category" class="eyebrow eyebrow-accent"></p>
+          <h2 id="image-dialog-title"></h2>
+        </div>
+        <button class="icon-button" type="button" data-dialog-close title="Close" aria-label="Close">
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="image-dialog-content"></div>
+    </dialog>
+
+    <div id="site-footer"></div>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="../assets/js/site.js"></script>
+    <script src="../assets/js/images.js"></script>
+  </body>
+</html>
