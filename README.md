@@ -95,103 +95,106 @@ The project is distributed under the MIT License.
 
 ## Screenshots
 
-The screenshots are arranged in the same order as the main workspace, so new users can understand the app from the quick-start page to advanced tools and settings. Each group explains what the area is for and what the screenshots highlight.
+These 18 screenshots follow the left navigation and the main workspace in order. They show the Home page first, then image and deployment workflows, disk utilities, logs, AI, tools, and settings.
 
 ### 1. Home
 
-The Home area is the starting point of WinDeploy Studio. It restores the focused Quick Start layout: the three primary workflows are immediately available, followed by version, platform, license, repository, and acknowledgement information.
+Home is the starting point of WinDeploy Studio. It combines the product title, Quick Start entry points, Workspace content, and project information without forcing users through a separate landing page.
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/1.png" alt="Home quick start"><br><sub><b>1. Quick Start</b> - Entry cards for installation media, To Go workspaces, and Image Center.</sub></td>
-    <td width="50%"><img src="screenshots/2.png" alt="Home about"><br><sub><b>2. About</b> - Version, platform, license, repository, and project acknowledgement information.</sub></td>
+    <td width="50%"><img src="screenshots/1.png" alt="Home title, Quick Start, and Workspace"><br><sub><b>1. Home</b> - Product title, Quick Start entry points, and the Workspace overview.</sub></td>
+    <td width="50%"><img src="screenshots/2.png" alt="Home About"><br><sub><b>2. About</b> - Version, platform, license, repository, and project acknowledgement information.</sub></td>
   </tr>
 </table>
 
-### 2. Image Center
+### 2. Image Library
 
-The Image Center separates official Microsoft downloads from community-maintained images and expert-level deployment resources. It is designed to make the source, purpose, language support, and download path clear before the user opens a link.
+The Image Library keeps official images, community editions, enterprise and LTSC builds, and supporting resources clearly separated. Each entry communicates its source, purpose, language support, and suitability before a user follows a download link.
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/3.png" alt="Image categories"><br><sub><b>3. Source Categories</b> - Official Microsoft images, community editions, and Enterprise/LTSC builds are separated for clarity.</sub></td>
-    <td width="33%"><img src="screenshots/4.png" alt="Image details"><br><sub><b>4. Image Details</b> - Cards show edition notes, source type, language information, and whether a resource is community or expert-oriented.</sub></td>
-    <td width="33%"><img src="screenshots/5.png" alt="Image download flow"><br><sub><b>5. Download Flow</b> - Official entries open Microsoft in the system browser, while community images keep mirror selection and WebView2 pages.</sub></td>
+    <td><img src="screenshots/3.png" alt="Image Library"><br><sub><b>3. Image Library</b> - Browse categorized image resources with clear source and suitability information.</sub></td>
   </tr>
 </table>
 
-### 3. Windows Installation Media
+### 3. Installation Media
 
-The Installation Media creator supports both Windows installation media and raw Linux ISOHybrid writing. The screen keeps platform selection, ISO validation, target disk selection, edition detection, and destructive-operation awareness in one workflow.
+Windows and Linux installation media are distinct workflows. Both make the selected ISO, target disk, validation result, and destructive action clear before writing begins.
 
 <table>
   <tr>
-    <td><img src="screenshots/6.png" alt="Installation media creator"><br><sub><b>6. Install Media Creator</b> - Choose Windows or Linux, validate the ISO, review the selected external disk, and create bootable installation media.</sub></td>
+    <td width="50%"><img src="screenshots/4.png" alt="Windows installation media"><br><sub><b>4. Windows Installation Media</b> - Select and validate a Windows ISO, choose an edition and target disk, then create bootable installation media.</sub></td>
+    <td width="50%"><img src="screenshots/5.png" alt="Linux installation media"><br><sub><b>5. Linux Installation Media</b> - Validate a Linux ISOHybrid image, review the target disk, and write a bootable Linux installer.</sub></td>
   </tr>
 </table>
 
 ### 4. To Go Workspaces
 
-The To Go area creates portable Windows workspaces and validates supported Linux To Go layouts before any destructive action. It emphasizes safer disk selection, an explicit confirmation summary, reliable elapsed-time progress, and a lightweight waiting game during long image-application steps.
+The To Go area creates portable Windows and Linux workspaces. It keeps the chosen image, target disk, compatibility checks, options, and confirmation summary together before a destructive operation starts.
 
 <table>
   <tr>
-    <td><img src="screenshots/7.png" alt="To Go workspace creator"><br><sub><b>7. To Go Creator</b> - Choose Windows or supported Linux, review the ISO and target disk, create the boot layout, and monitor the process without misleading ETA values.</sub></td>
+    <td width="50%"><img src="screenshots/6.png" alt="Windows To Go"><br><sub><b>6. Windows To Go</b> - Create a portable Windows workspace with image, disk, and deployment options shown in one workflow.</sub></td>
+    <td width="50%"><img src="screenshots/7.png" alt="Linux To Go"><br><sub><b>7. Linux To Go</b> - Create a portable Linux workspace after the selected image passes its supported-layout checks.</sub></td>
   </tr>
 </table>
 
-### 5. Logs
+### 5. Disk Utilities
 
-The Logs area collects operation output from installation media creation, To Go workspace creation, image downloads, update checks, AI requests, and errors. It helps users review what happened without searching through scattered files.
+Disk features are separated into testing, the Disk Tools directory, diagnostics, and BCD/EFI boot repair. This makes it easier to identify the intended scope and risk of an operation before opening it.
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/8.png" alt="Log center"><br><sub><b>8. Log Center</b> - Browse logs by category, source, and recent activity.</sub></td>
-    <td width="33%"><img src="screenshots/9.png" alt="Log details"><br><sub><b>9. Log Details</b> - Read structured messages, timestamps, warnings, and operation results.</sub></td>
-    <td width="33%"><img src="screenshots/10.png" alt="Log actions"><br><sub><b>10. Log Actions</b> - Filter entries, inspect important events, and open the log folder when manual review is needed.</sub></td>
+    <td width="50%"><img src="screenshots/8.png" alt="Disk Test"><br><sub><b>8. Disk Test</b> - Run and review storage performance tests with saved test history.</sub></td>
+    <td width="50%"><img src="screenshots/9.png" alt="Disk Tools directory"><br><sub><b>9. Disk Tools</b> - Open the disk-utility directory and choose the appropriate storage workflow.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/10.png" alt="Disk Diagnostics"><br><sub><b>10. Disk Diagnostics</b> - Review available drive identity, health, and diagnostic information.</sub></td>
+    <td width="50%"><img src="screenshots/11.png" alt="BCD and EFI Boot Repair"><br><sub><b>11. BCD/EFI Boot Repair</b> - Inspect and repair supported Windows boot configuration and EFI boot entries.</sub></td>
   </tr>
 </table>
 
-### 6. AI Assistant
+### 6. Log Center
 
-The AI Assistant provides deployment guidance, troubleshooting suggestions, and log-analysis help. For USB analysis and To Go suitability questions, users can select multiple saved disk-test records; the sent plain-text context includes the device, test configuration, measurements, raw sample points, and metric definitions. If no record is available, the request recommends a Standard test. It includes an explicit AI notice and supports custom OpenAI-compatible endpoints for users who host their own proxy.
+Log Center collects output from installation media, To Go, image downloads, updates, AI requests, diagnostics, and errors. It provides both an overview and a focused detail view for reviewing completed work.
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/11.png" alt="AI assistant chat"><br><sub><b>11. Assistant Chat</b> - Ask deployment questions, summarize errors, and get practical troubleshooting suggestions.</sub></td>
-    <td width="50%"><img src="screenshots/12.png" alt="AI assistant settings"><br><sub><b>12. AI Configuration</b> - Configure proxy endpoints and review the notice that AI output should be verified before important operations.</sub></td>
+    <td width="50%"><img src="screenshots/12.png" alt="Log Center overview"><br><sub><b>12. Log Center</b> - Browse log categories, sources, recent activity, warnings, and results.</sub></td>
+    <td width="50%"><img src="screenshots/13.png" alt="Log Center details"><br><sub><b>13. Log Details</b> - Inspect a selected log entry and its structured operation output.</sub></td>
   </tr>
 </table>
 
-### 7. Toolbox
+### 7. AI Assistant
 
-The Toolbox groups useful Windows deployment, recovery, diagnostics, hardware, network, and optimization utilities. Tool cards include safety levels and professional notices for advanced, expert, or activation-related utilities.
+The AI Assistant provides deployment guidance, troubleshooting suggestions, and log-analysis help. For USB analysis and To Go suitability questions, users can select multiple saved disk-test records; the sent plain-text context includes the device, test configuration, measurements, raw sample points, and metric definitions. If no record is available, the request recommends a Standard test. AI output remains advisory and should be verified before an important operation.
 
 <table>
   <tr>
-    <td><img src="screenshots/13.png" alt="Toolbox"><br><sub><b>13. Tool Cards</b> - Browse curated utilities, check developer/source information, and see Beginner, Advanced, or Expert safety badges before opening tools.</sub></td>
+    <td><img src="screenshots/14.png" alt="AI Assistant"><br><sub><b>14. AI Assistant</b> - Ask deployment questions, analyze selected disk-test records, and review the AI safety notice.</sub></td>
   </tr>
 </table>
 
-### 8. Settings
+### 8. Tools
 
-Settings centralizes app preferences, localization, local paths, version information, license details, and acknowledgements. It is also where users can confirm the project source and open-source status.
+Tools groups useful Windows deployment, recovery, diagnostics, hardware, network, and optimization utilities. Tool cards include source information and clear safety levels for advanced or expert actions.
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/14.png" alt="Settings preferences"><br><sub><b>14. Preferences</b> - Adjust appearance, language, and local ISO/library paths.</sub></td>
-    <td width="33%"><img src="screenshots/15.png" alt="Settings language"><br><sub><b>15. Localization</b> - Switch between eleven supported UI languages without mixing fallback text.</sub></td>
-    <td width="33%"><img src="screenshots/16.png" alt="About and acknowledgements"><br><sub><b>16. About</b> - View version, license, GitHub repository, and Special Thanks information.</sub></td>
+    <td><img src="screenshots/15.png" alt="Tools"><br><sub><b>15. Tools</b> - Browse curated utilities and their beginner, advanced, or expert suitability labels.</sub></td>
   </tr>
 </table>
 
-### 9. Built-in Website
+### 9. Settings
 
-The built-in website page is used for web-based resources such as community mirror pages and download flows. It keeps loading status visible and separates external web content from local disk operations.
+Settings centralizes application preferences, localization, local paths, update choices, version details, licensing, and acknowledgements. The three views below show the settings area as users move through it.
 
 <table>
   <tr>
-    <td><img src="screenshots/17.png" alt="Built-in website loading page"><br><sub><b>17. WebView2 Page</b> - Displays embedded web resources, loading state, and download pages while keeping official Microsoft downloads in the system browser.</sub></td>
+    <td width="33%"><img src="screenshots/16.png" alt="Settings view 1"><br><sub><b>16. Settings - 1</b> - First view of the central settings area.</sub></td>
+    <td width="33%"><img src="screenshots/17.png" alt="Settings view 2"><br><sub><b>17. Settings - 2</b> - Second view of the central settings area.</sub></td>
+    <td width="33%"><img src="screenshots/18.png" alt="Settings view 3"><br><sub><b>18. Settings - 3</b> - Third view of the central settings area.</sub></td>
   </tr>
 </table>
 
@@ -386,103 +389,106 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 ## 界面截图
 
-以下截图按主界面的使用顺序排列，从快速入口、镜像中心到高级工具和设置页逐步介绍。每个区域都说明它的用途，以及截图中重点展示的内容。
+以下 18 张截图按左侧导航和主工作区的使用顺序排列：从首页出发，依次展示镜像与部署流程、磁盘工具、日志、AI、工具箱和设置页。
 
 ### 1. 首页
 
-首页是 WinDeploy Studio 的起点，恢复为聚焦的“快速开始 + 关于”布局。用户可立即进入安装盘制作、随身系统和镜像中心，再查看版本、平台、许可证、仓库和项目鸣谢信息。
+首页是 WinDeploy Studio 的起点，将产品标题、快速开始入口、工作区内容和项目信息放在同一处，不需要再经过单独的介绍页。
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/1.png" alt="首页快速开始"><br><sub><b>1. 快速开始</b> - 提供安装盘、随身系统和镜像中心三个主要工作流入口。</sub></td>
+    <td width="50%"><img src="screenshots/1.png" alt="首页标题、快速开始与工作区"><br><sub><b>1. 首页</b> - 展示产品标题、快速开始入口和工作区概览。</sub></td>
     <td width="50%"><img src="screenshots/2.png" alt="首页关于"><br><sub><b>2. 关于</b> - 展示版本、平台、许可证、GitHub 仓库和项目鸣谢等信息。</sub></td>
   </tr>
 </table>
 
-### 2. 镜像中心
+### 2. 镜像库
 
-镜像中心把 Microsoft 官方下载、社区维护镜像和专家级部署资源分开呈现。用户在打开链接前可以先确认来源、用途、语言支持和下载方式，避免把官方镜像与第三方资源混在一起。
+镜像库将官方镜像、社区版本、企业版与 LTSC 构建和辅助资源清晰分开。用户在打开下载链接前，可以先确认来源、用途、语言支持和适用级别。
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/3.png" alt="镜像分类"><br><sub><b>3. 来源分类</b> - 将 Microsoft 官方镜像、社区版本和企业版 / LTSC 构建分组显示，来源更清楚。</sub></td>
-    <td width="33%"><img src="screenshots/4.png" alt="镜像详情"><br><sub><b>4. 镜像详情</b> - 卡片展示版本说明、来源类型、语言信息，以及是否属于社区或专家级资源。</sub></td>
-    <td width="33%"><img src="screenshots/5.png" alt="镜像下载流程"><br><sub><b>5. 下载流程</b> - 官方条目使用系统浏览器打开 Microsoft 页面，社区镜像保留镜像源选择和 WebView2 页面。</sub></td>
+    <td><img src="screenshots/3.png" alt="镜像库"><br><sub><b>3. 镜像库</b> - 按类别浏览镜像资源，并在下载前确认来源和适用性。</sub></td>
   </tr>
 </table>
 
-### 3. 安装盘创建工具
+### 3. 安装盘制作
 
-安装盘创建工具同时支持 Windows 安装介质和 Linux ISOHybrid 原始写入。界面把平台选择、ISO 验证、目标磁盘选择、版本识别和高风险操作提示放在同一流程里，方便用户逐步确认。
+Windows 与 Linux 安装盘是两个独立流程。两者都会在写入前明确显示所选 ISO、目标磁盘、验证结果以及将要执行的破坏性操作。
 
 <table>
   <tr>
-    <td><img src="screenshots/6.png" alt="安装盘创建工具"><br><sub><b>6. 安装盘创建</b> - 选择 Windows 或 Linux，验证 ISO，核对外接目标磁盘，并创建可启动安装介质。</sub></td>
+    <td width="50%"><img src="screenshots/4.png" alt="Windows 安装盘"><br><sub><b>4. Windows 安装盘</b> - 选择并验证 Windows ISO，选择版本与目标磁盘，然后创建可启动安装介质。</sub></td>
+    <td width="50%"><img src="screenshots/5.png" alt="Linux 安装盘"><br><sub><b>5. Linux 安装盘</b> - 验证 Linux ISOHybrid 镜像，核对目标磁盘，并写入可启动 Linux 安装盘。</sub></td>
   </tr>
 </table>
 
 ### 4. To Go 工作环境
 
-To Go 区域用于在外接磁盘上创建 Windows 工作空间，并在任何破坏性操作前验证受支持的 Linux To Go 布局。它强调更安全的磁盘选择、写入前摘要、可靠的已用时间进度，以及在长时间应用镜像时用于等待的小型 UI 游戏。
+To Go 区域用于创建便携的 Windows 与 Linux 工作环境。在任何破坏性操作开始前，它会将所选镜像、目标磁盘、兼容性检查、可选项和确认摘要集中展示。
 
 <table>
   <tr>
-    <td><img src="screenshots/7.png" alt="To Go 工作环境创建工具"><br><sub><b>7. 随身系统创建</b> - 选择 Windows 或受支持的 Linux，核对 ISO 与目标磁盘，创建启动布局，并用可靠进度信息替代容易误导的剩余时间估算。</sub></td>
+    <td width="50%"><img src="screenshots/6.png" alt="Windows To Go"><br><sub><b>6. Windows To Go</b> - 在一个流程中设置便携 Windows 工作区的镜像、磁盘和部署选项。</sub></td>
+    <td width="50%"><img src="screenshots/7.png" alt="Linux To Go"><br><sub><b>7. Linux To Go</b> - 仅在所选 Linux 镜像通过受支持布局检查后创建便携工作环境。</sub></td>
   </tr>
 </table>
 
-### 5. 日志中心
+### 5. 磁盘工具
 
-日志中心汇总安装盘制作、随身系统、镜像下载、更新检查、AI 请求和错误信息等输出。用户可以在一个地方回看操作过程，不需要到多个目录里手动找日志。
+磁盘功能分为磁盘测试、磁盘工具主目录、磁盘诊断和 BCD/EFI 启动修复，帮助用户在打开功能前先判断操作范围与风险。
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/8.png" alt="日志中心"><br><sub><b>8. 日志中心</b> - 按类别、来源和最近活动浏览日志。</sub></td>
-    <td width="33%"><img src="screenshots/9.png" alt="日志详情"><br><sub><b>9. 日志详情</b> - 查看结构化消息、时间戳、警告和操作结果。</sub></td>
-    <td width="33%"><img src="screenshots/10.png" alt="日志操作"><br><sub><b>10. 日志操作</b> - 筛选条目、检查关键事件，并在需要时快速打开日志目录。</sub></td>
+    <td width="50%"><img src="screenshots/8.png" alt="磁盘测试"><br><sub><b>8. 磁盘测试</b> - 运行并查看存储性能测试，测试记录可保存到历史中。</sub></td>
+    <td width="50%"><img src="screenshots/9.png" alt="磁盘工具主目录"><br><sub><b>9. 磁盘工具</b> - 打开磁盘工具主目录，选择对应的存储操作流程。</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="screenshots/10.png" alt="磁盘诊断"><br><sub><b>10. 磁盘诊断</b> - 查看可用的硬盘身份、健康状态和诊断信息。</sub></td>
+    <td width="50%"><img src="screenshots/11.png" alt="BCD 和 EFI 启动修复"><br><sub><b>11. BCD/EFI 启动修复</b> - 检查并修复受支持的 Windows 启动配置与 EFI 启动项。</sub></td>
   </tr>
 </table>
 
-### 6. AI 助手
+### 6. 日志中心
 
-AI 助手用于部署问答、排障建议和日志分析。对 USB 分析和随身系统适用性问题，用户可多选已保存的磁盘测试记录；发送的纯文本上下文包括设备信息、测试配置、测量结果、原始采样点和指标解释。没有可用记录时，请求会建议先运行一次标准测试。界面包含明确的 AI 内容提示，并支持自定义 OpenAI 兼容代理端点，适合使用自建代理或兼容服务的用户。
+日志中心汇总安装盘制作、随身系统、镜像下载、更新检查、AI 请求、诊断和错误信息等输出，同时提供概览和详情两种查看方式，方便回顾已完成的工作。
 
 <table>
   <tr>
-    <td width="50%"><img src="screenshots/11.png" alt="AI 助手对话"><br><sub><b>11. 助手对话</b> - 提问部署问题、总结错误信息，并获得面向实际操作的排障建议。</sub></td>
-    <td width="50%"><img src="screenshots/12.png" alt="AI 助手设置"><br><sub><b>12. AI 配置</b> - 配置代理端点，并提醒用户在执行重要操作前核实 AI 输出。</sub></td>
+    <td width="50%"><img src="screenshots/12.png" alt="日志中心概览"><br><sub><b>12. 日志中心</b> - 按类别、来源、最近活动、警告和结果浏览日志。</sub></td>
+    <td width="50%"><img src="screenshots/13.png" alt="日志中心详情"><br><sub><b>13. 日志详情</b> - 查看选中日志及其结构化操作输出。</sub></td>
   </tr>
 </table>
 
-### 7. 工具箱
+### 7. AI 助手
 
-工具箱收录部署、恢复、诊断、硬件、网络和优化等常用工具。工具卡片会显示安全等级，并在打开高级、专家级或激活相关工具前给出专业提示。
+AI 助手用于部署问答、排障建议和日志分析。对 USB 分析和随身系统适用性问题，用户可多选已保存的磁盘测试记录；发送的纯文本上下文包括设备信息、测试配置、测量结果、原始采样点和指标解释。没有可用记录时，请求会建议先运行一次标准测试。AI 输出仅供辅助，重要操作前仍应自行核实。
 
 <table>
   <tr>
-    <td><img src="screenshots/13.png" alt="工具箱"><br><sub><b>13. 工具卡片</b> - 浏览精选工具，查看开发者和来源信息，并在打开前识别入门、高级或专家级安全等级。</sub></td>
+    <td><img src="screenshots/14.png" alt="AI 助手"><br><sub><b>14. AI 助手</b> - 提出部署问题，分析所选磁盘测试记录，并查看 AI 使用提示。</sub></td>
   </tr>
 </table>
 
-### 8. 设置
+### 8. 工具箱
 
-设置页集中管理应用偏好、本地化、路径、版本信息、许可证和鸣谢内容。用户也可以在这里确认项目来源和开源状态。
+工具箱收录部署、恢复、诊断、硬件、网络和优化等常用工具。工具卡片会展示来源信息和明确的入门、高级或专家级适用标签。
 
 <table>
   <tr>
-    <td width="33%"><img src="screenshots/14.png" alt="设置偏好"><br><sub><b>14. 偏好设置</b> - 调整外观、语言和本地 ISO/镜像库路径。</sub></td>
-    <td width="33%"><img src="screenshots/15.png" alt="语言设置"><br><sub><b>15. 本地化</b> - 在 11 种界面语言之间切换，并避免混入回退文字。</sub></td>
-    <td width="33%"><img src="screenshots/16.png" alt="关于与鸣谢"><br><sub><b>16. 关于页面</b> - 查看版本、许可证、GitHub 仓库和特别鸣谢信息。</sub></td>
+    <td><img src="screenshots/15.png" alt="工具箱"><br><sub><b>15. 工具箱</b> - 浏览精选工具及其入门、高级或专家级适用标签。</sub></td>
   </tr>
 </table>
 
-### 9. 内置网站页面
+### 9. 设置
 
-内置网站页面用于承载社区镜像页和下载流程等 Web 资源。它会显示加载状态，并把外部网页内容与本地磁盘操作分开；Microsoft 官方下载仍会使用系统浏览器打开。
+设置页集中管理应用偏好、本地化、路径、更新选择、版本信息、许可证和鸣谢内容。以下三张图展示用户在设置区域中的不同视图。
 
 <table>
   <tr>
-    <td><img src="screenshots/17.png" alt="内置网站加载页面"><br><sub><b>17. WebView2 页面</b> - 展示内置网页资源、加载状态和下载页面，同时让 Microsoft 官方下载保持在系统浏览器中打开。</sub></td>
+    <td width="33%"><img src="screenshots/16.png" alt="设置视图 1"><br><sub><b>16. 设置 - 1</b> - 设置区域的第一个视图。</sub></td>
+    <td width="33%"><img src="screenshots/17.png" alt="设置视图 2"><br><sub><b>17. 设置 - 2</b> - 设置区域的第二个视图。</sub></td>
+    <td width="33%"><img src="screenshots/18.png" alt="设置视图 3"><br><sub><b>18. 设置 - 3</b> - 设置区域的第三个视图。</sub></td>
   </tr>
 </table>
 
