@@ -411,7 +411,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   _SettingsTile(
                     icon: Icons.public_outlined,
-                    title: tr(context, 'mirror_global_title'),
+                    title: tr(context, 'sourceforge_repository_title'),
                     subtitle: AppConstants.globalMirrorRepository,
                     trailing: IconButton(
                       icon: const Icon(Icons.open_in_new, size: 18),

@@ -3081,10 +3081,15 @@ try {
   $lastVerifyPercent = -1
 
   while ($verified -lt $total) {
-    $requested = [int][Math]::Min(
-      [int64]$bufferLength,
-      [int64]($total - $verified)
-    )
+    # Keep arithmetic in Int64 until the bounded chunk length is known.  Calling
+    # Math.Min here can select an Int32 overload in PowerShell and overflow when
+    # the remaining ISO size is larger than 2 GiB.
+    $remaining = [int64]($total - $verified)
+    $requested = if ($remaining -lt [int64]$bufferLength) {
+      [int]$remaining
+    } else {
+      [int]$bufferLength
+    }
     $sourceRead = $source.Read($sourceBuffer, 0, $requested)
     $targetRead = $target.Read($targetBuffer, 0, $requested)
     if ($sourceRead -ne $requested -or $targetRead -ne $requested) {
@@ -3360,10 +3365,15 @@ try {
   $lastPercent = -1
   Write-Output "WDS_VERIFY_PROGRESS:0"
   while ($verified -lt $isoLength) {
-    $requested = [int][Math]::Min(
-      [int64]$bufferLength,
-      [int64]($isoLength - $verified)
-    )
+    # Keep arithmetic in Int64 until the bounded chunk length is known.  Calling
+    # Math.Min here can select an Int32 overload in PowerShell and overflow when
+    # the remaining ISO size is larger than 2 GiB.
+    $remaining = [int64]($isoLength - $verified)
+    $requested = if ($remaining -lt [int64]$bufferLength) {
+      [int]$remaining
+    } else {
+      [int]$bufferLength
+    }
     if ($requested -lt $bufferLength) {
       [System.Array]::Clear($sourceBuffer, 0, $bufferLength)
       [System.Array]::Clear($targetBuffer, 0, $bufferLength)

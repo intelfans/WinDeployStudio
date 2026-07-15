@@ -1038,7 +1038,7 @@ class _AboutCard extends StatelessWidget {
               AppConstants.githubRepository,
             ),
             _InfoRow(
-              tr(context, 'mirror_global_title'),
+              tr(context, 'sourceforge_repository_title'),
               AppConstants.globalMirrorRepository,
             ),
             const SizedBox(height: 12),

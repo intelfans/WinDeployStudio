@@ -50,6 +50,15 @@ class GlobalMirrorDownloadResolver {
         uri.host.toLowerCase().endsWith('.dl.sourceforge.net');
   }
 
+  /// SourceForge's download endpoint is sometimes returned as an intermediate
+  /// URL before it chooses a concrete mirror. It is still inside the trusted
+  /// SourceForge boundary, but must be requested once more to obtain the
+  /// signed `*.dl.sourceforge.net` URL (or the file response itself).
+  static bool isDownloadEndpoint(Uri uri) {
+    final host = uri.host.toLowerCase();
+    return isDirectDownloadUrl(uri) || host == 'downloads.sourceforge.net';
+  }
+
   /// Extracts a trusted Global Mirror mirror URL from a Global Mirror HTML page.
   ///
   /// This method is intentionally pure so it can be regression-tested against
@@ -104,7 +113,7 @@ class GlobalMirrorDownloadResolver {
 
     for (final candidate in candidates) {
       final uri = _parseCandidate(candidate, baseUri);
-      if (uri != null && isDirectDownloadUrl(uri)) return uri;
+      if (uri != null && isDownloadEndpoint(uri)) return uri;
     }
     return null;
   }
@@ -161,7 +170,13 @@ class GlobalMirrorDownloadResolver {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final html = await _readHtml(response);
         final next = extractDirectUrl(html, baseUri: current);
-        if (next != null) return next;
+        if (next != null) {
+          if (isDirectDownloadUrl(next)) return next;
+          if (isDownloadEndpoint(next)) {
+            current = next;
+            continue;
+          }
+        }
         throw const GlobalMirrorDownloadResolutionException(
           'Global Mirror did not provide a direct download URL',
         );

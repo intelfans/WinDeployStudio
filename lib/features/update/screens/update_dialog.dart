@@ -64,7 +64,12 @@ class UpdateDialog extends ConsumerWidget {
       return _AvailableDialog(
         info: state.info!,
         onUpdate: () {
-          ref.read(updateProvider.notifier).startDownload();
+          ref
+              .read(updateProvider.notifier)
+              .startDownload(source: UpdateDownloadSource.sourceForge);
+        },
+        onUpdateSource: (source) {
+          ref.read(updateProvider.notifier).startDownload(source: source);
         },
         onLater: () => Navigator.of(context).pop(),
         onIgnore: () {
@@ -83,7 +88,9 @@ class UpdateDialog extends ConsumerWidget {
             ? () => ref
                   .read(updateProvider.notifier)
                   .checkForUpdate(forceRefresh: true)
-            : () => ref.read(updateProvider.notifier).startDownload(),
+            : () => ref
+                  .read(updateProvider.notifier)
+                  .startDownload(source: state.downloadSource),
         onClose: () => Navigator.of(context).pop(),
       );
     }
@@ -163,6 +170,7 @@ class _UpdateErrorDialog extends StatelessWidget {
 class _AvailableDialog extends StatelessWidget {
   final UpdateInfo info;
   final VoidCallback onUpdate;
+  final ValueChanged<UpdateDownloadSource>? onUpdateSource;
   final VoidCallback onLater;
   final VoidCallback onIgnore;
   final String releasePageUrl;
@@ -170,6 +178,7 @@ class _AvailableDialog extends StatelessWidget {
   const _AvailableDialog({
     required this.info,
     required this.onUpdate,
+    this.onUpdateSource,
     required this.onLater,
     required this.onIgnore,
     required this.releasePageUrl,
@@ -238,7 +247,9 @@ class _AvailableDialog extends StatelessWidget {
                   ),
                   child: SingleChildScrollView(
                     child: MarkdownBody(
-                      data: info.body,
+                      data: info.bodyForLocale(
+                        localeCodeFromLocale(Localizations.localeOf(context)),
+                      ),
                       styleSheet: MarkdownStyleSheet(
                         p: theme.textTheme.bodySmall,
                         h1: theme.textTheme.titleSmall?.copyWith(
@@ -273,6 +284,14 @@ class _AvailableDialog extends StatelessWidget {
       actions: [
         AppDialogActionBar(
           children: [
+            Text(
+              '${info.sourceForgeAvailable == false ? tr(context, 'update_source_unavailable') : tr(context, 'update_sourceforge_recommended')} · ${tr(context, 'update_github_release')}',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: info.sourceForgeAvailable == false
+                    ? colorScheme.error
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
             TextButton(
               onPressed: onIgnore,
               child: Text(tr(context, 'update_ignore')),
@@ -288,8 +307,29 @@ class _AvailableDialog extends StatelessWidget {
             ),
             FilledButton.icon(
               icon: const Icon(Icons.download_rounded, size: 18),
-              onPressed: onUpdate,
+              onPressed: info.sourceForgeAvailable == false
+                  ? null
+                  : () {
+                      final callback = onUpdateSource;
+                      if (callback != null) {
+                        callback(UpdateDownloadSource.sourceForge);
+                      } else {
+                        onUpdate();
+                      }
+                    },
               label: Text(tr(context, 'update_now')),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.cloud_download_outlined, size: 18),
+              onPressed: () {
+                final callback = onUpdateSource;
+                if (callback != null) {
+                  callback(UpdateDownloadSource.github);
+                } else {
+                  onUpdate();
+                }
+              },
+              label: Text(tr(context, 'update_github_release')),
             ),
           ],
         ),

@@ -70,7 +70,9 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
     }
   }
 
-  Future<void> startDownload() async {
+  Future<void> startDownload({
+    UpdateDownloadSource source = UpdateDownloadSource.sourceForge,
+  }) async {
     if (state.info == null) return;
 
     _downloadedFilePath = null;
@@ -83,23 +85,24 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       downloadPhase: DownloadPhase.connecting,
       retryCount: 0,
       error: '',
+      downloadSource: source,
     );
 
     _cancelToken = CancelToken();
 
-    final filePath = await _service.downloadUpdate(state.info!, (
-      progress,
-      speed,
-      remaining,
-      phase,
-    ) {
-      state = state.copyWith(
-        downloadProgress: progress,
-        downloadSpeed: speed,
-        downloadRemaining: remaining,
-        downloadPhase: phase,
-      );
-    }, _cancelToken!);
+    final filePath = await _service.downloadUpdate(
+      state.info!,
+      (progress, speed, remaining, phase) {
+        state = state.copyWith(
+          downloadProgress: progress,
+          downloadSpeed: speed,
+          downloadRemaining: remaining,
+          downloadPhase: phase,
+        );
+      },
+      _cancelToken!,
+      source: source,
+    );
 
     if (filePath != null) {
       _downloadedFilePath = filePath;

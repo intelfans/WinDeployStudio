@@ -186,6 +186,13 @@
     }
   }
 
+  function sourceForgeDownloadUrl(release, asset) {
+    const tag = String(release?.tag_name || "").trim();
+    const name = String(asset?.name || "").trim();
+    if (!/^v?\d+\.\d+\.\d+(?:[-.][0-9a-z.-]+)?$/i.test(tag) || !/\.exe$/i.test(name)) return "";
+    return `https://sourceforge.net/projects/windeploystudio/files/${encodeURIComponent(tag)}/${encodeURIComponent(name)}/download`;
+  }
+
   function formatBytes(bytes) {
     const value = Number(bytes || 0);
     if (!value) return "--";
@@ -228,9 +235,11 @@
     if (sections.length < 2) return content;
 
     const cjkCount = (section) => (section.match(/[\u3400-\u9FFF\uF900-\uFAFF]/g) || []).length;
-    const chinese = sections.find((section) => cjkCount(section) > 0);
-    const english = sections.find((section) => cjkCount(section) === 0);
-    return language === "zh" ? chinese || content : english || content;
+    const sorted = [...sections].sort((left, right) => {
+      const difference = cjkCount(left) - cjkCount(right);
+      return language === "zh" ? -difference : difference;
+    });
+    return sorted[0] || content;
   }
 
   // Historical GitHub release bodies mention the retired provider. Keep the
@@ -293,13 +302,17 @@
 
   function sourceOptions(release, asset) {
     const sources = element("div", "download-sources");
-    const globalMirror = element("div", "source-option");
-    const globalMirrorCopy = element("div");
-    globalMirrorCopy.append(element("h4", "", t("release_global_mirror")), element("p", "", t("release_global_mirror_copy")));
-    const pending = element("button", "button button-secondary", t("release_global_mirror_pending"));
-    pending.type = "button";
-    pending.disabled = true;
-    globalMirror.append(globalMirrorCopy, pending);
+    const sourceForge = element("div", "source-option");
+    const sourceForgeCopy = element("div");
+    sourceForgeCopy.append(element("h4", "", t("release_sourceforge")), element("p", "", t("release_sourceforge_copy")));
+    const sourceForgeUrl = sourceForgeDownloadUrl(release, asset);
+    if (sourceForgeUrl) {
+      sourceForge.append(sourceForgeCopy, actionLink(t("release_download_sourceforge"), sourceForgeUrl, true));
+    } else {
+      const unavailable = element("button", "button button-secondary", t("release_asset_unavailable"));
+      unavailable.disabled = true;
+      sourceForge.append(sourceForgeCopy, unavailable);
+    }
 
     const github = element("div", "source-option");
     const githubCopy = element("div");
@@ -311,7 +324,7 @@
       unavailable.disabled = true;
       github.append(githubCopy, unavailable);
     }
-    sources.append(globalMirror, github);
+    sources.append(sourceForge, github);
     return sources;
   }
 
@@ -354,8 +367,12 @@
     content.append(notes);
     const actions = element("div", "release-actions");
     actions.append(actionLink(t("release_open_github"), releaseLink(release)));
+    const sourceForgeUrl = sourceForgeDownloadUrl(release, asset);
+    if (sourceForgeUrl) {
+      actions.append(actionLink(t("release_download_sourceforge"), sourceForgeUrl, true));
+    }
     if (asset && safeGitHubUrl(asset.browser_download_url)) {
-      actions.append(actionLink(t("release_download_github"), safeGitHubUrl(asset.browser_download_url), true));
+      actions.append(actionLink(t("release_download_github"), safeGitHubUrl(asset.browser_download_url)));
     }
     content.append(actions);
     record.append(summary, content);

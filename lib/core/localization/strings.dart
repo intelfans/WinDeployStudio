@@ -144,11 +144,83 @@ Map<String, String> _withDeploymentStrings(
   Map<String, String> base,
 ) => Map.unmodifiable({
   ...base,
+  ..._updateSourceStringsForCode(code),
   ...visualStyleStringsForCode(code),
   ...deploymentStringsForCode(code),
   ...debugDialogStringsForCode(code),
   ...aiBenchmarkStringsForCode(code),
 });
+
+Map<String, String> _updateSourceStringsForCode(String code) {
+  return switch (normalizeLocaleCode(code)) {
+    'zh' => const {
+      'update_sourceforge_recommended': 'SourceForge（推荐）',
+      'update_github_fallback': 'GitHub Release（备用）',
+      'update_github_release': 'GitHub Release（备用）',
+      'update_source_unavailable': 'SourceForge 暂不可用',
+    },
+    'zh_TW' => const {
+      'update_sourceforge_recommended': 'SourceForge（推薦）',
+      'update_github_fallback': 'GitHub Release（備用）',
+      'update_github_release': 'GitHub Release（備用）',
+      'update_source_unavailable': 'SourceForge 暫時無法使用',
+    },
+    'ru' => const {
+      'update_sourceforge_recommended': 'SourceForge (рекомендуется)',
+      'update_github_fallback': 'GitHub Release (резерв)',
+      'update_github_release': 'GitHub Release (резерв)',
+      'update_source_unavailable': 'SourceForge недоступен',
+    },
+    'fr' => const {
+      'update_sourceforge_recommended': 'SourceForge (recommandé)',
+      'update_github_fallback': 'GitHub Release (secours)',
+      'update_github_release': 'GitHub Release (secours)',
+      'update_source_unavailable': 'SourceForge indisponible',
+    },
+    'de' => const {
+      'update_sourceforge_recommended': 'SourceForge (empfohlen)',
+      'update_github_fallback': 'GitHub Release (Alternative)',
+      'update_github_release': 'GitHub Release (Alternative)',
+      'update_source_unavailable': 'SourceForge nicht verfügbar',
+    },
+    'es' => const {
+      'update_sourceforge_recommended': 'SourceForge (recomendado)',
+      'update_github_fallback': 'GitHub Release (alternativo)',
+      'update_github_release': 'GitHub Release (alternativo)',
+      'update_source_unavailable': 'SourceForge no disponible',
+    },
+    'pt' => const {
+      'update_sourceforge_recommended': 'SourceForge (recomendado)',
+      'update_github_fallback': 'GitHub Release (alternativo)',
+      'update_github_release': 'GitHub Release (alternativo)',
+      'update_source_unavailable': 'SourceForge indisponível',
+    },
+    'ar' => const {
+      'update_sourceforge_recommended': 'SourceForge (موصى به)',
+      'update_github_fallback': 'إصدار GitHub (احتياطي)',
+      'update_github_release': 'إصدار GitHub (احتياطي)',
+      'update_source_unavailable': 'SourceForge غير متاح',
+    },
+    'ko' => const {
+      'update_sourceforge_recommended': 'SourceForge (권장)',
+      'update_github_fallback': 'GitHub 릴리스 (대체)',
+      'update_github_release': 'GitHub 릴리스 (대체)',
+      'update_source_unavailable': 'SourceForge를 사용할 수 없음',
+    },
+    'ja' => const {
+      'update_sourceforge_recommended': 'SourceForge（推奨）',
+      'update_github_fallback': 'GitHub リリース（代替）',
+      'update_github_release': 'GitHub リリース（代替）',
+      'update_source_unavailable': 'SourceForge は利用できません',
+    },
+    _ => const {
+      'update_sourceforge_recommended': 'SourceForge (Recommended)',
+      'update_github_fallback': 'GitHub Release (Fallback)',
+      'update_github_release': 'GitHub Release (Fallback)',
+      'update_source_unavailable': 'SourceForge unavailable',
+    },
+  };
+}
 
 final _enAll = _withDeploymentStrings('en', _en);
 final _zhAll = _withDeploymentStrings('zh', _zh);
@@ -383,6 +455,7 @@ const _en = <String, String>{
   'settings_built_with': 'Built with:',
   'settings_copyright': '©2026 Bob Steve. Released under the MIT License.',
   'about_github_repository': 'GitHub Repository',
+  'sourceforge_repository_title': 'SourceForge Repository',
   'special_thanks_title': 'Special Thanks',
   'special_thanks_intro':
       'WinDeploy Studio would like to thank the following people and communities for their valuable feedback, testing, ideas, inspiration, and support.',
@@ -1291,6 +1364,7 @@ const _zh = <String, String>{
   'settings_built_with': '构建工具：',
   'settings_copyright': '©2026 Bob Steve. 基于 MIT License 发布。',
   'about_github_repository': 'GitHub 仓库',
+  'sourceforge_repository_title': 'SourceForge 仓库',
   'special_thanks_title': '特别感谢',
   'special_thanks_intro': 'WinDeploy Studio 感谢以下个人和社区在反馈、测试、想法、灵感和支持方面提供的宝贵帮助。',
   'thanks_astra_desc': '早期反馈、测试和项目讨论',
@@ -2127,6 +2201,7 @@ const _ru = <String, String>{
   'settings_built_with': 'Создано с помощью:',
   'settings_copyright': '©2026 Bob Steve. Распространяется по лицензии MIT.',
   'about_github_repository': 'Репозиторий GitHub',
+  'sourceforge_repository_title': 'Репозиторий SourceForge',
   'special_thanks_title': 'Особая благодарность',
   'special_thanks_intro':
       'WinDeploy Studio благодарит людей и сообщества за ценные отзывы, тестирование, идеи, вдохновение и поддержку.',
@@ -3049,6 +3124,7 @@ const _fr = <String, String>{
   'settings_built_with': 'Construit avec :',
   'settings_copyright': '©2026 Bob Steve. Distribué sous licence MIT.',
   'about_github_repository': 'Dépôt GitHub',
+  'sourceforge_repository_title': 'Dépôt SourceForge',
   'special_thanks_title': 'Remerciements',
   'special_thanks_intro':
       'WinDeploy Studio remercie les personnes et communautés suivantes pour leurs retours, tests, idées, inspiration et soutien.',
@@ -3963,6 +4039,7 @@ const _ja = <String, String>{
   'settings_built_with': '使用ツール：',
   'settings_copyright': '©2026 Bob Steve. MIT License の下で配布されています。',
   'about_github_repository': 'GitHub リポジトリ',
+  'sourceforge_repository_title': 'SourceForge リポジトリ',
   'special_thanks_title': '特別な感謝',
   'special_thanks_intro':
       'WinDeploy Studio は、貴重なフィードバック、テスト、アイデア、インスピレーション、サポートを寄せてくださった皆さまとコミュニティに感謝します。',
@@ -4801,6 +4878,7 @@ const _zhTW = <String, String>{
   'settings_built_with': '建構工具：',
   'settings_copyright': '©2026 Bob Steve. 基於 MIT License 發行。',
   'about_github_repository': 'GitHub 儲存庫',
+  'sourceforge_repository_title': 'SourceForge 儲存庫',
   'special_thanks_title': '特別感謝',
   'special_thanks_intro': 'WinDeploy Studio 感謝以下個人和社群在回饋、測試、想法、靈感和支持方面提供的寶貴幫助。',
   'thanks_astra_desc': '早期回饋、測試和專案討論',
@@ -5642,6 +5720,7 @@ const _es = <String, String>{
   'settings_built_with': 'Construido con:',
   'settings_copyright': '©2026 Bob Steve. Publicado bajo la licencia MIT.',
   'about_github_repository': 'Repositorio de GitHub',
+  'sourceforge_repository_title': 'Repositorio de SourceForge',
   'special_thanks_title': 'Agradecimientos especiales',
   'special_thanks_intro':
       'WinDeploy Studio agradece a las siguientes personas y comunidades por sus comentarios, pruebas, ideas, inspiración y apoyo.',
@@ -6548,6 +6627,7 @@ const _ar = <String, String>{
   'settings_built_with': 'بُني بواسطة:',
   'settings_copyright': '©2026 Bob Steve. يُوزَّع بموجب ترخيص MIT.',
   'about_github_repository': 'مستودع GitHub',
+  'sourceforge_repository_title': 'مستودع SourceForge',
   'special_thanks_title': 'شكر خاص',
   'special_thanks_intro':
       'يشكر WinDeploy Studio الأشخاص والمجتمعات التالية على الملاحظات والاختبارات والأفكار والإلهام والدعم القيّم.',
@@ -7440,6 +7520,7 @@ const _pt = <String, String>{
   'settings_built_with': 'Construído com:',
   'settings_copyright': '©2026 Bob Steve. Distribuído sob a Licença MIT.',
   'about_github_repository': 'Repositório GitHub',
+  'sourceforge_repository_title': 'Repositório SourceForge',
   'special_thanks_title': 'Agradecimentos especiais',
   'special_thanks_intro':
       'O WinDeploy Studio agradece às seguintes pessoas e comunidades pelo feedback, testes, ideias, inspiração e apoio.',
@@ -8357,6 +8438,7 @@ const _de = <String, String>{
   'settings_built_with': 'Erstellt mit:',
   'settings_copyright': '©2026 Bob Steve. Veröffentlicht unter der MIT-Lizenz.',
   'about_github_repository': 'GitHub-Repository',
+  'sourceforge_repository_title': 'SourceForge-Repository',
   'special_thanks_title': 'Besonderer Dank',
   'special_thanks_intro':
       'WinDeploy Studio dankt den folgenden Personen und Communitys für wertvolles Feedback, Tests, Ideen, Inspiration und Unterstützung.',
@@ -9270,6 +9352,7 @@ const _ko = <String, String>{
   'settings_built_with': '빌드 도구:',
   'settings_copyright': '©2026 Bob Steve. MIT License에 따라 배포됩니다.',
   'about_github_repository': 'GitHub 저장소',
+  'sourceforge_repository_title': 'SourceForge 저장소',
   'special_thanks_title': '특별 감사',
   'special_thanks_intro':
       'WinDeploy Studio는 소중한 피드백, 테스트, 아이디어, 영감과 지원을 보내 준 다음 분들과 커뮤니티에 감사드립니다.',

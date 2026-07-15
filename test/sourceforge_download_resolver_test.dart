@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:win_deploy_studio/core/services/global_mirror_download_resolver.dart';
 
 void main() {
@@ -56,6 +58,21 @@ void main() {
     expect(result.host, 'pilotfiber.dl.sourceforge.net');
   });
 
+  test('keeps SourceForge download endpoint for a second resolution pass', () {
+    const html = '''
+      <meta http-equiv="refresh" content="5; url=https://downloads.sourceforge.net/project/windeploystudio/v1.1.2/WinDeployStudio_Setup_1.1.2.exe?use_mirror=master">
+    ''';
+
+    final result = GlobalMirrorDownloadResolver.extractDirectUrl(
+      html,
+      baseUri: landingPage,
+    );
+
+    expect(result, isNotNull);
+    expect(result!.host, 'downloads.sourceforge.net');
+    expect(GlobalMirrorDownloadResolver.isDownloadEndpoint(result), isTrue);
+  });
+
   test('does not accept a non-Global Mirror download URL', () {
     const html = '''
       <meta http-equiv="refresh" content="0; url=https://example.invalid/file.iso">
@@ -66,6 +83,37 @@ void main() {
       GlobalMirrorDownloadResolver.extractDirectUrl(html, baseUri: landingPage),
       isNull,
     );
+  });
+
+  test('follows the SourceForge endpoint to a signed mirror URL', () async {
+    final requests = <Uri>[];
+    final directUrl = Uri.parse(
+      'https://master.dl.sourceforge.net/project/windeploystudio/v1.1.2/WinDeployStudio_Setup_1.1.2.exe?viasf=1&fid=abc',
+    );
+    final client = MockClient((request) async {
+      requests.add(request.url);
+      if (requests.length == 1) {
+        return http.Response(
+          '<meta http-equiv="refresh" content="0; url=https://downloads.sourceforge.net/project/windeploystudio/v1.1.2/WinDeployStudio_Setup_1.1.2.exe?use_mirror=master">',
+          200,
+          headers: {'content-type': 'text/html'},
+        );
+      }
+      return http.Response(
+        '',
+        302,
+        headers: {'location': directUrl.toString()},
+      );
+    });
+
+    final resolved = await GlobalMirrorDownloadResolver.resolve(
+      'https://sourceforge.net/projects/windeploystudio/files/v1.1.2/WinDeployStudio_Setup_1.1.2.exe/download',
+      client: client,
+    );
+
+    expect(resolved, directUrl.toString());
+    expect(requests, hasLength(2));
+    expect(requests[1].host, 'downloads.sourceforge.net');
   });
 
   test('recognizes only HTTPS Global Mirror URLs as trusted', () {

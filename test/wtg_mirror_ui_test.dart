@@ -66,6 +66,7 @@ void main() {
     await tester.tap(find.byKey(const Key('wtg-platform-linux-label')));
     await tester.pumpAndSettle();
     expect(find.text(trByCode('en', 'wtg_linux_title')), findsOneWidget);
+    expect(find.text(trByCode('en', 'wtg_linux_select_iso')), findsOneWidget);
     debugPrint('Captured errors: ${details.length}');
   });
 

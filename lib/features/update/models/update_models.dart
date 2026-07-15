@@ -15,6 +15,13 @@ enum UpdateChannel {
   }
 }
 
+/// The two distribution channels exposed by the update dialog.
+///
+/// SourceForge is the preferred channel because it is the project's mirrored
+/// download location. GitHub remains available as a fallback when the mirror
+/// is not reachable.
+enum UpdateDownloadSource { sourceForge, github }
+
 class AppVersion implements Comparable<AppVersion> {
   final int major;
   final int minor;
@@ -101,6 +108,10 @@ class AppVersion implements Comparable<AppVersion> {
 class UpdateAsset {
   final String name;
   final String url;
+
+  /// Optional SourceForge landing URL discovered from the mirror RSS feed.
+  /// GitHub release metadata does not include this field.
+  final String sourceForgeUrl;
   final int sizeBytes;
   final String contentType;
   final String digest;
@@ -108,6 +119,7 @@ class UpdateAsset {
   const UpdateAsset({
     required this.name,
     required this.url,
+    this.sourceForgeUrl = '',
     required this.sizeBytes,
     required this.contentType,
     required this.digest,
@@ -117,6 +129,7 @@ class UpdateAsset {
     return UpdateAsset(
       name: json['name'] as String? ?? '',
       url: json['browser_download_url'] as String? ?? '',
+      sourceForgeUrl: json['sourceforge_url'] as String? ?? '',
       sizeBytes: json['size'] as int? ?? 0,
       contentType: json['content_type'] as String? ?? '',
       digest: json['digest'] as String? ?? '',
@@ -132,6 +145,7 @@ class UpdateAsset {
   }
 
   String get formattedSize {
+    if (sizeBytes <= 0) return 'Unknown size';
     if (sizeBytes < 1024) return '$sizeBytes B';
     if (sizeBytes < 1024 * 1024) {
       return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
@@ -148,6 +162,11 @@ class UpdateInfo {
   final DateTime publishedAt;
   final List<UpdateAsset> assets;
 
+  /// Whether the matching SourceForge file was reachable during the last
+  /// release check. A null value means the release came from an older cache
+  /// that did not contain availability metadata.
+  final bool? sourceForgeAvailable;
+
   const UpdateInfo({
     required this.version,
     required this.tagName,
@@ -155,6 +174,7 @@ class UpdateInfo {
     required this.body,
     required this.publishedAt,
     required this.assets,
+    this.sourceForgeAvailable,
   });
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
@@ -173,6 +193,19 @@ class UpdateInfo {
           DateTime.tryParse(json['published_at'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
       assets: assetsList,
+      sourceForgeAvailable: json['sourceforge_available'] as bool?,
+    );
+  }
+
+  UpdateInfo copyWith({bool? sourceForgeAvailable}) {
+    return UpdateInfo(
+      version: version,
+      tagName: tagName,
+      name: name,
+      body: body,
+      publishedAt: publishedAt,
+      assets: assets,
+      sourceForgeAvailable: sourceForgeAvailable ?? this.sourceForgeAvailable,
     );
   }
 
@@ -204,8 +237,75 @@ class UpdateInfo {
   String generateDownloadUrl() {
     final asset = bestAsset;
     if (asset == null) return '';
-    if (asset.url.isNotEmpty) return asset.url;
+    // A SourceForge-only fallback still needs a usable GitHub fallback. The
+    // canonical release URL is deterministic and avoids accidentally sending
+    // a SourceForge URL through the GitHub download button.
+    if (asset.url.isNotEmpty) {
+      final host = Uri.tryParse(asset.url)?.host.toLowerCase();
+      if (host == 'github.com' || host?.endsWith('.github.com') == true) {
+        return asset.url;
+      }
+    }
     return 'https://github.com/intelfans/WinDeployStudio/releases/download/$tagName/${Uri.encodeComponent(asset.name)}';
+  }
+
+  /// SourceForge's stable file landing URL. The final mirror URL is signed
+  /// and short-lived, so it is resolved immediately before downloading.
+  String? generateSourceForgeLandingUrl() {
+    final asset = bestAsset;
+    if (asset == null || tagName.trim().isEmpty || asset.name.trim().isEmpty) {
+      return null;
+    }
+    if (asset.sourceForgeUrl.trim().isNotEmpty) {
+      return asset.sourceForgeUrl;
+    }
+    return Uri(
+      scheme: 'https',
+      host: 'sourceforge.net',
+      pathSegments: <String>[
+        'projects',
+        'windeploystudio',
+        'files',
+        tagName,
+        asset.name,
+        'download',
+      ],
+    ).toString();
+  }
+
+  /// Returns the release-note section matching the selected UI language.
+  ///
+  /// Releases are authored with English and Simplified Chinese sections
+  /// separated by a horizontal rule. Other locales use the English section;
+  /// when a release has no clear bilingual separator the original body is
+  /// preserved verbatim.
+  String bodyForLocale(String localeCode) {
+    final normalized = localeCode.replaceAll('-', '_').toLowerCase();
+    final sections = body
+        .split(
+          RegExp(
+            r'^\s*(?:---+|<hr\s*/?>)\s*$',
+            multiLine: true,
+            caseSensitive: false,
+          ),
+        )
+        .map((section) => section.trim())
+        .where((section) => section.isNotEmpty)
+        .toList();
+    if (sections.length < 2) return body;
+
+    int chineseScore(String value) =>
+        RegExp(r'[\u3400-\u4dbf\u4e00-\u9fff]').allMatches(value).length;
+    if (normalized.startsWith('zh')) {
+      sections.sort(
+        (left, right) => chineseScore(right).compareTo(chineseScore(left)),
+      );
+    } else {
+      sections.sort(
+        (left, right) => chineseScore(left).compareTo(chineseScore(right)),
+      );
+    }
+    return sections.first;
   }
 }
 
@@ -256,6 +356,7 @@ class UpdateState {
   final bool autoCheckEnabled;
   final UpdateChannel channel;
   final String? ignoredVersion;
+  final UpdateDownloadSource downloadSource;
 
   const UpdateState({
     this.status = UpdateStatus.idle,
@@ -270,6 +371,7 @@ class UpdateState {
     this.autoCheckEnabled = true,
     this.channel = UpdateChannel.stable,
     this.ignoredVersion,
+    this.downloadSource = UpdateDownloadSource.sourceForge,
   });
 
   UpdateState copyWith({
@@ -285,6 +387,7 @@ class UpdateState {
     bool? autoCheckEnabled,
     UpdateChannel? channel,
     String? ignoredVersion,
+    UpdateDownloadSource? downloadSource,
   }) {
     return UpdateState(
       status: status ?? this.status,
@@ -299,6 +402,7 @@ class UpdateState {
       autoCheckEnabled: autoCheckEnabled ?? this.autoCheckEnabled,
       channel: channel ?? this.channel,
       ignoredVersion: ignoredVersion ?? this.ignoredVersion,
+      downloadSource: downloadSource ?? this.downloadSource,
     );
   }
 

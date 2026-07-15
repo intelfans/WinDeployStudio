@@ -10,6 +10,7 @@ import '../../benchmark_history/benchmark_history_copy.dart';
 import '../../benchmark_history/screens/benchmark_history_screen.dart';
 import '../../benchmark_history/widgets/benchmark_workload_chart.dart';
 import '../models/benchmark_models.dart';
+import '../services/benchmark_error_localization.dart';
 import '../services/native_drive_benchmark_service.dart';
 
 class DriveBenchmarkScreen extends ConsumerStatefulWidget {
@@ -877,8 +878,10 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
   }
 
   String _localizedError(BuildContext context, String error) {
-    if (error.startsWith('bench_')) return tr(context, error);
-    return error;
+    return localizeBenchmarkError(
+      localeCodeFromLocale(Localizations.localeOf(context)),
+      error,
+    );
   }
 
   Color _ratingColor(BenchmarkSuitability suitability) {

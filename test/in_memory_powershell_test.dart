@@ -73,10 +73,12 @@ void main() {
         script: r'''
 param([int]$DiskNumber, [int64]$ExpectedIsoLength)
 $bufferLength = 8388608
-$requested = [int][Math]::Min(
-  [int64]$bufferLength,
-  [int64]$ExpectedIsoLength
-)
+$remaining = [int64]$ExpectedIsoLength
+$requested = if ($remaining -lt [int64]$bufferLength) {
+  [int]$remaining
+} else {
+  [int]$bufferLength
+}
 Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
 ''',
         parameters: const {'DiskNumber': '1', 'ExpectedIsoLength': imageLength},
@@ -93,17 +95,18 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
     },
   );
 
-  test('Linux raw verification uses an Int64 minimum for large ISO chunks', () {
-    final script = BootableUsbService.linuxRawWriteScriptForTesting;
+  test(
+    'Linux raw verification bounds large ISO chunks without Int32 overflow',
+    () {
+      final script = BootableUsbService.linuxRawWriteScriptForTesting;
 
-    expect(script, contains(r'[Math]::Min('));
-    expect(script, contains(r'[int64]$bufferLength,'));
-    expect(script, contains(r'[int64]($total - $verified)'));
-    expect(
-      script,
-      isNot(contains(r'[Math]::Min($bufferLength, $total - $verified)')),
-    );
-  });
+      expect(script, contains(r'$remaining = [int64]($total - $verified)'));
+      expect(script, contains(r'$remaining -lt [int64]$bufferLength'));
+      expect(script, contains(r'[int]$remaining'));
+      expect(script, contains(r'[int]$bufferLength'));
+      expect(script, isNot(contains(r'[Math]::Min(')));
+    },
+  );
 
   test(
     'Linux raw imaging falls back to an exclusive handle until verification passes',

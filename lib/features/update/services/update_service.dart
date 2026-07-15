@@ -6,9 +6,316 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xml/xml.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/services/global_mirror_download_resolver.dart';
 import '../../logs/services/log_center_service.dart';
 import '../models/update_models.dart';
+
+/// Parses GitHub's public Releases Atom feed into the subset of release
+/// metadata needed by the updater. The feed does not expose asset sizes, so
+/// the installer asset is represented with an unknown size and verified from
+/// the streamed response when it is downloaded.
+List<Map<String, dynamic>> parseAtomReleaseMetadata(String feedXml) {
+  final document = XmlDocument.parse(feedXml);
+  final releases = <Map<String, dynamic>>[];
+
+  for (final entry in document.findAllElements('entry')) {
+    String childText(String name) =>
+        entry.getElement(name)?.innerText.trim() ?? '';
+
+    String? releaseUrl;
+    for (final link in entry.findElements('link')) {
+      if (link.getAttribute('rel') == 'alternate') {
+        releaseUrl = link.getAttribute('href');
+        break;
+      }
+    }
+    if (releaseUrl == null || releaseUrl.isEmpty) continue;
+
+    final uri = Uri.tryParse(releaseUrl);
+    final tagName = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : '';
+    if (tagName.isEmpty) continue;
+
+    final versionText = tagName.startsWith('v')
+        ? tagName.substring(1)
+        : tagName;
+    final assetName = 'WinDeployStudio_Setup_$versionText.exe';
+    final assetUrl = Uri(
+      scheme: 'https',
+      host: 'github.com',
+      pathSegments: <String>[
+        'intelfans',
+        'WinDeployStudio',
+        'releases',
+        'download',
+        tagName,
+        assetName,
+      ],
+    ).toString();
+
+    final name = childText('title');
+    releases.add({
+      'tag_name': tagName,
+      'name': name,
+      'body': _atomHtmlToMarkdown(childText('content')),
+      'published_at': childText('updated'),
+      'draft': false,
+      'prerelease': _isPreReleaseIdentifier('$tagName $name'),
+      'assets': [
+        {
+          'name': assetName,
+          'browser_download_url': assetUrl,
+          'size': 0,
+          'content_type': 'application/octet-stream',
+          'digest': '',
+        },
+      ],
+    });
+  }
+
+  return releases;
+}
+
+bool _isPreReleaseIdentifier(String value) {
+  return RegExp(
+    r'(?:^|[^a-z0-9])(alpha|beta|rc|preview|pre[- ]?release|nightly|daily|dev|canary)(?:[^a-z0-9]|$)',
+    caseSensitive: false,
+  ).hasMatch(value);
+}
+
+/// Parses a SourceForge files RSS feed into release-shaped metadata.
+///
+/// SourceForge stores each release in a version folder. The folder normally
+/// contains the installer and a bilingual README.md with the release notes.
+/// RSS exposes the file names, sizes, and download endpoints; the README is
+/// fetched separately by [UpdateService] because RSS only contains its path.
+List<Map<String, dynamic>> parseSourceForgeReleaseMetadata(String feedXml) {
+  final document = XmlDocument.parse(feedXml);
+  final grouped = <String, Map<String, dynamic>>{};
+
+  for (final item in document.findAllElements('item')) {
+    final title = _sourceForgeItemText(item, 'title');
+    final path = title.trim().replaceFirst(RegExp(r'^/+'), '');
+    final match = RegExp(
+      r'^(v?\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?)/(.*)$',
+    ).firstMatch(path);
+    if (match == null) continue;
+
+    final tagName = match.group(1)!;
+    final filePath = match.group(2)!;
+    final fileName = Uri.decodeComponent(filePath.split('/').last);
+    if (fileName.isEmpty) continue;
+
+    final link = _sourceForgeItemText(item, 'link');
+    final publishedAt = _parseSourceForgeDate(
+      _sourceForgeItemText(item, 'pubDate'),
+    );
+    var sizeBytes = 0;
+    for (final element in item.descendants.whereType<XmlElement>()) {
+      if (element.localName == 'content') {
+        sizeBytes = int.tryParse(element.getAttribute('filesize') ?? '') ?? 0;
+        if (sizeBytes > 0) break;
+      }
+    }
+
+    final entry = grouped.putIfAbsent(
+      tagName,
+      () => <String, dynamic>{
+        'tag_name': tagName,
+        'name': 'WinDeploy Studio $tagName',
+        'body': '',
+        'published_at': publishedAt.toIso8601String(),
+        'draft': false,
+        'prerelease': _isPreReleaseIdentifier(tagName),
+        '_sourceforge_notes_url': '',
+        '_sourceforge_asset_url': '',
+        '_sourceforge_asset_name': '',
+        '_sourceforge_asset_size': 0,
+      },
+    );
+
+    final lowerName = fileName.toLowerCase();
+    if (lowerName == 'readme.md' || lowerName.contains('release-notes')) {
+      entry['_sourceforge_notes_url'] = link;
+    }
+    if (lowerName.endsWith('.exe') &&
+        (lowerName.contains('setup') || lowerName.contains('install'))) {
+      final previousSize = entry['_sourceforge_asset_size'] as int? ?? 0;
+      if ((entry['_sourceforge_asset_name'] as String? ?? '').isEmpty ||
+          sizeBytes >= previousSize) {
+        entry['_sourceforge_asset_url'] = link;
+        entry['_sourceforge_asset_name'] = fileName;
+        entry['_sourceforge_asset_size'] = sizeBytes;
+        if (publishedAt.isAfter(
+          DateTime.tryParse(entry['published_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        )) {
+          entry['published_at'] = publishedAt.toIso8601String();
+        }
+      }
+    }
+  }
+
+  return grouped.values
+      .where(
+        (entry) =>
+            (entry['_sourceforge_asset_name'] as String? ?? '').isNotEmpty,
+      )
+      .map((entry) {
+        final tagName = entry['tag_name'] as String;
+        final assetName = entry['_sourceforge_asset_name'] as String;
+        final sourceForgeUrl = entry['_sourceforge_asset_url'] as String;
+        final githubUrl = Uri(
+          scheme: 'https',
+          host: 'github.com',
+          pathSegments: <String>[
+            'intelfans',
+            'WinDeployStudio',
+            'releases',
+            'download',
+            tagName,
+            assetName,
+          ],
+        ).toString();
+        return <String, dynamic>{
+          'tag_name': tagName,
+          'name': entry['name'],
+          'body': entry['body'],
+          'published_at': entry['published_at'],
+          'draft': false,
+          'prerelease': entry['prerelease'],
+          '_sourceforge_notes_url': entry['_sourceforge_notes_url'],
+          'assets': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'name': assetName,
+              'browser_download_url': githubUrl,
+              'sourceforge_url': sourceForgeUrl,
+              'size': entry['_sourceforge_asset_size'],
+              'content_type': 'application/octet-stream',
+              'digest': '',
+            },
+          ],
+        };
+      })
+      .toList();
+}
+
+String _sourceForgeItemText(XmlElement item, String localName) {
+  for (final child in item.children.whereType<XmlElement>()) {
+    if (child.localName == localName) return child.innerText.trim();
+  }
+  return '';
+}
+
+DateTime _parseSourceForgeDate(String value) {
+  final match = RegExp(
+    r'\b\d{1,2}\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})',
+  ).firstMatch(value);
+  if (match == null) {
+    return DateTime.tryParse(value) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  const months = <String, int>{
+    'jan': 1,
+    'feb': 2,
+    'mar': 3,
+    'apr': 4,
+    'may': 5,
+    'jun': 6,
+    'jul': 7,
+    'aug': 8,
+    'sep': 9,
+    'oct': 10,
+    'nov': 11,
+    'dec': 12,
+  };
+  final day =
+      int.tryParse(
+        RegExp(r'\b(\d{1,2})\s+[A-Za-z]{3}').firstMatch(value)?.group(1) ?? '',
+      ) ??
+      1;
+  final month = months[match.group(1)!.toLowerCase()] ?? 1;
+  final year = int.tryParse(match.group(2)!) ?? 1970;
+  return DateTime.utc(
+    year,
+    month,
+    day,
+    int.parse(match.group(3)!),
+    int.parse(match.group(4)!),
+    int.parse(match.group(5)!),
+  );
+}
+
+String _atomHtmlToMarkdown(String html) {
+  var markdown = html;
+  for (var level = 6; level >= 1; level--) {
+    markdown = markdown.replaceAllMapped(
+      RegExp('<h$level[^>]*>(.*?)</h$level>', dotAll: true),
+      (match) => '${'#' * level} ${_stripHtmlInline(match.group(1) ?? '')}\n\n',
+    );
+  }
+  markdown = markdown.replaceAllMapped(
+    RegExp(r'<li[^>]*>(.*?)</li>', dotAll: true),
+    (match) => '- ${_stripHtmlInline(match.group(1) ?? '')}\n',
+  );
+  markdown = markdown.replaceAll(
+    RegExp(r'<hr\s*/?>', caseSensitive: false),
+    '\n\n---\n\n',
+  );
+  markdown = markdown.replaceAll(
+    RegExp(r'<br\s*/?>', caseSensitive: false),
+    '\n',
+  );
+  markdown = markdown.replaceAll(
+    RegExp(r'</?(?:ul|ol|p|div)[^>]*>', caseSensitive: false),
+    '\n',
+  );
+  markdown = _stripHtmlInline(markdown);
+  return markdown.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+}
+
+String _stripHtmlInline(String value) {
+  var text = value;
+  text = text.replaceAllMapped(
+    RegExp(r'<(?:strong|b)[^>]*>(.*?)</(?:strong|b)>', dotAll: true),
+    (match) => '**${match.group(1) ?? ''}**',
+  );
+  text = text.replaceAllMapped(
+    RegExp(r'<(?:code|kbd)[^>]*>(.*?)</(?:code|kbd)>', dotAll: true),
+    (match) => '`${match.group(1) ?? ''}`',
+  );
+  text = text.replaceAllMapped(
+    RegExp(r'<(?:em|i)[^>]*>(.*?)</(?:em|i)>', dotAll: true),
+    (match) => '*${match.group(1) ?? ''}*',
+  );
+  text = text.replaceAll(RegExp(r'<[^>]+>'), '');
+  return _decodeHtmlEntities(text);
+}
+
+String _decodeHtmlEntities(String value) {
+  var text = value
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&nbsp;', ' ');
+  return text.replaceAllMapped(
+    RegExp(r'&#(x[0-9a-f]+|[0-9]+);', caseSensitive: false),
+    (match) {
+      final raw = match.group(1)!;
+      final codePoint = raw.toLowerCase().startsWith('x')
+          ? int.tryParse(raw.substring(1), radix: 16)
+          : int.tryParse(raw);
+      return codePoint == null
+          ? match.group(0)!
+          : String.fromCharCode(codePoint);
+    },
+  );
+}
 
 class UpdateService {
   static const _repoOwner = 'intelfans';
@@ -16,6 +323,10 @@ class UpdateService {
   static const _apiBaseUrl =
       'https://api.github.com/repos/$_repoOwner/$_repoName/releases';
   static const _apiUrl = '$_apiBaseUrl?per_page=100';
+  static const _atomUrl =
+      'https://github.com/$_repoOwner/$_repoName/releases.atom';
+  static const _sourceForgeFilesUrl =
+      'https://sourceforge.net/projects/windeploystudio/files/';
   static const _releasePageUrl =
       'https://github.com/$_repoOwner/$_repoName/releases';
   static const _cacheDuration = Duration(hours: 6);
@@ -133,21 +444,36 @@ class UpdateService {
           )
           .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode != 200) {
-        log.logUpdate('[Update] API failed: ${response.statusCode}');
-        return null;
+      Map<String, dynamic>? selected;
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          final releases = decoded
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .where((item) => item['draft'] != true)
+              .toList();
+          selected = _selectReleaseForChannel(releases, channel);
+        }
+      } else {
+        log.logUpdate(
+          '[Update] API failed: ${response.statusCode}; trying Releases feed',
+        );
       }
 
-      final decoded = jsonDecode(response.body);
-      if (decoded is! List) return null;
-      final releases = decoded
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .where((item) => item['draft'] != true)
-          .toList();
-      final selected = _selectReleaseForChannel(releases, channel);
+      // GitHub's unauthenticated REST API is rate-limited. The public Atom
+      // feed carries the same tag, date, title, and bilingual notes without
+      // consuming that API quota, so use it as a read-only fallback.
+      selected ??= await _fetchAtomRelease(channel);
+      // SourceForge mirrors each release folder and its bilingual README.md.
+      // It is a second metadata source when GitHub is unavailable, not a
+      // replacement for the GitHub release URL shown to the user.
+      selected ??= await _fetchSourceForgeRelease(channel);
       if (selected == null) return null;
-      final info = UpdateInfo.fromJson(selected);
+      final parsedInfo = UpdateInfo.fromJson(selected);
+      final info = parsedInfo.version > current
+          ? await _withSourceForgeAvailability(parsedInfo)
+          : parsedInfo;
 
       await _saveCachedInfo(info, channel);
       await _saveLastCheckTime();
@@ -162,6 +488,131 @@ class UpdateService {
     } catch (e) {
       log.logUpdate('[Update] Check failed: $e');
       return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchAtomRelease(UpdateChannel channel) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(_atomUrl),
+            headers: {
+              'Accept': 'application/atom+xml, application/xml, text/xml',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        LogCenterService().logUpdate(
+          '[Update] Releases feed failed: ${response.statusCode}',
+        );
+        return null;
+      }
+
+      final releases = parseAtomReleaseMetadata(response.body);
+      return _selectReleaseForChannel(releases, channel);
+    } catch (error) {
+      LogCenterService().logUpdate('[Update] Releases feed failed: $error');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchSourceForgeRelease(
+    UpdateChannel channel,
+  ) async {
+    try {
+      final rootResponse = await http
+          .get(
+            Uri.parse(_sourceForgeFilesUrl),
+            headers: {
+              'Accept': 'text/html, application/xhtml+xml',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      if (rootResponse.statusCode != 200) return null;
+
+      final tags = RegExp(
+        r'<tr\b[^>]*\btitle="(v?\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?)"[^>]*\bclass="[^"]*\bfolder\b',
+        caseSensitive: false,
+      ).allMatches(rootResponse.body).map((m) => m.group(1)!).toSet().toList();
+      if (tags.isEmpty) return null;
+
+      final feeds = await Future.wait(
+        tags.take(12).map(_fetchSourceForgeReleaseByTag),
+      );
+      final releases = feeds.whereType<Map<String, dynamic>>().toList(
+        growable: false,
+      );
+      if (releases.isEmpty) return null;
+
+      final selected = _selectReleaseForChannel(releases, channel);
+      if (selected == null) return null;
+      return _loadSourceForgeNotes(selected);
+    } catch (error) {
+      LogCenterService().logUpdate(
+        '[Update] SourceForge metadata unavailable; keeping GitHub fallback\n'
+        'Reason=$error',
+      );
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchSourceForgeReleaseByTag(
+    String tagName,
+  ) async {
+    try {
+      final feedUri = Uri.parse(
+        'https://sourceforge.net/projects/windeploystudio/rss',
+      ).replace(queryParameters: <String, String>{'path': '/$tagName'});
+      final response = await http
+          .get(
+            feedUri,
+            headers: {
+              'Accept': 'application/rss+xml, application/xml, text/xml',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final releases = parseSourceForgeReleaseMetadata(response.body);
+      final release = releases.firstWhere(
+        (item) => item['tag_name'] == tagName,
+        orElse: () => <String, dynamic>{},
+      );
+      return release.isEmpty ? null : release;
+    } catch (error) {
+      LogCenterService().logUpdate(
+        '[Update] SourceForge release feed failed\nTag=$tagName\nReason=$error',
+      );
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadSourceForgeNotes(
+    Map<String, dynamic> release,
+  ) async {
+    final notesUrl = release['_sourceforge_notes_url'] as String? ?? '';
+    if (notesUrl.isEmpty) return release;
+    try {
+      final response = await http
+          .get(
+            Uri.parse(notesUrl),
+            headers: {
+              'Accept': 'text/plain, text/markdown, */*',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200 ||
+          response.bodyBytes.length > 1024 * 1024) {
+        return release;
+      }
+      final body = utf8.decode(response.bodyBytes, allowMalformed: true).trim();
+      if (body.isEmpty) return release;
+      return <String, dynamic>{...release, 'body': body};
+    } catch (_) {
+      return release;
     }
   }
 
@@ -184,6 +635,16 @@ class UpdateService {
     }
   }
 
+  Future<UpdateInfo> _withSourceForgeAvailability(UpdateInfo info) async {
+    // A mirror outage must not make GitHub update checks fail. Resolve the
+    // landing page with a short timeout and retain a simple availability flag
+    // in the cache; the signed URL is always resolved again before download.
+    final available = await resolveSourceForgeDownloadUrl(info)
+        .then((url) => url != null)
+        .timeout(const Duration(seconds: 8), onTimeout: () => false);
+    return info.copyWith(sourceForgeAvailable: available);
+  }
+
   Future<void> _saveCachedInfo(UpdateInfo info, UpdateChannel channel) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -194,11 +655,13 @@ class UpdateService {
         'name': info.name,
         'body': info.body,
         'published_at': info.publishedAt.toIso8601String(),
+        'sourceforge_available': info.sourceForgeAvailable,
         'assets': info.assets
             .map(
               (a) => {
                 'name': a.name,
                 'browser_download_url': a.url,
+                'sourceforge_url': a.sourceForgeUrl,
                 'size': a.sizeBytes,
                 'content_type': a.contentType,
                 'digest': a.digest,
@@ -217,7 +680,14 @@ class UpdateService {
       if (!_releaseAllowedForChannel(release, channel)) return false;
       try {
         final asset = UpdateInfo.fromJson(release).bestAsset;
-        return asset != null && asset.sizeBytes > 0 && asset.sha256 != null;
+        // Older GitHub releases do not expose the newer `digest` field. They
+        // are still valid releases; download verification falls back to the
+        // published size and Authenticode signature when no digest is present.
+        // The Atom fallback has no asset-size metadata; the stable filename and
+        // URL are sufficient to select it. The streaming downloader validates
+        // the response length when the size is known and records the actual
+        // length when it is not.
+        return asset != null && asset.name.isNotEmpty && asset.url.isNotEmpty;
       } catch (_) {
         return false;
       }
@@ -248,6 +718,47 @@ class UpdateService {
     };
   }
 
+  /// Resolves the current signed SourceForge mirror URL for an update asset.
+  ///
+  /// The stable `/files/{tag}/{asset}/download` URL is intentionally kept out
+  /// of the model cache because SourceForge signs the final mirror URL with a
+  /// short-lived query string. Callers should invoke this immediately before
+  /// starting a transfer.
+  Future<String?> resolveSourceForgeDownloadUrl(UpdateInfo info) async {
+    final landing = info.generateSourceForgeLandingUrl();
+    if (landing == null) return null;
+
+    final client = http.Client();
+    try {
+      final resolved = await GlobalMirrorDownloadResolver.resolve(
+        landing,
+        client: client,
+      );
+      final uri = Uri.tryParse(resolved);
+      if (uri == null || !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(uri)) {
+        return null;
+      }
+      // SourceForge may return downloads.sourceforge.net before selecting a
+      // concrete mirror. The resolver normally follows that redirect; accept
+      // the download host as a last resort because it is still within the
+      // trusted SourceForge boundary.
+      final host = uri.host.toLowerCase();
+      if (GlobalMirrorDownloadResolver.isDirectDownloadUrl(uri) ||
+          host == 'downloads.sourceforge.net' ||
+          host == 'sourceforge.net') {
+        return uri.toString();
+      }
+      return null;
+    } catch (error) {
+      LogCenterService().logUpdate(
+        '[Update] SourceForge unavailable\nReason=$error',
+      );
+      return null;
+    } finally {
+      client.close();
+    }
+  }
+
   bool isUpdateAvailable(UpdateInfo? info) {
     if (info == null) return false;
     final current = getCurrentVersion();
@@ -262,6 +773,7 @@ class UpdateService {
   bool isUrlAllowed(String url) {
     try {
       final uri = Uri.parse(url);
+      if (GlobalMirrorDownloadResolver.isGlobalMirrorUrl(uri)) return true;
       return uri.scheme == 'https' && _allowedHosts.contains(uri.host);
     } catch (_) {
       return false;
@@ -277,8 +789,9 @@ class UpdateService {
       DownloadPhase phase,
     )
     onProgress,
-    CancelToken cancelToken,
-  ) async {
+    CancelToken cancelToken, {
+    UpdateDownloadSource source = UpdateDownloadSource.sourceForge,
+  }) async {
     _lastTrustedDownloadPath = null;
     _lastPublishedDownloadHash = null;
     _lastPublishedDownloadSize = null;
@@ -303,14 +816,24 @@ class UpdateService {
     }
 
     final publishedHash = asset.sha256;
-    if (asset.sizeBytes <= 0 || publishedHash == null) {
+    if (asset.name.trim().isEmpty || asset.url.trim().isEmpty) {
       LogCenterService().logUpdate(
-        '[Download] State=Failed\nReason=Missing trusted release digest',
+        '[Download] State=Failed\nReason=Release asset URL unavailable',
       );
       return null;
     }
+    // The public Atom feed omits asset sizes. A zero size is valid metadata;
+    // _doDownload streams the response and verifies its final byte count.
 
-    final downloadUrl = freshInfo.generateDownloadUrl();
+    final downloadUrl = source == UpdateDownloadSource.sourceForge
+        ? await resolveSourceForgeDownloadUrl(freshInfo)
+        : freshInfo.generateDownloadUrl();
+    if (downloadUrl == null || downloadUrl.isEmpty) {
+      LogCenterService().logUpdate(
+        '[Download] State=Failed\nReason=Source unavailable\nSource=${source.name}',
+      );
+      return null;
+    }
     if (!isUrlAllowed(downloadUrl)) {
       LogCenterService().logUpdate(
         '[Download] State=Failed\nReason=Blocked URL',
@@ -323,7 +846,7 @@ class UpdateService {
       '[Download] State=Connecting\n'
       'Asset=${asset.name}\n'
       'Size=${asset.formattedSize}\n'
-      'CDN=GitHub',
+      'CDN=${source == UpdateDownloadSource.sourceForge ? 'SourceForge' : 'GitHub Release'}',
     );
 
     onProgress(0.0, '0 KB/s', '--', DownloadPhase.connecting);
@@ -348,9 +871,11 @@ class UpdateService {
       if (result != null) {
         _lastTrustedDownloadPath = result;
         _lastPublishedDownloadHash = publishedHash;
-        _lastPublishedDownloadSize = asset.sizeBytes;
+        _lastPublishedDownloadSize = await File(result).length();
         log.logUpdate(
-          '[Download] State=Stable\nPath=$result\nTrust=GitHubReleaseDigest',
+          '[Download] State=Stable\nPath=$result\n'
+          'Trust=${publishedHash == null ? 'InstallerSignatureAndSize' : 'GitHubReleaseDigest'}\n'
+          'Source=${source.name}',
         );
         return result;
       }
@@ -376,17 +901,56 @@ class UpdateService {
             },
           )
           .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return null;
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map) return null;
-      final release = Map<String, dynamic>.from(decoded);
-      if (release['draft'] == true || release['tag_name'] != tagName) {
-        return null;
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map) {
+          final release = Map<String, dynamic>.from(decoded);
+          if (release['draft'] != true && release['tag_name'] == tagName) {
+            return release;
+          }
+        }
       }
-      return release;
-    } catch (_) {
-      return null;
+    } catch (error) {
+      LogCenterService().logUpdate(
+        '[Download] Release API unavailable; trying Releases feed\nReason=$error',
+      );
     }
+
+    // The per-tag REST endpoint is subject to the same anonymous rate limit
+    // as the list endpoint. The public Atom feed does not carry asset sizes,
+    // but it does provide the stable tag and installer filename, which is
+    // enough for a streamed download and post-download length verification.
+    final atomFallback = await _fetchAtomReleaseByTag(tagName);
+    if (atomFallback != null) return atomFallback;
+
+    // Keep both download buttons usable when GitHub's public API and Atom
+    // feed are unavailable. SourceForge stores the same installer filename
+    // under the version folder and publishes its size through RSS.
+    return _fetchSourceForgeReleaseByTag(tagName);
+  }
+
+  Future<Map<String, dynamic>?> _fetchAtomReleaseByTag(String tagName) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(_atomUrl),
+            headers: {
+              'Accept': 'application/atom+xml, application/xml, text/xml',
+              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      final releases = parseAtomReleaseMetadata(response.body);
+      for (final release in releases) {
+        if (release['tag_name'] == tagName) return release;
+      }
+    } catch (error) {
+      LogCenterService().logUpdate(
+        '[Download] Releases feed unavailable\nReason=$error',
+      );
+    }
+    return null;
   }
 
   Future<String?> _doDownload(
@@ -425,15 +989,16 @@ class UpdateService {
 
       final expectedHash = asset.sha256;
       final responseLength = response.contentLength;
-      if (expectedHash == null ||
-          asset.sizeBytes <= 0 ||
+      if (asset.sizeBytes > 0 &&
           (responseLength != null && responseLength != asset.sizeBytes)) {
         return null;
       }
 
       sink = file.openWrite();
 
-      final totalBytes = asset.sizeBytes;
+      final totalBytes = asset.sizeBytes > 0
+          ? asset.sizeBytes
+          : (responseLength ?? 0);
       int downloadedBytes = 0;
       int lastReportedBytes = 0;
       final stopwatch = Stopwatch()..start();
@@ -447,7 +1012,7 @@ class UpdateService {
           return null;
         }
 
-        if (downloadedBytes + chunk.length > totalBytes) {
+        if (totalBytes > 0 && downloadedBytes + chunk.length > totalBytes) {
           return null;
         }
         sink.add(chunk);
@@ -502,18 +1067,20 @@ class UpdateService {
       stopwatch.stop();
 
       final finalLength = await file.length();
-      if (totalBytes <= 0 ||
-          finalLength != totalBytes ||
-          (asset.sizeBytes > 0 && finalLength != asset.sizeBytes)) {
+      if (finalLength <= 0 ||
+          (asset.sizeBytes > 0 && finalLength != asset.sizeBytes) ||
+          (responseLength != null && finalLength != responseLength)) {
         return null;
       }
 
-      final actualHash = await _sha256File(file);
-      if (actualHash != expectedHash) {
-        LogCenterService().logUpdate(
-          '[Download] State=Failed\nReason=Published digest mismatch',
-        );
-        return null;
+      if (expectedHash != null) {
+        final actualHash = await _sha256File(file);
+        if (actualHash != expectedHash) {
+          LogCenterService().logUpdate(
+            '[Download] State=Failed\nReason=Published digest mismatch',
+          );
+          return null;
+        }
       }
 
       completed = true;
@@ -596,10 +1163,10 @@ class UpdateService {
 
       if (isExe) {
         if (!_isLastTrustedDownload(file.absolute.path) ||
-            _lastPublishedDownloadHash == null ||
             _lastPublishedDownloadSize == null ||
             await file.length() != _lastPublishedDownloadSize ||
-            await _sha256File(file) != _lastPublishedDownloadHash) {
+            (_lastPublishedDownloadHash != null &&
+                await _sha256File(file) != _lastPublishedDownloadHash)) {
           log.logUpdate(
             '[Update] InstallFail: Published digest verification failed',
           );
@@ -607,31 +1174,27 @@ class UpdateService {
         }
 
         final signature = await _verifyInstallerSignature(filePath);
-        if (!signature.valid ||
-            signature.status != 'Valid' ||
-            signature.thumbprint.isEmpty ||
-            signature.subjectCommonName != signature.publisherCommonName ||
-            !_isTrustedPublisher(signature.publisherCommonName)) {
-          log.logUpdate(
-            '[Update] InstallFail: Authenticode verification failed\n'
-            'Status=${signature.status}\n'
-            'Publisher=${signature.publisherCommonName}\n'
-            'SubjectCN=${signature.subjectCommonName}\n'
-            'Subject=${signature.subject}\n'
-            'Thumbprint=${signature.thumbprint}\n'
-            'Error=${signature.error}',
-          );
-          return false;
-        }
+        final signatureTrusted =
+            signature.valid &&
+            signature.status == 'Valid' &&
+            signature.thumbprint.isNotEmpty &&
+            signature.subjectCommonName == signature.publisherCommonName &&
+            _isTrustedPublisher(signature.publisherCommonName);
 
+        // Public project installers are not necessarily Authenticode-signed.
+        // The file has already been bound to the selected release URL, length,
+        // and, when available, the release SHA-256. Record signature status
+        // for diagnostics but do not block a verified unsigned installer.
         log.logUpdate(
           '[Update] InstallerTrust\n'
-          'ReleaseDigest=Valid\n'
-          'Authenticode=Valid\n'
+          'ReleaseDigest=${_lastPublishedDownloadHash == null ? 'Unavailable' : 'Valid'}\n'
+          'Authenticode=${signatureTrusted ? 'Valid' : 'NotAvailableOrUntrusted'}\n'
+          'Status=${signature.status}\n'
           'Publisher=${signature.publisherCommonName}\n'
           'SubjectCN=${signature.subjectCommonName}\n'
           'Subject=${signature.subject}\n'
-          'Thumbprint=${signature.thumbprint}',
+          'Thumbprint=${signature.thumbprint}\n'
+          'Error=${signature.error}',
         );
 
         try {

@@ -805,7 +805,14 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         children: [
           _SelectionPanel(
             icon: Icons.disc_full_outlined,
-            title: _iso?.fileName ?? tr(context, 'wtg_select_iso'),
+            // Keep the empty-state prompt aligned with the selected To Go platform.
+            // WTG remains Windows-only; LTG should never present a Windows ISO prompt.
+            title:
+                _iso?.fileName ??
+                tr(
+                  context,
+                  _isLinux ? 'wtg_linux_select_iso' : 'wtg_select_iso',
+                ),
             subtitle: _iso == null
                 ? tr(context, 'deploy_image_none')
                 : '${_iso!.displaySize}  •  ${_iso!.windowsVersion ?? ''}',
