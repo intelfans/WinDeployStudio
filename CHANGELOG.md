@@ -21,6 +21,10 @@ All notable changes to WinDeploy Studio are documented here.
 - Added explicit third-party, README, installer, and localized UI notices for
   this distribution gate.
 
+## v2.0.6
+
+- Updated the application, Windows metadata, installer, build script, and documentation to version 2.0.6.
+
 ## v2.0.0
 
 ### New Features

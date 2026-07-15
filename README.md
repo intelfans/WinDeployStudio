@@ -5,7 +5,7 @@ Windows desktop toolkit for Windows/Linux installation media, portable To Go wor
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Flutter](https://img.shields.io/badge/Flutter-Windows-02569B?logo=flutter)
-![Version](https://img.shields.io/badge/Version-2.0.0-orange)
+![Version](https://img.shields.io/badge/Version-2.0.6-orange)
 
 ## Overview
 

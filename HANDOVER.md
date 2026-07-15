@@ -1,7 +1,7 @@
 # WinDeploy Studio 交接文档
 
 最后更新：2026-07-12  
-当前版本：2.0.0  
+当前版本：2.0.6
 目标平台：Windows 10/11 x64  
 主工作区：`D:\Dev\WinDeployStudio`
 
@@ -33,12 +33,12 @@
 
 | 文件 | 当前值 |
 | --- | --- |
-| `pubspec.yaml` | `2.0.0` |
-| `lib/core/constants/app_constants.dart` | `2.0.0` |
-| `windows/runner/Runner.rc` | `2.0.0` / `2,0,0,0` |
-| `installer/windows/WinDeployStudio.iss` | `2.0.0` / `2.0.0.0` |
-| `scripts/build_installer.ps1` | `WinDeployStudio_Setup_2.0.0.exe` |
-| `README.md` | 版本徽章 `2.0.0` |
+| `pubspec.yaml` | `2.0.6` |
+| `lib/core/constants/app_constants.dart` | `2.0.6` |
+| `windows/runner/Runner.rc` | `2.0.6` / `2,0,6,0` |
+| `installer/windows/WinDeployStudio.iss` | `2.0.6` / `2.0.6.0` |
+| `scripts/build_installer.ps1` | `WinDeployStudio_Setup_2.0.6.exe` |
+| `README.md` | 版本徽章 `2.0.6` |
 
 ## 3. 目录与入口
 
