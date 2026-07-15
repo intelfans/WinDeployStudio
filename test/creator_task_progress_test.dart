@@ -44,6 +44,23 @@ void main() {
     );
   });
 
+  test('failed terminal state preserves a separate error diagnostic', () {
+    const diagnostic = 'DiskPart returned access denied.';
+    const finalProgress = CreateProgress(
+      step: CreateStep.failed,
+      message: 'boot_partition_failed',
+      error: diagnostic,
+    );
+
+    final state = finishCreatorTask(
+      success: false,
+      latestProgress: finalProgress,
+      cancelRequested: false,
+    );
+
+    expect(state.progress.error, diagnostic);
+  });
+
   test('requested cancellation becomes a terminal cancelled result', () {
     const finalProgress = CreateProgress(
       step: CreateStep.failed,

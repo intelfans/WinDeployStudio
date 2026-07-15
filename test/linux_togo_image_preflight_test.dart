@@ -119,6 +119,50 @@ void main() {
     },
   );
 
+  test('accepts the structurally bounded Deepin Live profile', () async {
+    await _writeDeepinLayout(testRoot);
+
+    final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
+      testRoot.path,
+      includeContentManifest: true,
+    );
+
+    expect(result.status, LinuxToGoImageStatus.supported);
+    final image = result.image;
+    expect(image, isNotNull);
+    expect(image!.family, LinuxToGoImageFamily.deepinLive);
+    expect(
+      image.persistenceStrategy,
+      LinuxToGoPersistenceStrategy.debianPersistenceImage,
+    );
+    expect(image.kernelRelativePath, 'live/vmlinuz.efi');
+    expect(image.initrdRelativePath, 'live/initrd');
+    expect(image.livePayloads.single.relativePath, 'live/filesys0.squ');
+    expect(image.livePayloadExtensions, contains('squ'));
+    expect(image.hasCompleteContentManifest, isTrue);
+    expect(image.contentFiles, isNotEmpty);
+    expect(
+      image.contentFiles.any(
+        (file) => file.relativePath == 'live/filesys0.squ',
+      ),
+      isTrue,
+    );
+  });
+
+  test('accepts the Deepin 25 Linglong layout marker', () async {
+    await _writeDeepinLayout(testRoot, useLinglongMarker: true);
+
+    final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
+      testRoot.path,
+      includeContentManifest: true,
+    );
+
+    expect(result.status, LinuxToGoImageStatus.supported);
+    expect(result.image?.family, LinuxToGoImageFamily.deepinLive);
+    expect(result.image?.kernelRelativePath, 'live/vmlinuz.efi');
+    expect(result.image?.initrdRelativePath, 'live/initrd');
+  });
+
   test(
     'recognizes a Windows installer before classifying Linux layouts',
     () async {
@@ -188,6 +232,30 @@ Future<void> _writeDebianLayout(
     '}\n',
   );
   await _writeFile(p.join(root.path, 'EFI', 'BOOT', 'BOOTX64.EFI'), [6]);
+}
+
+Future<void> _writeDeepinLayout(
+  Directory root, {
+  bool useLinglongMarker = false,
+}) async {
+  await _writeFile(
+    p.join(
+      root.path,
+      'live',
+      useLinglongMarker ? 'filesystem.linglong-manifest' : 'filesyst.lin',
+    ),
+    [1],
+  );
+  await _writeFile(p.join(root.path, 'live', 'vmlinuz.efi'), [2]);
+  await _writeFile(p.join(root.path, 'live', 'initrd'), [3]);
+  await _writeFile(p.join(root.path, 'live', 'filesys0.squ'), [4, 5, 6]);
+  await _writeText(
+    p.join(root.path, 'boot', 'grub', 'grub.cfg'),
+    'menuentry "Deepin" {\n'
+    '  linux /live/vmlinuz.efi boot=live union=overlay ---\n'
+    '}\n',
+  );
+  await _writeFile(p.join(root.path, 'EFI', 'BOOT', 'BOOTX64.EFI'), [7]);
 }
 
 Future<void> _writeWindowsInstallerLayout(Directory root) async {

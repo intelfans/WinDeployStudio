@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'bootable_media_validation.dart';
+import 'background_file_hash_service.dart';
 import 'file_logger_service.dart';
 import 'disk_safety_service.dart';
 import 'in_memory_powershell.dart';
@@ -14,6 +15,7 @@ import 'linux_driver_staging_service.dart';
 import 'linux_media_preflight.dart';
 import 'linux_togo_image_preflight.dart';
 import 'windows_iso_preflight.dart';
+import 'windows_system_environment.dart';
 import '../../features/deployment/models/deployment_plan.dart';
 import '../../features/logs/services/log_center_service.dart';
 
@@ -62,8 +64,14 @@ class BootableUsbService {
   static const String _debianPersistenceFileName = 'persistence';
   static const String _debianPersistenceVolumeLabel = 'persistence';
   static const String _debianPersistenceConfiguration = '/ union\n';
+  static const String _ext4BuilderExecutableName = 'wds_ext4_builder.exe';
+  static const String _ext4BuilderSha256 =
+      '85f4c3e74f6e005ecf94e0d688e1de6d35b715af21716151c4a23e9f52ab6184';
 
-  static const bool linuxPersistenceToolDistributionApproved = false;
+  /// The bundled helper is a narrow MIT-licensed ext4 image writer with its
+  /// pinned source and notices in tools/ext4-builder. This is intentionally
+  /// unrelated to the excluded GPL e2fsprogs distribution.
+  static const bool linuxPersistenceToolDistributionApproved = true;
 
   @visibleForTesting
   static String linuxToGoPersistenceFileNameForFamily(
@@ -71,6 +79,7 @@ class BootableUsbService {
   ) => switch (family) {
     LinuxToGoImageFamily.casper => _casperPersistenceFileName,
     LinuxToGoImageFamily.debianLive => _debianPersistenceFileName,
+    LinuxToGoImageFamily.deepinLive => _debianPersistenceFileName,
   };
 
   @visibleForTesting
@@ -79,6 +88,7 @@ class BootableUsbService {
   ) => switch (family) {
     LinuxToGoImageFamily.casper => 'persistent',
     LinuxToGoImageFamily.debianLive => 'persistence',
+    LinuxToGoImageFamily.deepinLive => 'persistence',
   };
 
   final Ref ref;
@@ -88,6 +98,17 @@ class BootableUsbService {
   Process? _activeLinuxUtilityProcess;
 
   BootableUsbService(this.ref);
+
+  Future<ProcessResult> _runPowerShell(
+    List<String> arguments, {
+    Map<String, String>? environment,
+  }) {
+    return Process.run(
+      WindowsSystemEnvironment.powerShellExecutable,
+      arguments,
+      environment: WindowsSystemEnvironment.withSystemRoot(environment),
+    );
+  }
 
   void cancel() {
     _cancelRequested = true;
@@ -146,12 +167,29 @@ class BootableUsbService {
     required String bootLetter,
     required String liveLetter,
     required String liveVolumeLabel,
+    String currentPartitionStyle = 'Unknown',
   }) => _buildLinuxToGoDiskpartScript(
     diskNumber: diskNumber,
     bootPartitionSizeMb: bootPartitionSizeMb,
     bootLetter: bootLetter,
     liveLetter: liveLetter,
     liveVolumeLabel: liveVolumeLabel,
+    currentPartitionStyle: currentPartitionStyle,
+  );
+
+  @visibleForTesting
+  static String installMediaDiskpartScriptForTesting({
+    required int diskNumber,
+    required String currentPartitionStyle,
+    required DeploymentBootMode deploymentBootMode,
+    required String volumeLabel,
+    String preferredDriveLetter = '',
+  }) => _buildInstallMediaDiskpartScript(
+    diskNumber: diskNumber,
+    currentPartitionStyle: currentPartitionStyle,
+    deploymentBootMode: deploymentBootMode,
+    preferredDriveLetter: preferredDriveLetter,
+    volumeLabel: volumeLabel,
   );
 
   @visibleForTesting
@@ -692,7 +730,7 @@ class BootableUsbService {
     if (kind == LinuxUsbKind.toGo) {
       final imageInspection = await ref
           .read(linuxToGoImagePreflightProvider)
-          .inspect(isoPath);
+          .inspectForDeployment(isoPath);
       if (!imageInspection.canCreate) {
         final messageKey =
             imageInspection.messageKey ?? 'linux_togo_unsupported_iso';
@@ -713,7 +751,7 @@ class BootableUsbService {
 
       // Validate the bundled persistence tool before doing any target-disk
       // work. Source compatibility and local tool availability are separate.
-      if (await _findMke2fs() == null) {
+      if (await _findExt4Builder() == null) {
         _notify(
           onProgress,
           const CreateProgress(
@@ -1078,6 +1116,17 @@ class BootableUsbService {
         );
       }
 
+      if (!freshImage.hasCompleteContentManifest) {
+        _logLine(
+          'Linux To Go preflight did not produce a complete source manifest.',
+        );
+        return const _LinuxRawWriteResult(
+          success: false,
+          error:
+              'Linux To Go source verification did not complete before disk preparation.',
+        );
+      }
+
       if (stagingBundle != null && !freshImage.supportsDriverStaging) {
         _logLine(
           'Linux To Go image family ${freshImage.family.name} does not '
@@ -1259,6 +1308,8 @@ class BootableUsbService {
           targetDrive: liveDrive,
           excludeWim: false,
           excludeAutoUnattend: false,
+          expectedTotalBytes: freshImage.totalContentBytes,
+          deferContentVerification: true,
           onProgress: (progress) {
             _notify(
               onProgress,
@@ -1283,7 +1334,9 @@ class BootableUsbService {
           targetDrive: bootDrive,
           excludeWim: false,
           excludeAutoUnattend: false,
-          excludedExtensions: const {'squashfs', 'ext2'},
+          excludedExtensions: freshImage.livePayloadExtensions,
+          expectedTotalBytes: freshImage.bootContentBytes,
+          deferContentVerification: true,
           onProgress: (progress) {
             _notify(
               onProgress,
@@ -1438,7 +1491,7 @@ class BootableUsbService {
     }
     final inspection = await ref
         .read(linuxToGoImagePreflightProvider)
-        .inspect(isoPath);
+        .inspectForDeployment(isoPath);
     if (inspection.canCreate && inspection.image != null) {
       final image = inspection.image!;
       _logLine(
@@ -1533,8 +1586,7 @@ class BootableUsbService {
 
   Future<bool?> _isPathOnTargetDisk(String path, int targetDiskNumber) async {
     try {
-      final result = await Process.run(
-        'powershell',
+      final result = await _runPowerShell(
         const [
           '-NoProfile',
           '-NonInteractive',
@@ -1566,7 +1618,7 @@ if ($partitions.Count -ne 1) {
 
   Future<int?> _getDiskSizeBytes(int diskNumber) async {
     try {
-      final result = await Process.run('powershell', [
+      final result = await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -1609,6 +1661,7 @@ if ($partitions.Count -ne 1) {
       bootLetter: letters.bootLetter,
       liveLetter: letters.liveLetter,
       liveVolumeLabel: liveVolumeLabel,
+      currentPartitionStyle: disk.partitionStyle,
     );
     _logLine('Linux To Go DiskPart script:\n$script');
 
@@ -1641,19 +1694,23 @@ if ($partitions.Count -ne 1) {
     required String bootLetter,
     required String liveLetter,
     required String liveVolumeLabel,
-  }) =>
-      '''
-select disk $diskNumber
-clean
-convert gpt
-create partition efi size=$bootPartitionSizeMb
-format fs=fat32 label="WDS_LTG" quick
-assign letter=$bootLetter
-create partition primary
-format fs=ntfs label="$liveVolumeLabel" quick
-assign letter=$liveLetter
-exit
-''';
+    required String currentPartitionStyle,
+  }) {
+    final currentStyle = currentPartitionStyle.trim().toUpperCase();
+    final commands = <String>[
+      'select disk $diskNumber',
+      'clean',
+      if (currentStyle != 'GPT') 'convert gpt',
+      'create partition efi size=$bootPartitionSizeMb',
+      'format fs=fat32 label="WDS_LTG" quick',
+      'assign letter=$bootLetter',
+      'create partition primary',
+      'format fs=ntfs label="$liveVolumeLabel" quick',
+      'assign letter=$liveLetter',
+      'exit',
+    ];
+    return '${commands.join('\n')}\n';
+  }
 
   bool _diskpartSucceeded(ProcessResult result) {
     if (result.exitCode != 0) return false;
@@ -1697,7 +1754,7 @@ exit
 
   Future<Set<String>?> _getUsedDriveLetters() async {
     try {
-      final result = await Process.run('powershell', [
+      final result = await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -1746,8 +1803,7 @@ $letters |
     final letter = drive.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
     for (var attempt = 1; attempt <= 30; attempt++) {
       try {
-        final result = await Process.run(
-          'powershell',
+        final result = await _runPowerShell(
           [
             '-NoProfile',
             '-ExecutionPolicy',
@@ -1838,7 +1894,9 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       '$escapedKernelPath(?:\\s|\$)',
       caseSensitive: false,
     );
-    final requiresLiveBoot = image.family == LinuxToGoImageFamily.debianLive;
+    final requiresLiveBoot =
+        image.family == LinuxToGoImageFamily.debianLive ||
+        image.family == LinuxToGoImageFamily.deepinLive;
     final liveBootPattern = RegExp(
       r'(^|\s)boot=live(?:\s|$)',
       caseSensitive: false,
@@ -1945,6 +2003,9 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
               LinuxToGoPersistenceStrategy.casperWritableImage) ||
       (image.family == LinuxToGoImageFamily.debianLive &&
           image.persistenceStrategy ==
+              LinuxToGoPersistenceStrategy.debianPersistenceImage) ||
+      (image.family == LinuxToGoImageFamily.deepinLive &&
+          image.persistenceStrategy ==
               LinuxToGoPersistenceStrategy.debianPersistenceImage);
 
   static String _linuxToGoPersistenceFileName(LinuxToGoSupportedImage image) =>
@@ -1989,12 +2050,12 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         error: 'Unsupported Linux To Go persistence strategy.',
       );
     }
-    final mke2fs = await _findMke2fs();
-    if (mke2fs == null) {
+    final ext4Builder = await _findExt4Builder();
+    if (ext4Builder == null) {
       return const _LinuxRawWriteResult(
         success: false,
         error:
-            'Bundled mke2fs.exe was not found. Linux To Go persistence requires mke2fs to create an ext4 writable image.',
+            'The bundled Linux persistence component is missing or did not pass integrity verification.',
       );
     }
 
@@ -2011,82 +2072,75 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     if (await persistenceImage.exists()) {
       await persistenceImage.delete();
     }
+    final arguments = <String>[
+      '--output',
+      persistenceImage.path,
+      '--size-mb',
+      '$sizeMb',
+      '--label',
+      volumeLabel,
+      if (configuration != null) '--debian-persistence',
+    ];
+    final result = await _runLinuxUtility(
+      ext4Builder,
+      arguments,
+      timeout: const Duration(minutes: 5),
+    );
 
-    final raf = await persistenceImage.open(mode: FileMode.write);
-    try {
-      await raf.truncate(sizeMb * 1024 * 1024);
-    } finally {
-      await raf.close();
+    _logLine('ext4 builder exit: ${result.exitCode}');
+    if (result.stdout.toString().trim().isNotEmpty) {
+      _logLine('ext4 builder stdout: ${result.stdout}');
+    }
+    if (result.stderr.toString().trim().isNotEmpty) {
+      _logLine('ext4 builder stderr: ${result.stderr}');
     }
 
-    Directory? seedDirectory;
-    try {
-      final arguments = <String>['-t', 'ext4', '-F', '-L', volumeLabel];
-      if (configuration != null) {
-        seedDirectory = await Directory.systemTemp.createTemp(
-          'wds_ltg_persistence_',
-        );
-        await File(
-          p.join(seedDirectory.path, 'persistence.conf'),
-        ).writeAsString(configuration, encoding: utf8, flush: true);
-        arguments
-          ..add('-d')
-          ..add(seedDirectory.path);
-      }
-      arguments.add(persistenceImage.path);
-
-      final result = await _runLinuxUtility(
-        mke2fs,
-        arguments,
-        timeout: const Duration(minutes: 5),
+    if (result.exitCode != 0) {
+      return _LinuxRawWriteResult(
+        success: false,
+        error: result.stderr.toString().trim().isNotEmpty
+            ? result.stderr.toString().trim()
+            : 'The Linux persistence component failed with exit code ${result.exitCode}.',
       );
-
-      _logLine('mke2fs exit: ${result.exitCode}');
-      if (result.stdout.toString().trim().isNotEmpty) {
-        _logLine('mke2fs stdout: ${result.stdout}');
-      }
-      if (result.stderr.toString().trim().isNotEmpty) {
-        _logLine('mke2fs stderr: ${result.stderr}');
-      }
-
-      if (result.exitCode != 0) {
-        return _LinuxRawWriteResult(
-          success: false,
-          error: result.stderr.toString().trim().isNotEmpty
-              ? result.stderr.toString().trim()
-              : 'mke2fs failed with exit code ${result.exitCode}.',
-        );
-      }
-
-      final verified = await _verifyExt4PersistenceImage(
-        persistenceImage,
-        expectedVolumeLabel: volumeLabel,
-        expectedConfiguration: configuration,
-      );
-      if (!verified) {
-        return _LinuxRawWriteResult(
-          success: false,
-          error:
-              'The ext4 $fileName persistence image did not pass post-create verification.',
-        );
-      }
-      return const _LinuxRawWriteResult(success: true);
-    } finally {
-      if (seedDirectory != null && await seedDirectory.exists()) {
-        await seedDirectory.delete(recursive: true);
-      }
     }
+
+    final verified = await _verifyExt4PersistenceImage(
+      persistenceImage,
+      expectedVolumeLabel: volumeLabel,
+      expectedConfiguration: configuration,
+    );
+    if (!verified) {
+      return _LinuxRawWriteResult(
+        success: false,
+        error:
+            'The ext4 $fileName persistence image did not pass post-create verification.',
+      );
+    }
+    return const _LinuxRawWriteResult(success: true);
   }
 
-  Future<String?> _findMke2fs() async {
-    if (!linuxPersistenceToolDistributionApproved) {
-      _logLine(
-        'No compliant mke2fs distribution is available. Linux To Go '
-        'persistence is disabled until its complete corresponding source and '
-        'reproducible build inputs can be shipped with the binary.',
-      );
+  Future<String?> _findExt4Builder() async {
+    if (!linuxPersistenceToolDistributionApproved || !Platform.isWindows) {
+      return null;
     }
-    return null;
+    final helper = File(
+      p.join(
+        p.dirname(Platform.resolvedExecutable),
+        'tools',
+        'ext4-builder',
+        _ext4BuilderExecutableName,
+      ),
+    );
+    if (!await helper.exists()) {
+      _logLine('Linux persistence helper is missing: ${helper.path}');
+      return null;
+    }
+    final digest = await BackgroundFileHashService.sha256File(helper);
+    if (digest.toLowerCase() != _ext4BuilderSha256) {
+      _logLine('Linux persistence helper integrity check failed.');
+      return null;
+    }
+    return helper.path;
   }
 
   Future<_LinuxRawWriteResult> _verifyLinuxToGoCopies({
@@ -2096,6 +2150,12 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     required LinuxToGoSupportedImage image,
   }) async {
     try {
+      if (!image.hasCompleteContentManifest) {
+        return const _LinuxRawWriteResult(
+          success: false,
+          error: 'Linux To Go source manifest is incomplete.',
+        );
+      }
       final sourceRoot = mountPoint.endsWith(r'\')
           ? mountPoint
           : '$mountPoint\\';
@@ -2104,25 +2164,28 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       var verifiedLiveBytes = 0;
       var verifiedBootBytes = 0;
 
-      await for (final entity in Directory(
-        sourceRoot,
-      ).list(recursive: true, followLinks: false)) {
-        if (entity is! File) continue;
-        final relativePath = p.relative(entity.path, from: sourceRoot);
-        final sourceLength = await entity.length();
-        final sourceDigest = (await sha256.bind(entity.openRead()).first)
-            .toString();
-        verifiedLiveBytes += sourceLength;
+      for (final contentFile in image.contentFiles) {
+        final relativePath = contentFile.relativePath;
+        final source = File(p.join(sourceRoot, relativePath));
+        if (!await source.exists() ||
+            await source.length() != contentFile.sizeBytes) {
+          return _LinuxRawWriteResult(
+            success: false,
+            error:
+                'Linux source changed during copy verification: $relativePath',
+          );
+        }
+        final sourceDigest = await BackgroundFileHashService.sha256File(source);
+        verifiedLiveBytes += contentFile.sizeBytes;
         final liveFile = File(p.join(liveRoot, relativePath));
         if (!await liveFile.exists() ||
-            await liveFile.length() != sourceLength) {
+            await liveFile.length() != contentFile.sizeBytes) {
           return _LinuxRawWriteResult(
             success: false,
             error: 'Linux Live copy verification failed: $relativePath',
           );
         }
-        final liveDigest = (await sha256.bind(liveFile.openRead()).first)
-            .toString();
+        final liveDigest = await BackgroundFileHashService.sha256File(liveFile);
         if (liveDigest != sourceDigest) {
           return _LinuxRawWriteResult(
             success: false,
@@ -2132,8 +2195,7 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
           );
         }
 
-        final extension = p.extension(relativePath).toLowerCase();
-        final isLivePayload = extension == '.squashfs' || extension == '.ext2';
+        final isLivePayload = image.isLivePayloadPath(relativePath);
         final bootFile = File(p.join(bootRoot, relativePath));
         if (isLivePayload) {
           if (await bootFile.exists()) {
@@ -2144,14 +2206,15 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
             );
           }
         } else if (!await bootFile.exists() ||
-            await bootFile.length() != sourceLength) {
+            await bootFile.length() != contentFile.sizeBytes) {
           return _LinuxRawWriteResult(
             success: false,
             error: 'Linux boot copy verification failed: $relativePath',
           );
         } else {
-          final bootDigest = (await sha256.bind(bootFile.openRead()).first)
-              .toString();
+          final bootDigest = await BackgroundFileHashService.sha256File(
+            bootFile,
+          );
           if (bootDigest != sourceDigest) {
             return _LinuxRawWriteResult(
               success: false,
@@ -2160,7 +2223,7 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
                   '(source=$sourceDigest, copy=$bootDigest)',
             );
           }
-          verifiedBootBytes += sourceLength;
+          verifiedBootBytes += contentFile.sizeBytes;
         }
       }
 
@@ -2381,7 +2444,8 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       ).hasMatch(line);
       return isLinuxLine &&
           kernelPattern.hasMatch(line) &&
-          (image.family != LinuxToGoImageFamily.debianLive ||
+          ((image.family != LinuxToGoImageFamily.debianLive &&
+                  image.family != LinuxToGoImageFamily.deepinLive) ||
               liveBootPattern.hasMatch(line)) &&
           persistencePattern.hasMatch(line) &&
           liveMediaPattern.hasMatch(line);
@@ -2549,8 +2613,7 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
   }) async {
     try {
       final letter = drive.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
-      final result = await Process.run(
-        'powershell',
+      final result = await _runPowerShell(
         [
           '-NoProfile',
           '-ExecutionPolicy',
@@ -2815,12 +2878,11 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     _logLine('$reason; terminating process tree PID ${process.pid}');
     if (Platform.isWindows) {
       try {
-        final result = await Process.run('taskkill', [
-          '/PID',
-          '${process.pid}',
-          '/T',
-          '/F',
-        ]).timeout(const Duration(seconds: 15));
+        final result = await Process.run(
+          WindowsSystemEnvironment.taskkillExecutable,
+          ['/PID', '${process.pid}', '/T', '/F'],
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+        ).timeout(const Duration(seconds: 15));
         _logLine('taskkill PID ${process.pid} exit: ${result.exitCode}');
       } catch (error) {
         _logLine('taskkill PID ${process.pid} failed: $error');
@@ -3512,23 +3574,13 @@ Write-Output "WDS_DISK_ONLINE"
     }
     final label = _sanitizeVolumeLabel(volumeLabel, fallback: 'WDS_BOOT');
     final useGpt = deploymentBootMode == DeploymentBootMode.uefiGpt;
-    final activeLine = deploymentBootMode == DeploymentBootMode.legacyBios
-        ? 'active'
-        : '';
-    final assignLine = requestedLetter == null
-        ? 'assign'
-        : 'assign letter=$requestedLetter';
-    final script =
-        '''
-select disk $diskNumber
-clean
-convert ${useGpt ? 'gpt' : 'mbr'}
-create partition primary
-$activeLine
-format fs=fat32 label="$label" quick
-$assignLine
-exit
-''';
+    final script = _buildInstallMediaDiskpartScript(
+      diskNumber: diskNumber,
+      currentPartitionStyle: disk.partitionStyle,
+      deploymentBootMode: deploymentBootMode,
+      preferredDriveLetter: requestedLetter ?? '',
+      volumeLabel: label,
+    );
     _logLine('DiskPart script:\n$script');
 
     final result = await ref
@@ -3574,6 +3626,36 @@ exit
     return _DiskPartResult(success: true, driveLetter: driveLetter);
   }
 
+  static String _buildInstallMediaDiskpartScript({
+    required int diskNumber,
+    required String currentPartitionStyle,
+    required DeploymentBootMode deploymentBootMode,
+    required String preferredDriveLetter,
+    required String volumeLabel,
+  }) {
+    final targetStyle = deploymentBootMode == DeploymentBootMode.uefiGpt
+        ? 'GPT'
+        : 'MBR';
+    final currentStyle = currentPartitionStyle.trim().toUpperCase();
+    // DiskPart `clean` removes partitions but deliberately keeps the disk's
+    // partition-table type. Re-running a matching `convert` command fails.
+    final conversion = currentStyle == targetStyle
+        ? null
+        : 'convert ${targetStyle.toLowerCase()}';
+    final normalizedLetter = _normalizePreferredLetter(preferredDriveLetter);
+    final commands = <String>[
+      'select disk $diskNumber',
+      'clean',
+      ?conversion,
+      'create partition primary',
+      if (deploymentBootMode == DeploymentBootMode.legacyBios) 'active',
+      'format fs=fat32 label="$volumeLabel" quick',
+      normalizedLetter == null ? 'assign' : 'assign letter=$normalizedLetter',
+      'exit',
+    ];
+    return '${commands.join('\n')}\n';
+  }
+
   Future<bool> _verifyInstallMediaPartition({
     required int diskNumber,
     required String driveLetter,
@@ -3582,8 +3664,7 @@ exit
   }) async {
     try {
       final letter = driveLetter.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
-      final result = await Process.run(
-        'powershell',
+      final result = await _runPowerShell(
         [
           '-NoProfile',
           '-ExecutionPolicy',
@@ -3616,7 +3697,7 @@ $disk = Get-Disk -Number $partition.DiskNumber -ErrorAction Stop
     }
   }
 
-  String? _normalizePreferredLetter(String value) {
+  static String? _normalizePreferredLetter(String value) {
     final normalized = value
         .trim()
         .replaceAll(RegExp(r'[:\\]'), '')
@@ -3627,8 +3708,7 @@ $disk = Get-Disk -Number $partition.DiskNumber -ErrorAction Stop
 
   Future<bool> _isDriveLetterAvailable(String letter, int diskNumber) async {
     try {
-      final result = await Process.run(
-        'powershell',
+      final result = await _runPowerShell(
         const [
           '-NoProfile',
           '-ExecutionPolicy',
@@ -3662,7 +3742,7 @@ exit 1''',
 
   Future<String?> _findDriveLetterForDisk(int diskNumber) async {
     try {
-      final result = await Process.run('powershell', [
+      final result = await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -3688,7 +3768,7 @@ exit 1''',
     required String fileSystem,
   }) async {
     try {
-      final result = await Process.run('powershell', [
+      final result = await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -3711,7 +3791,7 @@ exit 1''',
       _logLine('Mounting ISO: $isoPath');
 
       // Clean up any stale mount
-      await Process.run('powershell', [
+      await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -3720,7 +3800,7 @@ exit 1''',
       ]).timeout(const Duration(seconds: 10));
 
       // Mount
-      final mountResult = await Process.run('powershell', [
+      final mountResult = await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -3736,7 +3816,7 @@ exit 1''',
       // Get drive letter with retries
       for (int i = 0; i < 5; i++) {
         await Future.delayed(const Duration(milliseconds: 500));
-        final letterResult = await Process.run('powershell', [
+        final letterResult = await _runPowerShell([
           '-NoProfile',
           '-ExecutionPolicy',
           'Bypass',
@@ -3763,7 +3843,7 @@ exit 1''',
   Future<void> _unmountIso(String isoPath) async {
     try {
       final escapedPath = isoPath.replaceAll("'", "''");
-      await Process.run('powershell', [
+      await _runPowerShell([
         '-NoProfile',
         '-ExecutionPolicy',
         'Bypass',
@@ -3784,6 +3864,8 @@ exit 1''',
     required bool excludeWim,
     bool excludeAutoUnattend = true,
     Set<String> excludedExtensions = const {},
+    int? expectedTotalBytes,
+    bool deferContentVerification = false,
     void Function(double progress)? onProgress,
   }) async {
     try {
@@ -3830,11 +3912,17 @@ exit 1''',
 
       _logLine('robocopy args: ${args.join(" ")}');
 
-      final totalBytes = await _directorySize(
-        srcDir,
-        excludedNames: excludedNames,
-        excludedExtensions: normalizedExtensions,
-      );
+      // Linux To Go supplies a manifest captured in a worker isolate during
+      // preflight. Re-crawling a mounted 6+ GB ISO every second while robocopy
+      // runs can monopolize the UI isolate and make the entire window appear
+      // frozen. Other callers retain the legacy live-size progress path.
+      final totalBytes =
+          expectedTotalBytes ??
+          await _directorySize(
+            srcDir,
+            excludedNames: excludedNames,
+            excludedExtensions: normalizedExtensions,
+          );
       _logLine('robocopy total bytes: $totalBytes');
 
       onProgress?.call(0.0);
@@ -3855,29 +3943,36 @@ exit 1''',
         return code;
       });
 
-      var lastLoggedPercent = -1;
-      while (!completed) {
-        await Future.any([
-          exitFuture,
-          Future<void>.delayed(const Duration(seconds: 1)),
-        ]);
+      if (expectedTotalBytes != null) {
+        // Keep the known copy stage visible without periodically walking the
+        // destination tree. Exact file and SHA-256 verification follows the
+        // copy using the same manifest.
+        await exitFuture;
+      } else {
+        var lastLoggedPercent = -1;
+        while (!completed) {
+          await Future.any([
+            exitFuture,
+            Future<void>.delayed(const Duration(seconds: 1)),
+          ]);
 
-        if (totalBytes <= 0) continue;
+          if (totalBytes <= 0) continue;
 
-        final copiedBytes = await _directorySize(
-          dstDir,
-          excludedNames: excludedNames,
-          excludedExtensions: normalizedExtensions,
-        );
-        final progress = (copiedBytes / totalBytes).clamp(0.0, 0.99);
-        onProgress?.call(progress);
-
-        final percent = (progress * 100).floor();
-        if (percent >= lastLoggedPercent + 10) {
-          lastLoggedPercent = percent;
-          _logLine(
-            'robocopy progress: $percent% ($copiedBytes / $totalBytes bytes)',
+          final copiedBytes = await _directorySize(
+            dstDir,
+            excludedNames: excludedNames,
+            excludedExtensions: normalizedExtensions,
           );
+          final progress = (copiedBytes / totalBytes).clamp(0.0, 0.99);
+          onProgress?.call(progress);
+
+          final percent = (progress * 100).floor();
+          if (percent >= lastLoggedPercent + 10) {
+            lastLoggedPercent = percent;
+            _logLine(
+              'robocopy progress: $percent% ($copiedBytes / $totalBytes bytes)',
+            );
+          }
         }
       }
 
@@ -3899,15 +3994,21 @@ exit 1''',
         return false;
       }
 
-      final contentVerified = await _verifyCopiedTree(
-        sourceRoot: srcDir,
-        targetRoot: dstDir,
-        excludedNames: excludedNames,
-        excludedExtensions: normalizedExtensions,
-      );
-      if (!contentVerified) {
-        _logLine('robocopy content verification FAILED');
-        return false;
+      if (deferContentVerification) {
+        _logLine(
+          'robocopy content verification deferred to Linux To Go manifest',
+        );
+      } else {
+        final contentVerified = await _verifyCopiedTree(
+          sourceRoot: srcDir,
+          targetRoot: dstDir,
+          excludedNames: excludedNames,
+          excludedExtensions: normalizedExtensions,
+        );
+        if (!contentVerified) {
+          _logLine('robocopy content verification FAILED');
+          return false;
+        }
       }
 
       onProgress?.call(1.0);
@@ -3947,10 +4048,8 @@ exit 1''',
           _logLine('Copy verification missing/truncated: $relativePath');
           return false;
         }
-        final sourceDigest = (await sha256.bind(entity.openRead()).first)
-            .toString();
-        final targetDigest = (await sha256.bind(target.openRead()).first)
-            .toString();
+        final sourceDigest = await BackgroundFileHashService.sha256File(entity);
+        final targetDigest = await BackgroundFileHashService.sha256File(target);
         if (sourceDigest != targetDigest) {
           _logLine(
             'Copy verification SHA-256 mismatch: $relativePath '
@@ -4242,8 +4341,9 @@ exit 1''',
       if (!await iconFile.exists()) {
         errors.add('volume icon missing');
       } else {
-        final actualIconDigest = (await sha256.bind(iconFile.openRead()).first)
-            .toString();
+        final actualIconDigest = await BackgroundFileHashService.sha256File(
+          iconFile,
+        );
         if (actualIconDigest != expectedIcon.sha256Digest) {
           errors.add('volume icon content mismatch');
         }
@@ -4386,8 +4486,9 @@ exit 1''',
         iconFile.path,
       ]).timeout(const Duration(seconds: 5));
 
-      final writtenDigest = (await sha256.bind(iconFile.openRead()).first)
-          .toString();
+      final writtenDigest = await BackgroundFileHashService.sha256File(
+        iconFile,
+      );
       final autorunText = (await autorun.readAsString())
           .replaceAll('\r\n', '\n')
           .trim();
@@ -4418,8 +4519,7 @@ exit 1''',
         return !await autorun.exists() && !await iconFile.exists();
       }
       if (!await autorun.exists() || !await iconFile.exists()) return false;
-      final actualDigest = (await sha256.bind(iconFile.openRead()).first)
-          .toString();
+      final actualDigest = await BackgroundFileHashService.sha256File(iconFile);
       final autorunText = (await autorun.readAsString())
           .replaceAll('\r\n', '\n')
           .trim();
@@ -4526,8 +4626,9 @@ exit 1''',
         iconDest.path,
       ]).timeout(const Duration(seconds: 5));
 
-      final writtenDigest = (await sha256.bind(iconDest.openRead()).first)
-          .toString();
+      final writtenDigest = await BackgroundFileHashService.sha256File(
+        iconDest,
+      );
       final autorun = (await autorunFile.readAsString())
           .replaceAll('\r\n', '\n')
           .trim();

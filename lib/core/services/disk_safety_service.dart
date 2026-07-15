@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'windows_system_environment.dart';
+
 class DiskInfo {
   final int diskNumber;
   final String model;
@@ -289,33 +291,29 @@ class DiskOperationLock {
     if (pointer.address == 0) {
       throw StateError('Unable to allocate the disk operation mutex name.');
     }
-    pointer.asTypedList(codeUnits.length + 1).setRange(
-      0,
-      codeUnits.length,
-      codeUnits,
-    );
+    pointer
+        .asTypedList(codeUnits.length + 1)
+        .setRange(0, codeUnits.length, codeUnits);
     return pointer;
   }
 }
 
-typedef _CreateMutexWNative = Pointer<Void> Function(
-  Pointer<Void> mutexAttributes,
-  Int32 initialOwner,
-  Pointer<Uint16> name,
-);
-typedef _CreateMutexWDart = Pointer<Void> Function(
-  Pointer<Void> mutexAttributes,
-  int initialOwner,
-  Pointer<Uint16> name,
-);
-typedef _WaitForSingleObjectNative = Uint32 Function(
-  Pointer<Void> handle,
-  Uint32 milliseconds,
-);
-typedef _WaitForSingleObjectDart = int Function(
-  Pointer<Void> handle,
-  int milliseconds,
-);
+typedef _CreateMutexWNative =
+    Pointer<Void> Function(
+      Pointer<Void> mutexAttributes,
+      Int32 initialOwner,
+      Pointer<Uint16> name,
+    );
+typedef _CreateMutexWDart =
+    Pointer<Void> Function(
+      Pointer<Void> mutexAttributes,
+      int initialOwner,
+      Pointer<Uint16> name,
+    );
+typedef _WaitForSingleObjectNative =
+    Uint32 Function(Pointer<Void> handle, Uint32 milliseconds);
+typedef _WaitForSingleObjectDart =
+    int Function(Pointer<Void> handle, int milliseconds);
 typedef _ReleaseMutexNative = Int32 Function(Pointer<Void> handle);
 typedef _ReleaseMutexDart = int Function(Pointer<Void> handle);
 typedef _CloseHandleNative = Int32 Function(Pointer<Void> handle);
@@ -489,7 +487,7 @@ exit $LASTEXITCODE
         return ProcessResult(0, -1, '', 'Secure script storage is a link.');
       }
       final acl = await Process.run(
-        'powershell',
+        WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
           '-NonInteractive',
@@ -498,10 +496,9 @@ exit $LASTEXITCODE
           '-Command',
           _secureDirectoryAclScript,
         ],
-        environment: {
-          ...Platform.environment,
+        environment: WindowsSystemEnvironment.withSystemRoot({
           'WDS_SECURE_PATH': secureDirectory.path,
-        },
+        }),
       ).timeout(const Duration(seconds: 30));
       if (acl.exitCode != 0) {
         return ProcessResult(0, -1, '', 'Secure script ACL setup failed.');
@@ -530,8 +527,7 @@ exit $LASTEXITCODE
     } finally {
       await scriptHandle?.close();
     }
-    final environment = <String, String>{
-      ...Platform.environment,
+    final environment = WindowsSystemEnvironment.withSystemRoot({
       'WDS_DISK_NUMBER': '${disk.diskNumber}',
       'WDS_DISK_SIZE': '${disk.sizeBytes}',
       'WDS_DISK_MODEL': disk.model.trim().toUpperCase(),
@@ -541,17 +537,21 @@ exit $LASTEXITCODE
       'WDS_DISK_PATH': disk.reliableDevicePath,
       'WDS_DISKPART_SCRIPT': diskpartFile.path,
       'WDS_DISKPART_SHA256': scriptHash,
-    };
+    });
 
     Process? process;
     try {
-      process = await Process.start('powershell', const [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        _guardedDiskpartScript,
-      ], environment: environment);
+      process = await Process.start(
+        WindowsSystemEnvironment.powerShellExecutable,
+        const [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          _guardedDiskpartScript,
+        ],
+        environment: environment,
+      );
       final stdoutFuture = process.stdout
           .transform(const SystemEncoding().decoder)
           .join();
@@ -567,7 +567,11 @@ exit $LASTEXITCODE
       );
     } on TimeoutException {
       if (process != null) {
-        await Process.run('taskkill', ['/F', '/T', '/PID', '${process.pid}']);
+        await Process.run(
+          WindowsSystemEnvironment.taskkillExecutable,
+          ['/F', '/T', '/PID', '${process.pid}'],
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+        );
       }
       return ProcessResult(process?.pid ?? 0, -1, '', 'DiskPart timed out.');
     } catch (error) {
@@ -633,11 +637,11 @@ exit $LASTEXITCODE
 
   Future<String?> _getWindowsDriveLetter() async {
     try {
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-Command',
-        r'$env:SystemDrive',
-      ]).timeout(const Duration(seconds: 5));
+      final result = await Process.run(
+        WindowsSystemEnvironment.powerShellExecutable,
+        ['-NoProfile', '-Command', r'$env:SystemDrive'],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 5));
       if (result.exitCode == 0) {
         return result.stdout.toString().trim().replaceAll(':', '');
       }
@@ -646,13 +650,17 @@ exit $LASTEXITCODE
   }
 
   Future<List<DiskInfo>> _queryAllDisks() async {
-    final result = await Process.run('powershell', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      _getAllDisksScript,
-    ]).timeout(const Duration(seconds: 10));
+    final result = await Process.run(
+      WindowsSystemEnvironment.powerShellExecutable,
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        _getAllDisksScript,
+      ],
+      environment: WindowsSystemEnvironment.withSystemRoot(),
+    ).timeout(const Duration(seconds: 10));
 
     if (result.exitCode != 0) {
       throw StateError('Disk enumeration failed: ${result.stderr}');

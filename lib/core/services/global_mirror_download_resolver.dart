@@ -51,12 +51,25 @@ class GlobalMirrorDownloadResolver {
   }
 
   /// SourceForge's download endpoint is sometimes returned as an intermediate
-  /// URL before it chooses a concrete mirror. It is still inside the trusted
-  /// SourceForge boundary, but must be requested once more to obtain the
-  /// signed `*.dl.sourceforge.net` URL (or the file response itself).
+  /// URL before it chooses a concrete mirror. SourceForge can also serve a
+  /// file directly from its root host. Both forms stay inside the trusted
+  /// HTTPS SourceForge boundary and can be requested by the downloader.
   static bool isDownloadEndpoint(Uri uri) {
+    if (!isGlobalMirrorUrl(uri)) return false;
     final host = uri.host.toLowerCase();
-    return isDirectDownloadUrl(uri) || host == 'downloads.sourceforge.net';
+    return isDirectDownloadUrl(uri) ||
+        host == 'downloads.sourceforge.net' ||
+        (host == 'sourceforge.net' && _isRootFileDownloadUrl(uri));
+  }
+
+  /// A root-host URL is allowed only for SourceForge's standard file download
+  /// route. This prevents a regular project or files page from being treated
+  /// as a binary download merely because it is on the trusted root domain.
+  static bool _isRootFileDownloadUrl(Uri uri) {
+    final segments = uri.pathSegments;
+    return segments.length >= 3 &&
+        segments.contains('files') &&
+        segments.last.toLowerCase() == 'download';
   }
 
   /// Extracts a trusted Global Mirror mirror URL from a Global Mirror HTML page.

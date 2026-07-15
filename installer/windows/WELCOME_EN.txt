@@ -16,8 +16,9 @@ MAIN FEATURES:
     Create Windows media or write bootable Linux ISOHybrid images
     
   ◆ To Go Workspaces
-    Build portable Windows workspaces and validate x64 Ubuntu/casper
-    and Debian Live layouts; persistent Linux creation is currently disabled
+    Build portable Windows workspaces and experimental persistent Linux To Go for
+    structurally preflighted x64 Ubuntu/casper, Debian Live/Kali, and Deepin Live
+    profiles; real boot and reboot-persistence validation is still required
     
   ◆ Native Drive Benchmark
     Test sequential, 4K, multi-thread, and sustained writes

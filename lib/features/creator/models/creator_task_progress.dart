@@ -45,6 +45,7 @@ CreatorTaskTerminalState finishCreatorTask({
       message: latestMessage.isNotEmpty
           ? latestMessage
           : (cancelled ? 'deploy_cancel_requested' : 'creator_error'),
+      error: latestProgress?.error,
     ),
   );
 }

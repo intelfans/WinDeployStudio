@@ -109,13 +109,21 @@ class DownloadManager extends ChangeNotifier {
         client.close();
         return;
       }
-      final request = http.Request('GET', Uri.parse(resolvedUrl))
-        ..headers['Accept-Encoding'] = 'identity';
+      final requestHeaders = <String, String>{'Accept-Encoding': 'identity'};
       if (canResume) {
-        request.headers['Range'] = 'bytes=$resumeFrom-';
-        request.headers['If-Range'] = resumeValidator.value;
+        requestHeaders['Range'] = 'bytes=$resumeFrom-';
+        requestHeaders['If-Range'] = resumeValidator.value;
       }
-      final response = await client.send(request);
+      final response = await sendWithValidatedRedirects(
+        client,
+        Uri.parse(resolvedUrl),
+        headers: requestHeaders,
+      );
+
+      if (response == null) {
+        failBeforeStreaming('Blocked download redirect');
+        return;
+      }
 
       if (item._transferId != transferId) {
         client.close();
@@ -362,6 +370,58 @@ class DownloadManager extends ChangeNotifier {
     );
     notifyListeners();
   }
+
+  /// Sends a download request while retaining SourceForge's HTTPS/domain
+  /// boundary after mirror resolution. For other download origins, redirects
+  /// retain the previous unrestricted behavior.
+  @visibleForTesting
+  static Future<http.StreamedResponse?> sendWithValidatedRedirects(
+    http.Client client,
+    Uri initial, {
+    required Map<String, String> headers,
+  }) async {
+    final initialHost = initial.host.toLowerCase();
+    final isSourceForgeOrigin =
+        initialHost == 'sourceforge.net' ||
+        initialHost.endsWith('.sourceforge.net');
+    if (isSourceForgeOrigin &&
+        !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(initial)) {
+      return null;
+    }
+
+    var current = initial;
+    for (var redirectCount = 0; redirectCount <= 5; redirectCount++) {
+      if (isSourceForgeOrigin &&
+          !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(current)) {
+        return null;
+      }
+
+      final request = http.Request('GET', current)
+        ..followRedirects = false
+        ..headers.addAll(headers);
+      final response = await client.send(request);
+      if (!_isRedirectStatus(response.statusCode)) return response;
+
+      final location = response.headers['location'];
+      await response.stream.drain<void>();
+      if (location == null || location.isEmpty) return null;
+
+      final next = current.resolve(location);
+      if (isSourceForgeOrigin &&
+          !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(next)) {
+        return null;
+      }
+      current = next;
+    }
+    return null;
+  }
+
+  static bool _isRedirectStatus(int statusCode) =>
+      statusCode == 301 ||
+      statusCode == 302 ||
+      statusCode == 303 ||
+      statusCode == 307 ||
+      statusCode == 308;
 
   _ContentRange? _parseContentRange(String? contentRange) {
     if (contentRange == null) return null;

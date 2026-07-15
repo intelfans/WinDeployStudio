@@ -2,28 +2,41 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
-## Unreleased
+## v2.0.6
+
+- Updated the application, Windows metadata, installer, build script, and documentation to version 2.0.6.
+
+## v2.0.5
 
 ### Linux To Go and Licensing
 
+- Added a dedicated Deepin Live Linux To Go profile. It requires the audited
+  `live/vmlinuz.efi`, `live/initrd`, `live/filesystem.squashfs`, x64 UEFI,
+  `boot=live union=overlay`, live-boot, and NTFS contract before a target disk
+  can be changed; Deepin installer and ISO-check entries are never patched.
+- Added a code-owned profile identity for Ubuntu/casper, Debian Live/Kali, and
+  Deepin so write-time boot configuration uses the same narrowly scoped entry
+  rule as the read-only preflight.
 - Added a separate Debian Live Linux To Go profile: x64 UEFI, `boot=live`, a
   patchable GRUB entry, an NTFS-capable initrd, and the Debian
   `persistence` / `/persistence.conf` contract are now validated before any
   destructive operation.
-- Kept Ubuntu/casper and Debian persistence layouts separate. Casper uses
-  `writable` / `persistent`; Debian uses `persistence` with `/ union` in
-  `persistence.conf`.
+- Kept Ubuntu/casper and Debian live-boot persistence layouts separate. Casper
+  uses `writable` / `persistent`; Debian Live/Kali and the validated Deepin
+  profile use `persistence` with `/ union` in `persistence.conf`.
 - Removed the previously bundled Google/AOSP `mke2fs.exe` from source, release
   output, and installer packaging. Its complete corresponding GPLv2 source and
   static build inputs were not available to this project.
-- Disabled persistent Linux To Go creation until a reproducible, fully
-  license-compliant ext4 creator can be distributed with its source package.
-- Added explicit third-party, README, installer, and localized UI notices for
-  this distribution gate.
-
-## v2.0.6
-
-- Updated the application, Windows metadata, installer, build script, and documentation to version 2.0.6.
+- Added `wds_ext4_builder.exe`, a narrow Go helper built from pinned,
+  vendored MIT-licensed `go-ext4fs` source. It creates only local regular ext4
+  persistence images and is hash-checked before any target-disk operation.
+- Integrated experimental persistent Linux To Go creation for structurally
+  checked x64 Ubuntu/casper, Debian Live/Kali, and Deepin Live profiles.
+  Debian live-boot profiles receive only the fixed `/ union`
+  `persistence.conf` marker; real boot and second-boot persistence validation
+  remains required before claiming production support.
+- Added the helper source, local UUID collision fix, reproducible build script,
+  Go runtime notice, README, installer notices, and 11-language UI messaging.
 
 ## v2.0.0
 
@@ -41,7 +54,8 @@ All notable changes to WinDeploy Studio are documented here.
 ### Improvements
 
 - Added typed Linux To Go image classification at selection time and immediately before erase. The workflow now explicitly validates x64 casper Live layouts and reports missing EFI, kernel, initrd, payload, or patchable-GRUB requirements.
-- Debian Live layouts are recognized and clearly routed to Linux installation media until their separate persistence protocol is implemented; unsupported distributions can no longer appear selectable for Linux To Go.
+- Debian Live layouts now use their separate persistence protocol; unsupported
+  distributions can no longer appear selectable for Linux To Go.
 - Expanded the native benchmark protocol with sequential and 4K random reads, mixed read/write scenarios, IOPS, latency percentiles, and cache-behavior analysis while retaining unbuffered, write-through I/O.
 - Added compatibility blockers for unsupported deployment combinations, including Windows 7 VHDX, Windows 7 native VHD outside Enterprise/Ultimate, x86 Windows 7 UEFI, WIMBoot outside direct Windows 8.1 deployment, CompactOS outside Windows 10/11, and virtual disks below 32 GB.
 - Added a dedicated responsive deployment shell and clearer top-level navigation for advanced deployment and disk-management workflows.
@@ -51,7 +65,8 @@ All notable changes to WinDeploy Studio are documented here.
 
 - Fixed Linux To Go creation failing when a modern Ubuntu ISO contains a squashfs file larger than the FAT32 single-file limit.
 - Replaced the single FAT32 LTG layout with a dedicated FAT32 boot/persistence partition and an NTFS Live-data partition.
-- Added pre-erase validation for the bundled `mke2fs.exe`, patchable casper GRUB entries, FAT32 boot-file limits, and target capacity.
+- Added pre-erase validation for the bundled persistence-image helper,
+  patchable casper GRUB entries, FAT32 boot-file limits, and target capacity.
 - Added partition-identity checks and per-file copy verification for both LTG partitions.
 - Added fail-closed physical disk identity checks using serial number, device path, and UniqueId fallbacks, plus per-disk operation locks.
 - Added language-independent partition-layout postconditions before Windows/Linux media deployment continues.

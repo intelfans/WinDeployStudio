@@ -15,7 +15,7 @@
       workflows: ["install", "togo"],
       officialLink: {
         zh: "https://www.microsoft.com/zh-cn/software-download/windows10",
-        en: "https://www.microsoft.com/zh-cn/software-download/windows10",
+        en: "https://www.microsoft.com/en-us/software-download/windows10",
       },
       chinaLink: "https://1842249449.share.123pan.cn/123pan/Z4L0Td-KMR0h",
       caution: { zh: "使用官方来源下载，并在部署前核对版本与许可。", en: "Use the official source and verify version and licensing before deployment." },
@@ -442,7 +442,9 @@
     body.append(facts);
     const caution = localized(item.caution);
     if (caution) body.append(node("div", "notice", caution));
-    const languageNotice = localized(item.languageNotice);
+    // Regional availability notes are relevant only to the Chinese download
+    // choices. English and other non-Chinese views should not receive them.
+    const languageNotice = isChineseLanguage() ? localized(item.languageNotice) : "";
     if (languageNotice) body.append(node("div", "notice image-language-notice", languageNotice));
     body.append(node("h3", "", t("image_download_sources")));
     body.append(downloadSources(item));

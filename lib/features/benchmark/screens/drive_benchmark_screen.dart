@@ -501,6 +501,7 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
   Widget _buildLiveSummary(BuildContext context, BenchmarkProgress? progress) {
     final colorScheme = Theme.of(context).colorScheme;
     final phase = progress?.phase ?? BenchmarkPhase.idle;
+    final titleKey = progress?.workload?.livePhaseTitleKey ?? phase.titleKey;
     final progressValue = progress?.progress ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,7 +534,7 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tr(context, phase.titleKey),
+                    tr(context, titleKey),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),

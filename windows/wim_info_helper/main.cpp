@@ -13,7 +13,7 @@ class WimApi {
   using GetImageCountFn = DWORD(WINAPI*)(HANDLE);
   using LoadImageFn = HANDLE(WINAPI*)(HANDLE, DWORD);
   using GetImageInformationFn = BOOL(WINAPI*)(HANDLE, PVOID*, PDWORD);
-  using FreeMemoryFn = BOOL(WINAPI*)(PVOID);
+  using SetTemporaryPathFn = BOOL(WINAPI*)(HANDLE, PWSTR);
   using CloseHandleFn = BOOL(WINAPI*)(HANDLE);
 
   WimApi() {
@@ -28,11 +28,12 @@ class WimApi {
     load_image = LoadFunction<LoadImageFn>("WIMLoadImage");
     get_image_information =
         LoadFunction<GetImageInformationFn>("WIMGetImageInformation");
-    free_memory = LoadFunction<FreeMemoryFn>("WIMFreeMemory");
+    set_temporary_path =
+        LoadFunction<SetTemporaryPathFn>("WIMSetTemporaryPath");
     close_handle = LoadFunction<CloseHandleFn>("WIMCloseHandle");
     if (create_file == nullptr || get_image_count == nullptr ||
         load_image == nullptr || get_image_information == nullptr ||
-        free_memory == nullptr || close_handle == nullptr) {
+        set_temporary_path == nullptr || close_handle == nullptr) {
       error_ = ERROR_PROC_NOT_FOUND;
       FreeLibrary(module_);
       module_ = nullptr;
@@ -56,7 +57,7 @@ class WimApi {
   GetImageCountFn get_image_count = nullptr;
   LoadImageFn load_image = nullptr;
   GetImageInformationFn get_image_information = nullptr;
-  FreeMemoryFn free_memory = nullptr;
+  SetTemporaryPathFn set_temporary_path = nullptr;
   CloseHandleFn close_handle = nullptr;
 
  private:
@@ -136,6 +137,19 @@ int wmain(int argc, wchar_t* argv[]) {
     return 2;
   }
 
+  // WIMLoadImage requires a writable scratch directory even when the caller
+  // only reads image metadata. Without this, ESD-backed installers such as
+  // Tiny10 fail with ERROR_INSTALL_TEMP_UNWRITABLE (1632).
+  wchar_t temporary_path[MAX_PATH] = {};
+  const DWORD temporary_path_length =
+      GetTempPathW(MAX_PATH, temporary_path);
+  if (temporary_path_length == 0 || temporary_path_length >= MAX_PATH ||
+      !wim_api.set_temporary_path(wim, temporary_path)) {
+    std::cerr << "WIMSetTemporaryPath failed: " << GetLastError() << std::endl;
+    wim_api.close_handle(wim);
+    return 2;
+  }
+
   const DWORD image_count = wim_api.get_image_count(wim);
   if (image_count == 0) {
     std::cerr << "The image contains no entries." << std::endl;
@@ -162,7 +176,7 @@ int wmain(int argc, wchar_t* argv[]) {
       std::cerr << "WIMGetImageInformation failed for index " << index << ": "
                 << GetLastError() << std::endl;
       if (image_information != nullptr) {
-        wim_api.free_memory(image_information);
+        LocalFree(image_information);
       }
       wim_api.close_handle(image);
       wim_api.close_handle(wim);
@@ -172,9 +186,9 @@ int wmain(int argc, wchar_t* argv[]) {
     const auto* xml = static_cast<const wchar_t*>(image_information);
     const std::size_t character_count = information_size / sizeof(wchar_t);
     const std::string utf8 = ToUtf8(xml, character_count);
-    // WIMGetImageInformation allocates through WIMGAPI.  Release it through
-    // the matching API instead of LocalFree, which uses a different heap.
-    wim_api.free_memory(image_information);
+    // WIMGetImageInformation returns a LocalAlloc buffer. WIMFreeMemory is
+    // not exported by the system WIMGAPI DLL on supported Windows releases.
+    LocalFree(image_information);
     wim_api.close_handle(image);
 
     if (utf8.empty()) {

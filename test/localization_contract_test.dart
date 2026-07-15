@@ -55,6 +55,35 @@ void main() {
     }
   });
 
+  test('managed download progress copy is translated for every locale', () {
+    const managedDownloadKeys = <String>{
+      'webview_managed_download_title',
+      'webview_managed_download_message',
+      'webview_managed_download_keep_open',
+      'webview_managed_download_file_label',
+      'webview_managed_download_channel_label',
+      'webview_managed_download_waiting_location',
+      'webview_managed_download_preparing',
+      'webview_managed_download_choose_location',
+      'webview_managed_download_tracking',
+      'webview_managed_download_no_location',
+    };
+    final english = languages['en']!;
+
+    for (final language in languages.entries) {
+      for (final key in managedDownloadKeys) {
+        expect(language.value[key], isNotNull, reason: '${language.key}.$key');
+      }
+      if (language.key != 'en') {
+        expect(
+          language.value['webview_managed_download_title'],
+          isNot(english['webview_managed_download_title']),
+          reason: '${language.key} must not fall back to English download copy',
+        );
+      }
+    }
+  });
+
   test(
     'supplemental localization modules provide translated values for every locale',
     () {

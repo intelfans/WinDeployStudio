@@ -7,8 +7,10 @@ import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/bootable_usb_service.dart';
+import '../../../shared/widgets/known_iso_verification_panel.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
+import '../models/creator_progress_message.dart';
 import '../models/creator_task_progress.dart';
 
 enum _CreatorPlatform { windows, linux }
@@ -54,6 +56,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   KnownIsoVerification? _knownIsoVerification;
   int _knownIsoVerificationRequest = 0;
   Locale? _knownIsoVerificationLocale;
+  int _isoSelectionRequest = 0;
 
   @override
   void initState() {
@@ -69,13 +72,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     _knownIsoVerificationLocale = locale;
 
     final iso = _selectedIso;
-    if (_isLinuxMode || iso == null) {
+    if (iso == null) {
       _knownIsoVerification = null;
       return;
     }
     final request = ++_knownIsoVerificationRequest;
     _knownIsoVerification = null;
-    unawaited(_verifyKnownWindowsIso(iso.filePath, request, locale));
+    unawaited(_verifyKnownIso(iso.filePath, request, locale));
   }
 
   @override
@@ -88,6 +91,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   void _setPlatform(_CreatorPlatform platform) {
     if (_platform == platform || _creationRunning) return;
+    ref.read(isoParseServiceProvider).cancel();
     setState(() {
       _platform = platform;
       _currentStep = 0;
@@ -105,6 +109,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       _isoSelectionErrorKey = null;
       _knownIsoVerification = null;
       _knownIsoVerificationRequest++;
+      _isoSelectionRequest++;
     });
   }
 
@@ -133,6 +138,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   Future<void> _selectIsoFile() async {
+    int? activeSelectionRequest;
+    bool? activeLinuxMode;
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
@@ -150,6 +157,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       if (!mounted) return;
 
       final selectedLinuxMode = _isLinuxMode;
+      final selectionRequest = ++_isoSelectionRequest;
+      activeSelectionRequest = selectionRequest;
+      activeLinuxMode = selectedLinuxMode;
       final verificationRequest = ++_knownIsoVerificationRequest;
       setState(() {
         _isParsing = true;
@@ -158,6 +168,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _isoSelectionErrorKey = null;
         _knownIsoVerification = null;
       });
+      final selectedLocale = Localizations.localeOf(context);
 
       final isoService = ref.read(isoParseServiceProvider);
       IsoMetadata? metadata;
@@ -167,7 +178,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
             .parseIso(
               path,
               onProgress: (step, percent) {
-                if (!mounted) return;
+                if (!_isCurrentIsoSelection(
+                  selectionRequest,
+                  selectedLinuxMode,
+                )) {
+                  return;
+                }
                 String stepText;
                 switch (step) {
                   case 'detect':
@@ -195,7 +211,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               const Duration(seconds: 30),
               onTimeout: () {
                 debugPrint('ISO parse overall timeout');
-                isoService.cancel();
+                if (_isCurrentIsoSelection(
+                  selectionRequest,
+                  selectedLinuxMode,
+                )) {
+                  isoService.cancel();
+                }
                 return null;
               },
             );
@@ -203,7 +224,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         debugPrint('ISO parse error: $e');
       }
 
-      if (!mounted || _isLinuxMode != selectedLinuxMode) return;
+      if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
+        return;
+      }
 
       setState(() {
         _isParsing = false;
@@ -234,6 +257,16 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         await logCenter.logIso(
           'Linux ISO 已选择 | 文件: ${linuxMetadata.fileName} | 大小: ${linuxMetadata.displaySize}',
         );
+        if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
+          return;
+        }
+        unawaited(
+          _verifyKnownIso(
+            linuxMetadata.filePath,
+            verificationRequest,
+            selectedLocale,
+          ),
+        );
         return;
       }
 
@@ -248,11 +281,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _isoSelectionErrorKey = null;
       });
       unawaited(
-        _verifyKnownWindowsIso(
-          metadata.filePath,
-          verificationRequest,
-          Localizations.localeOf(context),
-        ),
+        _verifyKnownIso(metadata.filePath, verificationRequest, selectedLocale),
       );
       final logCenter = LogCenterService();
       await logCenter.logIso(
@@ -260,9 +289,23 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       );
     } catch (e) {
       debugPrint('ISO select error: $e');
-      if (!mounted) return;
+      if (!mounted ||
+          (activeSelectionRequest != null &&
+              activeLinuxMode != null &&
+              !_isCurrentIsoSelection(
+                activeSelectionRequest,
+                activeLinuxMode,
+              ))) {
+        return;
+      }
       _showIsoSelectionError('creator_error');
     }
+  }
+
+  bool _isCurrentIsoSelection(int request, bool isLinuxMode) {
+    return mounted &&
+        request == _isoSelectionRequest &&
+        _isLinuxMode == isLinuxMode;
   }
 
   void _showIsoSelectionError(String messageKey) {
@@ -273,7 +316,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     });
   }
 
-  Future<void> _verifyKnownWindowsIso(
+  Future<void> _verifyKnownIso(
     String filePath,
     int request,
     Locale locale,
@@ -283,7 +326,6 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         .verify(filePath, locale);
     if (!mounted ||
         request != _knownIsoVerificationRequest ||
-        _isLinuxMode ||
         _selectedIso?.filePath != filePath ||
         Localizations.localeOf(context) != locale ||
         verification == null) {
@@ -293,6 +335,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   void _cancelParsing() {
+    _isoSelectionRequest++;
     ref.read(isoParseServiceProvider).cancel();
     if (mounted) {
       setState(() => _isParsing = false);
@@ -719,10 +762,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
-                _IsoInfoCard(
-                  iso: _selectedIso!,
-                  verification: _knownIsoVerification,
-                ),
+                _IsoInfoCard(iso: _selectedIso!),
+                if (_knownIsoVerification != null) ...[
+                  const SizedBox(height: 12),
+                  KnownIsoVerificationPanel(
+                    verification: _knownIsoVerification,
+                    iso: _selectedIso,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => setState(() => _currentStep = 1),
@@ -744,7 +791,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_selectedIso != null) ...[
-          _IsoInfoCard(iso: _selectedIso!, verification: _knownIsoVerification),
+          _IsoInfoCard(iso: _selectedIso!),
+          if (_knownIsoVerification != null) ...[
+            const SizedBox(height: 12),
+            KnownIsoVerificationPanel(
+              verification: _knownIsoVerification,
+              iso: _selectedIso,
+            ),
+          ],
           const SizedBox(height: 16),
         ],
         Row(
@@ -897,6 +951,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                     ),
                   ],
                 ),
+                if (_knownIsoVerification != null) ...[
+                  const SizedBox(height: 12),
+                  KnownIsoVerificationPanel(
+                    verification: _knownIsoVerification,
+                    iso: _selectedIso,
+                  ),
+                ],
                 const Divider(),
                 _ConfirmSection(
                   title: tr(context, 'creator_usb_section'),
@@ -1070,22 +1131,16 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     );
   }
 
-  String _resolveLocalizedMessage(BuildContext context, String key) {
-    // Composite progress messages keep the first line as a localization key.
-    final parts = key.split('\n\nLog: ');
-    final messageLines = parts[0].split('\n');
-    final actualKey = messageLines.first;
-    final details = messageLines.skip(1).where((line) => line.isNotEmpty);
-    final logPath = parts.length > 1 ? parts[1] : null;
-
-    var resolved = tr(context, actualKey);
-    if (details.isNotEmpty) {
-      resolved = '$resolved\n${details.join('\n')}';
-    }
-    if (logPath != null) {
-      resolved = '$resolved\n\n${tr(context, 'logs_title')}: $logPath';
-    }
-    return resolved;
+  String _resolveLocalizedMessage(
+    BuildContext context,
+    String rawMessage, {
+    String? error,
+  }) {
+    return resolveCreatorProgressMessage(
+      rawMessage: rawMessage,
+      error: error,
+      translate: (key) => tr(context, key),
+    );
   }
 
   String _bootModeLabel(DeploymentBootMode mode) => switch (mode) {
@@ -1100,7 +1155,11 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     final theme = Theme.of(context);
     final progress = _createProgress;
     final rawMessage = progress?.message ?? 'step_preparing';
-    final message = _resolveLocalizedMessage(context, rawMessage);
+    final message = _resolveLocalizedMessage(
+      context,
+      rawMessage,
+      error: progress?.error,
+    );
     final pct = ((progress?.progress ?? 0) * 100).toInt();
     final isFailed = progress?.step == CreateStep.failed;
 
@@ -1111,6 +1170,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_knownIsoVerification != null) ...[
+                KnownIsoVerificationPanel(
+                  verification: _knownIsoVerification,
+                  iso: _selectedIso,
+                ),
+                const SizedBox(height: 24),
+              ],
               if (isFailed) ...[
                 Icon(
                   Icons.error_outline,
@@ -1266,6 +1332,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
+              if (_knownIsoVerification != null) ...[
+                const SizedBox(height: 16),
+                KnownIsoVerificationPanel(
+                  verification: _knownIsoVerification,
+                  iso: _selectedIso,
+                ),
+              ],
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: () {
@@ -1412,9 +1485,8 @@ class _IsoSelectionError extends StatelessWidget {
 
 class _IsoInfoCard extends StatelessWidget {
   final IsoMetadata iso;
-  final KnownIsoVerification? verification;
 
-  const _IsoInfoCard({required this.iso, this.verification});
+  const _IsoInfoCard({required this.iso});
 
   @override
   Widget build(BuildContext context) {
@@ -1453,31 +1525,6 @@ class _IsoInfoCard extends StatelessWidget {
                       Text(iso.displaySize, style: theme.textTheme.bodySmall),
                     ],
                   ),
-                  if (verification != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.verified_rounded,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            '${tr(context, 'known_iso_verified')}: ${verification!.image.getName(Localizations.localeOf(context))}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),

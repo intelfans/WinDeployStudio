@@ -14,7 +14,7 @@ Perfil GitHub: https://github.com/intelfans
 Repositório GitHub: https://github.com/intelfans/WinDeployStudio
 
 Aviso sobre ferramenta de terceiros:
-Esta versão não inclui uma ferramenta de criação ext4 porque o pacote completo de código-fonte correspondente exigido pela GPLv2 ainda não está disponível. A criação persistente de Linux To Go está desativada. Consulte THIRD_PARTY_NOTICES.md e tools\e2fsprogs\README.md no diretório de instalação.
+Esta versão inclui wds_ext4_builder, um componente integrado de imagem de persistência ext4 compilado do código go-ext4fs fixado sob licença MIT para perfis x64 experimentais Ubuntu/casper, Debian Live/Kali e Deepin Live aprovados na verificação estrutural. Ainda é necessária validação por inicialização real e persistência após reiniciar. Ele aceita somente uma imagem normal em uma unidade local e é verificado antes de qualquer operação no disco de destino. Consulte THIRD_PARTY_NOTICES.md e tools\ext4-builder\README.md no diretório de instalação.
 
 Agradecimentos especiais
 

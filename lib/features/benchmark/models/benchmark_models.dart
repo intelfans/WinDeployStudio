@@ -311,6 +311,18 @@ enum BenchmarkWorkload {
   fullSequentialWrite,
 }
 
+/// Supplies the precise live-test label when the high-level phase alone is
+/// ambiguous (for example, sequential read versus sequential write).
+extension BenchmarkWorkloadProgressInfo on BenchmarkWorkload {
+  String? get livePhaseTitleKey => switch (this) {
+    BenchmarkWorkload.sequentialRead => 'benchmark_history_sequential_read',
+    BenchmarkWorkload.sequentialWrite => 'bench_phase_sequential',
+    BenchmarkWorkload.random4kRead => 'benchmark_history_random_read',
+    BenchmarkWorkload.random4kWrite => 'bench_phase_random4k',
+    _ => null,
+  };
+}
+
 enum MixedWorkloadScenario {
   startup,
   browser,
@@ -731,6 +743,7 @@ class BenchmarkDeviceIdentity {
 
 class BenchmarkProgress {
   final BenchmarkPhase phase;
+  final BenchmarkWorkload? workload;
   final double progress;
   final Duration elapsed;
   final String messageKey;
@@ -751,6 +764,7 @@ class BenchmarkProgress {
     required this.progress,
     required this.elapsed,
     required this.messageKey,
+    this.workload,
     this.currentSpeedMBps = 0,
     this.currentIops = 0,
     this.currentLatency = const BenchmarkLatency(),

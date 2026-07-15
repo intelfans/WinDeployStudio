@@ -16,8 +16,9 @@ Hauptfunktionen:
     Windows-Medien erstellen oder bootfähige Linux-ISOHybrid-Images schreiben
     
   🚀 To Go-Umgebungen
-    Portable Windows-Umgebungen erstellen und x64-Ubuntu/casper- sowie
-    Debian-Live-Layouts prüfen; persistente Linux-Erstellung ist deaktiviert
+    Portable Windows-Umgebungen und experimentelles persistentes Linux To Go für
+    strukturell vorgeprüfte x64 Ubuntu/casper, Debian Live/Kali und Deepin Live
+    Profile erstellen; echter Bootvorgang und Persistenz nach Neustart sind weiter zu prüfen
     
   📊 Nativer Laufwerkstest
     Sequenzielle, 4K-, Multithread- und Dauerschreibtests

@@ -12,10 +12,12 @@ import '../../features/deployment/models/deployment_plan.dart';
 import '../../features/deployment/services/windows_deployment_service.dart';
 import '../../features/logs/services/log_center_service.dart';
 import '../constants/app_constants.dart';
+import 'background_file_hash_service.dart';
 import 'disk_safety_service.dart';
 import 'file_logger_service.dart';
 import 'wim_info_service.dart';
 import 'windows_iso_preflight.dart';
+import 'windows_system_environment.dart';
 
 enum WtgStep {
   preparing,
@@ -272,9 +274,29 @@ class _DriverManifest {
 }
 
 class WtgService {
+  @visibleForTesting
+  static String diskpartScriptForTesting({
+    required int diskNumber,
+    required WtgBootLayout bootLayout,
+    required String currentPartitionStyle,
+    required String bootLetter,
+    required String storageLetter,
+    String bootLabel = 'WDS_EFI',
+    String storageLabel = 'WDS_TOGO',
+  }) => _buildWtgDiskpartScript(
+    diskNumber: diskNumber,
+    bootLayout: bootLayout,
+    currentPartitionStyle: currentPartitionStyle,
+    bootLetter: bootLetter,
+    storageLetter: storageLetter,
+    bootLabel: bootLabel,
+    storageLabel: storageLabel,
+  );
+
   final Ref ref;
   final List<String> _log = [];
   final List<String> _debugLogs = [];
+  Future<void> _detailLogWriteQueue = Future.value();
   bool _cancelled = false;
   Process? _currentProcess;
   String? _currentIsoPath;
@@ -929,8 +951,8 @@ class WtgService {
     _logLine('Driver source content digest verification passed.');
   }
 
-  Future<String> _sha256File(File file) async =>
-      (await sha256.bind(file.openRead()).first).toString();
+  Future<String> _sha256File(File file) =>
+      BackgroundFileHashService.sha256File(file);
 
   Future<_DriverManifest> _stageDriverManifest(
     _DriverManifest source,
@@ -1255,29 +1277,15 @@ if ($partitions.Count -ne 1) {
     final storageLabel = plan.customVolumeLabel.trim().isEmpty
         ? 'WDS_TOGO'
         : plan.customVolumeLabel.trim();
-    final bootFileSystem = bootLayout == WtgBootLayout.legacyBios
-        ? 'ntfs'
-        : 'fat32';
-    final convert = bootLayout == WtgBootLayout.uefiGpt ? 'gpt' : 'mbr';
-    final efiKeyword = bootLayout == WtgBootLayout.uefiGpt
-        ? 'create partition efi size=300'
-        : 'create partition primary size=350';
-    final active = bootLayout == WtgBootLayout.uefiGpt ? '' : 'active';
-    final script =
-        '''
-select disk ${disk.diskNumber}
-clean
-convert $convert
-$efiKeyword
-format fs=$bootFileSystem label="$bootLabel" quick
-$active
-assign letter=${letters.boot}
-${bootLayout == WtgBootLayout.uefiGpt ? 'create partition msr size=16' : ''}
-create partition primary
-format fs=ntfs label="$storageLabel" quick
-assign letter=${letters.storage}
-exit
-''';
+    final script = _buildWtgDiskpartScript(
+      diskNumber: disk.diskNumber,
+      bootLayout: bootLayout,
+      currentPartitionStyle: disk.partitionStyle,
+      bootLetter: letters.boot,
+      storageLetter: letters.storage,
+      bootLabel: bootLabel,
+      storageLabel: storageLabel,
+    );
     final result = await ref
         .read(diskSafetyServiceProvider)
         .runGuardedDiskpart(disk, script, timeout: const Duration(minutes: 3));
@@ -1302,6 +1310,42 @@ exit
       );
     }
     return layout;
+  }
+
+  static String _buildWtgDiskpartScript({
+    required int diskNumber,
+    required WtgBootLayout bootLayout,
+    required String currentPartitionStyle,
+    required String bootLetter,
+    required String storageLetter,
+    required String bootLabel,
+    required String storageLabel,
+  }) {
+    final usesGpt = bootLayout == WtgBootLayout.uefiGpt;
+    final targetStyle = usesGpt ? 'GPT' : 'MBR';
+    final currentStyle = currentPartitionStyle.trim().toUpperCase();
+    // DiskPart `clean` retains GPT/MBR metadata. Avoid a matching conversion,
+    // which DiskPart rejects after the target has already been erased.
+    final conversion = currentStyle == targetStyle
+        ? null
+        : 'convert ${targetStyle.toLowerCase()}';
+    final commands = <String>[
+      'select disk $diskNumber',
+      'clean',
+      ?conversion,
+      usesGpt
+          ? 'create partition efi size=300'
+          : 'create partition primary size=350',
+      'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
+      if (!usesGpt) 'active',
+      'assign letter=$bootLetter',
+      if (usesGpt) 'create partition msr size=16',
+      'create partition primary',
+      'format fs=ntfs label="$storageLabel" quick',
+      'assign letter=$storageLetter',
+      'exit',
+    ];
+    return '${commands.join('\n')}\n';
   }
 
   Future<bool> _verifyPartitionLayout(
@@ -1639,7 +1683,11 @@ exit
       if (wimBoot) '/WIMBoot',
     ];
     _logLine('Starting DISM ${arguments.join(' ')}');
-    final process = await Process.start('dism', arguments);
+    final process = await Process.start(
+      'dism',
+      arguments,
+      environment: WindowsSystemEnvironment.withSystemRoot(),
+    );
     _currentProcess = process;
     if (_cancelled) {
       await _terminateProcess(process);
@@ -2174,10 +2222,13 @@ exit
         'A deployment subprocess is already running.',
       );
     }
+    final resolvedExecutable = executable.toLowerCase() == 'powershell'
+        ? WindowsSystemEnvironment.powerShellExecutable
+        : executable;
     final process = await Process.start(
-      executable,
+      resolvedExecutable,
       arguments,
-      environment: environment,
+      environment: WindowsSystemEnvironment.withSystemRoot(environment),
     );
     _currentProcess = process;
     if (_cancelled && !allowWhenCancelled) {
@@ -2209,12 +2260,11 @@ exit
 
   Future<void> _terminateProcess(Process process) async {
     try {
-      await Process.run('taskkill', [
-        '/F',
-        '/T',
-        '/PID',
-        '${process.pid}',
-      ]).timeout(const Duration(seconds: 15));
+      await Process.run(
+        WindowsSystemEnvironment.taskkillExecutable,
+        ['/F', '/T', '/PID', '${process.pid}'],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 15));
     } catch (_) {
       process.kill(ProcessSignal.sigkill);
     }
@@ -2247,15 +2297,23 @@ exit
     final line = '[${DateTime.now().toIso8601String()}] $message';
     _log.add(line);
     debugPrint(line);
+    _detailLogWriteQueue = _detailLogWriteQueue.then(
+      (_) => _appendDetailLogLine(line),
+    );
+  }
+
+  Future<void> _appendDetailLogLine(String line) async {
     try {
       final directory = Directory(
         p.join(AppConstants.appDataPath, 'WinDeployStudio', 'logs'),
       );
-      directory.createSync(recursive: true);
-      File(
+      await directory.create(recursive: true);
+      await File(
         p.join(directory.path, 'wtg_detail.log'),
-      ).writeAsStringSync('$line\n', mode: FileMode.append);
-    } catch (_) {}
+      ).writeAsString('$line\n', mode: FileMode.append);
+    } catch (_) {
+      // Detailed diagnostics must not interfere with deployment progress.
+    }
   }
 
   Future<String> saveLogToFile() async {

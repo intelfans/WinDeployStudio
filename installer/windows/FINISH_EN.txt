@@ -14,7 +14,7 @@ GitHub Profile: https://github.com/intelfans
 GitHub Repository: https://github.com/intelfans/WinDeployStudio
 
 Linux To Go notice:
-This release does not bundle an ext4 persistence creator because the required GPLv2 corresponding source package is not yet available. Persistent Linux To Go creation is disabled. See THIRD_PARTY_NOTICES.md and tools\e2fsprogs\README.md in the installation directory.
+This release includes wds_ext4_builder, a bundled ext4 persistence-image helper built from pinned MIT-licensed go-ext4fs source for experimental, structurally preflighted x64 Ubuntu/casper, Debian Live/Kali, and Deepin Live profiles. Real boot and reboot-persistence validation is still required. It accepts only a regular image on a local drive and is checked before target-disk work. See THIRD_PARTY_NOTICES.md and tools\ext4-builder\README.md in the installation directory.
 
 Special Thanks
 

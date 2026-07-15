@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'windows_system_environment.dart';
+
 class InMemoryPowerShellCommand {
   final String executable;
   final List<String> arguments;
@@ -43,10 +45,8 @@ class InMemoryPowerShell {
       throw const FormatException('In-memory PowerShell payload is too large.');
     }
 
-    final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
     return InMemoryPowerShellCommand(
-      executable:
-          '$systemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      executable: WindowsSystemEnvironment.powerShellExecutable,
       arguments: [
         '-NoLogo',
         '-NoProfile',
@@ -57,7 +57,7 @@ class InMemoryPowerShell {
         _encodedBootstrap,
       ],
       environment: {
-        ...Platform.environment,
+        ...WindowsSystemEnvironment.withSystemRoot(),
         scriptVariable: compressedScript,
         parametersVariable: serializedParameters,
       },

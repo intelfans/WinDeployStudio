@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - wrapcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - goconst
+    - gocyclo
+    - misspell
+    - whitespace
+    - nolintlint
+  settings:
+    gocyclo:
+      min-complexity: 15
+  exclusions:
+    paths:
+      - tmp
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    paths:
+      - tmp

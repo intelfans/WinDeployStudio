@@ -115,10 +115,9 @@ endif()
 
 set(WDS_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools")
 if(EXISTS "${WDS_TOOLS_DIR}")
-  # Do not accidentally redistribute an ext4 tool without its full GPLv2
-  # corresponding source package and reproducible build inputs. The source
-  # tree ships the compliance note only; any future approved tool must add an
-  # explicit, audited packaging rule here.
+  # Keep the excluded GPL e2fsprogs binary out of the bundle. The separately
+  # vendored MIT-licensed ext4 builder is installed with its pinned source and
+  # notices under tools/ext4-builder.
   install(CODE "file(REMOVE \"${CMAKE_INSTALL_PREFIX}/tools/e2fsprogs/mke2fs.exe\")"
     COMPONENT Runtime)
   install(DIRECTORY "${WDS_TOOLS_DIR}"

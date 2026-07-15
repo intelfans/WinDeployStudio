@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import 'windows_system_environment.dart';
+
 enum WindowsInstallImageFormat { wim, esd, swm }
 
 /// The structural result of inspecting a mounted ISO root.
@@ -167,49 +169,64 @@ class WindowsIsoPreflightService implements WindowsIsoPreflight {
   String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
   Future<String?> _mountIso(String isoPath) async {
+    var mounted = false;
     try {
       final quotedPath = _psQuote(isoPath);
-      final mount = await Process.run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop',
-      ]).timeout(const Duration(seconds: 15));
-      if (mount.exitCode != 0) return null;
-
-      for (var attempt = 0; attempt < 5; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        final volume = await Process.run('powershell', [
+      final mount = await Process.run(
+        WindowsSystemEnvironment.powerShellExecutable,
+        [
           '-NoProfile',
           '-NonInteractive',
           '-ExecutionPolicy',
           'Bypass',
           '-Command',
-          'Get-DiskImage -ImagePath $quotedPath | Get-Volume | '
-              'Select-Object -ExpandProperty DriveLetter',
-        ]);
+          'Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop',
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 15));
+      if (mount.exitCode != 0) return null;
+      mounted = true;
+
+      for (var attempt = 0; attempt < 20; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        final volume = await Process.run(
+          WindowsSystemEnvironment.powerShellExecutable,
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            'Get-DiskImage -ImagePath $quotedPath | Get-Volume | '
+                'Select-Object -ExpandProperty DriveLetter',
+          ],
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+        ).timeout(const Duration(seconds: 5));
         final letter = volume.stdout.toString().trim();
         if (volume.exitCode == 0 && letter.isNotEmpty) return '$letter:\\';
       }
     } catch (_) {
       // The caller turns a failed inspection into a non-destructive rejection.
     }
+    if (mounted) await _unmountIso(isoPath);
     return null;
   }
 
   Future<void> _unmountIso(String isoPath) async {
     try {
       final quotedPath = _psQuote(isoPath);
-      await Process.run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue',
-      ]).timeout(const Duration(seconds: 10));
+      await Process.run(
+        WindowsSystemEnvironment.powerShellExecutable,
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          'Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue',
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 10));
     } catch (_) {
       // An unmount failure is diagnostic only; the ISO was never written to.
     }

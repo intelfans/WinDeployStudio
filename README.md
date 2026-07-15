@@ -9,7 +9,7 @@ Windows desktop toolkit for Windows/Linux installation media, portable To Go wor
 
 ## Overview
 
-WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for x64 Ubuntu/casper and Debian Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
+WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for verified x64 Ubuntu/casper, Debian Live, and Deepin Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
 
 The project is distributed under the MIT License.
 
@@ -24,10 +24,10 @@ The project is distributed under the MIT License.
 
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
-  - Validate supported persistent Linux To Go layouts for x64 Ubuntu/casper and Debian Live ISOs before any disk is changed.
-  - Classify Linux To Go images when selected and again immediately before erasing the target. Ubuntu/casper requires x64 UEFI, casper kernel/initrd, Live payloads, and a patchable GRUB entry. Debian additionally requires `boot=live`, an NTFS-capable initrd, and its own `persistence` / `persistence.conf` protocol.
+  - Validate supported persistent Linux To Go layouts for verified x64 Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
+  - Classify Linux To Go images when selected and again immediately before erasing the target. Every accepted profile requires x64 UEFI, a real kernel/initrd, Live payloads, and a GRUB entry that can be safely updated. Ubuntu/casper uses its `writable` persistence image; Debian Live and Deepin Live require `boot=live` and use their `persistence` / `persistence.conf` protocol. Deepin 25 layouts with the current Linglong marker are included.
   - Reject unsupported distributions and unsafe Debian Live layouts before the target disk is changed; use Linux installation media for images outside the validated profiles.
-  - Stop before modifying the target disk when the release does not include a required, compliant persistence component.
+  - Stop before modifying the target disk when the image does not meet a verified profile or the release does not include a required, compliant persistence component. Use Linux installation media for other distributions and layouts.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing.
   - Configure local-disk visibility, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, VHD/VHDX drive-letter repair, .NET Framework 3.5, and deployment drive letters where supported. UEFI deployments automatically use an NTFS Windows volume with a separate FAT32 EFI partition.
@@ -288,7 +288,7 @@ WinDeploy Studio is built with Flutter and the Dart packages declared in [pubspe
 
 Disk diagnostics use an independently implemented, read-only compatibility layer informed by the public protocol layouts and compatibility behavior of CrystalDiskInfo. WinDeploy Studio does not include or redistribute CrystalDiskInfo, its bridge DLLs, or its diagnostic executables.
 
-The release does not redistribute `mke2fs.exe`, e2fsprogs, Cygwin, or another ext4-creation component. If a Linux To Go workflow requires that component and it is unavailable, the application stops before changing the selected disk. Full attribution and licensing notices are available in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Linux To Go uses the bundled `wds_ext4_builder.exe` helper to create bounded ext4 persistence images for the verified Ubuntu/casper, Debian Live, and Deepin Live profiles. It is built from the pinned MIT-licensed `go-ext4fs` source included in `tools/ext4-builder`; the application verifies its SHA-256 before changing the target disk. `mke2fs.exe`, e2fsprogs, and Cygwin are not redistributed. Full attribution and licensing notices are available in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Special Thanks
 
@@ -307,7 +307,7 @@ MIT License. See [LICENSE](LICENSE).
 
 # WinDeploy Studio 中文说明
 
-WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Windows 安装盘、Linux ISOHybrid 写盘、Windows To Go、x64 Ubuntu/casper 与 Debian Live 的严格 Linux To Go 布局预检、原生磁盘测试、镜像资源、工具箱、日志查看和 AI 辅助排障等场景。
+WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Windows 安装盘、Linux ISOHybrid 写盘、Windows To Go、已验证的 x64 Ubuntu/casper、Debian Live 与 Deepin Live 严格 Linux To Go 布局预检、原生磁盘测试、镜像资源、工具箱、日志查看和 AI 辅助排障等场景。
 
 ## 核心功能
 
@@ -320,10 +320,10 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。
-  - 在修改磁盘前验证 x64 Ubuntu/casper 与 Debian Live 的受支持持久化 Linux To Go 布局。
-  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；Ubuntu/casper 布局必须具备 x64 UEFI、casper 内核/initrd、Live 文件系统和可安全注入持久化参数的 GRUB 启动项。Debian 还必须具备 `boot=live`、支持 NTFS 的 initrd 与独立的 `persistence` / `persistence.conf` 协议。
+  - 在修改磁盘前验证已通过布局检查的 x64 Ubuntu/casper、Debian Live 与 Deepin Live 持久化 Linux To Go 镜像。
+  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；所有可接受配置都必须具备 x64 UEFI、真实内核/initrd、Live 文件系统和可安全注入参数的 GRUB 启动项。Ubuntu/casper 使用 `writable` 持久化镜像；Debian Live 与 Deepin Live 需要 `boot=live` 并使用独立的 `persistence` / `persistence.conf` 协议，已包含使用当前 Linglong 标记的 Deepin 25 布局。
   - 不受支持的发行版与不安全的 Debian Live 布局会在修改目标磁盘前被拒绝；验证范围外的镜像请使用 Linux 安装盘。
-  - 当当前发行版未包含所需且合规的持久化组件时，会在修改目标磁盘前停止操作。
+  - 不符合已验证配置、或当前发行版未包含所需且合规持久化组件时，会在修改目标磁盘前停止操作；其他发行版和布局请使用 Linux 安装盘。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
   - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。
   - 在支持的组合中配置本地磁盘可见性、OOBE/Audit、WinRE、UASP、CompactOS、WIMBoot、VHD/VHDX 盘符修复、.NET Framework 3.5 和部署盘符。UEFI 部署会自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区。
@@ -573,7 +573,7 @@ WinDeploy Studio 使用 Flutter 及 [pubspec.yaml](pubspec.yaml) 中声明的 Da
 
 磁盘诊断使用独立实现的只读兼容层，并参考 CrystalDiskInfo 的公开协议布局与兼容性行为。WinDeploy Studio 不包含或再分发 CrystalDiskInfo、其桥接 DLL 或诊断可执行文件。
 
-当前发行版不会再分发 `mke2fs.exe`、e2fsprogs、Cygwin 或其他 ext4 创建组件。若 Linux To Go 流程需要该组件而当前不可用，应用会在修改所选磁盘前停止操作。完整的署名与许可证说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Linux To Go 使用随应用提供的 `wds_ext4_builder.exe` 为已验证的 Ubuntu/casper、Debian Live 与 Deepin Live 配置创建受限的 ext4 持久化镜像。该工具基于 `tools/ext4-builder` 中固定版本、MIT 许可的 `go-ext4fs` 源码构建，应用会在修改目标磁盘前校验其 SHA-256。项目不会再分发 `mke2fs.exe`、e2fsprogs 或 Cygwin。完整的署名与许可证说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 特别鸣谢
 

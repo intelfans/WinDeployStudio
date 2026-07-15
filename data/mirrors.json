@@ -171,9 +171,9 @@
           "ディスク使用量が比較的多い"
         ]
       },
-      "downloadUrl": "https://www.microsoft.com/zh-cn/software-download/windows10",
+      "downloadUrl": "https://www.microsoft.com/en-us/software-download/windows10",
       "chinaUrl": "https://www.microsoft.com/zh-cn/software-download/windows10",
-      "globalUrl": "https://www.microsoft.com/zh-cn/software-download/windows10"
+      "globalUrl": "https://www.microsoft.com/en-us/software-download/windows10"
     },
     {
       "id": "official-win11",

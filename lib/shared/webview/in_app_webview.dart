@@ -456,39 +456,34 @@ class _InAppWebviewState extends State<InAppWebview> {
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
-  bool get _managedChinese =>
-      Localizations.localeOf(context).languageCode == 'zh';
-
   String _managedPrepareLabel() =>
-      _managedChinese ? '正在准备下载' : 'Preparing download';
+      tr(context, 'webview_managed_download_preparing');
 
-  String _managedPrepareDetail() => _managedChinese
-      ? '选择保存位置后将开始传输。'
-      : 'Choose a save location to begin the transfer.';
+  String _managedPrepareDetail() =>
+      tr(context, 'webview_managed_download_choose_location');
 
-  String _managedKeepOpenDetail() => _managedChinese
-      ? '请保持 WinDeploy Studio 打开，下载会在此页面持续显示。'
-      : 'Keep WinDeploy Studio open while this page tracks the transfer.';
+  String _managedKeepOpenDetail() =>
+      tr(context, 'webview_managed_download_tracking');
 
-  String _managedCancelledDetail() => _managedChinese
-      ? '未选择保存位置，下载未开始。'
-      : 'No save location was selected, so the download did not start.';
+  String _managedCancelledDetail() =>
+      tr(context, 'webview_managed_download_no_location');
 
   String _buildDownloadProgressPage(InAppDownloadRequest request) {
     final escape = const HtmlEscape();
-    final chinese = _managedChinese;
-    final title = chinese ? '下载正在准备' : 'Your download is being prepared';
-    final message = chinese
-        ? '选择保存位置后，应用会直接建立下载并持续显示进度。'
-        : 'After you choose where to save it, the app will begin and track the download directly.';
-    final keepOpen = chinese
-        ? '请保持 WinDeploy Studio 打开。你可以在右上角暂停、继续或取消下载。'
-        : 'Keep WinDeploy Studio open. Use the download button in the top-right to pause, resume, or cancel.';
-    final fileLabel = chinese ? '准备下载的文件' : 'Preparing file';
-    final sourceLabel = chinese ? '下载渠道' : 'Download channel';
-    final initialState = chinese ? '等待选择保存位置' : 'Waiting for a save location';
+    final locale = Localizations.localeOf(context);
+    final htmlLanguage = localeCodeFromLocale(locale).replaceAll('_', '-');
+    final isRtl = locale.languageCode == 'ar';
+    final title = tr(context, 'webview_managed_download_title');
+    final message = tr(context, 'webview_managed_download_message');
+    final keepOpen = tr(context, 'webview_managed_download_keep_open');
+    final fileLabel = tr(context, 'webview_managed_download_file_label');
+    final sourceLabel = tr(context, 'webview_managed_download_channel_label');
+    final initialState = tr(
+      context,
+      'webview_managed_download_waiting_location',
+    );
     return '''<!doctype html>
-<html lang="${chinese ? 'zh-CN' : 'en'}">
+<html lang="$htmlLanguage" dir="${isRtl ? 'rtl' : 'ltr'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -504,7 +499,7 @@ class _InAppWebviewState extends State<InAppWebview> {
   .eyebrow { margin: 0 0 10px; color: #416b99; font-size: 13px; font-weight: 700; letter-spacing: 0; }
   h1 { margin: 0; font-size: clamp(26px, 4vw, 34px); letter-spacing: 0; }
   .lead { max-width: 510px; margin: 14px auto 30px; color: #59677b; font-size: 16px; line-height: 1.65; }
-  .file { display: grid; grid-template-columns: 1fr auto; gap: 16px; text-align: left; padding: 16px 18px; border: 1px solid #dce4ee; border-radius: 12px; background: #fbfcfe; }
+  .file { display: grid; grid-template-columns: 1fr auto; gap: 16px; text-align: start; padding: 16px 18px; border: 1px solid #dce4ee; border-radius: 12px; background: #fbfcfe; }
   .file-label { display: block; margin-bottom: 5px; color: #66758a; font-size: 12px; }
   .file-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
   .channel { align-self: center; color: #24578b; font-size: 13px; font-weight: 700; white-space: nowrap; }
@@ -512,7 +507,7 @@ class _InAppWebviewState extends State<InAppWebview> {
   .progress > span { display: block; width: 0%; height: 100%; border-radius: inherit; background: #2e6ba7; transition: width 220ms ease; }
   .progress > span.indeterminate { width: 36%; animation: travel 1.15s ease-in-out infinite; }
   @keyframes travel { 0% { transform: translateX(-120%); } 100% { transform: translateX(310%); } }
-  .status { display: flex; gap: 16px; justify-content: space-between; text-align: left; color: #526176; font-size: 14px; }
+  .status { display: flex; gap: 16px; justify-content: space-between; text-align: start; color: #526176; font-size: 14px; }
   .status strong { color: #1c2b40; font-weight: 700; }
   .notice { margin: 30px 0 0; padding-top: 22px; border-top: 1px solid #e2e8f0; color: #5d6c80; font-size: 13px; line-height: 1.6; }
   @media (max-width: 540px) { body { padding: 16px; } .content { padding: 30px 22px; } .file { grid-template-columns: 1fr; gap: 8px; } .channel { justify-self: start; } .status { display: block; } .status strong { display: block; margin-top: 5px; } }

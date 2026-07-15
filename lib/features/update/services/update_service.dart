@@ -738,14 +738,10 @@ class UpdateService {
       if (uri == null || !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(uri)) {
         return null;
       }
-      // SourceForge may return downloads.sourceforge.net before selecting a
-      // concrete mirror. The resolver normally follows that redirect; accept
-      // the download host as a last resort because it is still within the
-      // trusted SourceForge boundary.
-      final host = uri.host.toLowerCase();
-      if (GlobalMirrorDownloadResolver.isDirectDownloadUrl(uri) ||
-          host == 'downloads.sourceforge.net' ||
-          host == 'sourceforge.net') {
+      // The resolver normally returns a concrete mirror URL. SourceForge can
+      // instead serve the file directly from sourceforge.net, so accept every
+      // trusted HTTPS download endpoint rather than only the mirror subdomain.
+      if (GlobalMirrorDownloadResolver.isDownloadEndpoint(uri)) {
         return uri.toString();
       }
       return null;

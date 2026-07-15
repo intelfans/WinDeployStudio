@@ -16,8 +16,9 @@
     创建 Windows 安装介质，或写入可启动的 Linux ISOHybrid 镜像
     
   🚀 To Go 工作环境
-    创建便携式 Windows 工作环境，并验证 x64 Ubuntu/casper 与 Debian Live
-    布局；持久化 Linux 创建目前已关闭
+    创建便携式 Windows 工作环境，并为通过结构预检的实验性 x64 Ubuntu/casper、
+    Debian Live/Kali 和 Deepin Live 配置创建持久化 Linux To Go；
+    仍需完成真实启动和重启后持久化验证
     
   📊 原生磁盘测试
     测试顺序、4K、多线程与持续写入性能

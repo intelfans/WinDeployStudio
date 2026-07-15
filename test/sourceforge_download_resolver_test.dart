@@ -73,6 +73,57 @@ void main() {
     expect(GlobalMirrorDownloadResolver.isDownloadEndpoint(result), isTrue);
   });
 
+  test('accepts an HTTPS root-host download endpoint', () {
+    const html = '''
+      <a href="https://sourceforge.net/projects/windeploystudio/files/v1.1.2/WinDeployStudio_Setup_1.1.2.exe/download?direct=1">Download</a>
+    ''';
+
+    final result = GlobalMirrorDownloadResolver.extractDirectUrl(
+      html,
+      baseUri: landingPage,
+    );
+
+    expect(result, isNotNull);
+    expect(result!.host, 'sourceforge.net');
+    expect(GlobalMirrorDownloadResolver.isDownloadEndpoint(result), isTrue);
+  });
+
+  test('returns a direct file response from the trusted root host', () async {
+    const directUrl =
+        'https://sourceforge.net/projects/windeploystudio/files/v1.1.2/WinDeployStudio_Setup_1.1.2.exe/download?direct=1';
+    final client = MockClient(
+      (_) async => http.Response.bytes(
+        const [0x4d, 0x5a],
+        200,
+        headers: {'content-type': 'application/octet-stream'},
+      ),
+    );
+
+    final resolved = await GlobalMirrorDownloadResolver.resolve(
+      directUrl,
+      client: client,
+    );
+
+    expect(resolved, directUrl);
+  });
+
+  test('does not treat an HTTP SourceForge endpoint as trusted', () {
+    expect(
+      GlobalMirrorDownloadResolver.isDownloadEndpoint(
+        Uri.parse('http://downloads.sourceforge.net/project/file.iso'),
+      ),
+      isFalse,
+    );
+    expect(
+      GlobalMirrorDownloadResolver.isDownloadEndpoint(
+        Uri.parse(
+          'http://sourceforge.net/projects/windeploystudio/files/file.iso/download',
+        ),
+      ),
+      isFalse,
+    );
+  });
+
   test('does not accept a non-Global Mirror download URL', () {
     const html = '''
       <meta http-equiv="refresh" content="0; url=https://example.invalid/file.iso">

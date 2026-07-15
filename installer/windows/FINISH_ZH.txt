@@ -14,7 +14,7 @@ GitHub 主页：https://github.com/intelfans
 GitHub 仓库：https://github.com/intelfans/WinDeployStudio
 
 Linux To Go 说明：
-本发行版未内置 ext4 持久化创建工具，因为 GPLv2 所需的完整对应源码包尚未就绪。持久化 Linux To Go 创建已关闭。详见安装目录中的 THIRD_PARTY_NOTICES.md 和 tools\e2fsprogs\README.md。
+本发行版内置 wds_ext4_builder，它由固定的 MIT 许可 go-ext4fs 源码构建，用于通过结构预检的实验性 x64 Ubuntu/casper、Debian Live/Kali 和 Deepin Live 配置；仍需完成真实启动和重启后持久化验证。它只接受本地盘符上的普通镜像，并会在操作目标磁盘前完成校验。详见安装目录中的 THIRD_PARTY_NOTICES.md 和 tools\ext4-builder\README.md。
 
 特别感谢
 

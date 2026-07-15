@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:xml/xml.dart';
 
+import 'windows_system_environment.dart';
+
 class WimImageInfo {
   final int index;
   final String name;
@@ -61,15 +63,25 @@ class WimInfoService {
     if (!await File(helperPath).exists()) {
       throw StateError('WIM metadata helper is missing.');
     }
-    final result = await Process.run(helperPath, [
-      imagePath,
-    ]).timeout(const Duration(seconds: 60));
+    final result = await Process.run(
+      helperPath,
+      [imagePath],
+      environment: WindowsSystemEnvironment.withSystemRoot(),
+    ).timeout(const Duration(seconds: 60));
     if (result.exitCode != 0) {
       throw StateError(result.stderr.toString().trim());
     }
 
+    return parseHelperOutput(result.stdout.toString());
+  }
+
+  /// Parses the line-oriented output emitted by the native WIMGAPI helper.
+  ///
+  /// Keeping this separate from process execution gives ESD-backed Windows
+  /// images the same metadata parsing path as regular WIM installers.
+  static List<WimImageInfo> parseHelperOutput(String output) {
     final images = <WimImageInfo>[];
-    for (final line in const LineSplitter().convert(result.stdout.toString())) {
+    for (final line in const LineSplitter().convert(output)) {
       final parts = line.trim().split('|');
       if (parts.length != 3 || parts.first != 'IMAGE') continue;
       final index = int.tryParse(parts[1]);

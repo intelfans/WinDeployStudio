@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../../features/logs/services/log_center_service.dart';
 import 'wim_info_service.dart';
 import 'windows_iso_preflight.dart';
+import 'windows_system_environment.dart';
 
 class IsoMetadata {
   final String filePath;
@@ -196,13 +197,17 @@ class IsoParseService {
   Future<String?> _mountIso(String isoPath) async {
     try {
       final quotedPath = _psQuote(isoPath);
-      final result = await Process.run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Mount-DiskImage -ImagePath $quotedPath",
-      ]).timeout(const Duration(seconds: 15));
+      final result = await Process.run(
+        WindowsSystemEnvironment.powerShellExecutable,
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          "Mount-DiskImage -ImagePath $quotedPath",
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 15));
 
       if (result.exitCode != 0) return null;
       if (_cancelled) {
@@ -217,13 +222,17 @@ class IsoParseService {
           return null;
         }
         await Future.delayed(const Duration(milliseconds: 500));
-        final r = await Process.run('powershell', [
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          "Get-DiskImage -ImagePath $quotedPath | Get-Volume | Select-Object -ExpandProperty DriveLetter",
-        ]);
+        final r = await Process.run(
+          WindowsSystemEnvironment.powerShellExecutable,
+          [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            "Get-DiskImage -ImagePath $quotedPath | Get-Volume | Select-Object -ExpandProperty DriveLetter",
+          ],
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+        ).timeout(const Duration(seconds: 5));
         if (r.exitCode == 0) {
           final letter = r.stdout.toString().trim();
           if (letter.isNotEmpty) return '$letter:\\';
@@ -240,13 +249,17 @@ class IsoParseService {
   Future<void> _unmount(String isoPath) async {
     try {
       final quotedPath = _psQuote(isoPath);
-      final process = await Process.start('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue",
-      ]);
+      final process = await Process.start(
+        WindowsSystemEnvironment.powerShellExecutable,
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          "Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue",
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      );
       final exited = await process.exitCode.timeout(
         const Duration(seconds: 10),
         onTimeout: () {

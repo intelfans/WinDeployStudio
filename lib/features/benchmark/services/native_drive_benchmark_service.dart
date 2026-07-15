@@ -106,6 +106,7 @@ class DriveBenchmarkService {
         BenchmarkPhase phase,
         double progress,
         String messageKey, {
+        BenchmarkWorkload? workload,
         double currentSpeed = 0,
         double currentIops = 0,
         BenchmarkLatency latency = const BenchmarkLatency(),
@@ -113,6 +114,7 @@ class DriveBenchmarkService {
         onProgress?.call(
           BenchmarkProgress(
             phase: phase,
+            workload: workload,
             progress: progress.clamp(0, 1),
             elapsed: stopwatch.elapsed,
             messageKey: messageKey,
@@ -160,7 +162,12 @@ class DriveBenchmarkService {
           readPercent: readPercent,
         );
         liveSeries.add(series);
-        emit(BenchmarkPhase.warmingUp, progressStart, messageKey);
+        emit(
+          BenchmarkPhase.warmingUp,
+          progressStart,
+          messageKey,
+          workload: workload,
+        );
         final result = await _runHelper(
           helperPath: helperPath,
           arguments: arguments,
@@ -176,6 +183,7 @@ class DriveBenchmarkService {
               nativePhase,
               state == 'COOLDOWN' ? progressEnd : progressStart,
               messageKey,
+              workload: workload,
             );
           },
           onSample: (sample) {
@@ -188,6 +196,7 @@ class DriveBenchmarkService {
               phase,
               progressStart + (progressEnd - progressStart) * fraction,
               messageKey,
+              workload: workload,
               currentSpeed: sample.throughputMBps,
               currentIops: sample.iops,
               latency: sample.latency,

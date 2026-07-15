@@ -167,6 +167,21 @@ p {
   margin-left: max(24px, calc((100vw - var(--content-width)) / 2));
 }
 
+/* The Images-page title needs the full desktop content width; its supporting
+   copy deliberately remains at the narrower, more readable measure. */
+.images-intro-content {
+  max-width: var(--content-width);
+}
+
+.images-intro-content h1 {
+  font-size: 60px;
+  white-space: nowrap;
+}
+
+.images-intro-content p:last-child {
+  max-width: var(--narrow-width);
+}
+
 .site-header {
   position: sticky;
   z-index: 40;
@@ -1158,6 +1173,10 @@ p {
     font-size: 56px;
   }
 
+  .images-intro-content h1 {
+    font-size: 50px;
+  }
+
   h2 {
     font-size: 38px;
   }
@@ -1205,8 +1224,19 @@ p {
   }
 }
 
+@media (max-width: 760px) {
+  .images-intro-content h1 {
+    font-size: 44px;
+    white-space: normal;
+  }
+}
+
 @media (max-width: 680px) {
   h1 {
+    font-size: 42px;
+  }
+
+  .images-intro-content h1 {
     font-size: 42px;
   }
 

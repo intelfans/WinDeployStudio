@@ -17,8 +17,43 @@ import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/wtg_service.dart';
 import '../../../core/services/windows_iso_preflight.dart';
 import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
+import '../../../shared/widgets/known_iso_verification_panel.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
+
+/// Returns the localization key shown for a To Go execution phase. Linux To
+/// Go emits explicit writer statuses; preserving those keys prevents the UI
+/// from incorrectly presenting Windows image-application text.
+String toGoProgressTitleKey({
+  required bool isLinux,
+  required String phase,
+  required String message,
+}) {
+  final messageKey = message.split('\n').first.trim();
+  if (isLinux && messageKey.isNotEmpty) return messageKey;
+  if (isLinux) {
+    return switch (phase) {
+      'complete' => 'step_complete',
+      'failed' => 'step_failed',
+      _ => 'linux_preparing',
+    };
+  }
+  return switch (phase) {
+    'preparing' => 'wtg_step_preparing',
+    'cleaningDisk' ||
+    'creatingPartitions' ||
+    'formatting' ||
+    'partitioningDisk' ||
+    'partitioning' => 'wtg_step_partitioning',
+    'mountingIso' => 'wtg_step_mounting',
+    'applyingImage' || 'copyingFiles' || 'splittingWim' => 'wtg_step_applying',
+    'writingBootFiles' => 'wtg_step_boot',
+    'verifying' => 'wtg_step_verifying',
+    'complete' => 'step_complete',
+    'failed' => 'step_failed',
+    _ => 'wtg_step_preparing',
+  };
+}
 
 enum _ToGoPlatform { windows, linux }
 
@@ -106,6 +141,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   KnownIsoVerification? _knownIsoVerification;
   int _knownIsoVerificationRequest = 0;
   Locale? _knownIsoVerificationLocale;
+  int _isoSelectionRequest = 0;
 
   List<DiskInfo> _disks = const [];
   DiskInfo? _disk;
@@ -157,13 +193,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     _knownIsoVerificationLocale = locale;
 
     final iso = _iso;
-    if (_isLinux || iso == null) {
+    if (iso == null) {
       _knownIsoVerification = null;
       return;
     }
     final request = ++_knownIsoVerificationRequest;
     _knownIsoVerification = null;
-    unawaited(_verifyKnownWindowsIso(iso.filePath, request, locale));
+    unawaited(_verifyKnownIso(iso.filePath, request, locale));
   }
 
   @override
@@ -210,6 +246,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _linuxToGoInspection = null;
       _knownIsoVerification = null;
       _knownIsoVerificationRequest++;
+      _isoSelectionRequest++;
+      _loadingImage = false;
+      _imageStatus = '';
       _deploymentMode = DeploymentMode.direct;
       _bootMode = DeploymentBootMode.uefiGpt;
       _compactOs = false;
@@ -232,6 +271,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final path = pickedFile.path;
     if (path == null || !mounted) return;
     final selectedPlatform = _platform;
+    final locale = Localizations.localeOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final selectionRequest = ++_isoSelectionRequest;
     final verificationRequest = ++_knownIsoVerificationRequest;
 
     setState(() {
@@ -245,23 +287,28 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     });
 
     try {
-      if (_isLinux) {
+      if (selectedPlatform == _ToGoPlatform.linux) {
         final windowsLayout = await ref
             .read(windowsIsoPreflightProvider)
             .inspect(path);
+        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+          return;
+        }
         if (windowsLayout.isValid) {
           throw StateError('wtg_windows_iso_in_linux_mode');
         }
         final inspection = await ref
             .read(linuxToGoImagePreflightProvider)
             .inspect(path);
+        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+          return;
+        }
         final iso = IsoMetadata(
           filePath: path,
           fileName: p.basename(path),
           fileSize: pickedFile.size,
           windowsVersion: 'Linux ISOHybrid',
         );
-        if (!mounted) return;
         setState(() {
           _iso = iso;
           _imageIndex = inspection.canCreate ? 1 : null;
@@ -271,17 +318,21 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             _driverDirectory = '';
           }
         });
+        unawaited(_verifyKnownIso(path, verificationRequest, locale));
         if (!inspection.canCreate) {
           final messageKey =
               inspection.messageKey ?? 'linux_togo_unsupported_iso';
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(_localizedOrRaw(messageKey))));
+          messenger.showSnackBar(
+            SnackBar(content: Text(_localizedOrRaw(messageKey))),
+          );
         }
       } else {
         final windowsLayout = await ref
             .read(windowsIsoPreflightProvider)
             .inspect(path);
+        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+          return;
+        }
         if (!windowsLayout.isValid) {
           throw StateError('wtg_invalid_windows_iso');
         }
@@ -290,39 +341,43 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             .parseIso(
               path,
               onProgress: (phase, percent) {
-                if (!mounted) return;
+                if (!_isCurrentIsoSelection(
+                  selectionRequest,
+                  selectedPlatform,
+                )) {
+                  return;
+                }
                 setState(() {
                   _imageStatus = '${tr(context, 'wtg_parsing_iso')} $percent%';
                 });
               },
             );
+        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+          return;
+        }
         if (iso == null) throw StateError('creator_parse_error');
         final images = await ref.read(wtgServiceProvider).getWimImages(path);
+        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+          return;
+        }
         if (images.isEmpty) throw StateError('wtg_invalid_windows_iso');
-        if (!mounted) return;
         setState(() {
           _iso = iso;
           _images = images;
           _imageIndex = images.first['index'] as int?;
         });
         if (selectedPlatform == _ToGoPlatform.windows) {
-          unawaited(
-            _verifyKnownWindowsIso(
-              path,
-              verificationRequest,
-              Localizations.localeOf(context),
-            ),
-          );
+          unawaited(_verifyKnownIso(path, verificationRequest, locale));
         }
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+        return;
+      }
       final key = error.toString().replaceFirst('Bad state: ', '');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_localizedOrRaw(key))));
+      messenger.showSnackBar(SnackBar(content: Text(_localizedOrRaw(key))));
     } finally {
-      if (mounted) {
+      if (_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
         setState(() {
           _loadingImage = false;
           _imageStatus = '';
@@ -331,7 +386,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     }
   }
 
-  Future<void> _verifyKnownWindowsIso(
+  bool _isCurrentIsoSelection(int request, _ToGoPlatform platform) {
+    return mounted && request == _isoSelectionRequest && _platform == platform;
+  }
+
+  Future<void> _verifyKnownIso(
     String filePath,
     int request,
     Locale locale,
@@ -341,7 +400,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         .verify(filePath, locale);
     if (!mounted ||
         request != _knownIsoVerificationRequest ||
-        _isLinux ||
         _iso?.filePath != filePath ||
         Localizations.localeOf(context) != locale ||
         verification == null) {
@@ -628,6 +686,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _images = const [];
       _imageIndex = null;
       _linuxToGoInspection = null;
+      _knownIsoVerification = null;
+      _knownIsoVerificationRequest++;
+      _isoSelectionRequest++;
+      _loadingImage = false;
+      _imageStatus = '';
       _disk = null;
       _diskSafety = null;
       _running = false;
@@ -826,23 +889,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             ),
             stackTrailingNarrowly: true,
           ),
-          if (!_isLinux && _knownIsoVerification != null) ...[
+          if (_knownIsoVerification != null) ...[
             const SizedBox(height: 12),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: LayoutBuilder(
-                builder: (context, constraints) => ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: constraints.maxWidth),
-                  child: Chip(
-                    avatar: const Icon(Icons.verified_rounded, size: 18),
-                    label: Text(
-                      '${tr(context, 'known_iso_verified')}: ${_knownIsoVerification!.image.getName(Localizations.localeOf(context))}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ),
+            KnownIsoVerificationPanel(
+              verification: _knownIsoVerification,
+              iso: _iso,
             ),
           ],
           if (_isLinux && _linuxToGoInspection != null) ...[
@@ -900,6 +951,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         ? 'linux_togo_mke2fs_missing'
         : inspection.image?.family == LinuxToGoImageFamily.debianLive
         ? 'linux_togo_debian_image_supported'
+        : inspection.image?.family == LinuxToGoImageFamily.deepinLive
+        ? 'linux_togo_deepin_image_supported'
         : 'linux_togo_image_supported';
 
     return Semantics(
@@ -933,6 +986,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_knownIsoVerification != null) ...[
+            KnownIsoVerificationPanel(
+              verification: _knownIsoVerification,
+              iso: _iso,
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -1007,6 +1067,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_knownIsoVerification != null) ...[
+              KnownIsoVerificationPanel(
+                verification: _knownIsoVerification,
+                iso: _iso,
+              ),
+              const SizedBox(height: 12),
+            ],
             _OptionTile(
               icon: Icons.terminal,
               title: tr(context, 'deploy_direct'),
@@ -1026,6 +1093,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_knownIsoVerification != null) ...[
+            KnownIsoVerificationPanel(
+              verification: _knownIsoVerification,
+              iso: _iso,
+            ),
+            const SizedBox(height: 12),
+          ],
           Text(
             tr(context, 'deploy_boot_mode'),
             style: Theme.of(context).textTheme.titleMedium,
@@ -1141,6 +1215,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_knownIsoVerification != null) ...[
+            KnownIsoVerificationPanel(
+              verification: _knownIsoVerification,
+              iso: _iso,
+            ),
+            const SizedBox(height: 12),
+          ],
           Card(
             child: ExpansionTile(
               initiallyExpanded: true,
@@ -1375,6 +1456,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               ],
             ),
           ),
+          if (_knownIsoVerification != null) ...[
+            const SizedBox(height: 12),
+            KnownIsoVerificationPanel(
+              verification: _knownIsoVerification,
+              iso: _iso,
+            ),
+          ],
           _buildCompatibilityNotices(),
           const SizedBox(height: 12),
           Card(
@@ -1514,6 +1602,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
+                if (_knownIsoVerification != null) ...[
+                  const SizedBox(height: 16),
+                  KnownIsoVerificationPanel(
+                    verification: _knownIsoVerification,
+                    iso: _iso,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 Card(
                   child: Padding(
@@ -1541,7 +1636,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _phaseLabel(progress?.phase ?? 'preparing'),
+                                    _phaseLabel(
+                                      progress?.phase ?? 'preparing',
+                                      message: progress?.message ?? '',
+                                    ),
                                     style: Theme.of(
                                       context,
                                     ).textTheme.titleMedium,
@@ -1811,25 +1909,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     VirtualDiskType.fixed => tr(context, 'deploy_vdisk_fixed'),
   };
 
-  String _phaseLabel(String phase) {
-    final key = switch (phase) {
-      'preparing' => 'wtg_step_preparing',
-      'cleaningDisk' ||
-      'creatingPartitions' ||
-      'formatting' ||
-      'partitioningDisk' ||
-      'partitioning' => 'wtg_step_partitioning',
-      'mountingIso' => 'wtg_step_mounting',
-      'applyingImage' ||
-      'copyingFiles' ||
-      'splittingWim' => 'wtg_step_applying',
-      'writingBootFiles' => 'wtg_step_boot',
-      'verifying' => 'wtg_step_verifying',
-      'complete' => 'step_complete',
-      'failed' => 'step_failed',
-      _ => 'wtg_step_preparing',
-    };
-    return tr(context, key);
+  String _phaseLabel(String phase, {required String message}) {
+    return tr(
+      context,
+      toGoProgressTitleKey(isLinux: _isLinux, phase: phase, message: message),
+    );
   }
 
   String _localizedOrRaw(String value) {

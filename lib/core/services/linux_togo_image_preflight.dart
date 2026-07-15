@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import 'windows_system_environment.dart';
 import 'windows_iso_preflight.dart';
 
 /// The result of determining whether an ISO can create a persistent Linux To
@@ -12,7 +14,7 @@ enum LinuxToGoImageStatus { supported, unsupported, inspectionFailed }
 
 /// A supported Live image layout. More layouts can be added without making
 /// callers infer behavior from individual files.
-enum LinuxToGoImageFamily { casper, debianLive }
+enum LinuxToGoImageFamily { casper, debianLive, deepinLive }
 
 /// The persistence layout required by an image family.
 enum LinuxToGoPersistenceStrategy {
@@ -68,12 +70,26 @@ class LinuxToGoBootConfig {
   const LinuxToGoBootConfig({required this.relativePath, required this.syntax});
 }
 
-/// A live filesystem payload copied only to the writable data partition.
+/// A Live filesystem payload copied only to the writable data partition.
 class LinuxToGoPayload {
   final String relativePath;
   final int sizeBytes;
 
   const LinuxToGoPayload({required this.relativePath, required this.sizeBytes});
+}
+
+/// A source file captured by the destructive-operation preflight.
+///
+/// Keeping the manifest lets the copy path use fixed source sizes and avoids
+/// repeatedly crawling a mounted ISO on Flutter's UI isolate.
+class LinuxToGoContentFile {
+  final String relativePath;
+  final int sizeBytes;
+
+  const LinuxToGoContentFile({
+    required this.relativePath,
+    required this.sizeBytes,
+  });
 }
 
 /// The immutable contract a Linux To Go creator needs after an image has
@@ -86,6 +102,8 @@ class LinuxToGoSupportedImage {
   final String initrdRelativePath;
   final List<LinuxToGoBootConfig> patchableBootConfigs;
   final List<LinuxToGoPayload> livePayloads;
+  final List<LinuxToGoContentFile> contentFiles;
+  final bool hasCompleteContentManifest;
   final int totalContentBytes;
   final int bootContentBytes;
   final bool supportsDriverStaging;
@@ -98,15 +116,32 @@ class LinuxToGoSupportedImage {
     required this.initrdRelativePath,
     required List<LinuxToGoBootConfig> patchableBootConfigs,
     required List<LinuxToGoPayload> livePayloads,
+    List<LinuxToGoContentFile> contentFiles = const [],
+    this.hasCompleteContentManifest = false,
     required this.totalContentBytes,
     required this.bootContentBytes,
     required this.supportsDriverStaging,
   }) : patchableBootConfigs = List.unmodifiable(patchableBootConfigs),
-       livePayloads = List.unmodifiable(livePayloads);
+       livePayloads = List.unmodifiable(livePayloads),
+       contentFiles = List.unmodifiable(contentFiles);
 
   List<String> get patchableBootConfigPaths => List.unmodifiable(
     patchableBootConfigs.map((config) => config.relativePath),
   );
+
+  Set<String> get livePayloadExtensions => Set.unmodifiable(
+    livePayloads
+        .map((payload) => p.extension(payload.relativePath).toLowerCase())
+        .where((extension) => extension.isNotEmpty)
+        .map((extension) => extension.substring(1)),
+  );
+
+  bool isLivePayloadPath(String relativePath) {
+    final normalized = _normalizeRelativePath(relativePath);
+    return livePayloads.any(
+      (payload) => _normalizeRelativePath(payload.relativePath) == normalized,
+    );
+  }
 }
 
 /// An immutable classification of one selected ISO.
@@ -161,6 +196,19 @@ abstract interface class LinuxToGoImagePreflight {
   Future<LinuxToGoImageInspection> inspect(String isoPath);
 }
 
+/// Allows the real implementation to build a complete source manifest before
+/// erasing a disk, while test and alternate implementations keep the compact
+/// [LinuxToGoImagePreflight] contract.
+extension LinuxToGoImagePreflightDeployment on LinuxToGoImagePreflight {
+  Future<LinuxToGoImageInspection> inspectForDeployment(String isoPath) {
+    final service = this;
+    if (service is LinuxToGoImagePreflightService) {
+      return service.inspectForDeployment(isoPath);
+    }
+    return inspect(isoPath);
+  }
+}
+
 /// Windows implementation which mounts an ISO, inspects its root, and always
 /// attempts to unmount it afterwards.
 class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
@@ -170,15 +218,36 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
   static const String _casperInitrdRelativePath = 'casper/initrd';
   static const String _debianKernelRelativePath = 'live/vmlinuz';
   static const String _debianInitrdRelativePath = 'live/initrd.img';
+  static const String _deepinKernelRelativePath = 'live/vmlinuz.efi';
+  static const String _deepinInitrdRelativePath = 'live/initrd';
+  static const List<String> _deepinMarkerRelativePaths = [
+    'live/filesyst.lin',
+    'live/filesystem.linglong-manifest',
+  ];
   static const List<String> _grubConfigPaths = [
     'boot/grub/grub.cfg',
     'boot/grub/loopback.cfg',
   ];
 
+  /// The deployment flow invokes preflight twice: once before its early
+  /// checks and again immediately before erasing. Cache only the complete
+  /// manifest for the same immutable source snapshot so the second check does
+  /// not crawl a multi-gigabyte ISO again.
+  static final Map<String, LinuxToGoImageInspection> _deploymentCache = {};
+
   const LinuxToGoImagePreflightService();
 
   @override
-  Future<LinuxToGoImageInspection> inspect(String isoPath) async {
+  Future<LinuxToGoImageInspection> inspect(String isoPath) =>
+      _inspect(isoPath, includeContentManifest: false);
+
+  Future<LinuxToGoImageInspection> inspectForDeployment(String isoPath) =>
+      _inspect(isoPath, includeContentManifest: true);
+
+  Future<LinuxToGoImageInspection> _inspect(
+    String isoPath, {
+    required bool includeContentManifest,
+  }) async {
     final source = File(isoPath);
     if (await FileSystemEntity.type(source.path, followLinks: false) !=
         FileSystemEntityType.file) {
@@ -187,15 +256,43 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
       );
     }
 
+    FileStat stat;
+    try {
+      stat = await source.stat();
+    } catch (error) {
+      return LinuxToGoImageInspection.inspectionFailed(
+        LinuxToGoImageIssue.sourceNotRegularFile,
+        diagnostic: 'Could not read the ISO source: $error',
+      );
+    }
+    final cacheKey = _cacheKey(source.path, stat);
+    if (includeContentManifest) {
+      final cached = _deploymentCache[cacheKey];
+      if (cached != null) return cached;
+    }
+
     final mountPoint = await _mountIso(isoPath);
     if (mountPoint == null) {
       return const LinuxToGoImageInspection.inspectionFailed(
         LinuxToGoImageIssue.mountFailed,
+        diagnostic:
+            'Windows did not expose a drive letter for the mounted ISO.',
       );
     }
 
     try {
-      return inspectMountedRoot(mountPoint);
+      final inspection = includeContentManifest
+          ? await Isolate.run(
+              () => _inspectMountedRootInWorker(mountPoint, stat.size),
+            )
+          : await inspectMountedRoot(mountPoint, sourceSizeBytes: stat.size);
+      if (includeContentManifest && inspection.canCreate) {
+        _deploymentCache[cacheKey] = inspection;
+        while (_deploymentCache.length > 4) {
+          _deploymentCache.remove(_deploymentCache.keys.first);
+        }
+      }
+      return inspection;
     } catch (error) {
       return LinuxToGoImageInspection.inspectionFailed(
         LinuxToGoImageIssue.mountFailed,
@@ -208,9 +305,15 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
 
   /// Inspects an already mounted ISO root. This is public so tests and other
   /// read-only callers can validate a directory fixture without PowerShell.
+  ///
+  /// Supplying [sourceSizeBytes] uses a fast structural scan suitable for the
+  /// picker UI. The destructive path requests [includeContentManifest], which
+  /// records every file in a worker isolate for exact space and copy checks.
   static Future<LinuxToGoImageInspection> inspectMountedRoot(
-    String mountedRoot,
-  ) async {
+    String mountedRoot, {
+    int? sourceSizeBytes,
+    bool includeContentManifest = false,
+  }) async {
     try {
       final root = Directory(mountedRoot);
       if (!await root.exists()) {
@@ -229,19 +332,39 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
         );
       }
 
-      final scan = await _scanFiles(mountedRoot);
-      if (await _looksLikeDebianLive(mountedRoot, scan)) {
-        return _inspectDebianLive(mountedRoot: mountedRoot, scan: scan);
+      final hasDeepinMarker = await Future.wait(
+        _deepinMarkerRelativePaths.map(
+          (relativePath) => _isRegularFile(p.join(mountedRoot, relativePath)),
+        ),
+      ).then((matches) => matches.any((matches) => matches));
+      if (hasDeepinMarker) {
+        return _inspectDeepinLive(
+          mountedRoot: mountedRoot,
+          sourceSizeBytes: sourceSizeBytes,
+          includeContentManifest: includeContentManifest,
+        );
       }
 
+      final livePayloads = await _collectPayloads(
+        mountedRoot,
+        directory: 'live',
+        extensions: const {'.squashfs', '.ext2'},
+      );
+      if (livePayloads.isNotEmpty) {
+        return _inspectDebianLive(
+          mountedRoot: mountedRoot,
+          sourceSizeBytes: sourceSizeBytes,
+          includeContentManifest: includeContentManifest,
+          livePayloads: livePayloads,
+        );
+      }
+
+      final casperDirectory = Directory(p.join(mountedRoot, 'casper'));
+      final hasCasperDirectory = await casperDirectory.exists();
       final kernel = File(p.join(mountedRoot, _casperKernelRelativePath));
       final initrd = File(p.join(mountedRoot, _casperInitrdRelativePath));
       final hasCasperKernel = await _isRegularFile(kernel.path);
       final hasCasperInitrd = await _isRegularFile(initrd.path);
-      final hasCasperDirectory = await Directory(
-        p.join(mountedRoot, 'casper'),
-      ).exists();
-
       if (!hasCasperDirectory && !hasCasperKernel && !hasCasperInitrd) {
         return const LinuxToGoImageInspection.unsupported(
           LinuxToGoImageIssue.unknownLayout,
@@ -258,24 +381,26 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
         );
       }
 
+      final casperPayloads = await _collectPayloads(
+        mountedRoot,
+        directory: 'casper',
+        extensions: const {'.squashfs', '.ext2'},
+      );
+      if (casperPayloads.isEmpty) {
+        return const LinuxToGoImageInspection.unsupported(
+          LinuxToGoImageIssue.missingLivePayload,
+        );
+      }
       if (!await _isRegularFile(p.join(mountedRoot, _efiBootRelativePath))) {
         return const LinuxToGoImageInspection.unsupported(
           LinuxToGoImageIssue.missingX64Efi,
         );
       }
-      if (scan.livePayloads.isEmpty) {
-        return const LinuxToGoImageInspection.unsupported(
-          LinuxToGoImageIssue.missingLivePayload,
-        );
-      }
-      if (scan.largestBootFileBytes > _fat32MaxFileBytes) {
-        return const LinuxToGoImageInspection.unsupported(
-          LinuxToGoImageIssue.bootFileTooLarge,
-        );
-      }
 
-      final patchableConfigs = await _findPatchableCasperGrubConfigs(
+      final patchableConfigs = await _findPatchableGrubConfigs(
         mountedRoot,
+        kernelRelativePath: _casperKernelRelativePath,
+        requiresLiveBoot: false,
       );
       if (patchableConfigs.isEmpty) {
         return const LinuxToGoImageInspection.unsupported(
@@ -283,17 +408,33 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
         );
       }
 
+      final scan = await _buildFileScan(
+        mountedRoot,
+        livePayloads: casperPayloads,
+        criticalBootPaths: [
+          _efiBootRelativePath,
+          _casperKernelRelativePath,
+          _casperInitrdRelativePath,
+          ...patchableConfigs.map((config) => config.relativePath),
+        ],
+        sourceSizeBytes: sourceSizeBytes,
+        includeContentManifest: includeContentManifest,
+      );
+      if (scan.largestBootFileBytes > _fat32MaxFileBytes) {
+        return const LinuxToGoImageInspection.unsupported(
+          LinuxToGoImageIssue.bootFileTooLarge,
+        );
+      }
+
       return LinuxToGoImageInspection.supported(
-        LinuxToGoSupportedImage(
+        _supportedImage(
           family: LinuxToGoImageFamily.casper,
           persistenceStrategy: LinuxToGoPersistenceStrategy.casperWritableImage,
-          efiBootRelativePath: _efiBootRelativePath,
           kernelRelativePath: _casperKernelRelativePath,
           initrdRelativePath: _casperInitrdRelativePath,
-          patchableBootConfigs: patchableConfigs,
-          livePayloads: scan.livePayloads,
-          totalContentBytes: scan.totalContentBytes,
-          bootContentBytes: scan.bootContentBytes,
+          patchableConfigs: patchableConfigs,
+          livePayloads: casperPayloads,
+          scan: scan,
           supportsDriverStaging: true,
         ),
       );
@@ -305,67 +446,11 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
     }
   }
 
-  static Future<_LinuxToGoFileScan> _scanFiles(String mountedRoot) async {
-    var totalContentBytes = 0;
-    var bootContentBytes = 0;
-    var largestBootFileBytes = 0;
-    final livePayloads = <LinuxToGoPayload>[];
-
-    await for (final entity in Directory(
-      mountedRoot,
-    ).list(recursive: true, followLinks: false)) {
-      if (entity is! File) continue;
-      if (!await _isRegularFile(entity.path)) continue;
-
-      final sizeBytes = await entity.length();
-      totalContentBytes += sizeBytes;
-      final relativePath = p
-          .relative(entity.path, from: mountedRoot)
-          .replaceAll('\\', '/');
-      final extension = p.extension(relativePath).toLowerCase();
-      if (extension == '.squashfs' || extension == '.ext2') {
-        livePayloads.add(
-          LinuxToGoPayload(relativePath: relativePath, sizeBytes: sizeBytes),
-        );
-        continue;
-      }
-
-      bootContentBytes += sizeBytes;
-      if (sizeBytes > largestBootFileBytes) largestBootFileBytes = sizeBytes;
-    }
-
-    return _LinuxToGoFileScan(
-      totalContentBytes: totalContentBytes,
-      bootContentBytes: bootContentBytes,
-      largestBootFileBytes: largestBootFileBytes,
-      livePayloads: livePayloads,
-    );
-  }
-
-  static Future<bool> _looksLikeDebianLive(
-    String mountedRoot,
-    _LinuxToGoFileScan scan,
-  ) async {
-    final liveRoot = Directory(p.join(mountedRoot, 'live'));
-    if (!await liveRoot.exists()) return false;
-
-    final hasPayload = scan.livePayloads.any(
-      (payload) => payload.relativePath.toLowerCase().startsWith('live/'),
-    );
-    if (!hasPayload) return false;
-
-    final hasKernel = await _isRegularFile(
-      p.join(mountedRoot, 'live', 'vmlinuz'),
-    );
-    final hasInitrd = await _isRegularFile(
-      p.join(mountedRoot, _debianInitrdRelativePath),
-    );
-    return hasPayload || hasKernel || hasInitrd;
-  }
-
   static Future<LinuxToGoImageInspection> _inspectDebianLive({
     required String mountedRoot,
-    required _LinuxToGoFileScan scan,
+    required int? sourceSizeBytes,
+    required bool includeContentManifest,
+    required List<LinuxToGoPayload> livePayloads,
   }) async {
     final kernel = File(p.join(mountedRoot, _debianKernelRelativePath));
     final initrd = File(p.join(mountedRoot, _debianInitrdRelativePath));
@@ -385,89 +470,284 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
       );
     }
 
-    final livePayloads = scan.livePayloads
-        .where(
-          (payload) => payload.relativePath.toLowerCase().startsWith('live/'),
-        )
-        .toList(growable: false);
-    if (livePayloads.isEmpty) {
-      return const LinuxToGoImageInspection.unsupported(
-        LinuxToGoImageIssue.missingLivePayload,
-      );
-    }
-    if (scan.largestBootFileBytes > _fat32MaxFileBytes) {
-      return const LinuxToGoImageInspection.unsupported(
-        LinuxToGoImageIssue.bootFileTooLarge,
-      );
-    }
-
-    final patchableConfigs = await _findPatchableDebianGrubConfigs(mountedRoot);
+    final patchableConfigs = await _findPatchableGrubConfigs(
+      mountedRoot,
+      kernelRelativePath: _debianKernelRelativePath,
+      requiresLiveBoot: true,
+    );
     if (patchableConfigs.isEmpty) {
       return const LinuxToGoImageInspection.unsupported(
         LinuxToGoImageIssue.noPatchableBootConfig,
       );
     }
-
-    // The Live filesystem is deliberately stored on NTFS so a FAT32 boot
-    // partition never needs to carry a multi-gigabyte squashfs payload. The
-    // selected initrd must contain both an NTFS implementation and live-boot
-    // content before we permit a destructive operation. We fail closed for
-    // compressed/opaque initrds and malformed CPIO archives.
     if (!await _debianInitrdProvidesNtfsSupport(initrd)) {
       return const LinuxToGoImageInspection.unsupported(
         LinuxToGoImageIssue.debianLiveMissingNtfsSupport,
       );
     }
 
+    final scan = await _buildFileScan(
+      mountedRoot,
+      livePayloads: livePayloads,
+      criticalBootPaths: [
+        _efiBootRelativePath,
+        _debianKernelRelativePath,
+        _debianInitrdRelativePath,
+        ...patchableConfigs.map((config) => config.relativePath),
+      ],
+      sourceSizeBytes: sourceSizeBytes,
+      includeContentManifest: includeContentManifest,
+    );
+    if (scan.largestBootFileBytes > _fat32MaxFileBytes) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.bootFileTooLarge,
+      );
+    }
+
     return LinuxToGoImageInspection.supported(
-      LinuxToGoSupportedImage(
+      _supportedImage(
         family: LinuxToGoImageFamily.debianLive,
         persistenceStrategy:
             LinuxToGoPersistenceStrategy.debianPersistenceImage,
-        efiBootRelativePath: _efiBootRelativePath,
         kernelRelativePath: _debianKernelRelativePath,
         initrdRelativePath: _debianInitrdRelativePath,
-        patchableBootConfigs: patchableConfigs,
+        patchableConfigs: patchableConfigs,
         livePayloads: livePayloads,
-        totalContentBytes: scan.totalContentBytes,
-        bootContentBytes: scan.bootContentBytes,
+        scan: scan,
         supportsDriverStaging: false,
       ),
     );
   }
 
-  static Future<List<LinuxToGoBootConfig>> _findPatchableCasperGrubConfigs(
-    String mountedRoot,
-  ) async {
-    final configs = <LinuxToGoBootConfig>[];
-    final casperEntry = RegExp(
-      r'^\s*linux(efi)?\s+.*\/casper\/vmlinuz(?:\s|$)',
-      caseSensitive: false,
-      multiLine: true,
+  static Future<LinuxToGoImageInspection> _inspectDeepinLive({
+    required String mountedRoot,
+    required int? sourceSizeBytes,
+    required bool includeContentManifest,
+  }) async {
+    final kernel = File(p.join(mountedRoot, _deepinKernelRelativePath));
+    final initrd = File(p.join(mountedRoot, _deepinInitrdRelativePath));
+    if (!await _isRegularFile(kernel.path)) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingKernel,
+      );
+    }
+    if (!await _isRegularFile(initrd.path)) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingInitrd,
+      );
+    }
+    if (!await _isRegularFile(p.join(mountedRoot, _efiBootRelativePath))) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingX64Efi,
+      );
+    }
+
+    final livePayloads = await _collectPayloads(
+      mountedRoot,
+      directory: 'live',
+      extensions: const {'.squ'},
+      fileNamePredicate: (name) => name.startsWith('filesys'),
     );
-    for (final relativePath in _grubConfigPaths) {
-      final file = File(p.join(mountedRoot, relativePath));
-      if (!await _isRegularFile(file.path)) continue;
-      final text = await file.readAsString();
-      if (!casperEntry.hasMatch(text)) continue;
-      configs.add(
-        LinuxToGoBootConfig(
+    if (livePayloads.isEmpty) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.missingLivePayload,
+      );
+    }
+
+    final patchableConfigs = await _findPatchableGrubConfigs(
+      mountedRoot,
+      kernelRelativePath: _deepinKernelRelativePath,
+      requiresLiveBoot: true,
+    );
+    if (patchableConfigs.isEmpty) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.noPatchableBootConfig,
+      );
+    }
+
+    // Deepin 25 stores a microcode archive followed by its opaque Live initrd,
+    // so the Debian newc-only NTFS probe cannot safely inspect it. Its own
+    // `filesyst.lin` marker, split Live payloads, and `boot=live` GRUB entry
+    // form the bounded Deepin profile accepted here.
+    final scan = await _buildFileScan(
+      mountedRoot,
+      livePayloads: livePayloads,
+      criticalBootPaths: [
+        _efiBootRelativePath,
+        _deepinKernelRelativePath,
+        _deepinInitrdRelativePath,
+        ...patchableConfigs.map((config) => config.relativePath),
+      ],
+      sourceSizeBytes: sourceSizeBytes,
+      includeContentManifest: includeContentManifest,
+    );
+    if (scan.largestBootFileBytes > _fat32MaxFileBytes) {
+      return const LinuxToGoImageInspection.unsupported(
+        LinuxToGoImageIssue.bootFileTooLarge,
+      );
+    }
+
+    return LinuxToGoImageInspection.supported(
+      _supportedImage(
+        family: LinuxToGoImageFamily.deepinLive,
+        persistenceStrategy:
+            LinuxToGoPersistenceStrategy.debianPersistenceImage,
+        kernelRelativePath: _deepinKernelRelativePath,
+        initrdRelativePath: _deepinInitrdRelativePath,
+        patchableConfigs: patchableConfigs,
+        livePayloads: livePayloads,
+        scan: scan,
+        supportsDriverStaging: false,
+      ),
+    );
+  }
+
+  static LinuxToGoSupportedImage _supportedImage({
+    required LinuxToGoImageFamily family,
+    required LinuxToGoPersistenceStrategy persistenceStrategy,
+    required String kernelRelativePath,
+    required String initrdRelativePath,
+    required List<LinuxToGoBootConfig> patchableConfigs,
+    required List<LinuxToGoPayload> livePayloads,
+    required _LinuxToGoFileScan scan,
+    required bool supportsDriverStaging,
+  }) => LinuxToGoSupportedImage(
+    family: family,
+    persistenceStrategy: persistenceStrategy,
+    efiBootRelativePath: _efiBootRelativePath,
+    kernelRelativePath: kernelRelativePath,
+    initrdRelativePath: initrdRelativePath,
+    patchableBootConfigs: patchableConfigs,
+    livePayloads: livePayloads,
+    contentFiles: scan.contentFiles,
+    hasCompleteContentManifest: scan.hasCompleteContentManifest,
+    totalContentBytes: scan.totalContentBytes,
+    bootContentBytes: scan.bootContentBytes,
+    supportsDriverStaging: supportsDriverStaging,
+  );
+
+  static Future<List<LinuxToGoPayload>> _collectPayloads(
+    String mountedRoot, {
+    required String directory,
+    required Set<String> extensions,
+    bool Function(String fileName)? fileNamePredicate,
+  }) async {
+    final payloadRoot = Directory(p.join(mountedRoot, directory));
+    if (!await payloadRoot.exists()) return const [];
+
+    final payloads = <LinuxToGoPayload>[];
+    await for (final entity in payloadRoot.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entity is! File) continue;
+      final relativePath = p
+          .relative(entity.path, from: mountedRoot)
+          .replaceAll('\\', '/');
+      final extension = p.extension(relativePath).toLowerCase();
+      final fileName = p.basename(relativePath).toLowerCase();
+      if (!extensions.contains(extension) ||
+          (fileNamePredicate != null && !fileNamePredicate(fileName))) {
+        continue;
+      }
+      payloads.add(
+        LinuxToGoPayload(
           relativePath: relativePath,
-          syntax: LinuxToGoBootConfigSyntax.grub,
+          sizeBytes: await entity.length(),
         ),
       );
     }
-    return configs;
+    return payloads;
   }
 
-  static Future<List<LinuxToGoBootConfig>> _findPatchableDebianGrubConfigs(
-    String mountedRoot,
-  ) async {
+  static Future<_LinuxToGoFileScan> _buildFileScan(
+    String mountedRoot, {
+    required List<LinuxToGoPayload> livePayloads,
+    required List<String> criticalBootPaths,
+    required int? sourceSizeBytes,
+    required bool includeContentManifest,
+  }) async {
+    final needsFullManifest = includeContentManifest || sourceSizeBytes == null;
+    final payloadPaths = livePayloads
+        .map((payload) => _normalizeRelativePath(payload.relativePath))
+        .toSet();
+    if (needsFullManifest) {
+      var totalContentBytes = 0;
+      var bootContentBytes = 0;
+      var largestBootFileBytes = 0;
+      final contentFiles = <LinuxToGoContentFile>[];
+      await for (final entity in Directory(
+        mountedRoot,
+      ).list(recursive: true, followLinks: false)) {
+        // ISO mounts are read-only. Directory.list with followLinks disabled
+        // yields Link rather than File for a link, so no extra per-file type
+        // syscall is needed while walking thousands of package files.
+        if (entity is! File) continue;
+        final relativePath = p
+            .relative(entity.path, from: mountedRoot)
+            .replaceAll('\\', '/');
+        final sizeBytes = await entity.length();
+        contentFiles.add(
+          LinuxToGoContentFile(
+            relativePath: relativePath,
+            sizeBytes: sizeBytes,
+          ),
+        );
+        totalContentBytes += sizeBytes;
+        if (payloadPaths.contains(_normalizeRelativePath(relativePath))) {
+          continue;
+        }
+        bootContentBytes += sizeBytes;
+        if (sizeBytes > largestBootFileBytes) {
+          largestBootFileBytes = sizeBytes;
+        }
+      }
+      return _LinuxToGoFileScan(
+        totalContentBytes: totalContentBytes,
+        bootContentBytes: bootContentBytes,
+        largestBootFileBytes: largestBootFileBytes,
+        contentFiles: contentFiles,
+        hasCompleteContentManifest: true,
+      );
+    }
+
+    var largestBootFileBytes = 0;
+    for (final relativePath in criticalBootPaths) {
+      final file = File(p.join(mountedRoot, relativePath));
+      if (!await _isRegularFile(file.path)) continue;
+      final sizeBytes = await file.length();
+      if (sizeBytes > largestBootFileBytes) largestBootFileBytes = sizeBytes;
+    }
+    final payloadBytes = livePayloads.fold<int>(
+      0,
+      (total, payload) => total + payload.sizeBytes,
+    );
+    // The null case above always builds the complete manifest.
+    final estimatedTotalBytes = sourceSizeBytes;
+    var estimatedBootBytes = estimatedTotalBytes - payloadBytes;
+    if (estimatedBootBytes < largestBootFileBytes) {
+      estimatedBootBytes = largestBootFileBytes;
+    }
+    return _LinuxToGoFileScan(
+      totalContentBytes: estimatedTotalBytes,
+      bootContentBytes: estimatedBootBytes,
+      largestBootFileBytes: largestBootFileBytes,
+      contentFiles: const [],
+      hasCompleteContentManifest: false,
+    );
+  }
+
+  static Future<List<LinuxToGoBootConfig>> _findPatchableGrubConfigs(
+    String mountedRoot, {
+    required String kernelRelativePath,
+    required bool requiresLiveBoot,
+  }) async {
     final configs = <LinuxToGoBootConfig>[];
-    final liveEntry = RegExp(
-      r'^\s*linux(efi)?\s+.*\/live\/vmlinuz(?:\s|$)',
+    final kernelEntry = RegExp(
+      r'^\s*linux(efi)?\s+.*' +
+          RegExp.escape('/$kernelRelativePath') +
+          r'(?:\s|$)',
       caseSensitive: false,
-      multiLine: true,
     );
     final liveBootArgument = RegExp(
       r'(^|\s)boot=live(?:\s|$)',
@@ -482,7 +762,8 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
           .split('\n')
           .any(
             (line) =>
-                liveEntry.hasMatch(line) && liveBootArgument.hasMatch(line),
+                kernelEntry.hasMatch(line) &&
+                (!requiresLiveBoot || liveBootArgument.hasMatch(line)),
           );
       if (!hasPatchableEntry) continue;
       configs.add(
@@ -574,67 +855,103 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
   String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
   Future<String?> _mountIso(String isoPath) async {
+    var mounted = false;
     try {
       final quotedPath = _psQuote(isoPath);
-      final mount = await Process.run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop',
-      ]).timeout(const Duration(seconds: 15));
-      if (mount.exitCode != 0) return null;
-
-      for (var attempt = 0; attempt < 5; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        final volume = await Process.run('powershell', [
+      final mount = await Process.run(
+        WindowsSystemEnvironment.powerShellExecutable,
+        [
           '-NoProfile',
           '-NonInteractive',
           '-ExecutionPolicy',
           'Bypass',
           '-Command',
-          'Get-DiskImage -ImagePath $quotedPath | Get-Volume | '
-              'Select-Object -ExpandProperty DriveLetter',
-        ]);
+          'Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop',
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 15));
+      if (mount.exitCode != 0) return null;
+      mounted = true;
+
+      // Larger modern ISO files can take longer than the previous 2.5-second
+      // window before Windows assigns their volume letter.
+      for (var attempt = 0; attempt < 20; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        final volume = await Process.run(
+          WindowsSystemEnvironment.powerShellExecutable,
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            'Get-DiskImage -ImagePath $quotedPath | Get-Volume | '
+                'Select-Object -ExpandProperty DriveLetter',
+          ],
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+        ).timeout(const Duration(seconds: 5));
         final letter = volume.stdout.toString().trim();
-        if (volume.exitCode == 0 && letter.isNotEmpty) return '$letter:\\';
+        if (volume.exitCode == 0 && RegExp(r'^[A-Za-z]$').hasMatch(letter)) {
+          return '$letter:\\';
+        }
       }
     } catch (_) {
       // A failed mount is a non-destructive inspection failure.
     }
+    if (mounted) await _unmountIso(isoPath);
     return null;
   }
 
   Future<void> _unmountIso(String isoPath) async {
     try {
       final quotedPath = _psQuote(isoPath);
-      await Process.run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue',
-      ]).timeout(const Duration(seconds: 10));
+      await Process.run(
+        WindowsSystemEnvironment.powerShellExecutable,
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          'Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue',
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 10));
     } catch (_) {
       // The source image was only read, so an unmount failure is diagnostic.
     }
   }
+
+  static String _cacheKey(String path, FileStat stat) =>
+      '${p.normalize(p.absolute(path))}|${stat.size}|${stat.modified.microsecondsSinceEpoch}';
 }
+
+Future<LinuxToGoImageInspection> _inspectMountedRootInWorker(
+  String mountedRoot,
+  int sourceSizeBytes,
+) => LinuxToGoImagePreflightService.inspectMountedRoot(
+  mountedRoot,
+  sourceSizeBytes: sourceSizeBytes,
+  includeContentManifest: true,
+);
+
+String _normalizeRelativePath(String value) =>
+    value.replaceAll('\\', '/').toLowerCase();
 
 class _LinuxToGoFileScan {
   final int totalContentBytes;
   final int bootContentBytes;
   final int largestBootFileBytes;
-  final List<LinuxToGoPayload> livePayloads;
+  final List<LinuxToGoContentFile> contentFiles;
+  final bool hasCompleteContentManifest;
 
   _LinuxToGoFileScan({
     required this.totalContentBytes,
     required this.bootContentBytes,
     required this.largestBootFileBytes,
-    required List<LinuxToGoPayload> livePayloads,
-  }) : livePayloads = List.unmodifiable(livePayloads);
+    required List<LinuxToGoContentFile> contentFiles,
+    required this.hasCompleteContentManifest,
+  }) : contentFiles = List.unmodifiable(contentFiles);
 }
 
 final linuxToGoImagePreflightProvider = Provider<LinuxToGoImagePreflight>(

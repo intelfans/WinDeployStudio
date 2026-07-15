@@ -16,8 +16,9 @@ Recursos principais:
     Criar mídia do Windows ou gravar imagens Linux ISOHybrid inicializáveis
     
   🚀 Ambientes To Go
-    Criar ambientes Windows portáteis e validar layouts Ubuntu/casper e
-    Debian Live x64; a criação Linux persistente está desativada
+    Criar ambientes Windows portáteis e Linux To Go persistente experimental para perfis
+    x64 Ubuntu/casper, Debian Live/Kali e Deepin Live aprovados na verificação estrutural;
+    ainda é necessário validar a inicialização real e a persistência após reiniciar
     
   📊 Teste nativo de unidades
     Medir gravações sequenciais, 4K, multithread e sustentadas

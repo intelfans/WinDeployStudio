@@ -84,4 +84,67 @@ void main() {
     expect(info.bodyForLocale('en'), contains('Improved updates'));
     expect(info.bodyForLocale('zh'), contains('改进更新'));
   });
+
+  test('parses SourceForge release metadata and its notes link', () {
+    const feed = '''
+      <rss xmlns:media="http://search.yahoo.com/mrss/">
+        <channel>
+          <item>
+            <title>/v2.0.7/README.md</title>
+            <link>https://sourceforge.net/projects/windeploystudio/files/v2.0.7/README.md/download</link>
+            <pubDate>Wed, 15 Jul 2026 10:00:00 UT</pubDate>
+          </item>
+          <item>
+            <title>/v2.0.7/WinDeployStudio_Setup_2.0.7.exe</title>
+            <link>https://sourceforge.net/projects/windeploystudio/files/v2.0.7/WinDeployStudio_Setup_2.0.7.exe/download</link>
+            <pubDate>Wed, 15 Jul 2026 10:01:00 UT</pubDate>
+            <media:content filesize="50331648" />
+          </item>
+        </channel>
+      </rss>
+    ''';
+
+    final releases = parseSourceForgeReleaseMetadata(feed);
+
+    expect(releases, hasLength(1));
+    expect(releases.single['tag_name'], 'v2.0.7');
+    expect(
+      releases.single['_sourceforge_notes_url'],
+      'https://sourceforge.net/projects/windeploystudio/files/v2.0.7/README.md/download',
+    );
+    final info = UpdateInfo.fromJson(releases.single);
+    expect(info.bestAsset?.sizeBytes, 50331648);
+    expect(
+      info.bestAsset?.sourceForgeUrl,
+      'https://sourceforge.net/projects/windeploystudio/files/v2.0.7/WinDeployStudio_Setup_2.0.7.exe/download',
+    );
+    expect(
+      info.generateDownloadUrl(),
+      'https://github.com/intelfans/WinDeployStudio/releases/download/v2.0.7/WinDeployStudio_Setup_2.0.7.exe',
+    );
+  });
+
+  test('marks Atom and SourceForge beta releases as prereleases', () {
+    const atom = '''
+      <feed xmlns="http://www.w3.org/2005/Atom">
+        <entry>
+          <title>WinDeploy Studio v2.0.8-beta.1</title>
+          <updated>2026-07-15T00:00:00Z</updated>
+          <link rel="alternate" href="https://github.com/intelfans/WinDeployStudio/releases/tag/v2.0.8-beta.1" />
+          <content type="html">Preview build.</content>
+        </entry>
+      </feed>
+    ''';
+    const rss = '''
+      <rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item>
+        <title>/v2.0.8-beta.1/WinDeployStudio_Setup_2.0.8-beta.1.exe</title>
+        <link>https://sourceforge.net/projects/windeploystudio/files/v2.0.8-beta.1/WinDeployStudio_Setup_2.0.8-beta.1.exe/download</link>
+        <pubDate>Wed, 15 Jul 2026 10:01:00 UT</pubDate>
+        <media:content filesize="50331648" />
+      </item></channel></rss>
+    ''';
+
+    expect(parseAtomReleaseMetadata(atom).single['prerelease'], isTrue);
+    expect(parseSourceForgeReleaseMetadata(rss).single['prerelease'], isTrue);
+  });
 }

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import '../../../core/services/windows_system_environment.dart';
+
 enum PowerShellCompletion { exited, timedOut, cancelled }
 
 class DiskToolsCancellationToken {
@@ -257,7 +259,7 @@ class SecurePowerShellRunner {
       powershellPath: powershellPath,
       cancelPath: cancelPath,
       cancelGracePeriod: cancellationGracePeriod,
-      baseEnvironment: Platform.environment,
+      baseEnvironment: WindowsSystemEnvironment.withSystemRoot(),
     );
     final process = await _startProcess(
       command.executable,
@@ -377,22 +379,17 @@ class SecurePowerShellRunner {
   }
 
   static Future<void> _defaultTerminateProcessTree(int processId) async {
-    final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
-    final taskkill = '$systemRoot\\System32\\taskkill.exe';
     try {
-      await Process.run(taskkill, [
-        '/F',
-        '/T',
-        '/PID',
-        '$processId',
-      ]).timeout(const Duration(seconds: 15));
+      await Process.run(
+        WindowsSystemEnvironment.taskkillExecutable,
+        ['/F', '/T', '/PID', '$processId'],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 15));
     } catch (_) {}
   }
 
-  static String get _defaultPowerShellPath {
-    final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
-    return '$systemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-  }
+  static String get _defaultPowerShellPath =>
+      WindowsSystemEnvironment.powerShellExecutable;
 }
 
 class DiskToolsPowerShellWorkspace {

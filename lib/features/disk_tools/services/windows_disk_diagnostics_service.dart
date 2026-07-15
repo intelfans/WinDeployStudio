@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../core/services/windows_system_environment.dart';
 import '../models/disk_diagnostic_models.dart';
 import 'secure_powershell_runner.dart';
 
@@ -532,7 +533,12 @@ class WindowsDiskDiagnosticsService {
     String executable,
     List<String> arguments,
   ) {
-    return Process.start(executable, arguments, runInShell: false);
+    return Process.start(
+      executable,
+      arguments,
+      environment: WindowsSystemEnvironment.withSystemRoot(),
+      runInShell: false,
+    );
   }
 
   static String _defaultHelperPath() {

@@ -95,9 +95,9 @@
 - 本地磁盘 SAN policy、启动到 Audit 模式（跳过 OOBE）、禁用 WinRE、禁用 UASP、CompactOS、WIMBoot、VHD/VHDX 启动后盘符修复和 .NET Framework 3.5 均为可配置项，服务侧执行后会验证。UEFI 模式自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区，不提供无实际差异的开关。
 - Windows 可从所选目录离线注入 INF 驱动；可选择系统/启动分区盘符、自定义卷标和 ICO 图标。
 - 启动分区与 Windows 存储必须保持独立；BCD、默认设备、虚拟磁盘绑定和 UEFI fallback 文件均会验证。
-- Linux To Go 预检支持 x64 Ubuntu/casper 和 Debian Live；当前 Release 因 ext4 创建工具的 GPLv2 完整对应源码不可用而关闭实际创建。
-- Ubuntu/casper 使用独立 FAT32 启动/持久化分区、NTFS Live 数据分区、`writable` ext4 镜像和 `persistent` 参数。Debian 使用同一分区原则，但采用 `persistence` ext4 镜像、镜像内 `/persistence.conf`（`/ union`）及 `persistence` 参数；两者都明确写入 `live-media`。
-- 首启 `.deb`/`.rpm`/Arch 包、匹配内核模块或 `.sh` 脚本暂存只适用于 casper，且只有合规 ext4 创建工具恢复后才能实际部署。
+- Linux To Go 预检支持 x64 Ubuntu/casper、Debian Live/Kali 以及经严格布局检查的 Deepin Live；当前 Release 使用受限、可审计的 MIT ext4 helper 启用实验性创建，真实首次和二次启动持久化验证仍是发布门槛。
+- Ubuntu/casper 使用独立 FAT32 启动/持久化分区、NTFS Live 数据分区、`writable` ext4 镜像和 `persistent` 参数。Debian Live/Kali 与 Deepin 使用同一分区原则，但采用 `persistence` ext4 镜像、镜像内 `/persistence.conf`（`/ union`）及 `persistence` 参数；所有 profile 都明确写入 `live-media`。Deepin 仅修改普通 `boot=live union=overlay` 项，安装器和 ISO 校验项绝不修改。
+- 首启 `.deb`/`.rpm`/Arch 包、匹配内核模块或 `.sh` 脚本暂存只适用于 casper，且需与实验性 LTG 创建流程一并完成真实启动验证后方可作为受支持功能发布。
 - 不支持的发行版会在清盘前拒绝；其他 Linux 发行版可使用“安装盘”原始写入模式。
 - To Go UI 只显示可靠的已用时间，并提供不影响部署进程的等待小游戏。
 
@@ -225,7 +225,7 @@ Release 目录必须至少包含：
 - `wds_benchmark_helper.exe`
 - `wds_disk_diagnostics_helper.exe`
 - `wds_wim_info_helper.exe`
-- `tools\e2fsprogs\README.md`（当前 Release 不包含 e2fsprogs 二进制）
+- `tools\ext4-builder\wds_ext4_builder.exe` 与其 README、许可证和完整源码
 - Flutter DLL、插件 DLL 与 `data\flutter_assets`
 
 ## 11. 已知边界
@@ -234,7 +234,7 @@ Release 目录必须至少包含：
 | --- | --- |
 | 更新签名 | 安全策略要求有效 Authenticode；发布流程必须给安装包签名，否则应用内安装会被拒绝 |
 | Linux 安装盘范围 | 支持可启动 ISOHybrid 镜像的原始写入，不宣称任意 Linux ISO 都可直接启动 |
-| LTG 范围 | 预检支持 x64 Ubuntu/casper 与 Debian Live 布局，不宣称支持所有 Linux 发行版；当前 Release 关闭持久化创建直到合规工具链就绪 |
+| LTG 范围 | 预检和持久化创建支持 x64 Ubuntu/casper、Debian Live/Kali 与严格验证的 Deepin Live 布局，不宣称支持所有 Linux 发行版；实际首次/二次启动持久化测试仍是发布前验证项 |
 | LTG 首启载荷 | 只在 casper 布局中暂存受控 Linux 包、匹配内核模块或显式脚本，不等同于跨发行版驱动注入 |
 | Windows 部署兼容性 | WIMBoot 仅限 Windows 8.1 直接部署；CompactOS 仅限 Windows 10/11；Windows 7 不支持 VHDX，原生 VHD 仅限 Enterprise/Ultimate，x86 Windows 7 仅支持 Legacy BIOS |
 | NTFS UEFI | UEFI 模式自动使用 NTFS Windows 存储配合独立 FAT32 EFI 分区，不提供假开关，也不宣称固件可直接从任意 NTFS 卷启动 |
@@ -246,7 +246,7 @@ Release 目录必须至少包含：
 
 原计划④-⑨中已经完成的策略、启动/部署模式、摘要流程、统一界面和分层导航已移入“已实现功能”。这里只保留真实未完成项：
 
-- 使用实际启动与二次启动持久化测试验证 x64 Ubuntu/casper 与 Debian Live，并在提供可复现、许可证合规的 ext4 创建工具后恢复创建；任意发行版 Linux To Go 尚未实现，不能在文档或安装器中作此承诺。
+- 使用实际启动与二次启动持久化测试验证 x64 Ubuntu/casper、Debian Live/Kali 与 Deepin Live；任意发行版 Linux To Go 尚未实现，不能在文档或安装器中作此承诺。
 - 将离线 Windows 可选功能扩展到当前已实现的 .NET Framework 3.5 之外。原计划④中的“其他功能”仍属未来工作。
 - 原计划⑩：加入更新源选择，甲骨文云为推荐高速源，GitHub Releases 为备用源；当前只有 GitHub 更新源。
 
@@ -255,11 +255,11 @@ Release 目录必须至少包含：
 - 磁盘：不得放宽外接盘过滤；清盘前必须复核物理身份。
 - Windows To Go：EFI 与 Windows 分区必须独立；不能用“第一个盘符”或固定 `S:` / `W:`。
 - 部署计划：兼容性错误必须在清盘前阻止；新增选项必须同时接入摘要、UAC 任务序列化、服务执行和执行后验证。
-- Linux：安装盘先验 ISOHybrid；LTG 在清盘前检查 x64 casper 或 Debian Live 结构、对应 GRUB 启动项、Debian initrd 的 NTFS 支持、FAT32 启动文件上限和目标磁盘空间；不得重新打包未具备完整对应源码的 ext4 工具。
+- Linux：安装盘先验 ISOHybrid；LTG 在清盘前检查 x64 casper、Debian Live/Kali 或 Deepin Live 结构、对应的受限 GRUB 启动项、Debian live-boot initrd 的 NTFS 支持、FAT32 启动文件上限和目标磁盘空间；ext4 helper 必须保持受限参数、完整源码、许可证、哈希和发布前启动验证。
 - 磁盘工具：诊断保持只读；启动修复不得放宽外接非系统盘限制、双重确认、BCD 备份和执行后验证。
 - 镜像：Official Microsoft 不进 WebView；StarValleyX 与字体包保持中文专属。
 - 字体包：仅 Tiny / X-Lite 提示，StarValleyX 永不提示，首页不恢复快捷卡片。
 - 本地化：通用 UI 同步 11 语；中文专属功能只在简繁中文保留键和数据。
-- 安装器：11 种欢迎文案都应覆盖 Windows/Linux 安装盘、Windows To Go、Linux To Go 预检和原生磁盘测试，且必须说明当前 Release 未打包合规 ext4 工具，不得暗示可创建任意 LTG 发行版。
+- 安装器：11 种欢迎文案都应覆盖 Windows/Linux 安装盘、Windows To Go、Linux To Go 预检和原生磁盘测试，说明受限 ext4 helper 的来源与许可证，但不得暗示可创建任意 LTG 发行版。
 - 更新：不能绕过 HTTPS 主机限制、哈希、Authenticode 或发布者检查。
-- 构建：静态分析后构建 Release，并确认三个 helper、`THIRD_PARTY_NOTICES.md` 和 `tools\e2fsprogs\README.md` 均在产物中，且绝不能包含 `mke2fs.exe`。
+- 构建：静态分析后构建 Release，并确认三个原有 helper、`wds_ext4_builder.exe`、`THIRD_PARTY_NOTICES.md` 和 `tools\ext4-builder` 源码/许可证均在产物中，且绝不能包含 `mke2fs.exe`。

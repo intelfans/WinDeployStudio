@@ -1,0 +1,7 @@
+# Codecov by default counts a partially-covered line (several statements on
+# one line, some unexecuted) as uncovered, which understates Go coverage by
+# ~10 points versus `go tool cover -func`. Count partials as hits to stay
+# close to Go's own statement metric.
+parsers:
+  go:
+    partials_as_hits: true

@@ -144,12 +144,308 @@ Map<String, String> _withDeploymentStrings(
   Map<String, String> base,
 ) => Map.unmodifiable({
   ...base,
+  ..._knownIsoVerificationStringsForCode(code),
+  ..._managedDownloadStringsForCode(code),
   ..._updateSourceStringsForCode(code),
   ...visualStyleStringsForCode(code),
   ...deploymentStringsForCode(code),
   ...debugDialogStringsForCode(code),
   ...aiBenchmarkStringsForCode(code),
 });
+
+Map<String, String> _knownIsoVerificationStringsForCode(String code) {
+  return switch (normalizeLocaleCode(code)) {
+    'zh' => const {
+      'known_iso_verified': '镜像校验成功',
+      'known_iso_system': '系统',
+      'known_iso_language': '语言',
+      'known_iso_language_english': '英语',
+      'known_iso_language_simplified_chinese': '简体中文',
+      'known_iso_language_traditional_chinese': '繁体中文',
+      'known_iso_language_not_specified': '未提供',
+    },
+    'zh_TW' => const {
+      'known_iso_verified': '映像驗證成功',
+      'known_iso_system': '系統',
+      'known_iso_language': '語言',
+      'known_iso_language_english': '英文',
+      'known_iso_language_simplified_chinese': '簡體中文',
+      'known_iso_language_traditional_chinese': '繁體中文',
+      'known_iso_language_not_specified': '未提供',
+    },
+    'ru' => const {
+      'known_iso_verified': 'Образ проверен',
+      'known_iso_system': 'Система',
+      'known_iso_language': 'Язык',
+      'known_iso_language_english': 'Английский',
+      'known_iso_language_simplified_chinese': 'Упрощённый китайский',
+      'known_iso_language_traditional_chinese': 'Традиционный китайский',
+      'known_iso_language_not_specified': 'Не указан',
+    },
+    'fr' => const {
+      'known_iso_verified': 'Image vérifiée',
+      'known_iso_system': 'Système',
+      'known_iso_language': 'Langue',
+      'known_iso_language_english': 'Anglais',
+      'known_iso_language_simplified_chinese': 'Chinois simplifié',
+      'known_iso_language_traditional_chinese': 'Chinois traditionnel',
+      'known_iso_language_not_specified': 'Non indiqué',
+    },
+    'de' => const {
+      'known_iso_verified': 'Image überprüft',
+      'known_iso_system': 'System',
+      'known_iso_language': 'Sprache',
+      'known_iso_language_english': 'Englisch',
+      'known_iso_language_simplified_chinese': 'Vereinfachtes Chinesisch',
+      'known_iso_language_traditional_chinese': 'Traditionelles Chinesisch',
+      'known_iso_language_not_specified': 'Nicht angegeben',
+    },
+    'es' => const {
+      'known_iso_verified': 'Imagen verificada',
+      'known_iso_system': 'Sistema',
+      'known_iso_language': 'Idioma',
+      'known_iso_language_english': 'Inglés',
+      'known_iso_language_simplified_chinese': 'Chino simplificado',
+      'known_iso_language_traditional_chinese': 'Chino tradicional',
+      'known_iso_language_not_specified': 'No especificado',
+    },
+    'pt' => const {
+      'known_iso_verified': 'Imagem verificada',
+      'known_iso_system': 'Sistema',
+      'known_iso_language': 'Idioma',
+      'known_iso_language_english': 'Inglês',
+      'known_iso_language_simplified_chinese': 'Chinês simplificado',
+      'known_iso_language_traditional_chinese': 'Chinês tradicional',
+      'known_iso_language_not_specified': 'Não informado',
+    },
+    'ar' => const {
+      'known_iso_verified': 'تم التحقق من الصورة',
+      'known_iso_system': 'النظام',
+      'known_iso_language': 'اللغة',
+      'known_iso_language_english': 'الإنجليزية',
+      'known_iso_language_simplified_chinese': 'الصينية المبسطة',
+      'known_iso_language_traditional_chinese': 'الصينية التقليدية',
+      'known_iso_language_not_specified': 'غير محددة',
+    },
+    'ko' => const {
+      'known_iso_verified': '이미지 검증 완료',
+      'known_iso_system': '시스템',
+      'known_iso_language': '언어',
+      'known_iso_language_english': '영어',
+      'known_iso_language_simplified_chinese': '중국어 간체',
+      'known_iso_language_traditional_chinese': '중국어 번체',
+      'known_iso_language_not_specified': '지정되지 않음',
+    },
+    'ja' => const {
+      'known_iso_verified': 'イメージを検証しました',
+      'known_iso_system': 'システム',
+      'known_iso_language': '言語',
+      'known_iso_language_english': '英語',
+      'known_iso_language_simplified_chinese': '簡体字中国語',
+      'known_iso_language_traditional_chinese': '繁体字中国語',
+      'known_iso_language_not_specified': '指定なし',
+    },
+    _ => const {
+      'known_iso_verified': 'Image verified',
+      'known_iso_system': 'System',
+      'known_iso_language': 'Language',
+      'known_iso_language_english': 'English',
+      'known_iso_language_simplified_chinese': 'Simplified Chinese',
+      'known_iso_language_traditional_chinese': 'Traditional Chinese',
+      'known_iso_language_not_specified': 'Not specified',
+    },
+  };
+}
+
+Map<String, String> _managedDownloadStringsForCode(String code) {
+  return switch (normalizeLocaleCode(code)) {
+    'zh' => const {
+      'webview_managed_download_title': '下载正在准备',
+      'webview_managed_download_message': '选择保存位置后，应用会直接建立下载并持续显示进度。',
+      'webview_managed_download_keep_open':
+          '请保持 WinDeploy Studio 打开。你可以在右上角暂停、继续或取消下载。',
+      'webview_managed_download_file_label': '准备下载的文件',
+      'webview_managed_download_channel_label': '下载渠道',
+      'webview_managed_download_waiting_location': '等待选择保存位置',
+      'webview_managed_download_preparing': '正在准备下载',
+      'webview_managed_download_choose_location': '选择保存位置后将开始传输。',
+      'webview_managed_download_tracking':
+          '请保持 WinDeploy Studio 打开，下载会在此页面持续显示。',
+      'webview_managed_download_no_location': '未选择保存位置，下载未开始。',
+    },
+    'zh_TW' => const {
+      'webview_managed_download_title': '正在準備下載',
+      'webview_managed_download_message': '選擇儲存位置後，應用程式會直接開始下載並持續顯示進度。',
+      'webview_managed_download_keep_open':
+          '請保持 WinDeploy Studio 開啟。你可以在右上角暫停、繼續或取消下載。',
+      'webview_managed_download_file_label': '準備下載的檔案',
+      'webview_managed_download_channel_label': '下載管道',
+      'webview_managed_download_waiting_location': '等待選擇儲存位置',
+      'webview_managed_download_preparing': '正在準備下載',
+      'webview_managed_download_choose_location': '選擇儲存位置後將開始傳輸。',
+      'webview_managed_download_tracking':
+          '請保持 WinDeploy Studio 開啟，下載會在此頁面持續顯示。',
+      'webview_managed_download_no_location': '未選擇儲存位置，下載尚未開始。',
+    },
+    'ru' => const {
+      'webview_managed_download_title': 'Ваша загрузка подготавливается',
+      'webview_managed_download_message':
+          'После выбора места сохранения приложение начнет загрузку и будет отслеживать ее напрямую.',
+      'webview_managed_download_keep_open':
+          'Не закрывайте WinDeploy Studio. Используйте кнопку загрузок в правом верхнем углу, чтобы приостановить, продолжить или отменить загрузку.',
+      'webview_managed_download_file_label': 'Подготавливаемый файл',
+      'webview_managed_download_channel_label': 'Канал загрузки',
+      'webview_managed_download_waiting_location':
+          'Ожидание выбора места сохранения',
+      'webview_managed_download_preparing': 'Подготовка загрузки',
+      'webview_managed_download_choose_location':
+          'Выберите место сохранения, чтобы начать передачу.',
+      'webview_managed_download_tracking':
+          'Не закрывайте WinDeploy Studio, пока эта страница отслеживает передачу.',
+      'webview_managed_download_no_location':
+          'Место сохранения не выбрано, поэтому загрузка не началась.',
+    },
+    'fr' => const {
+      'webview_managed_download_title':
+          'Votre téléchargement est en préparation',
+      'webview_managed_download_message':
+          'Après avoir choisi l’emplacement d’enregistrement, l’application démarrera et suivra directement le téléchargement.',
+      'webview_managed_download_keep_open':
+          'Laissez WinDeploy Studio ouvert. Utilisez le bouton de téléchargement en haut à droite pour suspendre, reprendre ou annuler le téléchargement.',
+      'webview_managed_download_file_label': 'Fichier en préparation',
+      'webview_managed_download_channel_label': 'Canal de téléchargement',
+      'webview_managed_download_waiting_location':
+          'En attente d’un emplacement d’enregistrement',
+      'webview_managed_download_preparing': 'Préparation du téléchargement',
+      'webview_managed_download_choose_location':
+          'Choisissez un emplacement d’enregistrement pour commencer le transfert.',
+      'webview_managed_download_tracking':
+          'Laissez WinDeploy Studio ouvert pendant que cette page suit le transfert.',
+      'webview_managed_download_no_location':
+          'Aucun emplacement d’enregistrement n’a été sélectionné, le téléchargement n’a pas démarré.',
+    },
+    'de' => const {
+      'webview_managed_download_title': 'Ihr Download wird vorbereitet',
+      'webview_managed_download_message':
+          'Nach Auswahl eines Speicherorts startet die App den Download direkt und verfolgt seinen Fortschritt.',
+      'webview_managed_download_keep_open':
+          'Lassen Sie WinDeploy Studio geöffnet. Mit der Download-Schaltfläche oben rechts können Sie den Download anhalten, fortsetzen oder abbrechen.',
+      'webview_managed_download_file_label': 'Datei wird vorbereitet',
+      'webview_managed_download_channel_label': 'Downloadkanal',
+      'webview_managed_download_waiting_location':
+          'Warten auf einen Speicherort',
+      'webview_managed_download_preparing': 'Download wird vorbereitet',
+      'webview_managed_download_choose_location':
+          'Wählen Sie einen Speicherort, um die Übertragung zu starten.',
+      'webview_managed_download_tracking':
+          'Lassen Sie WinDeploy Studio geöffnet, während diese Seite die Übertragung verfolgt.',
+      'webview_managed_download_no_location':
+          'Es wurde kein Speicherort ausgewählt, daher wurde der Download nicht gestartet.',
+    },
+    'es' => const {
+      'webview_managed_download_title': 'Tu descarga se está preparando',
+      'webview_managed_download_message':
+          'Después de elegir dónde guardarla, la aplicación iniciará y seguirá la descarga directamente.',
+      'webview_managed_download_keep_open':
+          'Mantén WinDeploy Studio abierto. Usa el botón de descargas de la esquina superior derecha para pausar, reanudar o cancelar la descarga.',
+      'webview_managed_download_file_label': 'Archivo en preparación',
+      'webview_managed_download_channel_label': 'Canal de descarga',
+      'webview_managed_download_waiting_location':
+          'Esperando una ubicación para guardar',
+      'webview_managed_download_preparing': 'Preparando descarga',
+      'webview_managed_download_choose_location':
+          'Elige una ubicación para guardar e iniciar la transferencia.',
+      'webview_managed_download_tracking':
+          'Mantén WinDeploy Studio abierto mientras esta página sigue la transferencia.',
+      'webview_managed_download_no_location':
+          'No se seleccionó una ubicación para guardar, por lo que la descarga no se inició.',
+    },
+    'pt' => const {
+      'webview_managed_download_title': 'Seu download está sendo preparado',
+      'webview_managed_download_message':
+          'Depois de escolher onde salvar, o aplicativo iniciará e acompanhará o download diretamente.',
+      'webview_managed_download_keep_open':
+          'Mantenha o WinDeploy Studio aberto. Use o botão de downloads no canto superior direito para pausar, retomar ou cancelar o download.',
+      'webview_managed_download_file_label': 'Arquivo em preparação',
+      'webview_managed_download_channel_label': 'Canal de download',
+      'webview_managed_download_waiting_location':
+          'Aguardando um local para salvar',
+      'webview_managed_download_preparing': 'Preparando download',
+      'webview_managed_download_choose_location':
+          'Escolha um local para salvar e iniciar a transferência.',
+      'webview_managed_download_tracking':
+          'Mantenha o WinDeploy Studio aberto enquanto esta página acompanha a transferência.',
+      'webview_managed_download_no_location':
+          'Nenhum local para salvar foi selecionado, então o download não foi iniciado.',
+    },
+    'ar' => const {
+      'webview_managed_download_title': 'يجري إعداد التنزيل',
+      'webview_managed_download_message':
+          'بعد اختيار مكان الحفظ، سيبدأ التطبيق التنزيل ويتابعه مباشرةً.',
+      'webview_managed_download_keep_open':
+          'أبقِ WinDeploy Studio مفتوحًا. استخدم زر التنزيل في شريط الأدوات للإيقاف المؤقت أو الاستئناف أو الإلغاء.',
+      'webview_managed_download_file_label': 'الملف الجاري إعداده',
+      'webview_managed_download_channel_label': 'قناة التنزيل',
+      'webview_managed_download_waiting_location': 'بانتظار اختيار موقع الحفظ',
+      'webview_managed_download_preparing': 'يجري إعداد التنزيل',
+      'webview_managed_download_choose_location': 'اختر موقع الحفظ لبدء النقل.',
+      'webview_managed_download_tracking':
+          'أبقِ WinDeploy Studio مفتوحًا بينما تتعقب هذه الصفحة النقل.',
+      'webview_managed_download_no_location':
+          'لم يتم اختيار موقع للحفظ، لذلك لم يبدأ التنزيل.',
+    },
+    'ko' => const {
+      'webview_managed_download_title': '다운로드를 준비하고 있습니다',
+      'webview_managed_download_message':
+          '저장 위치를 선택하면 앱이 다운로드를 시작하고 진행 상황을 직접 추적합니다.',
+      'webview_managed_download_keep_open':
+          'WinDeploy Studio를 열어 두세요. 오른쪽 위의 다운로드 버튼에서 다운로드를 일시 중지, 재개 또는 취소할 수 있습니다.',
+      'webview_managed_download_file_label': '준비 중인 파일',
+      'webview_managed_download_channel_label': '다운로드 채널',
+      'webview_managed_download_waiting_location': '저장 위치를 기다리는 중',
+      'webview_managed_download_preparing': '다운로드 준비 중',
+      'webview_managed_download_choose_location': '전송을 시작할 저장 위치를 선택하세요.',
+      'webview_managed_download_tracking':
+          '이 페이지에서 전송을 추적하는 동안 WinDeploy Studio를 열어 두세요.',
+      'webview_managed_download_no_location':
+          '저장 위치를 선택하지 않아 다운로드가 시작되지 않았습니다.',
+    },
+    'ja' => const {
+      'webview_managed_download_title': 'ダウンロードを準備しています',
+      'webview_managed_download_message':
+          '保存先を選択すると、アプリがダウンロードを開始し、進行状況を直接追跡します。',
+      'webview_managed_download_keep_open':
+          'WinDeploy Studio を開いたままにしてください。右上のダウンロードボタンから、一時停止、再開、キャンセルを行えます。',
+      'webview_managed_download_file_label': '準備中のファイル',
+      'webview_managed_download_channel_label': 'ダウンロードチャネル',
+      'webview_managed_download_waiting_location': '保存先の選択を待機しています',
+      'webview_managed_download_preparing': 'ダウンロードを準備しています',
+      'webview_managed_download_choose_location': '転送を開始する保存先を選択してください。',
+      'webview_managed_download_tracking':
+          'このページが転送を追跡している間は、WinDeploy Studio を開いたままにしてください。',
+      'webview_managed_download_no_location':
+          '保存先が選択されなかったため、ダウンロードは開始されませんでした。',
+    },
+    _ => const {
+      'webview_managed_download_title': 'Your download is being prepared',
+      'webview_managed_download_message':
+          'After you choose where to save it, the app will begin and track the download directly.',
+      'webview_managed_download_keep_open':
+          'Keep WinDeploy Studio open. Use the download button in the top-right to pause, resume, or cancel.',
+      'webview_managed_download_file_label': 'Preparing file',
+      'webview_managed_download_channel_label': 'Download channel',
+      'webview_managed_download_waiting_location':
+          'Waiting for a save location',
+      'webview_managed_download_preparing': 'Preparing download',
+      'webview_managed_download_choose_location':
+          'Choose a save location to begin the transfer.',
+      'webview_managed_download_tracking':
+          'Keep WinDeploy Studio open while this page tracks the transfer.',
+      'webview_managed_download_no_location':
+          'No save location was selected, so the download did not start.',
+    },
+  };
+}
 
 Map<String, String> _updateSourceStringsForCode(String code) {
   return switch (normalizeLocaleCode(code)) {
