@@ -1277,18 +1277,50 @@ if ($partitions.Count -ne 1) {
     final storageLabel = plan.customVolumeLabel.trim().isEmpty
         ? 'WDS_TOGO'
         : plan.customVolumeLabel.trim();
+    final currentDisk = await ref
+        .read(diskSafetyServiceProvider)
+        .refreshDisk(disk);
+    if (currentDisk == null) {
+      throw const _WtgFailure(
+        'wtg_svc_partition_failed',
+        'Target disk identity changed before partitioning.',
+      );
+    }
+    final targetStyle = bootLayout == WtgBootLayout.uefiGpt ? 'GPT' : 'MBR';
+    final diskSafety = ref.read(diskSafetyServiceProvider);
+    final initialization = await diskSafety.initializeDiskPartitionStyle(
+      currentDisk,
+      partitionStyle: targetStyle,
+    );
+    if (initialization.exitCode != 0) {
+      throw _WtgFailure(
+        'wtg_svc_partition_failed',
+        'Disk initialization failed: ${_trimOutput(initialization.stderr)} '
+            '${_trimOutput(initialization.stdout)}',
+      );
+    }
+    final initializedDisk = await diskSafety.refreshDisk(currentDisk);
+    if (initializedDisk == null ||
+        initializedDisk.partitionStyle.toUpperCase() != targetStyle) {
+      throw const _WtgFailure(
+        'wtg_svc_partition_failed',
+        'Target disk initialization could not be verified.',
+      );
+    }
     final script = _buildWtgDiskpartScript(
-      diskNumber: disk.diskNumber,
+      diskNumber: initializedDisk.diskNumber,
       bootLayout: bootLayout,
-      currentPartitionStyle: disk.partitionStyle,
+      currentPartitionStyle: initializedDisk.partitionStyle,
       bootLetter: letters.boot,
       storageLetter: letters.storage,
       bootLabel: bootLabel,
       storageLabel: storageLabel,
     );
-    final result = await ref
-        .read(diskSafetyServiceProvider)
-        .runGuardedDiskpart(disk, script, timeout: const Duration(minutes: 3));
+    final result = await diskSafety.runGuardedDiskpart(
+      initializedDisk,
+      script,
+      timeout: const Duration(minutes: 3),
+    );
     if (!_diskpartSucceeded(result)) {
       throw _WtgFailure(
         'wtg_svc_partition_failed',
@@ -1322,25 +1354,20 @@ if ($partitions.Count -ne 1) {
     required String storageLabel,
   }) {
     final usesGpt = bootLayout == WtgBootLayout.uefiGpt;
-    final targetStyle = usesGpt ? 'GPT' : 'MBR';
-    final currentStyle = currentPartitionStyle.trim().toUpperCase();
-    // DiskPart `clean` retains GPT/MBR metadata. Avoid a matching conversion,
-    // which DiskPart rejects after the target has already been erased.
-    final conversion = currentStyle == targetStyle
-        ? null
-        : 'convert ${targetStyle.toLowerCase()}';
     final commands = <String>[
       'select disk $diskNumber',
-      'clean',
-      ?conversion,
       usesGpt
           ? 'create partition efi size=300'
           : 'create partition primary size=350',
-      'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
+      'select partition 1',
       if (!usesGpt) 'active',
+      'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
       'assign letter=$bootLetter',
+      'select disk $diskNumber',
       if (usesGpt) 'create partition msr size=16',
+      if (usesGpt) 'select disk $diskNumber',
       'create partition primary',
+      'select partition ${usesGpt ? 3 : 2}',
       'format fs=ntfs label="$storageLabel" quick',
       'assign letter=$storageLetter',
       'exit',
@@ -1448,6 +1475,7 @@ select vdisk file="$filePath"
 attach vdisk
 convert mbr
 create partition primary
+select partition 1
 format fs=ntfs label="WDS_OS" quick
 assign letter=$imageLetter
 exit
@@ -2191,10 +2219,15 @@ exit
       'virtual disk service error',
       'access is denied',
       'the parameter is incorrect',
+      'the volume size is too big',
+      'there is no volume selected',
+      'no volume selected',
       'diskpart 遇到错误',
       '虚拟磁盘服务错误',
       '拒绝访问',
       '参数错误',
+      '卷大小太大',
+      '没有选择卷',
     ];
     return !knownErrors.any(output.contains);
   }

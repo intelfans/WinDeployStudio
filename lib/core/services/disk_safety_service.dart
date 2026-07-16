@@ -397,12 +397,145 @@ if ($actualHash -ne $env:WDS_DISKPART_SHA256) {
 exit $LASTEXITCODE
 ''';
 
+  static const _guardedDiskInitializationScript = r'''
+$ErrorActionPreference = 'Stop'
+$targetStyle = $env:WDS_PARTITION_STYLE.Trim().ToUpperInvariant()
+if ($targetStyle -notin @('GPT', 'MBR')) {
+  throw 'Requested partition style is invalid.'
+}
+
+function Normalize-IdentityValue([object]$Value) {
+  if ($null -eq $Value) { return '' }
+  return ($Value.ToString() -replace '\s+', '').ToUpperInvariant()
+}
+
+function Assert-TargetDisk([bool]$CheckIdentity, [bool]$RequireOnline) {
+  $disk = Get-Disk -Number ([int]$env:WDS_DISK_NUMBER) -ErrorAction Stop
+  $bus = $disk.BusType.ToString().ToUpperInvariant()
+  $isExternal = $bus -in @('USB', 'SD', 'MMC') -or [bool]$disk.IsRemovable
+  if (-not $isExternal -or $disk.IsSystem -or $disk.IsBoot) {
+    throw 'Target disk is no longer a safe external disk.'
+  }
+  if ($RequireOnline -and $disk.IsOffline) {
+    throw 'Target disk is offline.'
+  }
+  if ([int64]$disk.Size -ne [int64]$env:WDS_DISK_SIZE) {
+    throw 'Target disk size changed after selection.'
+  }
+  if ($disk.FriendlyName.ToString().Trim().ToUpperInvariant() -ne $env:WDS_DISK_MODEL) {
+    throw 'Target disk model changed after selection.'
+  }
+  if ($bus -ne $env:WDS_DISK_BUS) {
+    throw 'Target disk bus changed after selection.'
+  }
+  if ($CheckIdentity) {
+    if ($env:WDS_DISK_SERIAL) {
+      $physical = Get-PhysicalDisk -ErrorAction Stop |
+        Where-Object { $_.DeviceId -eq $disk.Number.ToString() } |
+        Select-Object -First 1
+      $diskSerial = if ($disk.SerialNumber) {
+        Normalize-IdentityValue $disk.SerialNumber
+      } else { '' }
+      $physicalSerial = if ($physical -and $physical.SerialNumber) {
+        Normalize-IdentityValue $physical.SerialNumber
+      } else { '' }
+      if ($diskSerial -ne $env:WDS_DISK_SERIAL -and
+          $physicalSerial -ne $env:WDS_DISK_SERIAL) {
+        throw 'Target disk serial number changed after selection.'
+      }
+    } elseif ($env:WDS_DISK_UNIQUE_ID) {
+      $currentId = if ($disk.UniqueId) { Normalize-IdentityValue $disk.UniqueId } else { '' }
+      if ($currentId -ne $env:WDS_DISK_UNIQUE_ID) {
+        throw 'Target disk identity changed after selection.'
+      }
+    } elseif ($env:WDS_DISK_PATH) {
+      $currentPath = if ($disk.Path) { Normalize-IdentityValue $disk.Path } else { '' }
+      if ($currentPath -ne $env:WDS_DISK_PATH) {
+        throw 'Target disk device path changed after selection.'
+      }
+    } else {
+      throw 'Target disk has no reliable physical identity.'
+    }
+  }
+  return $disk
+}
+
+function Assert-PersistentIdentity([object]$Disk) {
+  if ($env:WDS_DISK_SERIAL) {
+    $physical = Get-PhysicalDisk -ErrorAction Stop |
+      Where-Object { $_.DeviceId -eq $Disk.Number.ToString() } |
+      Select-Object -First 1
+    $diskSerial = if ($Disk.SerialNumber) {
+      Normalize-IdentityValue $Disk.SerialNumber
+    } else { '' }
+    $physicalSerial = if ($physical -and $physical.SerialNumber) {
+      Normalize-IdentityValue $physical.SerialNumber
+    } else { '' }
+    if ($diskSerial -ne $env:WDS_DISK_SERIAL -and
+        $physicalSerial -ne $env:WDS_DISK_SERIAL) {
+      throw 'Target disk serial number changed while initializing.'
+    }
+    return
+  }
+  if ($env:WDS_DISK_PATH) {
+    $currentPath = if ($Disk.Path) { Normalize-IdentityValue $Disk.Path } else { '' }
+    if ($currentPath -ne $env:WDS_DISK_PATH) {
+      throw 'Target disk device path changed while initializing.'
+    }
+    return
+  }
+  throw 'Target disk has no persistent identity after it was cleared.'
+}
+
+$disk = Assert-TargetDisk $true $true
+if ($disk.IsReadOnly) {
+  Set-Disk -Number $disk.Number -IsReadOnly $false -ErrorAction Stop | Out-Null
+}
+Clear-Disk -Number $disk.Number -RemoveData -RemoveOEM -Confirm:$false -ErrorAction Stop | Out-Null
+$deadline = [DateTime]::UtcNow.AddSeconds(5)
+do {
+  Update-Disk -Number $disk.Number -ErrorAction Stop | Out-Null
+  Start-Sleep -Milliseconds 150
+  $disk = Assert-TargetDisk $false $false
+  if ($disk.PartitionStyle.ToString().ToUpperInvariant() -eq 'RAW') {
+    break
+  }
+} while ([DateTime]::UtcNow -lt $deadline)
+if ($disk.PartitionStyle.ToString().ToUpperInvariant() -ne 'RAW') {
+  throw 'Target disk did not become RAW after it was cleared.'
+}
+
+# The disk signature/unique ID can legitimately change after Clear-Disk.
+# Require a persistent serial number or device path before reinitializing it.
+Assert-PersistentIdentity $disk
+if ($disk.IsOffline) {
+  Set-Disk -Number $disk.Number -IsOffline $false -ErrorAction Stop | Out-Null
+}
+Initialize-Disk -Number $disk.Number -PartitionStyle $targetStyle -ErrorAction Stop | Out-Null
+Update-Disk -Number $disk.Number -ErrorAction Stop | Out-Null
+$initialized = Get-Disk -Number $disk.Number -ErrorAction Stop
+if ($initialized.PartitionStyle.ToString().ToUpperInvariant() -ne $targetStyle) {
+  throw "Target disk did not initialize as $targetStyle."
+}
+if (@(Get-Partition -DiskNumber $initialized.Number -ErrorAction SilentlyContinue).Count -ne 0) {
+  throw 'Target disk has partitions immediately after initialization.'
+}
+Assert-PersistentIdentity $initialized
+Write-Output 'WDS_DISK_INITIALIZED'
+''';
+
   Future<List<DiskInfo>> getAllDisks() async {
     try {
       return await _queryAllDisks();
     } catch (_) {
       return [];
     }
+  }
+
+  Future<DiskInfo?> getDiskByNumber(int diskNumber) async {
+    final disks = await getAllDisks();
+    final matches = disks.where((disk) => disk.diskNumber == diskNumber);
+    return matches.length == 1 ? matches.single : null;
   }
 
   Future<List<DiskInfo>> getRemovableDisks() async {
@@ -580,6 +713,86 @@ exit $LASTEXITCODE
       try {
         if (await diskpartFile.exists()) await diskpartFile.delete();
       } catch (_) {}
+    }
+  }
+
+  Future<ProcessResult> initializeDiskPartitionStyle(
+    DiskInfo disk, {
+    required String partitionStyle,
+    Duration timeout = const Duration(seconds: 90),
+  }) async {
+    final targetStyle = partitionStyle.trim().toUpperCase();
+    if (targetStyle != 'GPT' && targetStyle != 'MBR') {
+      return ProcessResult(
+        0,
+        -1,
+        '',
+        'Unsupported partition style: $partitionStyle',
+      );
+    }
+    final safety = await checkDiskSafety(disk);
+    if (!safety.isSafe) {
+      return ProcessResult(0, -1, '', safety.reason);
+    }
+
+    final environment = WindowsSystemEnvironment.withSystemRoot({
+      'WDS_DISK_NUMBER': '${disk.diskNumber}',
+      'WDS_DISK_SIZE': '${disk.sizeBytes}',
+      'WDS_DISK_MODEL': disk.model.trim().toUpperCase(),
+      'WDS_DISK_BUS': disk.busType.trim().toUpperCase(),
+      'WDS_DISK_UNIQUE_ID': disk.reliableUniqueId,
+      'WDS_DISK_SERIAL': disk.reliableSerialNumber,
+      'WDS_DISK_PATH': disk.reliableDevicePath,
+      'WDS_PARTITION_STYLE': targetStyle,
+    });
+    Process? process;
+    try {
+      process = await Process.start(
+        WindowsSystemEnvironment.powerShellExecutable,
+        const [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          _guardedDiskInitializationScript,
+        ],
+        environment: environment,
+      );
+      final stdoutFuture = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .join();
+      final stderrFuture = process.stderr
+          .transform(const SystemEncoding().decoder)
+          .join();
+      int exitCode;
+      try {
+        exitCode = await process.exitCode.timeout(timeout);
+      } on TimeoutException {
+        await Process.run(
+          WindowsSystemEnvironment.taskkillExecutable,
+          ['/F', '/T', '/PID', '${process.pid}'],
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+        );
+        return ProcessResult(
+          process.pid,
+          -1,
+          await stdoutFuture,
+          '${await stderrFuture}\nDisk initialization timed out.',
+        );
+      }
+      final stdout = await stdoutFuture;
+      final stderr = await stderrFuture;
+      if (exitCode == 0 && !stdout.contains('WDS_DISK_INITIALIZED')) {
+        return ProcessResult(
+          process.pid,
+          -1,
+          stdout,
+          '$stderr\nDisk initialization did not confirm completion.',
+        );
+      }
+      return ProcessResult(process.pid, exitCode, stdout, stderr);
+    } catch (error) {
+      return ProcessResult(process?.pid ?? 0, -1, '', error.toString());
     }
   }
 

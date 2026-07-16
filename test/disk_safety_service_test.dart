@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/disk_safety_service.dart';
 
@@ -80,4 +82,52 @@ void main() {
 
     expect(unknown.hasSamePhysicalIdentity(unknown), isFalse);
   });
+
+  test(
+    'guarded Storage initialization clears before initializing and confirms completion',
+    () {
+      final source = File(
+        'lib/core/services/disk_safety_service.dart',
+      ).readAsStringSync();
+      final scriptStart = source.indexOf(
+        'static const _guardedDiskInitializationScript',
+      );
+      final scriptEnd = source.indexOf("''';", scriptStart);
+      final methodStart = source.indexOf(
+        'Future<ProcessResult> initializeDiskPartitionStyle',
+      );
+      final methodEnd = source.indexOf(
+        'Future<SafetyCheckResult> _checkCurrentDiskSafety',
+        methodStart,
+      );
+
+      expect(scriptStart, greaterThanOrEqualTo(0));
+      expect(scriptEnd, greaterThan(scriptStart));
+      expect(methodStart, greaterThan(scriptEnd));
+      expect(methodEnd, greaterThan(methodStart));
+
+      final script = source.substring(scriptStart, scriptEnd);
+      final initializer = source.substring(methodStart, methodEnd);
+      final clear = script.indexOf('Clear-Disk');
+      final initialize = script.indexOf('Initialize-Disk');
+      final completion = script.indexOf('WDS_DISK_INITIALIZED');
+
+      expect(script, contains(r'Assert-TargetDisk $true $true'));
+      expect(script, contains(r'Assert-TargetDisk $false $false'));
+      expect(clear, greaterThanOrEqualTo(0));
+      expect(initialize, greaterThan(clear));
+      expect(completion, greaterThan(initialize));
+      expect(
+        script.indexOf(r'Assert-TargetDisk $false $false'),
+        greaterThan(clear),
+      );
+      expect(
+        script.indexOf(r'Assert-TargetDisk $false $false'),
+        lessThan(initialize),
+      );
+      expect(initializer, contains('checkDiskSafety(disk)'));
+      expect(initializer, contains('_guardedDiskInitializationScript'));
+      expect(initializer, contains("stdout.contains('WDS_DISK_INITIALIZED')"));
+    },
+  );
 }

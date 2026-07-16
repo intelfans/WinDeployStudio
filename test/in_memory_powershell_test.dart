@@ -109,7 +109,7 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
   );
 
   test(
-    'Linux raw imaging falls back to an exclusive handle until verification passes',
+    'Linux raw imaging keeps the target isolated through verification and restores it before completion',
     () {
       final write = BootableUsbService.linuxRawWriteScriptForTesting;
       final finalize = BootableUsbService.linuxRawFinalizeScriptForTesting;
@@ -123,10 +123,11 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
           write.indexOf(r'$targetPath = "\\.\PhysicalDrive$DiskNumber"'),
         ),
       );
-      expect(write, isNot(contains(r'Update-Disk -Number $DiskNumber')));
       expect(write, contains(r'[System.IO.FileShare]::None'));
       expect(write, contains('WDS_VERIFY_STARTED'));
       expect(write, contains('WDS_VERIFY_PROGRESS:0'));
+      expect(write, contains('WDS_VERIFY_COMPLETE'));
+      expect(write, contains('WDS_DISK_ONLINE'));
       expect(
         write,
         contains(r'$blockMatches = if ($requested -eq $bufferLength)'),
@@ -145,7 +146,45 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
       );
       expect(
         write.indexOf('WDS_VERIFY_STARTED'),
+        lessThan(write.indexOf('WDS_VERIFY_COMPLETE')),
+      );
+      expect(
+        write.indexOf('WDS_VERIFY_COMPLETE'),
+        lessThan(write.indexOf('WDS_DISK_ONLINE')),
+      );
+      expect(
+        write.indexOf('WDS_DISK_ONLINE'),
         lessThan(write.indexOf('WDS_DONE')),
+      );
+      expect(
+        write,
+        contains(r'Set-Disk -Number $DiskNumber -IsOffline $false'),
+      );
+      expect(write, contains(r'Update-Disk -Number $DiskNumber'));
+      expect(
+        write.lastIndexOf(r'$target.Dispose()'),
+        lessThan(
+          write.lastIndexOf(r'Set-Disk -Number $DiskNumber -IsOffline $false'),
+        ),
+      );
+      expect(
+        write.lastIndexOf(r'Set-Disk -Number $DiskNumber -IsOffline $false'),
+        lessThan(write.lastIndexOf(r'Update-Disk -Number $DiskNumber')),
+      );
+      expect(
+        write.lastIndexOf(r'Update-Disk -Number $DiskNumber'),
+        lessThan(
+          write.lastIndexOf(
+            r'$onlineDisk = Get-Disk -Number $DiskNumber -ErrorAction Stop',
+          ),
+        ),
+      );
+      expect(write, contains(r'if ([bool]$onlineDisk.IsOffline) {'));
+      expect(
+        write.lastIndexOf(
+          r'$onlineDisk = Get-Disk -Number $DiskNumber -ErrorAction Stop',
+        ),
+        lessThan(write.lastIndexOf('WDS_DISK_ONLINE')),
       );
       expect(
         finalize,
@@ -156,6 +195,73 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
         finalize.indexOf(r'Set-Disk -Number $DiskNumber -IsOffline $false'),
         lessThan(finalize.indexOf(r'Update-Disk -Number $DiskNumber')),
       );
+    },
+  );
+
+  test('Linux raw writer parses completion markers and preserves progress', () {
+    final source = File(
+      'lib/core/services/bootable_usb_service.dart',
+    ).readAsStringSync();
+    final writerStart = source.indexOf(
+      'Future<_LinuxRawWriteResult> _writeIsoHybridRaw',
+    );
+    final restoreStart = source.indexOf(
+      'Future<_LinuxRawWriteResult> _restoreLinuxRawDiskOnline',
+      writerStart,
+    );
+    final writer = source.substring(writerStart, restoreStart);
+
+    expect(writerStart, greaterThanOrEqualTo(0));
+    expect(restoreStart, greaterThan(writerStart));
+    expect(writer, contains("cleanLine == 'WDS_VERIFY_COMPLETE'"));
+    expect(writer, contains("cleanLine == 'WDS_DISK_ONLINE'"));
+    expect(writer, contains("cleanLine == 'WDS_DONE'"));
+    expect(writer, contains('imageVerified = true;'));
+    expect(writer, contains('diskOnline = true;'));
+    expect(writer, contains("substring('WDS_PROGRESS:'.length)"));
+    expect(writer, contains(".split(':');"));
+
+    final doneMarker = writer.indexOf("if (cleanLine == 'WDS_DONE')");
+    final doneMarkerEnd = writer.indexOf('\n            }', doneMarker);
+    expect(doneMarker, greaterThanOrEqualTo(0));
+    expect(doneMarkerEnd, greaterThan(doneMarker));
+    final doneBlock = writer.substring(doneMarker, doneMarkerEnd);
+    expect(doneBlock, contains('completed = true;'));
+    expect(doneBlock, isNot(contains('imageVerified = true;')));
+  });
+
+  test(
+    'Linux raw disk recovery failure is not reported as a verification failure',
+    () {
+      final source = File(
+        'lib/core/services/bootable_usb_service.dart',
+      ).readAsStringSync();
+      final writerStart = source.indexOf(
+        'Future<_LinuxRawWriteResult> _writeIsoHybridRaw',
+      );
+      final restoreStart = source.indexOf(
+        'Future<_LinuxRawWriteResult> _restoreLinuxRawDiskOnline',
+        writerStart,
+      );
+      final writer = source.substring(writerStart, restoreStart);
+
+      expect(
+        writer,
+        contains(
+          "failureMessageKey: imageVerified && !diskOnline\n              ? 'linux_write_failed'",
+        ),
+      );
+      expect(
+        writer,
+        contains('verificationFailed: verificationStarted && !imageVerified'),
+      );
+      expect(
+        writer,
+        contains(
+          "failureMessageKey: imageVerified ? 'linux_write_failed' : null",
+        ),
+      );
+      expect(writer, contains('verificationFailed: !imageVerified'));
     },
   );
 
@@ -190,10 +296,23 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
     final source = File(
       'lib/core/services/bootable_usb_service.dart',
     ).readAsStringSync();
+    final successfulRawPathStart = source.indexOf(
+      '// The raw writer returns the disk online before emitting WDS_DONE.',
+    );
+    final successfulRawPathEnd = source.indexOf(
+      "_logLine('Linux verify:",
+      successfulRawPathStart,
+    );
 
     expect(source, isNot(contains('_verifyLinuxRawWrite(')));
     expect(source, contains('onVerifyProgress: (verifyProgress)'));
     expect(source, contains('verificationFailed: verificationStarted'));
+    expect(successfulRawPathStart, greaterThanOrEqualTo(0));
+    expect(successfulRawPathEnd, greaterThan(successfulRawPathStart));
+    expect(
+      source.substring(successfulRawPathStart, successfulRawPathEnd),
+      isNot(contains('_restoreLinuxRawDiskOnline')),
+    );
   });
 
   test('PowerShell failure summaries exclude CLIXML and stack traces', () {

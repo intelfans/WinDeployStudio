@@ -65,6 +65,8 @@ class BootableUsbService {
   static const String _debianPersistenceVolumeLabel = 'persistence';
   static const String _debianPersistenceConfiguration = '/ union\n';
   static const String _ext4BuilderExecutableName = 'wds_ext4_builder.exe';
+  static const int _fat32NativeFormatLimitBytes = 32 * 1024 * 1024 * 1024;
+  static const int _fat32BootPartitionSizeMb = 32760;
   static const String _ext4BuilderSha256 =
       '85f4c3e74f6e005ecf94e0d688e1de6d35b715af21716151c4a23e9f52ab6184';
 
@@ -184,12 +186,14 @@ class BootableUsbService {
     required DeploymentBootMode deploymentBootMode,
     required String volumeLabel,
     String preferredDriveLetter = '',
+    int? diskSizeBytes,
   }) => _buildInstallMediaDiskpartScript(
     diskNumber: diskNumber,
     currentPartitionStyle: currentPartitionStyle,
     deploymentBootMode: deploymentBootMode,
     preferredDriveLetter: preferredDriveLetter,
     volumeLabel: volumeLabel,
+    diskSizeBytes: diskSizeBytes,
   );
 
   @visibleForTesting
@@ -965,7 +969,9 @@ class BootableUsbService {
 
       if (!result.success) {
         var errorDetail = result.error ?? 'Unknown error';
-        final restoreResult = await _restoreLinuxRawDiskOnline(disk: disk);
+        final restoreResult = result.diskOnline
+            ? const _LinuxRawWriteResult(success: true)
+            : await _restoreLinuxRawDiskOnline(disk: disk);
         if (restoreResult.success) {
           rawDiskMayNeedRestore = false;
         } else {
@@ -974,15 +980,17 @@ class BootableUsbService {
               'The target disk could not be returned online: '
               '${restoreResult.error ?? 'Unknown error'}';
         }
-        final errorKey = result.cancelled
-            ? 'deploy_cancel_requested'
-            : result.verificationFailed
-            ? 'linux_verify_failed'
-            : errorDetail.contains('Access is denied') ||
-                  errorDetail.contains('拒绝访问') ||
-                  errorDetail.contains('UnauthorizedAccess')
-            ? 'linux_access_denied'
-            : 'linux_write_failed';
+        final errorKey =
+            result.failureMessageKey ??
+            (result.cancelled
+                ? 'deploy_cancel_requested'
+                : result.verificationFailed
+                ? 'linux_verify_failed'
+                : errorDetail.contains('Access is denied') ||
+                      errorDetail.contains('拒绝访问') ||
+                      errorDetail.contains('UnauthorizedAccess')
+                ? 'linux_access_denied'
+                : 'linux_write_failed');
         _logLine('Linux raw write FAILED: $errorDetail');
         final logPath = await saveLogToFile();
         _notify(
@@ -1005,19 +1013,10 @@ class BootableUsbService {
         return false;
       }
 
-      final restoreResult = await _restoreLinuxRawDiskOnline(disk: disk);
-      if (restoreResult.success) {
-        rawDiskMayNeedRestore = false;
-      }
-      final finalResult = restoreResult.success
-          ? result
-          : _LinuxRawWriteResult(
-              success: false,
-              error:
-                  '${result.error ?? 'Image verification finished.'}\n\n'
-                  'The target disk could not be returned online: '
-                  '${restoreResult.error ?? 'Unknown error'}',
-            );
+      // The raw writer returns the disk online before emitting WDS_DONE. Do
+      // not start a second PowerShell process after successful verification.
+      rawDiskMayNeedRestore = false;
+      final finalResult = result;
       _logLine('Linux verify: ${finalResult.success ? "OK" : "FAILED"}');
 
       _notify(
@@ -1646,7 +1645,6 @@ if ($partitions.Count -ne 1) {
     required int bootPartitionSizeMb,
     required String liveVolumeLabel,
   }) async {
-    final diskNumber = disk.diskNumber;
     final letters = await _reserveLinuxToGoDriveLetters();
     if (letters == null) {
       return const _LinuxToGoPartitionResult(
@@ -1655,19 +1653,50 @@ if ($partitions.Count -ne 1) {
       );
     }
 
+    final currentDisk = await ref
+        .read(diskSafetyServiceProvider)
+        .refreshDisk(disk);
+    if (currentDisk == null) {
+      return const _LinuxToGoPartitionResult(
+        success: false,
+        error: 'Target disk identity changed before partitioning.',
+      );
+    }
+    final diskSafety = ref.read(diskSafetyServiceProvider);
+    final initialization = await diskSafety.initializeDiskPartitionStyle(
+      currentDisk,
+      partitionStyle: 'GPT',
+    );
+    if (initialization.exitCode != 0) {
+      final stderr = initialization.stderr.toString();
+      final stdout = initialization.stdout.toString();
+      return _LinuxToGoPartitionResult(
+        success: false,
+        error: stderr.trim().isNotEmpty
+            ? stderr
+            : (stdout.isEmpty ? 'Disk initialization failed.' : stdout),
+      );
+    }
+    final initializedDisk = await diskSafety.refreshDisk(currentDisk);
+    if (initializedDisk == null ||
+        initializedDisk.partitionStyle.toUpperCase() != 'GPT') {
+      return const _LinuxToGoPartitionResult(
+        success: false,
+        error: 'Target disk initialization could not be verified.',
+      );
+    }
+
     final script = _buildLinuxToGoDiskpartScript(
-      diskNumber: diskNumber,
+      diskNumber: initializedDisk.diskNumber,
       bootPartitionSizeMb: bootPartitionSizeMb,
       bootLetter: letters.bootLetter,
       liveLetter: letters.liveLetter,
       liveVolumeLabel: liveVolumeLabel,
-      currentPartitionStyle: disk.partitionStyle,
+      currentPartitionStyle: initializedDisk.partitionStyle,
     );
     _logLine('Linux To Go DiskPart script:\n$script');
 
-    final result = await ref
-        .read(diskSafetyServiceProvider)
-        .runGuardedDiskpart(disk, script);
+    final result = await diskSafety.runGuardedDiskpart(initializedDisk, script);
     _logLine('Linux To Go DiskPart exit: ${result.exitCode}');
 
     if (!_diskpartSucceeded(result)) {
@@ -1696,15 +1725,15 @@ if ($partitions.Count -ne 1) {
     required String liveVolumeLabel,
     required String currentPartitionStyle,
   }) {
-    final currentStyle = currentPartitionStyle.trim().toUpperCase();
     final commands = <String>[
       'select disk $diskNumber',
-      'clean',
-      if (currentStyle != 'GPT') 'convert gpt',
       'create partition efi size=$bootPartitionSizeMb',
+      'select partition 1',
       'format fs=fat32 label="WDS_LTG" quick',
       'assign letter=$bootLetter',
+      'select disk $diskNumber',
       'create partition primary',
+      'select partition 2',
       'format fs=ntfs label="$liveVolumeLabel" quick',
       'assign letter=$liveLetter',
       'exit',
@@ -1721,11 +1750,14 @@ if ($partitions.Count -ne 1) {
       'the parameter is incorrect',
       'access is denied',
       'the volume size is too big',
+      'there is no volume selected',
+      'no volume selected',
       'diskpart 遇到错误',
       '虚拟磁盘服务错误',
       '参数错误',
       '拒绝访问',
       '卷大小太大',
+      '没有选择卷',
     ];
     return !errors.any(combined.contains);
   }
@@ -2668,6 +2700,11 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       },
     );
     Process? process;
+    var verificationStarted = false;
+    var imageVerified = false;
+    var diskOnline = false;
+    var completed = false;
+    String? restoreFailureDetail;
     try {
       process = await Process.start(
         command.executable,
@@ -2686,8 +2723,6 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
 
       final stdoutText = StringBuffer();
       final stderrText = StringBuffer();
-      var verificationStarted = false;
-      var verificationCompleted = false;
       final stdoutDone = process.stdout
           .transform(const SystemEncoding().decoder)
           .transform(const LineSplitter())
@@ -2697,9 +2732,10 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
             stdoutText.writeln(cleanLine);
             _logLine('Linux raw stdout: $cleanLine');
             if (cleanLine.startsWith('WDS_PROGRESS:')) {
-              final percent = int.tryParse(
-                cleanLine.substring('WDS_PROGRESS:'.length),
-              );
+              final fields = cleanLine
+                  .substring('WDS_PROGRESS:'.length)
+                  .split(':');
+              final percent = int.tryParse(fields.first);
               if (percent != null) {
                 onProgress(percent.clamp(0, 100) / 100.0);
               }
@@ -2716,8 +2752,34 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
                 onVerifyProgress(percent.clamp(0, 100) / 100.0);
               }
             }
+            if (cleanLine == 'WDS_VERIFY_COMPLETE') {
+              if (!verificationStarted) {
+                _logLine(
+                  'Linux raw writer emitted verification completion before verification started.',
+                );
+              }
+              imageVerified = true;
+            }
+            if (cleanLine == 'WDS_DISK_ONLINE') {
+              if (!imageVerified) {
+                _logLine(
+                  'Linux raw writer emitted disk-online before verification completed.',
+                );
+              }
+              diskOnline = true;
+            }
             if (cleanLine == 'WDS_DONE') {
-              verificationCompleted = true;
+              if (!imageVerified || !diskOnline) {
+                _logLine(
+                  'Linux raw writer emitted completion before required recovery markers.',
+                );
+              }
+              completed = true;
+            }
+            if (cleanLine.startsWith('WDS_RESTORE_FAILED:')) {
+              restoreFailureDetail = cleanLine
+                  .substring('WDS_RESTORE_FAILED:'.length)
+                  .trim();
             }
           })
           .asFuture<void>();
@@ -2743,6 +2805,9 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
           success: false,
           error:
               'Linux raw writing timed out after ${timeout.inSeconds} seconds.',
+          verificationFailed: verificationStarted && !imageVerified,
+          imageVerified: imageVerified,
+          diskOnline: diskOnline,
         );
       }
       await Future.wait([
@@ -2750,16 +2815,19 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         stderrDone.catchError((_) {}),
       ]);
       if (_cancelRequested) {
-        return const _LinuxRawWriteResult(
+        return _LinuxRawWriteResult(
           success: false,
           cancelled: true,
           error: 'Linux raw writing was cancelled.',
+          verificationFailed: verificationStarted && !imageVerified,
+          imageVerified: imageVerified,
+          diskOnline: diskOnline,
         );
       }
       if (exitCode != 0) {
         final rawDetail = stderrText.toString().trim().isNotEmpty
             ? stderrText.toString().trim()
-            : stdoutText.toString().trim();
+            : restoreFailureDetail ?? stdoutText.toString().trim();
         final detail = _summarizePowerShellFailure(
           rawDetail,
           fallback: 'PowerShell exited with code $exitCode.',
@@ -2767,17 +2835,31 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         return _LinuxRawWriteResult(
           success: false,
           error: detail,
-          verificationFailed: verificationStarted,
+          failureMessageKey: imageVerified && !diskOnline
+              ? 'linux_write_failed'
+              : null,
+          verificationFailed: verificationStarted && !imageVerified,
+          imageVerified: imageVerified,
+          diskOnline: diskOnline,
         );
       }
-      if (!verificationCompleted) {
-        return const _LinuxRawWriteResult(
+      if (!imageVerified || !diskOnline || !completed) {
+        return _LinuxRawWriteResult(
           success: false,
-          error: 'Linux raw verification did not complete.',
-          verificationFailed: true,
+          error: imageVerified
+              ? 'Image verification finished, but the target disk was not returned online.'
+              : 'Linux raw verification did not complete.',
+          failureMessageKey: imageVerified ? 'linux_write_failed' : null,
+          verificationFailed: !imageVerified,
+          imageVerified: imageVerified,
+          diskOnline: diskOnline,
         );
       }
-      return const _LinuxRawWriteResult(success: true);
+      return const _LinuxRawWriteResult(
+        success: true,
+        imageVerified: true,
+        diskOnline: true,
+      );
     } catch (error) {
       if (process != null) {
         await _terminateProcessTree(process, reason: 'Linux write failed');
@@ -2785,6 +2867,9 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
       return _LinuxRawWriteResult(
         success: false,
         error: 'Linux raw writing failed: $error',
+        verificationFailed: verificationStarted && !imageVerified,
+        imageVerified: imageVerified,
+        diskOnline: diskOnline,
       );
     } finally {
       if (identical(_activeLinuxRawWriteProcess, process)) {
@@ -3081,6 +3166,8 @@ $source = $null
 $target = $null
 $sourceHash = $null
 $targetHash = $null
+$operationFailure = $null
+$restoreFailure = $null
 try {
   $source = [System.IO.File]::Open(
     $IsoPath,
@@ -3214,13 +3301,92 @@ try {
     throw "Full-stream SHA-256 verification mismatch."
   }
 
-  Write-Output "WDS_DONE"
+  Write-Output "WDS_VERIFY_COMPLETE"
+} catch {
+  # Always release the exclusive raw handle before asking the Storage module
+  # to rediscover the newly-written hybrid layout.  Retaining the original
+  # error lets the caller distinguish write/verification failures from the
+  # recovery step below.
+  $operationFailure = $_
 } finally {
   if ($null -ne $targetHash) { $targetHash.Dispose() }
   if ($null -ne $sourceHash) { $sourceHash.Dispose() }
   if ($null -ne $target) { $target.Dispose() }
   if ($null -ne $source) { $source.Dispose() }
 }
+
+# Do this in the same elevated PowerShell process that performed the raw
+# write. Starting a second process after verification can be denied by a
+# security product or by a transient device state, even though the image is
+# already correct. The separate finalizer remains only as a timeout/cancel
+# fallback in Dart.
+try {
+  $restoredDisk = Get-Disk -Number $DiskNumber -ErrorAction Stop
+  $restoredBus = $restoredDisk.BusType.ToString().ToUpperInvariant()
+  $restoredIsExternal = $restoredBus -in @('USB', 'SD', 'MMC') -or [bool]$restoredDisk.IsRemovable
+  if (-not $restoredIsExternal -or $restoredDisk.IsSystem -or $restoredDisk.IsBoot) {
+    throw "Refusing to return a non-external disk online."
+  }
+  if ([int64]$restoredDisk.Size -ne $ExpectedSize -or
+      $restoredDisk.FriendlyName.ToString().Trim().ToUpperInvariant() -ne $ExpectedModel.Trim().ToUpperInvariant() -or
+      $restoredBus -ne $ExpectedBus.Trim().ToUpperInvariant()) {
+    throw "Target disk identity changed before it could be returned online."
+  }
+  if ($ExpectedSerial -and $ExpectedSerial.Trim().ToUpperInvariant() -notin @('N/A', 'UNKNOWN')) {
+    $physical = Get-PhysicalDisk -ErrorAction Stop |
+      Where-Object { $_.DeviceId -eq $restoredDisk.Number.ToString() } |
+      Select-Object -First 1
+    $currentSerial = if ($physical -and $physical.SerialNumber) {
+      $physical.SerialNumber.ToString().Trim().ToUpperInvariant()
+    } else { '' }
+    if ($currentSerial -ne $ExpectedSerial.Trim().ToUpperInvariant()) {
+      throw "Target disk serial number changed before it could be returned online."
+    }
+  } elseif ($ExpectedUniqueId) {
+    $currentUniqueId = if ($restoredDisk.UniqueId) { $restoredDisk.UniqueId.ToString().Trim().ToUpperInvariant() } else { '' }
+    if ($currentUniqueId -ne $ExpectedUniqueId.Trim().ToUpperInvariant()) {
+      throw "Target disk unique identity changed before it could be returned online."
+    }
+  } elseif ($ExpectedDevicePath) {
+    $currentPath = if ($restoredDisk.Path) { $restoredDisk.Path.ToString().Trim().ToUpperInvariant() } else { '' }
+    if ($currentPath -ne $ExpectedDevicePath.Trim().ToUpperInvariant()) {
+      throw "Target disk device path changed before it could be returned online."
+    }
+  } else {
+    throw "Target disk has no reliable physical identity."
+  }
+
+  if ($restoredDisk.IsOffline) {
+    Set-Disk -Number $DiskNumber -IsOffline $false -ErrorAction Stop
+  }
+  Update-Disk -Number $DiskNumber -ErrorAction Stop | Out-Null
+  $onlineDisk = Get-Disk -Number $DiskNumber -ErrorAction Stop
+  if ([bool]$onlineDisk.IsOffline) {
+    throw "Target disk is still offline after recovery."
+  }
+  Write-Output "WDS_DISK_ONLINE"
+} catch {
+  $restoreFailure = $_
+  Write-Output ("WDS_RESTORE_FAILED:{0}" -f $_.Exception.Message)
+}
+
+if ($null -ne $operationFailure) {
+  if ($null -ne $restoreFailure) {
+    throw (
+      "Linux raw operation failed: {0}`nDisk recovery also failed: {1}" -f
+        $operationFailure.Exception.Message, $restoreFailure.Exception.Message
+    )
+  }
+  throw $operationFailure
+}
+if ($null -ne $restoreFailure) {
+  throw (
+    "Image verification completed, but the target disk could not be returned online: {0}" -f
+      $restoreFailure.Exception.Message
+  )
+}
+
+Write-Output "WDS_DONE"
 ''';
 
   static const String _linuxRawVerifyScript = r'''
@@ -3572,23 +3738,56 @@ Write-Output "WDS_DISK_ONLINE"
         error: 'The requested drive letter is already in use.',
       );
     }
+    final currentDisk = await ref
+        .read(diskSafetyServiceProvider)
+        .refreshDisk(disk);
+    if (currentDisk == null) {
+      return const _DiskPartResult(
+        success: false,
+        error: 'Target disk identity changed before partitioning.',
+      );
+    }
     final label = _sanitizeVolumeLabel(volumeLabel, fallback: 'WDS_BOOT');
     final useGpt = deploymentBootMode == DeploymentBootMode.uefiGpt;
+    final targetStyle = useGpt ? 'GPT' : 'MBR';
+    final diskSafety = ref.read(diskSafetyServiceProvider);
+    _logLine('Initializing target disk as $targetStyle before partitioning.');
+    final initialization = await diskSafety.initializeDiskPartitionStyle(
+      currentDisk,
+      partitionStyle: targetStyle,
+    );
+    if (initialization.exitCode != 0) {
+      final stderr = initialization.stderr.toString();
+      final stdout = initialization.stdout.toString();
+      final detail = stderr.trim().isNotEmpty ? stderr : stdout;
+      _logLine('Disk initialization failed: $detail');
+      return _DiskPartResult(
+        success: false,
+        error: detail.isEmpty ? 'Disk initialization failed.' : detail,
+      );
+    }
+    final initializedDisk = await diskSafety.refreshDisk(currentDisk);
+    if (initializedDisk == null ||
+        initializedDisk.partitionStyle.toUpperCase() != targetStyle) {
+      return const _DiskPartResult(
+        success: false,
+        error: 'Target disk initialization could not be verified.',
+      );
+    }
     final script = _buildInstallMediaDiskpartScript(
       diskNumber: diskNumber,
-      currentPartitionStyle: disk.partitionStyle,
+      currentPartitionStyle: initializedDisk.partitionStyle,
       deploymentBootMode: deploymentBootMode,
       preferredDriveLetter: requestedLetter ?? '',
       volumeLabel: label,
+      diskSizeBytes: initializedDisk.sizeBytes,
     );
     _logLine('DiskPart script:\n$script');
 
-    final result = await ref
-        .read(diskSafetyServiceProvider)
-        .runGuardedDiskpart(disk, script);
+    final result = await diskSafety.runGuardedDiskpart(initializedDisk, script);
     _logLine('DiskPart exit: ${result.exitCode}');
 
-    if (result.exitCode != 0) {
+    if (!_diskpartSucceeded(result)) {
       final stderr = result.stderr.toString();
       final stdout = result.stdout.toString();
       _logLine('DiskPart stderr: $stderr');
@@ -3632,28 +3831,34 @@ Write-Output "WDS_DISK_ONLINE"
     required DeploymentBootMode deploymentBootMode,
     required String preferredDriveLetter,
     required String volumeLabel,
+    required int? diskSizeBytes,
   }) {
-    final targetStyle = deploymentBootMode == DeploymentBootMode.uefiGpt
-        ? 'GPT'
-        : 'MBR';
-    final currentStyle = currentPartitionStyle.trim().toUpperCase();
-    // DiskPart `clean` removes partitions but deliberately keeps the disk's
-    // partition-table type. Re-running a matching `convert` command fails.
-    final conversion = currentStyle == targetStyle
-        ? null
-        : 'convert ${targetStyle.toLowerCase()}';
     final normalizedLetter = _normalizePreferredLetter(preferredDriveLetter);
+    final fat32PartitionSizeMb = _fat32PartitionSizeMbForDisk(diskSizeBytes);
+    final primaryPartition = fat32PartitionSizeMb == null
+        ? 'create partition primary'
+        : 'create partition primary size=$fat32PartitionSizeMb';
     final commands = <String>[
       'select disk $diskNumber',
-      'clean',
-      ?conversion,
-      'create partition primary',
+      primaryPartition,
+      // DiskPart does not reliably move focus from the disk to a new
+      // partition on every Windows build. Formatting and assigning require
+      // an explicit partition focus.
+      'select partition 1',
       if (deploymentBootMode == DeploymentBootMode.legacyBios) 'active',
       'format fs=fat32 label="$volumeLabel" quick',
       normalizedLetter == null ? 'assign' : 'assign letter=$normalizedLetter',
       'exit',
     ];
     return '${commands.join('\n')}\n';
+  }
+
+  static int? _fat32PartitionSizeMbForDisk(int? diskSizeBytes) {
+    if (diskSizeBytes == null ||
+        diskSizeBytes <= _fat32NativeFormatLimitBytes) {
+      return null;
+    }
+    return _fat32BootPartitionSizeMb;
   }
 
   Future<bool> _verifyInstallMediaPartition({
@@ -4740,6 +4945,8 @@ class _LinuxRawWriteResult {
   final String? failureMessageKey;
   final bool cancelled;
   final bool verificationFailed;
+  final bool imageVerified;
+  final bool diskOnline;
 
   const _LinuxRawWriteResult({
     required this.success,
@@ -4747,6 +4954,8 @@ class _LinuxRawWriteResult {
     this.failureMessageKey,
     this.cancelled = false,
     this.verificationFailed = false,
+    this.imageVerified = false,
+    this.diskOnline = false,
   });
 }
 
