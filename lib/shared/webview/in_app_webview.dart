@@ -25,24 +25,28 @@ class InAppDownloadRequest {
     required this.fileName,
     required this.imageName,
     required this.mirrorLabel,
+    this.expectedSha256,
   });
 
   final String url;
   final String fileName;
   final String imageName;
   final String mirrorLabel;
+  final String? expectedSha256;
 }
 
 class InAppWebview extends StatefulWidget {
   final String url;
   final String? title;
   final InAppDownloadRequest? downloadRequest;
+  final String? expectedSha256;
 
   const InAppWebview({
     super.key,
     required this.url,
     this.title,
     this.downloadRequest,
+    this.expectedSha256,
   });
 
   @override
@@ -320,7 +324,11 @@ class _InAppWebviewState extends State<InAppWebview> {
   void _handleDownloadUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    _startDownload(url, _guessFileName(uri));
+    _startDownload(
+      url,
+      _guessFileName(uri),
+      expectedSha256: widget.expectedSha256,
+    );
   }
 
   String _guessFileName(Uri uri) {
@@ -338,7 +346,11 @@ class _InAppWebviewState extends State<InAppWebview> {
     return 'download';
   }
 
-  Future<void> _startDownload(String url, String defaultName) async {
+  Future<void> _startDownload(
+    String url,
+    String defaultName, {
+    String? expectedSha256,
+  }) async {
     final savePath = await FilePicker.saveFile(
       dialogTitle: tr(context, 'webview_save_title'),
       fileName: defaultName,
@@ -349,6 +361,7 @@ class _InAppWebviewState extends State<InAppWebview> {
       url: url,
       fileName: p.basename(savePath),
       savePath: savePath,
+      expectedSha256: expectedSha256,
     );
     if (mounted) _showDownloadPanel();
   }
@@ -385,6 +398,7 @@ class _InAppWebviewState extends State<InAppWebview> {
       url: request.url,
       fileName: p.basename(savePath),
       savePath: savePath,
+      expectedSha256: request.expectedSha256,
     );
     _managedDownloadId = item.id;
     _downloadManager.addListener(_onManagedDownloadChanged);
@@ -417,7 +431,7 @@ class _InAppWebviewState extends State<InAppWebview> {
     await _setManagedDownloadState(
       phase: phase,
       detail: item.status == DownloadStatus.error && item.error != null
-          ? item.error!
+          ? tr(context, item.error!.localizationKey)
           : detail,
       progress: item.progress * 100,
       indeterminate:

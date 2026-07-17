@@ -8,6 +8,23 @@ import 'package:win_deploy_studio/features/deployment/models/deployment_plan.dar
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('Windows To Go retries only transient ISO mount preflight failures', () {
+    expect(
+      shouldRetryWindowsToGoIsoPreflight(
+        const WindowsIsoLayoutInspection.invalid(
+          'The ISO could not be mounted for Windows setup validation.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      shouldRetryWindowsToGoIsoPreflight(
+        const WindowsIsoLayoutInspection.invalid('Linux layout'),
+      ),
+      isFalse,
+    );
+  });
+
   test(
     'Windows To Go rejects a non-Windows source before disk access',
     () async {

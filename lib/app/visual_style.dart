@@ -76,7 +76,8 @@ class AppAppearanceSettings {
     return AppAppearanceSettings(
       themeMode: _themeModeFromName(json['themeMode']?.toString()),
       visualStyle:
-          VisualStyle.fromName(json['style']?.toString()) ?? defaults.visualStyle,
+          VisualStyle.fromName(json['style']?.toString()) ??
+          defaults.visualStyle,
       accentColor: _colorFromValue(json['accent']),
       fontFamily: _fontFromValue(json['fontFamily']),
     );

@@ -20,6 +20,8 @@ import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
 import '../../../shared/widgets/known_iso_verification_panel.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
+import '../models/to_go_execution_timer.dart';
+import '../models/to_go_progress_message.dart';
 
 /// Returns the localization key shown for a To Go execution phase. Linux To
 /// Go emits explicit writer statuses; preserving those keys prevents the UI
@@ -47,6 +49,7 @@ String toGoProgressTitleKey({
     'partitioning' => 'wtg_step_partitioning',
     'mountingIso' => 'wtg_step_mounting',
     'applyingImage' || 'copyingFiles' || 'splittingWim' => 'wtg_step_applying',
+    'configuringImage' => 'wtg_step_configuring',
     'writingBootFiles' => 'wtg_step_boot',
     'verifying' => 'wtg_step_verifying',
     'complete' => 'step_complete',
@@ -57,6 +60,31 @@ String toGoProgressTitleKey({
 
 enum _ToGoPlatform { windows, linux }
 
+/// Runs the Windows To Go image metadata lookup again when a freshly mounted
+/// ISO has not exposed its volume yet.  This is deliberately kept in the To
+/// Go feature: installation-media creation must retain its already-tested
+/// import path.
+Future<List<T>> retryWindowsToGoImageLookup<T>(
+  Future<List<T>> Function() lookup, {
+  int maxAttempts = 2,
+  Duration retryDelay = const Duration(milliseconds: 800),
+}) async {
+  if (maxAttempts < 1) {
+    throw ArgumentError.value(
+      maxAttempts,
+      'maxAttempts',
+      'Must be at least 1.',
+    );
+  }
+
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    final images = await lookup();
+    if (images.isNotEmpty || attempt == maxAttempts - 1) return images;
+    await Future<void>.delayed(retryDelay);
+  }
+  return <T>[];
+}
+
 class _ToGoProgress {
   final String phase;
   final String message;
@@ -65,7 +93,7 @@ class _ToGoProgress {
   final int writtenBytes;
   final int totalBytes;
   final int speedBytesPerSecond;
-  final int elapsedSeconds;
+  final String? error;
 
   const _ToGoProgress({
     required this.phase,
@@ -75,14 +103,17 @@ class _ToGoProgress {
     this.writtenBytes = 0,
     this.totalBytes = 0,
     this.speedBytesPerSecond = 0,
-    this.elapsedSeconds = 0,
+    this.error,
   });
 
-  factory _ToGoProgress.fromWtg(
-    WtgProgress progress, {
-    required int elapsedSeconds,
-  }) {
+  factory _ToGoProgress.fromWtg(WtgProgress progress) {
     final step = progress.step;
+    final messageDetail = progress.message
+        .split('\n')
+        .skip(1)
+        .join('\n')
+        .trim();
+    final reportedError = progress.error?.trim();
     return _ToGoProgress(
       phase: step.name,
       message: progress.message,
@@ -94,21 +125,19 @@ class _ToGoProgress {
       writtenBytes: progress.writtenBytes,
       totalBytes: progress.totalBytes,
       speedBytesPerSecond: progress.currentSpeedBytes,
-      elapsedSeconds: elapsedSeconds,
+      error: reportedError?.isNotEmpty == true
+          ? reportedError
+          : (messageDetail.isEmpty ? null : messageDetail),
     );
   }
 
-  factory _ToGoProgress.fromLinux(
-    CreateProgress progress, {
-    required int elapsedSeconds,
-  }) {
+  factory _ToGoProgress.fromLinux(CreateProgress progress) {
     final step = progress.step;
     return _ToGoProgress(
       phase: step.name,
       message: progress.message,
       progress: progress.progress,
       cancellable: step != CreateStep.complete && step != CreateStep.failed,
-      elapsedSeconds: elapsedSeconds,
     );
   }
 }
@@ -153,7 +182,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   VirtualDiskType _virtualDiskType = VirtualDiskType.dynamic;
   bool _blockLocalDisks = true;
   bool _skipOobe = false;
-  bool _disableWinRe = true;
+  // Offline WinRE removal is deliberately not offered for To Go. Preserving
+  // recovery tools is safer than assuming a fixed WinRE layout in every ISO.
+  final bool _disableWinRe = false;
   bool _disableUasp = false;
   bool _compactOs = false;
   bool _wimBoot = false;
@@ -170,9 +201,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   _ToGoProgress? _taskProgress;
   WtgService? _activeWtgService;
   BootableUsbService? _activeLinuxService;
-  final _executionStopwatch = Stopwatch();
+  final _executionTimer = ToGoExecutionTimer();
+  int _elapsedSeconds = 0;
   bool _cancelRequested = false;
   final List<String> _progressLog = [];
+  String? _lastProgressLogKey;
   int _gameTarget = 4;
   int _gameScore = 0;
   bool _showGame = false;
@@ -204,6 +237,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   @override
   void dispose() {
+    _executionTimer.dispose();
     _virtualDiskNameController.dispose();
     _virtualDiskSizeController.dispose();
     _volumeLabelController.dispose();
@@ -327,44 +361,29 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           );
         }
       } else {
-        final windowsLayout = await ref
-            .read(windowsIsoPreflightProvider)
-            .inspect(path);
-        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
-          return;
-        }
-        if (!windowsLayout.isValid) {
-          throw StateError('wtg_invalid_windows_iso');
-        }
-        final iso = await ref
-            .read(isoParseServiceProvider)
-            .parseIso(
-              path,
-              onProgress: (phase, percent) {
-                if (!_isCurrentIsoSelection(
-                  selectionRequest,
-                  selectedPlatform,
-                )) {
-                  return;
-                }
-                setState(() {
-                  _imageStatus = '${tr(context, 'wtg_parsing_iso')} $percent%';
-                });
-              },
-            );
-        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
-          return;
-        }
-        if (iso == null) throw StateError('creator_parse_error');
-        final images = await ref.read(wtgServiceProvider).getWimImages(path);
+        // Do not route Windows To Go through the creator/installation-media
+        // parser first.  It causes three back-to-back ISO mounts and a newly
+        // inserted Tiny10 ESD ISO can be reported unavailable before Windows
+        // exposes its mounted volume.  WtgService validates the exact same
+        // Windows setup structure, with its To Go-specific mount handling.
+        final images = await retryWindowsToGoImageLookup(
+          () => ref.read(wtgServiceProvider).getWimImages(path),
+        );
         if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
           return;
         }
         if (images.isEmpty) throw StateError('wtg_invalid_windows_iso');
+        final iso = _metadataFromWindowsToGoImages(
+          path: path,
+          fileName: pickedFile.name,
+          fileSize: pickedFile.size,
+          images: images,
+        );
         setState(() {
           _iso = iso;
           _images = images;
           _imageIndex = images.first['index'] as int?;
+          _normalizeWindowsOptionsForSelectedImage();
         });
         if (selectedPlatform == _ToGoPlatform.windows) {
           unawaited(_verifyKnownIso(path, verificationRequest, locale));
@@ -388,6 +407,48 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   bool _isCurrentIsoSelection(int request, _ToGoPlatform platform) {
     return mounted && request == _isoSelectionRequest && _platform == platform;
+  }
+
+  IsoMetadata _metadataFromWindowsToGoImages({
+    required String path,
+    required String fileName,
+    required int fileSize,
+    required List<Map<String, dynamic>> images,
+  }) {
+    final primary = images.first;
+    final build = primary['build']?.toString().trim() ?? '';
+    final imageName = primary['name']?.toString().trim() ?? '';
+    final version = primary['version']?.toString().trim() ?? '';
+    final productFamily = _windowsProductFamilyForImage(primary);
+    final parsedBuild = int.tryParse(build);
+    final windowsVersion = productFamily == WindowsProductFamily.server
+        ? build.isNotEmpty
+              ? 'Windows Server (Build $build)'
+              : imageName.isNotEmpty
+              ? imageName
+              : 'Windows Server'
+        : parsedBuild != null && parsedBuild >= 22000
+        ? 'Windows 11 (Build $build)'
+        : parsedBuild != null && parsedBuild >= 10240
+        ? 'Windows 10 (Build $build)'
+        : parsedBuild != null && parsedBuild == 9600
+        ? 'Windows 8.1 (Build $build)'
+        : parsedBuild != null && parsedBuild == 9200
+        ? 'Windows 8 (Build $build)'
+        : version.isNotEmpty
+        ? version
+        : imageName;
+    return IsoMetadata(
+      filePath: path,
+      fileName: fileName,
+      fileSize: fileSize,
+      windowsVersion: windowsVersion,
+      buildNumber: build.isEmpty ? null : build,
+      architecture: primary['architecture']?.toString(),
+      language: primary['language']?.toString(),
+      edition: primary['edition']?.toString(),
+      isValidWindowsIso: true,
+    );
   }
 
   Future<void> _verifyKnownIso(
@@ -451,6 +512,34 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     return _images.where((image) => image['index'] == index).firstOrNull;
   }
 
+  WindowsProductFamily _windowsProductFamilyForImage(
+    Map<String, dynamic>? image,
+  ) {
+    return DeploymentPlan.detectWindowsProductFamily(
+      installationType: image?['installationType']?.toString() ?? '',
+      edition: image?['edition']?.toString() ?? '',
+      name: image?['name']?.toString() ?? '',
+      description: image?['description']?.toString() ?? '',
+    );
+  }
+
+  void _normalizeWindowsOptionsForSelectedImage() {
+    if (_isLinux) return;
+    var plan = _plan;
+    final availableModes = DeploymentCompatibility.deploymentModesFor(plan);
+    if (!availableModes.contains(_deploymentMode)) {
+      _deploymentMode = availableModes.first;
+      _virtualDiskNameController.text = _normalizedVirtualDiskName();
+      plan = _plan;
+    }
+    if (!DeploymentCompatibility.supportsCompactOs(plan)) {
+      _compactOs = false;
+    }
+    if (!DeploymentCompatibility.supportsWimBoot(plan)) {
+      _wimBoot = false;
+    }
+  }
+
   DeploymentPlan get _plan {
     final image = _selectedImage;
     final build = image?['build']?.toString() ?? _iso?.buildNumber ?? '';
@@ -471,6 +560,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         build: build,
         version: version,
       ),
+      windowsProductFamily: _isLinux
+          ? WindowsProductFamily.client
+          : _windowsProductFamilyForImage(image),
       bootMode: _bootMode,
       deploymentMode: _isLinux ? DeploymentMode.direct : _deploymentMode,
       virtualDiskType: _virtualDiskType,
@@ -531,14 +623,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final compatibility = DeploymentCompatibility.evaluate(plan);
     if (!compatibility.canDeploy) return;
 
-    _executionStopwatch
-      ..reset()
-      ..start();
     setState(() {
       _running = true;
       _finished = false;
       _success = false;
       _cancelRequested = false;
+      _elapsedSeconds = 0;
       _taskProgress = const _ToGoProgress(
         phase: 'preparing',
         message: 'wtg_step_preparing',
@@ -547,7 +637,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _progressLog
         ..clear()
         ..add(tr(context, 'wtg_step_preparing'));
+      _lastProgressLogKey = 'wtg_step_preparing';
     });
+    _startExecutionTimer();
 
     var success = false;
     DiskOperationLock? operationLock;
@@ -623,7 +715,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       }
     } finally {
       await operationLock?.release();
-      _executionStopwatch.stop();
+      _stopExecutionTimer();
       if (mounted) {
         setState(() {
           _running = false;
@@ -637,30 +729,36 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   void _onWtgProgress(WtgProgress progress) {
-    _updateTaskProgress(
-      _ToGoProgress.fromWtg(
-        progress,
-        elapsedSeconds: _executionStopwatch.elapsed.inSeconds,
-      ),
-    );
+    _updateTaskProgress(_ToGoProgress.fromWtg(progress));
   }
 
   void _onLinuxProgress(CreateProgress progress) {
-    _updateTaskProgress(
-      _ToGoProgress.fromLinux(
-        progress,
-        elapsedSeconds: _executionStopwatch.elapsed.inSeconds,
-      ),
-    );
+    _updateTaskProgress(_ToGoProgress.fromLinux(progress));
+  }
+
+  void _startExecutionTimer() {
+    _executionTimer.start((elapsedSeconds) {
+      if (!mounted || !_running) return;
+      setState(() => _elapsedSeconds = elapsedSeconds);
+    });
+  }
+
+  void _stopExecutionTimer() {
+    _executionTimer.stop();
+    _elapsedSeconds = _executionTimer.elapsedSeconds;
   }
 
   void _updateTaskProgress(_ToGoProgress progress) {
     if (!mounted) return;
     setState(() {
       _taskProgress = progress;
-      final message = _localizedOrRaw(progress.message.split('\n').first);
-      if (_progressLog.isEmpty || _progressLog.last != message) {
+      final messageKey = progress.message.split('\n').first;
+      final message = _localizedProgressMessage(progress, messageKey);
+      if (_lastProgressLogKey == messageKey && _progressLog.isNotEmpty) {
+        _progressLog[_progressLog.length - 1] = message;
+      } else {
         _progressLog.add(message);
+        _lastProgressLogKey = messageKey;
       }
     });
   }
@@ -698,8 +796,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _taskProgress = null;
       _cancelRequested = false;
       _progressLog.clear();
+      _lastProgressLogKey = null;
+      _elapsedSeconds = 0;
     });
-    _executionStopwatch.reset();
+    _executionTimer.reset();
     _loadDisks();
   }
 
@@ -922,13 +1022,23 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                   icon: Icons.window_outlined,
                   title: image['name']?.toString() ?? 'Windows',
                   subtitle:
-                      [image['edition'], image['architecture'], image['build']]
+                      [
+                            if (_windowsProductFamilyForImage(image) ==
+                                WindowsProductFamily.server)
+                              'Windows Server',
+                            image['edition'],
+                            image['architecture'],
+                            image['build'],
+                          ]
                           .where(
                             (value) => value != null && '$value'.isNotEmpty,
                           )
                           .join(' • '),
                   selected: selected,
-                  onTap: () => setState(() => _imageIndex = index),
+                  onTap: () => setState(() {
+                    _imageIndex = index;
+                    _normalizeWindowsOptionsForSelectedImage();
+                  }),
                 ),
               );
             }),
@@ -1124,6 +1234,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             onSelectionChanged: (value) =>
                 setState(() => _bootMode = value.first),
           ),
+          const SizedBox(height: 12),
+          _advancedNotice(Icons.info_outline, 'deploy_boot_mode_notice'),
           const SizedBox(height: 24),
           Text(
             tr(context, 'deploy_mode'),
@@ -1150,6 +1262,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       _deploymentMode = mode;
                       _virtualDiskNameController.text =
                           _normalizedVirtualDiskName();
+                      _normalizeWindowsOptionsForSelectedImage();
                     });
                   },
                 ),
@@ -1241,11 +1354,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     _skipOobe,
                     (value) => _skipOobe = value,
                   ),
-                  _switchTile(
-                    'deploy_disable_winre',
-                    'deploy_disable_winre_desc',
-                    _disableWinRe,
-                    (value) => _disableWinRe = value,
+                  _advancedNotice(
+                    Icons.health_and_safety_outlined,
+                    'deploy_winre_preserved_notice',
                   ),
                   _switchTile(
                     'deploy_disable_uasp',
@@ -1564,6 +1675,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   Widget _buildExecutionView() {
     final progress = _taskProgress;
     final colorScheme = Theme.of(context).colorScheme;
+    final failureReason = _finished && !_success
+        ? _localizedFailureReason(progress)
+        : null;
+    final progressDescription = progress == null
+        ? _localizedOrRaw('wtg_step_preparing')
+        : _localizedProgressMessage(
+            progress,
+            progress.message.split('\n').first,
+          );
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -1594,14 +1714,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                               ? 'deploy_complete_desc'
                               : 'deploy_failed_desc',
                         )
-                      : _localizedOrRaw(
-                          progress?.message.split('\n').first ??
-                              'wtg_step_preparing',
-                        ),
+                      : progressDescription,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
+                if (failureReason != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    failureReason,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: colorScheme.error),
+                  ),
+                ],
                 if (_knownIsoVerification != null) ...[
                   const SizedBox(height: 16),
                   KnownIsoVerificationPanel(
@@ -1653,9 +1779,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                             ),
                             _Metric(
                               label: tr(context, 'wtg_elapsed'),
-                              value: _formatDuration(
-                                progress?.elapsedSeconds ?? 0,
-                              ),
+                              value: _formatDuration(_elapsedSeconds),
                             ),
                           ],
                         ),
@@ -1692,56 +1816,35 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  tr(context, 'deploy_log_summary'),
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(height: 10),
-                                Expanded(
-                                  child: ListView.builder(
-                                    itemCount: _progressLog.length,
-                                    itemBuilder: (context, index) => Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 4,
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Icon(
-                                            Icons.check_circle_outline,
-                                            size: 16,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(_progressLog[index]),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (_showGame) ...[
-                        const SizedBox(width: 12),
-                        SizedBox(width: 230, child: _buildGame()),
-                      ],
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final gameHeight = (constraints.maxHeight * 0.46)
+                          .clamp(120.0, 250.0)
+                          .toDouble();
+                      final stackGame = _showGame && constraints.maxWidth < 640;
+                      final log = _buildProgressLog(colorScheme);
+                      if (!_showGame) return log;
+                      if (stackGame) {
+                        return Column(
+                          children: [
+                            SizedBox(height: gameHeight, child: _buildGame()),
+                            const SizedBox(height: 12),
+                            Expanded(child: log),
+                          ],
+                        );
+                      }
+                      final gameWidth = (constraints.maxWidth * 0.3)
+                          .clamp(170.0, 230.0)
+                          .toDouble();
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: log),
+                          const SizedBox(width: 12),
+                          SizedBox(width: gameWidth, child: _buildGame()),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1780,40 +1883,59 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   Widget _buildGame() {
+    return DeploymentWaitingGame(
+      score: _gameScore,
+      activeTarget: _gameTarget,
+      onTargetPressed: (index) {
+        if (index != _gameTarget) return;
+        setState(() {
+          _gameScore++;
+          var next = _random.nextInt(9);
+          if (next == _gameTarget) next = (next + 1) % 9;
+          _gameTarget = next;
+        });
+      },
+    );
+  }
+
+  Widget _buildProgressLog(ColorScheme colorScheme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              tr(context, 'deploy_waiting_game'),
+              tr(context, 'deploy_log_summary'),
               style: Theme.of(context).textTheme.titleSmall,
             ),
-            const SizedBox(height: 8),
-            Text('${tr(context, 'deploy_game_score')}: $_gameScore'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Expanded(
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: 9,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
+              child: ListView.builder(
+                itemCount: _progressLog.length,
                 itemBuilder: (context, index) {
-                  final active = index == _gameTarget;
-                  return IconButton.filledTonal(
-                    onPressed: () {
-                      if (!active) return;
-                      setState(() {
-                        _gameScore++;
-                        var next = _random.nextInt(9);
-                        if (next == _gameTarget) next = (next + 1) % 9;
-                        _gameTarget = next;
-                      });
-                    },
-                    icon: Icon(active ? Icons.bolt : Icons.circle_outlined),
+                  final isFailure =
+                      _finished &&
+                      !_success &&
+                      index == _progressLog.length - 1;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          isFailure
+                              ? Icons.error_outline
+                              : Icons.check_circle_outline,
+                          size: 16,
+                          color: isFailure
+                              ? colorScheme.error
+                              : colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(_progressLog[index])),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1835,6 +1957,28 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       subtitle: Text(tr(context, subtitleKey)),
       value: value,
       onChanged: (next) => setState(() => update(next)),
+    );
+  }
+
+  Widget _advancedNotice(IconData icon, String messageKey) {
+    final color = Theme.of(context).colorScheme.tertiary;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Expanded(child: Text(tr(context, messageKey))),
+        ],
+      ),
     );
   }
 
@@ -1918,9 +2062,31 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   String _localizedOrRaw(String value) {
     final localized = tr(context, value);
-    return localized.isEmpty || localized.contains('unavailable')
+    return localized.isEmpty || localized == tr(context, 'translation_missing')
         ? value
         : localized;
+  }
+
+  String _localizedProgressMessage(_ToGoProgress progress, String messageKey) {
+    return resolveToGoProgressMessage(
+      rawMessage: messageKey,
+      translate: (key) => tr(context, key),
+      translationMissing: tr(context, 'translation_missing'),
+      writtenBytes: progress.writtenBytes,
+      totalBytes: progress.totalBytes,
+      progress: progress.progress,
+    );
+  }
+
+  String? _localizedFailureReason(_ToGoProgress? progress) {
+    if (progress == null || progress.phase != 'failed') return null;
+    final messageKey = progress.message.split('\n').first.trim();
+    if (messageKey.isNotEmpty) {
+      final localized = _localizedOrRaw(messageKey);
+      if (localized != messageKey) return localized;
+    }
+    final detail = progress.error?.trim() ?? '';
+    return detail.isEmpty ? null : detail;
   }
 
   String _formatDuration(int seconds) {
@@ -1938,6 +2104,104 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+}
+
+/// Compact, non-scrollable waiting game shown during To Go creation.
+///
+/// Its fixed design canvas is scaled down by [FittedBox] whenever the
+/// deployment window is short or narrow.  Keeping the board out of a
+/// [ScrollView] avoids a dead scrollbar and keeps all nine targets reachable.
+class DeploymentWaitingGame extends StatelessWidget {
+  final int score;
+  final int activeTarget;
+  final ValueChanged<int> onTargetPressed;
+
+  const DeploymentWaitingGame({
+    super.key,
+    required this.score,
+    required this.activeTarget,
+    required this.onTargetPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          width: 240,
+          height: 304,
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    tr(context, 'deploy_waiting_game'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Text('${tr(context, 'deploy_game_score')}: $score'),
+                  const SizedBox(height: 10),
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: _DeploymentWaitingGameBoard(
+                      activeTarget: activeTarget,
+                      onTargetPressed: onTargetPressed,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeploymentWaitingGameBoard extends StatelessWidget {
+  final int activeTarget;
+  final ValueChanged<int> onTargetPressed;
+
+  const _DeploymentWaitingGameBoard({
+    required this.activeTarget,
+    required this.onTargetPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const spacing = 8.0;
+    return Column(
+      children: List.generate(3, (row) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: row == 2 ? 0 : spacing),
+            child: Row(
+              children: List.generate(3, (column) {
+                final index = row * 3 + column;
+                final active = index == activeTarget;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: column == 2 ? 0 : spacing),
+                    child: IconButton.filledTonal(
+                      key: ValueKey('deployment-game-target-$index'),
+                      onPressed: () => onTargetPressed(index),
+                      icon: Icon(active ? Icons.bolt : Icons.circle_outlined),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        );
+      }),
+    );
   }
 }
 

@@ -7,6 +7,33 @@ import 'package:win_deploy_studio/core/services/windows_iso_preflight.dart';
 import 'package:win_deploy_studio/features/deployment/models/deployment_plan.dart';
 
 void main() {
+  test('only non-loopback UNC ISO sources bypass local disk resolution', () {
+    expect(
+      BootableUsbService.isRemoteInstallMediaUncPathForTesting(
+        r'\\fileserver\images\win11.iso',
+      ),
+      isTrue,
+    );
+    expect(
+      BootableUsbService.isRemoteInstallMediaUncPathForTesting(
+        r'\\localhost\images\win11.iso',
+      ),
+      isFalse,
+    );
+    expect(
+      BootableUsbService.isRemoteInstallMediaUncPathForTesting(
+        r'\\127.0.0.1\images\win11.iso',
+      ),
+      isFalse,
+    );
+    expect(
+      BootableUsbService.isRemoteInstallMediaUncPathForTesting(
+        r'C:\images\win11.iso',
+      ),
+      isFalse,
+    );
+  });
+
   test(
     'Windows creation rejects a non-Windows source before disk access',
     () async {

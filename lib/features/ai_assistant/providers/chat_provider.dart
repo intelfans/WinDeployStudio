@@ -12,6 +12,8 @@ import '../services/ai_service.dart';
 import '../../logs/services/log_center_service.dart';
 
 class ChatState {
+  static const Object _unset = Object();
+
   final List<ChatSession> sessions;
   final String? activeSessionId;
   final bool isGenerating;
@@ -33,13 +35,15 @@ class ChatState {
 
   ChatState copyWith({
     List<ChatSession>? sessions,
-    String? activeSessionId,
+    Object? activeSessionId = _unset,
     bool? isGenerating,
     SearchMode? searchMode,
   }) {
     return ChatState(
       sessions: sessions ?? this.sessions,
-      activeSessionId: activeSessionId ?? this.activeSessionId,
+      activeSessionId: identical(activeSessionId, _unset)
+          ? this.activeSessionId
+          : activeSessionId as String?,
       isGenerating: isGenerating ?? this.isGenerating,
       searchMode: searchMode ?? this.searchMode,
     );
@@ -47,12 +51,19 @@ class ChatState {
 }
 
 class ChatNotifier extends StateNotifier<ChatState> {
-  final AiService _aiService;
+  final AiMessageService _aiService;
+  final bool persistHistory;
   CancelToken? _cancelToken;
-  String _streamBuffer = '';
+  _ChatGeneration? _activeGeneration;
+  int _generationRequest = 0;
+  bool _disposed = false;
 
-  ChatNotifier(this._aiService) : super(ChatState()) {
-    unawaited(_loadSessions());
+  ChatNotifier(
+    this._aiService, {
+    bool loadHistory = true,
+    this.persistHistory = true,
+  }) : super(ChatState()) {
+    if (loadHistory) unawaited(_loadSessions());
   }
 
   String get _storageDir {
@@ -130,6 +141,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
           await _deleteHistoryFile(file, action: 'Retention cleanup');
         }
       }
+      if (_disposed) return;
       state = state.copyWith(sessions: retained);
     } catch (error) {
       await LogCenterService().logError(
@@ -139,6 +151,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   Future<bool> _saveSession(ChatSession session) async {
+    if (!persistHistory) return true;
     try {
       final dir = Directory(_storageDir);
       if (!dir.existsSync()) dir.createSync(recursive: true);
@@ -180,6 +193,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void createNewSession() {
+    _cancelActiveGeneration();
     final session = ChatSession(title: trCurrent('ai_new_chat'));
     final sessions = [session, ...state.sessions];
     state = state.copyWith(
@@ -190,10 +204,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   void selectSession(String sessionId) {
+    if (state.activeSessionId != sessionId) {
+      _cancelActiveGeneration();
+    }
     state = state.copyWith(activeSessionId: sessionId);
   }
 
   void deleteSession(String sessionId) {
+    final deletingActiveGeneration = _activeGeneration?.sessionId == sessionId;
+    if (deletingActiveGeneration) {
+      _cancelActiveGeneration(save: false);
+    }
     final sessions = state.sessions.where((s) => s.id != sessionId).toList();
     final newActiveId = state.activeSessionId == sessionId
         ? (sessions.isNotEmpty ? sessions.first.id : null)
@@ -241,9 +262,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final withAssistant = [...updatedSession.messages, assistantMessage];
     _updateSession(updatedSession.copyWith(messages: withAssistant));
 
+    final cancelToken = CancelToken();
+    final generation = _ChatGeneration(
+      id: ++_generationRequest,
+      sessionId: updatedSession.id,
+      messageId: assistantMessage.id,
+      cancelToken: cancelToken,
+    );
+    _activeGeneration = generation;
+    _cancelToken = cancelToken;
     state = state.copyWith(isGenerating: true);
-    _streamBuffer = '';
-    _cancelToken = CancelToken();
 
     final apiMessages = [
       {
@@ -253,40 +281,67 @@ class ChatNotifier extends StateNotifier<ChatState> {
       ...updatedMessages.map((m) => {'role': m.apiRole, 'content': m.content}),
     ];
 
-    await _aiService.sendMessage(
-      messages: apiMessages,
-      cancelToken: _cancelToken,
-      searchMode: state.searchMode,
-      onChunk: (chunk) {
-        _streamBuffer += chunk;
-        _updateLastMessage(_streamBuffer, isStreaming: true);
-      },
-      onSources: (sources) {
-        final sourceMaps = sources
-            .map((s) => {'title': s.title, 'url': s.url})
-            .toList();
-        _updateLastMessageSources(sourceMaps);
-      },
-      onComplete: () {
-        _updateLastMessage(_streamBuffer, isStreaming: false);
-        state = state.copyWith(isGenerating: false);
-        _saveCurrentSession();
-      },
-      onError: (error) {
-        _updateLastMessage(
-          '${trCurrent('creator_error')}: $error',
-          isStreaming: false,
-        );
-        state = state.copyWith(isGenerating: false);
-        _saveCurrentSession();
-      },
-    );
+    try {
+      await _aiService.sendMessage(
+        messages: apiMessages,
+        cancelToken: cancelToken,
+        searchMode: state.searchMode,
+        onChunk: (chunk) {
+          if (!_isCurrentGeneration(generation)) return;
+          generation.buffer += chunk;
+          _updateMessage(
+            sessionId: generation.sessionId,
+            messageId: generation.messageId,
+            content: generation.buffer,
+            isStreaming: true,
+          );
+        },
+        onSources: (sources) {
+          if (!_isCurrentGeneration(generation)) return;
+          final sourceMaps = sources
+              .map((source) => {'title': source.title, 'url': source.url})
+              .toList();
+          _updateMessage(
+            sessionId: generation.sessionId,
+            messageId: generation.messageId,
+            sources: sourceMaps,
+          );
+        },
+        onComplete: () {
+          if (!_isCurrentGeneration(generation)) return;
+          _updateMessage(
+            sessionId: generation.sessionId,
+            messageId: generation.messageId,
+            content: generation.buffer,
+            isStreaming: false,
+          );
+          _finishGeneration(generation);
+        },
+        onError: (error) {
+          if (!_isCurrentGeneration(generation)) return;
+          _updateMessage(
+            sessionId: generation.sessionId,
+            messageId: generation.messageId,
+            content: '${trCurrent('creator_error')}: $error',
+            isStreaming: false,
+          );
+          _finishGeneration(generation);
+        },
+      );
+    } catch (error) {
+      if (!_isCurrentGeneration(generation)) return;
+      _updateMessage(
+        sessionId: generation.sessionId,
+        messageId: generation.messageId,
+        content: '${trCurrent('creator_error')}: $error',
+        isStreaming: false,
+      );
+      _finishGeneration(generation);
+    }
   }
 
   void stopGeneration() {
-    _cancelToken?.cancel();
-    state = state.copyWith(isGenerating: false);
-    _saveCurrentSession();
+    _cancelActiveGeneration();
   }
 
   void _updateSession(ChatSession session) {
@@ -296,51 +351,114 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(sessions: sessions);
   }
 
-  void _updateLastMessage(String content, {required bool isStreaming}) {
-    final session = state.activeSession;
-    if (session == null || session.messages.isEmpty) return;
+  bool _isCurrentGeneration(_ChatGeneration generation) {
+    return !_disposed &&
+        identical(_activeGeneration, generation) &&
+        generation.id == _generationRequest &&
+        state.isGenerating &&
+        state.activeSessionId == generation.sessionId;
+  }
 
-    final lastMsg = session.messages.last;
-    final updated = lastMsg.copyWith(
+  void _finishGeneration(_ChatGeneration generation) {
+    if (!identical(_activeGeneration, generation) || _disposed) return;
+    _activeGeneration = null;
+    if (identical(_cancelToken, generation.cancelToken)) {
+      _cancelToken = null;
+    }
+    state = state.copyWith(isGenerating: false);
+    _saveSessionById(generation.sessionId);
+  }
+
+  void _cancelActiveGeneration({bool save = true}) {
+    final generation = _activeGeneration;
+    _generationRequest++;
+    _activeGeneration = null;
+    _cancelToken = null;
+    generation?.cancelToken.cancel();
+
+    if (generation != null && !_disposed) {
+      _updateMessage(
+        sessionId: generation.sessionId,
+        messageId: generation.messageId,
+        content: generation.buffer,
+        isStreaming: false,
+      );
+    }
+    if (!_disposed && state.isGenerating) {
+      state = state.copyWith(isGenerating: false);
+    }
+    if (generation != null && save && !_disposed) {
+      _saveSessionById(generation.sessionId);
+    }
+  }
+
+  void _updateMessage({
+    required String sessionId,
+    required String messageId,
+    String? content,
+    bool? isStreaming,
+    List<Map<String, String>>? sources,
+  }) {
+    final sessionIndex = state.sessions.indexWhere(
+      (session) => session.id == sessionId,
+    );
+    if (sessionIndex < 0) return;
+    final session = state.sessions[sessionIndex];
+    final messageIndex = session.messages.indexWhere(
+      (message) => message.id == messageId,
+    );
+    if (messageIndex < 0) return;
+
+    final messages = [...session.messages];
+    messages[messageIndex] = messages[messageIndex].copyWith(
       content: content,
       isStreaming: isStreaming,
+      sources: sources,
     );
-    final messages = [
-      ...session.messages.sublist(0, session.messages.length - 1),
-      updated,
-    ];
     _updateSession(
       session.copyWith(messages: messages, updatedAt: DateTime.now()),
     );
   }
 
-  void _updateLastMessageSources(List<Map<String, String>> sources) {
-    final session = state.activeSession;
-    if (session == null || session.messages.isEmpty) return;
-
-    final lastMsg = session.messages.last;
-    final updated = lastMsg.copyWith(sources: sources);
-    final messages = [
-      ...session.messages.sublist(0, session.messages.length - 1),
-      updated,
-    ];
-    _updateSession(
-      session.copyWith(messages: messages, updatedAt: DateTime.now()),
-    );
-  }
-
-  void _saveCurrentSession() {
-    final session = state.activeSession;
+  void _saveSessionById(String sessionId) {
+    final session = state.sessions
+        .where((candidate) => candidate.id == sessionId)
+        .firstOrNull;
     if (session != null) unawaited(_saveSession(session));
   }
 
   void clearActiveSession() {
     final session = state.activeSession;
     if (session == null) return;
+    if (_activeGeneration?.sessionId == session.id) {
+      _cancelActiveGeneration(save: false);
+    }
     final cleared = session.copyWith(messages: [], updatedAt: DateTime.now());
     _updateSession(cleared);
     unawaited(_saveSession(cleared));
   }
+
+  @override
+  void dispose() {
+    _cancelActiveGeneration(save: false);
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+class _ChatGeneration {
+  final int id;
+  final String sessionId;
+  final String messageId;
+  final CancelToken cancelToken;
+  String buffer = '';
+
+  _ChatGeneration({
+    required this.id,
+    required this.sessionId,
+    required this.messageId,
+    required this.cancelToken,
+  });
 }
 
 final aiServiceProvider = Provider<AiService>((ref) => AiService());

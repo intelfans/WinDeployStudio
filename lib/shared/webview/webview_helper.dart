@@ -25,6 +25,7 @@ class WebviewHelper {
     BuildContext context,
     String url, {
     String? title,
+    String? expectedSha256,
   }) async {
     if (!context.mounted) return;
 
@@ -34,7 +35,11 @@ class WebviewHelper {
     if (available) {
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
-          builder: (_) => InAppWebview(url: url, title: title),
+          builder: (_) => InAppWebview(
+            url: url,
+            title: title,
+            expectedSha256: expectedSha256,
+          ),
         ),
       );
     } else {

@@ -23,7 +23,7 @@ String resolveCreatorProgressMessage({
   final localizedTemplate = translate(messageKey);
   final usesErrorPlaceholder = localizedTemplate.contains('{error}');
   final resolvedError = diagnostic?.isNotEmpty == true
-      ? diagnostic!
+      ? _resolveCreatorDiagnostic(diagnostic!, translate)
       : translate('creator_error');
   var resolved = usesErrorPlaceholder
       ? localizedTemplate.replaceAll('{error}', resolvedError)
@@ -45,4 +45,13 @@ String resolveCreatorProgressMessage({
     resolved = '$resolved\n\n${translate('logs_title')}: $logPath';
   }
   return resolved;
+}
+
+String _resolveCreatorDiagnostic(
+  String diagnostic,
+  String Function(String key) translate,
+) {
+  const prefix = 'i18n:';
+  if (!diagnostic.startsWith(prefix)) return diagnostic;
+  return translate(diagnostic.substring(prefix.length));
 }

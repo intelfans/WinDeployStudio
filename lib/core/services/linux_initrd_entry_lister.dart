@@ -64,11 +64,10 @@ class LinuxInitrdEntryListerService implements LinuxInitrdEntryLister {
     Process? process;
     var processExited = false;
     try {
-      final activeProcess = await Process.start(
-        tar,
-        ['-tf', initrd.path],
-        runInShell: false,
-      );
+      final activeProcess = await Process.start(tar, [
+        '-tf',
+        initrd.path,
+      ], runInShell: false);
       process = activeProcess;
       var overflow = false;
       void stopForOverflow() {
@@ -117,7 +116,8 @@ class LinuxInitrdEntryListerService implements LinuxInitrdEntryLister {
       }
 
       final entries = <String>{};
-      for (final rawLine in utf8.decode(output, allowMalformed: true).split('\n')) {
+      for (final rawLine
+          in utf8.decode(output, allowMalformed: true).split('\n')) {
         final normalized = _normalizeEntry(rawLine);
         if (normalized == null) continue;
         entries.add(normalized);

@@ -554,10 +554,7 @@ class DeploymentSection extends StatelessWidget {
               ),
               boxShadow: tokens.surfaceShadow,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: content,
-            ),
+            child: Padding(padding: const EdgeInsets.all(20), child: content),
           );
 
     return IgnorePointer(

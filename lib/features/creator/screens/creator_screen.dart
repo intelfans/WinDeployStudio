@@ -6,6 +6,7 @@ import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/known_iso_verification_service.dart';
+import '../../../core/services/linux_media_preflight.dart';
 import '../../../core/services/bootable_usb_service.dart';
 import '../../../shared/widgets/known_iso_verification_panel.dart';
 import '../../deployment/models/deployment_plan.dart';
@@ -23,6 +24,7 @@ class CreatorScreen extends ConsumerStatefulWidget {
 }
 
 class _CreatorScreenState extends ConsumerState<CreatorScreen> {
+  late final IsoParseService _isoParseService;
   int _currentStep = 0;
   _CreatorPlatform _platform = _CreatorPlatform.windows;
 
@@ -54,13 +56,18 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   int _parsePercent = 0;
   String? _isoSelectionErrorKey;
   KnownIsoVerification? _knownIsoVerification;
+  LinuxIsoHybridInspection? _linuxIsoInspection;
   int _knownIsoVerificationRequest = 0;
   Locale? _knownIsoVerificationLocale;
   int _isoSelectionRequest = 0;
+  LinuxIsoHybridInspectionCancellationToken? _linuxInspectionCancellation;
 
   @override
   void initState() {
     super.initState();
+    // Cache the provider instance while the element is mounted. Riverpod
+    // cannot be read from dispose(), after the element has been unmounted.
+    _isoParseService = ref.read(isoParseServiceProvider);
     _detectDisks();
   }
 
@@ -74,6 +81,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     final iso = _selectedIso;
     if (iso == null) {
       _knownIsoVerification = null;
+      _linuxIsoInspection = null;
       return;
     }
     final request = ++_knownIsoVerificationRequest;
@@ -83,6 +91,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   @override
   void dispose() {
+    _cancelLinuxInspection();
+    unawaited(_isoParseService.cancel());
     _volumeLabelController.dispose();
     super.dispose();
   }
@@ -91,7 +101,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   void _setPlatform(_CreatorPlatform platform) {
     if (_platform == platform || _creationRunning) return;
-    ref.read(isoParseServiceProvider).cancel();
+    _cancelLinuxInspection();
+    unawaited(ref.read(isoParseServiceProvider).cancel());
     setState(() {
       _platform = platform;
       _currentStep = 0;
@@ -156,6 +167,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
       if (!mounted) return;
 
+      _cancelLinuxInspection();
       final selectedLinuxMode = _isLinuxMode;
       final selectionRequest = ++_isoSelectionRequest;
       activeSelectionRequest = selectionRequest;
@@ -166,6 +178,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _parseStepText = tr(context, 'creator_parsing');
         _parsePercent = 0;
         _isoSelectionErrorKey = null;
+        _selectedIso = null;
+        _linuxIsoInspection = null;
         _knownIsoVerification = null;
       });
       final selectedLocale = Localizations.localeOf(context);
@@ -215,7 +229,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   selectionRequest,
                   selectedLinuxMode,
                 )) {
-                  isoService.cancel();
+                  unawaited(isoService.cancel());
                 }
                 return null;
               },
@@ -228,10 +242,6 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         return;
       }
 
-      setState(() {
-        _isParsing = false;
-      });
-
       if (metadata == null) {
         _showIsoSelectionError('creator_parse_error');
         return;
@@ -242,6 +252,45 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           _showIsoSelectionError('creator_windows_iso_in_linux_mode');
           return;
         }
+        final inspectionCancellation =
+            LinuxIsoHybridInspectionCancellationToken();
+        _linuxInspectionCancellation = inspectionCancellation;
+        setState(() {
+          // Keep the existing cancellable progress surface visible while the
+          // Linux ISOHybrid structure is inspected. This inspection only reads
+          // bounded portions of the image, but may still wait on slow media.
+          _parseStepText = tr(context, 'creator_parsing');
+          _parsePercent = 100;
+        });
+        final linuxInspection =
+            await LinuxIsoHybridInspector.inspect(
+              path,
+              cancellationToken: inspectionCancellation,
+            ).timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                inspectionCancellation.cancel();
+                return const LinuxIsoHybridInspection.failure(
+                  'ISOHybrid structure inspection timed out.',
+                );
+              },
+            );
+        if (identical(_linuxInspectionCancellation, inspectionCancellation)) {
+          _linuxInspectionCancellation = null;
+        }
+        if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
+          return;
+        }
+        setState(() => _isParsing = false);
+        if (linuxInspection.wasCancelled) return;
+        if (!linuxInspection.isValid) {
+          debugPrint(
+            'Linux ISOHybrid inspection rejected $path: '
+            '${linuxInspection.error}',
+          );
+          _showIsoSelectionError('linux_not_isohybrid');
+          return;
+        }
         final linuxMetadata = IsoMetadata(
           filePath: metadata.filePath,
           fileName: metadata.fileName,
@@ -250,6 +299,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         );
         setState(() {
           _selectedIso = linuxMetadata;
+          _linuxIsoInspection = linuxInspection;
           _currentStep = 1;
           _isoSelectionErrorKey = null;
         });
@@ -270,6 +320,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         return;
       }
 
+      setState(() => _isParsing = false);
+
       if (!metadata.isValidWindowsIso) {
         _showIsoSelectionError('creator_invalid_windows_iso');
         return;
@@ -277,6 +329,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
       setState(() {
         _selectedIso = metadata;
+        _linuxIsoInspection = null;
         _currentStep = 1;
         _isoSelectionErrorKey = null;
       });
@@ -336,10 +389,17 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   void _cancelParsing() {
     _isoSelectionRequest++;
-    ref.read(isoParseServiceProvider).cancel();
+    _cancelLinuxInspection();
+    unawaited(ref.read(isoParseServiceProvider).cancel());
     if (mounted) {
       setState(() => _isParsing = false);
     }
+  }
+
+  void _cancelLinuxInspection() {
+    final cancellation = _linuxInspectionCancellation;
+    _linuxInspectionCancellation = null;
+    cancellation?.cancel();
   }
 
   Future<void> _checkDiskSafety(DiskInfo disk) async {
@@ -763,6 +823,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 const Divider(),
                 const SizedBox(height: 12),
                 _IsoInfoCard(iso: _selectedIso!),
+                if (_isLinuxMode && _linuxIsoInspection != null) ...[
+                  const SizedBox(height: 12),
+                  _LinuxIsoHybridCapabilityPanel(
+                    inspection: _linuxIsoInspection!,
+                  ),
+                ],
                 if (_knownIsoVerification != null) ...[
                   const SizedBox(height: 12),
                   KnownIsoVerificationPanel(
@@ -792,6 +858,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       children: [
         if (_selectedIso != null) ...[
           _IsoInfoCard(iso: _selectedIso!),
+          if (_isLinuxMode && _linuxIsoInspection != null) ...[
+            const SizedBox(height: 12),
+            _LinuxIsoHybridCapabilityPanel(inspection: _linuxIsoInspection!),
+          ],
           if (_knownIsoVerification != null) ...[
             const SizedBox(height: 12),
             KnownIsoVerificationPanel(
@@ -956,6 +1026,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   KnownIsoVerificationPanel(
                     verification: _knownIsoVerification,
                     iso: _selectedIso,
+                  ),
+                ],
+                if (_isLinuxMode && _linuxIsoInspection != null) ...[
+                  const SizedBox(height: 12),
+                  _LinuxIsoHybridCapabilityPanel(
+                    inspection: _linuxIsoInspection!,
                   ),
                 ],
                 const Divider(),
@@ -1345,6 +1421,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   setState(() {
                     _currentStep = 0;
                     _selectedIso = null;
+                    _linuxIsoInspection = null;
                     _selectedDisk = null;
                     _safetyResult = null;
                     _createProgress = null;
@@ -1436,6 +1513,125 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 }
 
 // --- Sub-widgets ---
+
+class _LinuxIsoHybridCapabilityPanel extends StatelessWidget {
+  final LinuxIsoHybridInspection inspection;
+
+  const _LinuxIsoHybridCapabilityPanel({required this.inspection});
+
+  String _state(BuildContext context, bool available) => tr(
+    context,
+    available ? 'linux_media_available' : 'linux_media_not_advertised',
+  );
+
+  String _architectures(BuildContext context) {
+    if (!inspection.hasUefiBoot) {
+      return tr(context, 'linux_media_not_advertised');
+    }
+    if (!inspection.hasKnownEfiArchitecture) {
+      return tr(context, 'linux_media_arch_unknown');
+    }
+    return inspection.efiArchitectures
+        .map(
+          (architecture) => switch (architecture) {
+            LinuxEfiArchitecture.ia32 => 'IA32',
+            LinuxEfiArchitecture.x64 => 'x64',
+            LinuxEfiArchitecture.arm32 => 'ARM32',
+            LinuxEfiArchitecture.arm64 => 'ARM64',
+            LinuxEfiArchitecture.riscv64 => 'RISC-V 64',
+            LinuxEfiArchitecture.loongarch64 => 'LoongArch64',
+          },
+        )
+        .join(', ');
+  }
+
+  String _withValue(BuildContext context, String key, String value) =>
+      tr(context, key).replaceAll('{value}', value);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Semantics(
+      container: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.secondaryContainer.withValues(alpha: 0.52),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.secondary.withValues(alpha: 0.28)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.verified_user_outlined,
+                    size: 18,
+                    color: colors.onSecondaryContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      tr(context, 'linux_media_capabilities_title'),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: colors.onSecondaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _withValue(
+                  context,
+                  'linux_media_legacy_boot',
+                  _state(context, inspection.hasLegacyBiosBoot),
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSecondaryContainer,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _withValue(
+                  context,
+                  'linux_media_uefi_boot',
+                  _state(context, inspection.hasUefiBoot),
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSecondaryContainer,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _withValue(
+                  context,
+                  'linux_media_efi_architectures',
+                  _architectures(context),
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSecondaryContainer,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                tr(context, 'linux_media_raw_write_notice'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSecondaryContainer,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _IsoSelectionError extends StatelessWidget {
   final String message;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -344,6 +345,13 @@ class UpdateService {
   static const _prefKeyChannel = 'update_channel';
   static const _prefKeyCachedInfo = 'update_cached_info';
 
+  /// Automatic installer downloads are allowed only when GitHub's release
+  /// API supplies a cryptographically verifiable digest for the exact asset.
+  static const automaticUpdateTrustRequiredErrorKey =
+      'update_download_trust_required';
+  static const automaticUpdateIntegrityFailedErrorKey =
+      'update_download_integrity_failed';
+
   static UpdateService? _instance;
   UpdateService._();
   factory UpdateService() => _instance ??= UpdateService._();
@@ -351,8 +359,10 @@ class UpdateService {
   String? _lastTrustedDownloadPath;
   String? _lastPublishedDownloadHash;
   int? _lastPublishedDownloadSize;
+  String? _lastDownloadErrorKey;
 
   String get releasePageUrl => _releasePageUrl;
+  String? get lastDownloadErrorKey => _lastDownloadErrorKey;
 
   Future<bool> getAutoCheckEnabled() async {
     final prefs = await SharedPreferences.getInstance();
@@ -680,13 +690,9 @@ class UpdateService {
       if (!_releaseAllowedForChannel(release, channel)) return false;
       try {
         final asset = UpdateInfo.fromJson(release).bestAsset;
-        // Older GitHub releases do not expose the newer `digest` field. They
-        // are still valid releases; download verification falls back to the
-        // published size and Authenticode signature when no digest is present.
-        // The Atom fallback has no asset-size metadata; the stable filename and
-        // URL are sufficient to select it. The streaming downloader validates
-        // the response length when the size is known and records the actual
-        // length when it is not.
+        // A release may still be shown when its metadata lacks a digest. The
+        // automatic installer path performs a stricter GitHub digest check
+        // immediately before it downloads or launches anything.
         return asset != null && asset.name.isNotEmpty && asset.url.isNotEmpty;
       } catch (_) {
         return false;
@@ -791,13 +797,19 @@ class UpdateService {
     _lastTrustedDownloadPath = null;
     _lastPublishedDownloadHash = null;
     _lastPublishedDownloadSize = null;
+    _lastDownloadErrorKey = null;
 
-    final freshRelease = await _fetchReleaseByTag(info.tagName);
+    // Do not use Atom or mirror metadata for automatic executable updates:
+    // neither source carries the GitHub asset digest needed to bind the file
+    // to the published release. They remain valid for update discovery and
+    // opening the release page in a browser.
+    final freshRelease = await _fetchGithubReleaseByTag(info.tagName);
     final channel = await getChannel();
     if (freshRelease == null ||
         !_releaseAllowedForChannel(freshRelease, channel)) {
-      LogCenterService().logUpdate(
-        '[Download] State=Failed\nReason=Release metadata unavailable',
+      _recordDownloadFailure(
+        automaticUpdateTrustRequiredErrorKey,
+        'Trusted GitHub release metadata unavailable',
       );
       return null;
     }
@@ -805,21 +817,24 @@ class UpdateService {
     final freshInfo = UpdateInfo.fromJson(freshRelease);
     final asset = freshInfo.bestAsset;
     if (asset == null) {
-      LogCenterService().logUpdate(
-        '[Download] State=Failed\nReason=No asset found',
+      _recordDownloadFailure(
+        automaticUpdateTrustRequiredErrorKey,
+        'No GitHub installer asset found',
       );
       return null;
     }
 
-    final publishedHash = asset.sha256;
-    if (asset.name.trim().isEmpty || asset.url.trim().isEmpty) {
-      LogCenterService().logUpdate(
-        '[Download] State=Failed\nReason=Release asset URL unavailable',
+    final publishedHash = githubReleaseDigestForAutomaticInstall(
+      asset,
+      tagName: freshInfo.tagName,
+    );
+    if (publishedHash == null) {
+      _recordDownloadFailure(
+        automaticUpdateTrustRequiredErrorKey,
+        'GitHub installer asset has no trusted SHA-256 digest',
       );
       return null;
     }
-    // The public Atom feed omits asset sizes. A zero size is valid metadata;
-    // _doDownload streams the response and verifies its final byte count.
 
     final downloadUrl = source == UpdateDownloadSource.sourceForge
         ? await resolveSourceForgeDownloadUrl(freshInfo)
@@ -854,7 +869,9 @@ class UpdateService {
         await Future.delayed(Duration(seconds: attempt * 2));
       }
 
-      final result = await _doDownload(downloadUrl, asset, (
+      // The mirror only supplies bytes. The SHA-256 used during streaming is
+      // the digest accepted from the fresh GitHub Release record above.
+      final result = await _doDownload(downloadUrl, asset, publishedHash, (
         progress,
         speed,
         remaining,
@@ -870,7 +887,7 @@ class UpdateService {
         _lastPublishedDownloadSize = await File(result).length();
         log.logUpdate(
           '[Download] State=Stable\nPath=$result\n'
-          'Trust=${publishedHash == null ? 'InstallerSignatureAndSize' : 'GitHubReleaseDigest'}\n'
+          'Trust=GitHubReleaseDigest\n'
           'Source=${source.name}',
         );
         return result;
@@ -886,7 +903,7 @@ class UpdateService {
     return null;
   }
 
-  Future<Map<String, dynamic>?> _fetchReleaseByTag(String tagName) async {
+  Future<Map<String, dynamic>?> _fetchGithubReleaseByTag(String tagName) async {
     try {
       final response = await http
           .get(
@@ -908,50 +925,68 @@ class UpdateService {
       }
     } catch (error) {
       LogCenterService().logUpdate(
-        '[Download] Release API unavailable; trying Releases feed\nReason=$error',
-      );
-    }
-
-    // The per-tag REST endpoint is subject to the same anonymous rate limit
-    // as the list endpoint. The public Atom feed does not carry asset sizes,
-    // but it does provide the stable tag and installer filename, which is
-    // enough for a streamed download and post-download length verification.
-    final atomFallback = await _fetchAtomReleaseByTag(tagName);
-    if (atomFallback != null) return atomFallback;
-
-    // Keep both download buttons usable when GitHub's public API and Atom
-    // feed are unavailable. SourceForge stores the same installer filename
-    // under the version folder and publishes its size through RSS.
-    return _fetchSourceForgeReleaseByTag(tagName);
-  }
-
-  Future<Map<String, dynamic>?> _fetchAtomReleaseByTag(String tagName) async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(_atomUrl),
-            headers: {
-              'Accept': 'application/atom+xml, application/xml, text/xml',
-              'User-Agent': 'WinDeployStudio/${AppConstants.appVersion}',
-            },
-          )
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return null;
-      final releases = parseAtomReleaseMetadata(response.body);
-      for (final release in releases) {
-        if (release['tag_name'] == tagName) return release;
-      }
-    } catch (error) {
-      LogCenterService().logUpdate(
-        '[Download] Releases feed unavailable\nReason=$error',
+        '[Download] Trusted GitHub release metadata unavailable\nReason=$error',
       );
     }
     return null;
   }
 
+  /// Returns the published SHA-256 only for the exact installer asset exposed
+  /// by this project's GitHub Release API. A mirror is allowed to carry that
+  /// file, but it can never provide the trust material itself.
+  @visibleForTesting
+  static String? githubReleaseDigestForAutomaticInstall(
+    UpdateAsset asset, {
+    required String tagName,
+  }) {
+    final digest = asset.sha256;
+    if (digest == null ||
+        !asset.name.toLowerCase().endsWith('.exe') ||
+        tagName.trim().isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(asset.url);
+    final segments = uri?.pathSegments;
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        (uri.hasPort && uri.port != 443) ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.fragment.isNotEmpty ||
+        uri.host.toLowerCase() != 'github.com' ||
+        segments == null ||
+        segments.length != 6 ||
+        segments[0].toLowerCase() != _repoOwner ||
+        segments[1].toLowerCase() != _repoName.toLowerCase() ||
+        segments[2] != 'releases' ||
+        segments[3] != 'download' ||
+        segments[4] != tagName ||
+        segments[5] != asset.name) {
+      return null;
+    }
+    return digest;
+  }
+
+  /// Both values must be complete SHA-256 strings. Prefix matches and
+  /// malformed values are not sufficient to launch an installer.
+  @visibleForTesting
+  static bool matchesTrustedSha256(String actualHash, String publishedHash) {
+    final hex = RegExp(r'^[0-9a-f]{64}$', caseSensitive: false);
+    return hex.hasMatch(actualHash) &&
+        hex.hasMatch(publishedHash) &&
+        actualHash.toUpperCase() == publishedHash.toUpperCase();
+  }
+
+  void _recordDownloadFailure(String errorKey, String reason) {
+    _lastDownloadErrorKey = errorKey;
+    LogCenterService().logUpdate('[Download] State=Failed\nReason=$reason');
+  }
+
   Future<String?> _doDownload(
     String url,
     UpdateAsset asset,
+    String trustedGitHubSha256,
     void Function(
       double progress,
       String speed,
@@ -983,10 +1018,13 @@ class UpdateService {
         return null;
       }
 
-      final expectedHash = asset.sha256;
       final responseLength = response.contentLength;
       if (asset.sizeBytes > 0 &&
           (responseLength != null && responseLength != asset.sizeBytes)) {
+        _recordDownloadFailure(
+          automaticUpdateIntegrityFailedErrorKey,
+          'Response length does not match GitHub release metadata',
+        );
         return null;
       }
 
@@ -1009,6 +1047,10 @@ class UpdateService {
         }
 
         if (totalBytes > 0 && downloadedBytes + chunk.length > totalBytes) {
+          _recordDownloadFailure(
+            automaticUpdateIntegrityFailedErrorKey,
+            'Response exceeds the size published by GitHub Release',
+          );
           return null;
         }
         sink.add(chunk);
@@ -1066,17 +1108,20 @@ class UpdateService {
       if (finalLength <= 0 ||
           (asset.sizeBytes > 0 && finalLength != asset.sizeBytes) ||
           (responseLength != null && finalLength != responseLength)) {
+        _recordDownloadFailure(
+          automaticUpdateIntegrityFailedErrorKey,
+          'Downloaded file length does not match GitHub release metadata',
+        );
         return null;
       }
 
-      if (expectedHash != null) {
-        final actualHash = await _sha256File(file);
-        if (actualHash != expectedHash) {
-          LogCenterService().logUpdate(
-            '[Download] State=Failed\nReason=Published digest mismatch',
-          );
-          return null;
-        }
+      final actualHash = await _sha256File(file);
+      if (!matchesTrustedSha256(actualHash, trustedGitHubSha256)) {
+        _recordDownloadFailure(
+          automaticUpdateIntegrityFailedErrorKey,
+          'Downloaded file does not match the GitHub Release SHA-256 digest',
+        );
+        return null;
       }
 
       completed = true;
@@ -1159,10 +1204,10 @@ class UpdateService {
 
       if (isExe) {
         if (!_isLastTrustedDownload(file.absolute.path) ||
+            _lastPublishedDownloadHash == null ||
             _lastPublishedDownloadSize == null ||
             await file.length() != _lastPublishedDownloadSize ||
-            (_lastPublishedDownloadHash != null &&
-                await _sha256File(file) != _lastPublishedDownloadHash)) {
+            await _sha256File(file) != _lastPublishedDownloadHash) {
           log.logUpdate(
             '[Update] InstallFail: Published digest verification failed',
           );

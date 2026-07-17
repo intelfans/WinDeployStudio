@@ -49,7 +49,7 @@ add_definitions(-DUNICODE -D_UNICODE)
 # of modifying this function.
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
-  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
+  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd4100)
   target_compile_options(${TARGET} PRIVATE /EHsc)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS")
@@ -67,6 +67,34 @@ add_subdirectory("runner")
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+
+# The webview_windows plugin publishes its native dependency metadata only as
+# MSBuild .targets files. Mirror the needed include and loader settings when a
+# Ninja generator is used, so non-MSBuild Windows builds remain functional.
+if(CMAKE_GENERATOR MATCHES "Ninja" AND TARGET webview_windows_plugin)
+  set(WDS_WEBVIEW2_PACKAGE_DIR
+      "${CMAKE_BINARY_DIR}/packages/Microsoft.Web.WebView2")
+  set(WDS_WIL_PACKAGE_DIR
+      "${CMAKE_BINARY_DIR}/packages/Microsoft.Windows.ImplementationLibrary")
+  if(TARGET webview_windows_DEPENDENCIES_DOWNLOAD)
+    # Packages are supplied before configuring Ninja. The plugin's legacy
+    # ALL target invokes NuGet again and is neither needed nor usable here.
+    set_property(TARGET webview_windows_DEPENDENCIES_DOWNLOAD
+                 PROPERTY EXCLUDE_FROM_ALL TRUE)
+  endif()
+  get_target_property(WDS_WEBVIEW_LINK_LIBRARIES
+                      webview_windows_plugin LINK_LIBRARIES)
+  list(FILTER WDS_WEBVIEW_LINK_LIBRARIES EXCLUDE REGEX "\\.targets$")
+  set_property(TARGET webview_windows_plugin PROPERTY LINK_LIBRARIES
+               "${WDS_WEBVIEW_LINK_LIBRARIES}")
+  target_include_directories(webview_windows_plugin PRIVATE
+    "${WDS_WEBVIEW2_PACKAGE_DIR}/build/native/include"
+    "${WDS_WIL_PACKAGE_DIR}/include"
+  )
+  target_link_libraries(webview_windows_plugin PRIVATE
+    "${WDS_WEBVIEW2_PACKAGE_DIR}/build/native/x64/WebView2Loader.dll.lib"
+  )
+endif()
 
 
 # === Installation ===
@@ -94,6 +122,14 @@ install(TARGETS wds_wim_info_helper RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}
 
 install(TARGETS wds_disk_diagnostics_helper RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
+
+if(CMAKE_GENERATOR MATCHES "Ninja" AND
+   EXISTS "${WDS_WEBVIEW2_PACKAGE_DIR}/runtimes/win-x64/native/WebView2Loader.dll")
+  install(FILES
+    "${WDS_WEBVIEW2_PACKAGE_DIR}/runtimes/win-x64/native/WebView2Loader.dll"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    COMPONENT Runtime)
+endif()
 
 set(WDS_THIRD_PARTY_NOTICE "${CMAKE_CURRENT_SOURCE_DIR}/../THIRD_PARTY_NOTICES.md")
 if(EXISTS "${WDS_THIRD_PARTY_NOTICE}")

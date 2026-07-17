@@ -8,7 +8,20 @@ enum DeploymentMode { direct, vhd, vhdx }
 
 enum VirtualDiskType { dynamic, fixed }
 
-enum WindowsGeneration { unknown, windows7, windows81, windows10, windows11 }
+enum WindowsGeneration {
+  unknown,
+  windows7,
+  windows8,
+  windows81,
+  windows10,
+  windows11,
+}
+
+/// WIM metadata distinguishes client and Server images even when their build
+/// numbers share the same Windows generation (for example Server 2022 and
+/// Windows 10).  Keep this separate from [WindowsGeneration] so To Go can
+/// apply only features that are valid for the selected product family.
+enum WindowsProductFamily { client, server }
 
 enum CompatibilitySeverity { info, warning, error }
 
@@ -51,6 +64,7 @@ class DeploymentPlan {
   final String imageBuild;
   final String imageArchitecture;
   final WindowsGeneration windowsGeneration;
+  final WindowsProductFamily windowsProductFamily;
   final DeploymentBootMode bootMode;
   final DeploymentMode deploymentMode;
   final VirtualDiskType virtualDiskType;
@@ -81,6 +95,7 @@ class DeploymentPlan {
     this.imageBuild = '',
     this.imageArchitecture = '',
     this.windowsGeneration = WindowsGeneration.unknown,
+    this.windowsProductFamily = WindowsProductFamily.client,
     this.bootMode = DeploymentBootMode.uefiGpt,
     this.deploymentMode = DeploymentMode.direct,
     this.virtualDiskType = VirtualDiskType.dynamic,
@@ -105,6 +120,8 @@ class DeploymentPlan {
   bool get isWindows => platform == DeploymentPlatform.windows;
   bool get isLinux => platform == DeploymentPlatform.linux;
   bool get isToGo => purpose == DeploymentPurpose.toGo;
+  bool get isWindowsServer =>
+      isWindows && windowsProductFamily == WindowsProductFamily.server;
   bool get usesVirtualDisk => deploymentMode != DeploymentMode.direct;
   bool get usesNtfsUefiLayout =>
       isWindows && isToGo && bootMode != DeploymentBootMode.legacyBios;
@@ -119,6 +136,7 @@ class DeploymentPlan {
     String? imageBuild,
     String? imageArchitecture,
     WindowsGeneration? windowsGeneration,
+    WindowsProductFamily? windowsProductFamily,
     DeploymentBootMode? bootMode,
     DeploymentMode? deploymentMode,
     VirtualDiskType? virtualDiskType,
@@ -149,6 +167,7 @@ class DeploymentPlan {
       imageBuild: imageBuild ?? this.imageBuild,
       imageArchitecture: imageArchitecture ?? this.imageArchitecture,
       windowsGeneration: windowsGeneration ?? this.windowsGeneration,
+      windowsProductFamily: windowsProductFamily ?? this.windowsProductFamily,
       bootMode: bootMode ?? this.bootMode,
       deploymentMode: deploymentMode ?? this.deploymentMode,
       virtualDiskType: virtualDiskType ?? this.virtualDiskType,
@@ -182,6 +201,7 @@ class DeploymentPlan {
     'imageBuild': imageBuild,
     'imageArchitecture': imageArchitecture,
     'windowsGeneration': windowsGeneration.name,
+    'windowsProductFamily': windowsProductFamily.name,
     'bootMode': bootMode.name,
     'deploymentMode': deploymentMode.name,
     'virtualDiskType': virtualDiskType.name,
@@ -232,6 +252,11 @@ class DeploymentPlan {
         'windowsGeneration',
         WindowsGeneration.unknown,
       ),
+      windowsProductFamily: enumValue(
+        WindowsProductFamily.values,
+        'windowsProductFamily',
+        WindowsProductFamily.client,
+      ),
       bootMode: enumValue(
         DeploymentBootMode.values,
         'bootMode',
@@ -278,16 +303,72 @@ class DeploymentPlan {
       if (buildNumber >= 22000) return WindowsGeneration.windows11;
       if (buildNumber >= 10240) return WindowsGeneration.windows10;
       if (buildNumber == 9600) return WindowsGeneration.windows81;
+      if (buildNumber == 9200) return WindowsGeneration.windows8;
       if (buildNumber >= 7600 && buildNumber < 9200) {
         return WindowsGeneration.windows7;
       }
     }
     final normalized = version.toLowerCase();
+    if (normalized.contains('server 2025')) return WindowsGeneration.windows11;
+    if (normalized.contains('server 2022') ||
+        normalized.contains('server 2019') ||
+        normalized.contains('server 2016')) {
+      return WindowsGeneration.windows10;
+    }
+    if (normalized.contains('server 2012 r2')) {
+      return WindowsGeneration.windows81;
+    }
+    if (normalized.contains('server 2012')) return WindowsGeneration.windows8;
+    if (normalized.contains('server 2008 r2')) {
+      return WindowsGeneration.windows7;
+    }
     if (normalized.contains('windows 11')) return WindowsGeneration.windows11;
     if (normalized.contains('windows 10')) return WindowsGeneration.windows10;
     if (normalized.contains('8.1')) return WindowsGeneration.windows81;
+    if (normalized.contains('windows 8')) return WindowsGeneration.windows8;
     if (normalized.contains('windows 7')) return WindowsGeneration.windows7;
     return WindowsGeneration.unknown;
+  }
+
+  /// Determines the Windows product family from WIM XML metadata.
+  ///
+  /// [installationType] is authoritative when it is present.  Edition and
+  /// image labels are used as deliberate fallbacks because some customized
+  /// Server media omit the installation type from their WIM metadata.
+  static WindowsProductFamily detectWindowsProductFamily({
+    String installationType = '',
+    String edition = '',
+    String name = '',
+    String description = '',
+  }) {
+    final type = installationType.trim().toLowerCase();
+    if (type.contains('server')) return WindowsProductFamily.server;
+    if (type.contains('client')) return WindowsProductFamily.client;
+
+    final editionId = edition.trim().toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+    if (editionId.startsWith('server') ||
+        const {
+          'standard',
+          'datacenter',
+          'azurestackhci',
+          'serverrdsh',
+        }.contains(editionId)) {
+      // A bare Standard or Datacenter edition id occurs on Server media. A
+      // client WIM instead reports Professional, Core, Enterprise, and so on.
+      return WindowsProductFamily.server;
+    }
+
+    final labels = '$name\n$description'.toLowerCase();
+    if (RegExp(r'(^|[^a-z])windows\s+server([^a-z]|$)').hasMatch(labels) ||
+        RegExp(
+          r'(^|[^a-z])server\s+(20\d{2}|vnext)([^a-z]|$)',
+        ).hasMatch(labels)) {
+      return WindowsProductFamily.server;
+    }
+    return WindowsProductFamily.client;
   }
 }
 
@@ -352,6 +433,7 @@ class DeploymentCompatibility {
         error('win7_x86_uefi', 'deploy_compat_win7_x86_legacy');
       }
       if (plan.deploymentMode == DeploymentMode.vhd &&
+          plan.windowsProductFamily == WindowsProductFamily.client &&
           !supportsWindows7NativeVhdEdition(
             plan.imageEdition,
             imageName: plan.imageName,
@@ -364,7 +446,20 @@ class DeploymentCompatibility {
       '-',
       '',
     );
-    if ((architecture.contains('arm64') || architecture == 'arm') &&
+    final knownArchitecture = {
+      'x86',
+      'i386',
+      'x64',
+      'amd64',
+      'arm64',
+    }.contains(architecture);
+    if (plan.isToGo && architecture.isNotEmpty && !knownArchitecture) {
+      error(
+        'unsupported_architecture',
+        'deploy_compat_unsupported_architecture',
+      );
+    }
+    if (architecture == 'arm64' &&
         plan.bootMode != DeploymentBootMode.uefiGpt) {
       error('arm_requires_uefi_gpt', 'deploy_compat_arm_requires_uefi_gpt');
     }
@@ -376,14 +471,22 @@ class DeploymentCompatibility {
 
     if (plan.wimBoot &&
         (plan.windowsGeneration != WindowsGeneration.windows81 ||
-            plan.deploymentMode != DeploymentMode.direct)) {
+            plan.deploymentMode != DeploymentMode.direct ||
+            (plan.isToGo &&
+                plan.windowsProductFamily != WindowsProductFamily.client))) {
       error('wimboot_scope', 'deploy_compat_wimboot_scope');
     }
 
     if (plan.compactOs &&
-        plan.windowsGeneration != WindowsGeneration.windows10 &&
-        plan.windowsGeneration != WindowsGeneration.windows11) {
+        (plan.windowsGeneration != WindowsGeneration.windows10 &&
+                plan.windowsGeneration != WindowsGeneration.windows11 ||
+            (plan.isToGo &&
+                plan.windowsProductFamily != WindowsProductFamily.client))) {
       error('compact_scope', 'deploy_compat_compact_scope');
+    }
+
+    if (plan.isToGo && plan.disableWinRe) {
+      error('offline_winre_unsupported', 'deploy_compat_winre_preserved');
     }
 
     if (plan.fixVhdDriveLetter && !plan.usesVirtualDisk) {
@@ -431,6 +534,9 @@ class DeploymentCompatibility {
       return const [DeploymentMode.direct];
     }
     if (plan.windowsGeneration == WindowsGeneration.windows7) {
+      if (plan.windowsProductFamily == WindowsProductFamily.server) {
+        return const [DeploymentMode.direct, DeploymentMode.vhd];
+      }
       return supportsWindows7NativeVhdEdition(
             plan.imageEdition,
             imageName: plan.imageName,
@@ -446,11 +552,15 @@ class DeploymentCompatibility {
 
   static bool supportsWimBoot(DeploymentPlan plan) =>
       plan.isWindows &&
+      plan.isToGo &&
+      plan.windowsProductFamily == WindowsProductFamily.client &&
       plan.windowsGeneration == WindowsGeneration.windows81 &&
       plan.deploymentMode == DeploymentMode.direct;
 
   static bool supportsCompactOs(DeploymentPlan plan) =>
       plan.isWindows &&
+      plan.isToGo &&
+      plan.windowsProductFamily == WindowsProductFamily.client &&
       (plan.windowsGeneration == WindowsGeneration.windows10 ||
           plan.windowsGeneration == WindowsGeneration.windows11);
 

@@ -24,6 +24,7 @@ enum WtgStep {
   partitioningDisk,
   mountingIso,
   applyingImage,
+  configuringImage,
   writingBootFiles,
   verifying,
   complete,
@@ -34,6 +35,46 @@ enum WtgBootLayout { uefiGpt, uefiMbr, legacyBios }
 
 class WtgBootContract {
   const WtgBootContract._();
+
+  /// The host's BootEx servicing policy can be newer than the selected
+  /// Windows image.  Retry only the precise situation where BCDBoot selected
+  /// the 2023-CA BootEx binaries but the offline image does not include them.
+  /// A generic BCDBoot failure must keep its original failure path.
+  @visibleForTesting
+  static bool shouldRetryWithStandardBootFiles({
+    required int exitCode,
+    required String output,
+    required bool hasStandardBootManager,
+  }) {
+    if (exitCode == 0 || !hasStandardBootManager) return false;
+    final normalized = output.toLowerCase().replaceAll('/', r'\');
+    return normalized.contains(r'\boot\efi_ex\bootmgfw_ex.efi') &&
+        (normalized.contains('bfsvc') ||
+            normalized.contains('bootex') ||
+            normalized.contains('checksum'));
+  }
+
+  /// `/offline` without `/bootex` makes current BCDBoot versions select the
+  /// standard boot files from the offline Windows image.  That avoids a
+  /// host-only BootEx policy leaking into older/minimal To Go images.
+  @visibleForTesting
+  static List<String> bcdbootArguments({
+    required String windowsPath,
+    required String bootRoot,
+    required String firmware,
+    bool forceStandardBootFiles = false,
+  }) {
+    final arguments = <String>[
+      windowsPath,
+      '/s',
+      bootRoot,
+      '/f',
+      firmware,
+      '/v',
+    ];
+    if (forceStandardBootFiles) arguments.add('/offline');
+    return arguments;
+  }
 
   static String expectedDevice({
     required String windowsDrive,
@@ -157,9 +198,78 @@ class WtgProgress {
   }
 }
 
+@visibleForTesting
+WtgProgress preserveWtgFailureProgress(
+  WtgProgress? previous,
+  WtgProgress next,
+) {
+  if (next.step != WtgStep.failed ||
+      previous == null ||
+      next.progress >= previous.progress) {
+    return next;
+  }
+  return WtgProgress(
+    step: next.step,
+    progress: previous.progress,
+    message: next.message,
+    error: next.error,
+    currentFile: next.currentFile ?? previous.currentFile,
+    writtenBytes: next.writtenBytes > 0
+        ? next.writtenBytes
+        : previous.writtenBytes,
+    totalBytes: next.totalBytes > 0 ? next.totalBytes : previous.totalBytes,
+    currentSpeedBytes: next.currentSpeedBytes > 0
+        ? next.currentSpeedBytes
+        : previous.currentSpeedBytes,
+    elapsedTime: next.elapsedTime ?? previous.elapsedTime,
+  );
+}
+
 typedef WtgProgressCallback = void Function(WtgProgress progress);
 
 final wtgServiceProvider = Provider<WtgService>(WtgService.new);
+
+/// Returns whether a failed ISO layout inspection is worth retrying for
+/// Windows To Go.  A transient Storage/volume-mount failure is distinct from
+/// a structurally invalid (for example, Linux) ISO and must not be presented
+/// as a permanent incompatibility on the first selection.
+bool shouldRetryWindowsToGoIsoPreflight(WindowsIsoLayoutInspection layout) {
+  if (layout.isValid) return false;
+  final error = (layout.error ?? '').toLowerCase();
+  return error.contains('could not be mounted') ||
+      error.contains('mounted iso root is not available') ||
+      error.contains('mount timed out');
+}
+
+/// Makes the WIM selected at deployment time the source of truth for the
+/// Windows release and product family.  The UI reads the same metadata during
+/// import, but the ISO is mounted again immediately before an irreversible
+/// operation; retaining client metadata from an earlier selection could make
+/// a Server image inherit client-only options such as CompactOS or WIMBoot.
+@visibleForTesting
+DeploymentPlan resolveWindowsToGoPlanFromWimImage({
+  required DeploymentPlan requestedPlan,
+  required WimImageInfo image,
+}) {
+  final generation = DeploymentPlan.detectWindowsGeneration(
+    build: image.build,
+    version: '${image.name} ${image.description} ${image.version}',
+  );
+  final productFamily = DeploymentPlan.detectWindowsProductFamily(
+    installationType: image.installationType,
+    edition: image.edition,
+    name: image.name,
+    description: image.description,
+  );
+  return requestedPlan.copyWith(
+    imageBuild: image.build,
+    imageName: image.name,
+    imageEdition: image.edition,
+    imageArchitecture: image.architecture,
+    windowsGeneration: generation,
+    windowsProductFamily: productFamily,
+  );
+}
 
 class _WtgFailure implements Exception {
   final String messageKey;
@@ -169,6 +279,13 @@ class _WtgFailure implements Exception {
 
   @override
   String toString() => detail;
+}
+
+class _WtgPartitionFailure implements Exception {
+  final String detail;
+  final String output;
+
+  const _WtgPartitionFailure(this.detail, {this.output = ''});
 }
 
 class _WtgImageSource {
@@ -293,6 +410,19 @@ class WtgService {
     storageLabel: storageLabel,
   );
 
+  @visibleForTesting
+  static String virtualDiskpartScriptForTesting({
+    required String filePath,
+    required int maximumMb,
+    required String type,
+    required String imageLetter,
+  }) => _buildVirtualDiskpartScript(
+    filePath: filePath,
+    maximumMb: maximumMb,
+    type: type,
+    imageLetter: imageLetter,
+  );
+
   final Ref ref;
   final List<String> _log = [];
   final List<String> _debugLogs = [];
@@ -300,6 +430,7 @@ class WtgService {
   bool _cancelled = false;
   Process? _currentProcess;
   String? _currentIsoPath;
+  WtgProgress? _lastProgress;
 
   WtgService(this.ref) {
     ref.onDispose(() {
@@ -367,7 +498,7 @@ class WtgService {
           deploymentMode: DeploymentMode.direct,
           preferredSystemLetter: _letterOnly(driveLetter),
           blockLocalDisks: true,
-          disableWinRe: true,
+          disableWinRe: false,
         );
     final diskNumber = disk.diskNumber;
     final logger = ref.read(fileLoggerServiceProvider);
@@ -382,6 +513,7 @@ class WtgService {
     _debugLogs.clear();
     _cancelled = false;
     _currentIsoPath = isoPath;
+    _lastProgress = null;
     _logLine('=== Windows To Go deployment start ===');
     _logLine('Disk=$diskNumber Plan=${jsonEncode(plan.toJson())}');
 
@@ -416,6 +548,13 @@ class WtgService {
         throw const _WtgFailure('wtg_svc_mount_failed', 'ISO mount failed.');
       }
       final source = await _inspectImage(mountPoint, plan, imageIndex);
+      if (source.plan.bootMode == DeploymentBootMode.legacyBios &&
+          !await File(p.join(mountPoint, 'boot', 'bootsect.exe')).exists()) {
+        throw const _WtgFailure(
+          'wtg_svc_boot_failed',
+          'The selected ISO does not include boot\\bootsect.exe required for Legacy BIOS.',
+        );
+      }
       _throwIfCancelled();
       _validateCapacity(disk, source);
       await _validateIsoSourceBeforeErase(isoPath, diskNumber);
@@ -472,6 +611,15 @@ class WtgService {
         );
       }
 
+      _notify(
+        onProgress,
+        const WtgProgress(
+          step: WtgStep.configuringImage,
+          message: 'wtg_svc_configuring',
+          progress: 0.72,
+        ),
+      );
+
       await _verifyDriverManifest(driverManifest);
       _throwIfCancelled();
       final configuredPlan = driverManifest.entries.isEmpty
@@ -492,7 +640,7 @@ class WtgService {
       );
       if (!configured) {
         throw const _WtgFailure(
-          'wtg_svc_apply_failed',
+          'wtg_svc_config_failed',
           'Offline Windows configuration failed verification.',
         );
       }
@@ -501,7 +649,7 @@ class WtgService {
         requested: source.plan.disableWinRe,
       )) {
         throw const _WtgFailure(
-          'wtg_svc_apply_failed',
+          'wtg_svc_winre_failed',
           'WinRE configuration failed verification.',
         );
       }
@@ -693,17 +841,18 @@ class WtgService {
       );
     }
     final image = matches.single;
-    final generation = DeploymentPlan.detectWindowsGeneration(
-      build: image.build,
-      version: '${image.name} ${image.version}',
+    final effectivePlan = resolveWindowsToGoPlanFromWimImage(
+      requestedPlan: requestedPlan,
+      image: image,
     );
-    final effectivePlan = requestedPlan.copyWith(
-      imageBuild: image.build,
-      imageName: image.name,
-      imageEdition: image.edition,
-      imageArchitecture: image.architecture,
-      windowsGeneration: generation,
-    );
+    if (requestedPlan.windowsProductFamily !=
+        effectivePlan.windowsProductFamily) {
+      _logLine(
+        'Selected WIM product family overrides requested plan: '
+        '${requestedPlan.windowsProductFamily.name} -> '
+        '${effectivePlan.windowsProductFamily.name}.',
+      );
+    }
     final compatibility = DeploymentCompatibility.evaluate(effectivePlan);
     if (!compatibility.canDeploy) {
       throw _WtgFailure(
@@ -727,25 +876,36 @@ class WtgService {
         'The virtual disk is too small for the selected Windows image.',
       );
     }
-    final sourceArchitecture = switch (image.architecture.toLowerCase()) {
+    final sourceArchitecture = switch (image.architecture
+        .trim()
+        .toLowerCase()) {
       'x64' || 'amd64' => 'amd64',
       'arm64' => 'arm64',
-      _ => 'x86',
+      'x86' || 'i386' => 'x86',
+      _ => null,
     };
+    if (sourceArchitecture == null) {
+      throw _WtgFailure(
+        'deploy_compat_unsupported_architecture',
+        'The image architecture "${image.architecture}" is not supported for Windows To Go.',
+      );
+    }
     final sxs = p.join(mountPoint, 'sources', 'sxs');
     final netFx3Source =
-        effectivePlan.enableNetFx3 && await Directory(sxs).exists()
+        effectivePlan.enableNetFx3 && await _hasNetFx3Payload(Directory(sxs))
         ? sxs
         : null;
     if (effectivePlan.enableNetFx3 && netFx3Source == null) {
       throw const _WtgFailure(
         'wtg_svc_apply_failed',
-        'The selected ISO does not contain a sources\\sxs payload for .NET Framework 3.5.',
+        'The selected ISO does not contain a matching NetFx3 package in sources\\sxs.',
       );
     }
     _logLine(
       'Selected image: index=${image.index} name=${image.name} '
-      'build=${image.build} arch=${image.architecture}',
+      'build=${image.build} arch=${image.architecture} '
+      'family=${effectivePlan.windowsProductFamily.name} '
+      'installationType=${image.installationType}',
     );
     return _WtgImageSource(
       imagePath: imagePath,
@@ -754,6 +914,27 @@ class WtgService {
       architecture: sourceArchitecture,
       netFx3Source: netFx3Source,
     );
+  }
+
+  /// The selected ISO is the only supported NetFx3 source.  Checking for a
+  /// real NetFx3 CAB here prevents a destructive deployment from reaching
+  /// DISM with merely an empty or unrelated `sources\\sxs` directory.
+  Future<bool> _hasNetFx3Payload(Directory sourceDirectory) async {
+    if (!await sourceDirectory.exists()) return false;
+    try {
+      await for (final entity in sourceDirectory.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final fileName = p.basename(entity.path).toLowerCase();
+        if (fileName.endsWith('.cab') && fileName.contains('netfx3')) {
+          return true;
+        }
+      }
+    } on FileSystemException catch (error) {
+      _logLine(
+        'NetFx3 source preflight could not read ${sourceDirectory.path}: $error',
+      );
+    }
+    return false;
   }
 
   void _validateCapacity(DiskInfo disk, _WtgImageSource source) {
@@ -801,7 +982,17 @@ class WtgService {
   }
 
   Future<void> _validateWindowsIsoLayoutBeforeErase(String isoPath) async {
-    final layout = await ref.read(windowsIsoPreflightProvider).inspect(isoPath);
+    var layout = await ref.read(windowsIsoPreflightProvider).inspect(isoPath);
+    // The preflight implementation is shared with the installation-media
+    // feature and remains untouched.  Only WTG retries its transient mount
+    // outcome here, before any destructive disk action takes place.
+    if (shouldRetryWindowsToGoIsoPreflight(layout)) {
+      _logLine(
+        'Windows To Go ISO preflight mount was not ready; retrying once.',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      layout = await ref.read(windowsIsoPreflightProvider).inspect(isoPath);
+    }
     if (!layout.isValid) {
       throw _WtgFailure(
         'wtg_invalid_windows_iso',
@@ -1266,44 +1457,73 @@ if ($partitions.Count -ne 1) {
     required DeploymentPlan plan,
     required _WtgDriveLetters letters,
   }) async {
-    final bootLayout = switch (plan.bootMode) {
+    final requestedLayout = switch (plan.bootMode) {
       DeploymentBootMode.uefiGpt => WtgBootLayout.uefiGpt,
       DeploymentBootMode.uefiMbr => WtgBootLayout.uefiMbr,
       DeploymentBootMode.legacyBios => WtgBootLayout.legacyBios,
     };
-    final bootLabel = bootLayout == WtgBootLayout.legacyBios
-        ? 'WDS_BOOT'
-        : 'WDS_EFI';
     final storageLabel = plan.customVolumeLabel.trim().isEmpty
         ? 'WDS_TOGO'
         : plan.customVolumeLabel.trim();
-    final currentDisk = await ref
-        .read(diskSafetyServiceProvider)
-        .refreshDisk(disk);
+    try {
+      return await _partitionDiskWithLayout(
+        disk: disk,
+        bootLayout: requestedLayout,
+        letters: letters,
+        storageLabel: storageLabel,
+      );
+    } on _WtgPartitionFailure catch (failure) {
+      if (shouldRetryWtgWithUefiMbr(
+        requestedLayout: requestedLayout,
+        isRemovable: disk.isRemovable,
+        busType: disk.busType,
+        diskpartOutput: failure.output,
+      )) {
+        _logLine(
+          'WTG GPT partitioning hit a removable-media limitation. '
+          'Automatic UEFI/MBR fallback is disabled to preserve the user-selected layout.',
+        );
+        throw _WtgFailure(
+          'wtg_svc_partition_failed',
+          'The target rejected UEFI/GPT. Choose UEFI/MBR manually only if the target firmware is known to support it: ${failure.detail}',
+        );
+      }
+      throw _WtgFailure('wtg_svc_partition_failed', failure.detail);
+    }
+  }
+
+  Future<_WtgPartitionLayout> _partitionDiskWithLayout({
+    required DiskInfo disk,
+    required WtgBootLayout bootLayout,
+    required _WtgDriveLetters letters,
+    required String storageLabel,
+  }) async {
+    _throwIfCancelled();
+    final bootLabel = bootLayout == WtgBootLayout.legacyBios
+        ? 'WDS_BOOT'
+        : 'WDS_EFI';
+    final diskSafety = ref.read(diskSafetyServiceProvider);
+    final currentDisk = await diskSafety.refreshDisk(disk);
     if (currentDisk == null) {
-      throw const _WtgFailure(
-        'wtg_svc_partition_failed',
+      throw const _WtgPartitionFailure(
         'Target disk identity changed before partitioning.',
       );
     }
     final targetStyle = bootLayout == WtgBootLayout.uefiGpt ? 'GPT' : 'MBR';
-    final diskSafety = ref.read(diskSafetyServiceProvider);
     final initialization = await diskSafety.initializeDiskPartitionStyle(
       currentDisk,
       partitionStyle: targetStyle,
     );
     if (initialization.exitCode != 0) {
-      throw _WtgFailure(
-        'wtg_svc_partition_failed',
+      throw _WtgPartitionFailure(
         'Disk initialization failed: ${_trimOutput(initialization.stderr)} '
-            '${_trimOutput(initialization.stdout)}',
+        '${_trimOutput(initialization.stdout)}',
       );
     }
     final initializedDisk = await diskSafety.refreshDisk(currentDisk);
     if (initializedDisk == null ||
         initializedDisk.partitionStyle.toUpperCase() != targetStyle) {
-      throw const _WtgFailure(
-        'wtg_svc_partition_failed',
+      throw const _WtgPartitionFailure(
         'Target disk initialization could not be verified.',
       );
     }
@@ -1316,16 +1536,17 @@ if ($partitions.Count -ne 1) {
       bootLabel: bootLabel,
       storageLabel: storageLabel,
     );
+    _throwIfCancelled();
     final result = await diskSafety.runGuardedDiskpart(
       initializedDisk,
       script,
       timeout: const Duration(minutes: 3),
     );
     if (!_diskpartSucceeded(result)) {
-      throw _WtgFailure(
-        'wtg_svc_partition_failed',
+      throw _WtgPartitionFailure(
         'DiskPart failed: ${_trimOutput(result.stderr)} '
-            '${_trimOutput(result.stdout)}',
+        '${_trimOutput(result.stdout)}',
+        output: '${result.stderr}\n${result.stdout}',
       );
     }
     final layout = _WtgPartitionLayout(
@@ -1336,12 +1557,45 @@ if ($partitions.Count -ne 1) {
       storageLabel: storageLabel,
     );
     if (!await _verifyPartitionLayout(disk.diskNumber, layout)) {
-      throw const _WtgFailure(
-        'wtg_svc_partition_failed',
+      throw const _WtgPartitionFailure(
         'The target partition layout failed its postcondition check.',
       );
     }
     return layout;
+  }
+
+  @visibleForTesting
+  static bool shouldRetryWtgWithUefiMbr({
+    required WtgBootLayout requestedLayout,
+    required bool isRemovable,
+    required String busType,
+    required String diskpartOutput,
+  }) {
+    // Some USB bridges and flash controllers report IsRemovable=false even
+    // though DiskPart itself treats them as removable media. The guarded
+    // partition operation has already proved this is an external target; for
+    // this precise DiskPart limitation, its result is more authoritative than
+    // the controller's removable bit.
+    if (requestedLayout != WtgBootLayout.uefiGpt ||
+        !_isExternalWtgMedia(isRemovable: isRemovable, busType: busType)) {
+      return false;
+    }
+    final normalized = diskpartOutput.toLowerCase();
+    return normalized.contains(
+          'removable media does not support this operation',
+        ) ||
+        normalized.contains('可移动媒体不支持此操作');
+  }
+
+  static bool _isExternalWtgMedia({
+    required bool isRemovable,
+    required String busType,
+  }) {
+    final normalizedBus = busType.trim().toUpperCase();
+    return isRemovable ||
+        normalizedBus == 'USB' ||
+        normalizedBus == 'SD' ||
+        normalizedBus == 'MMC';
   }
 
   static String _buildWtgDiskpartScript({
@@ -1360,9 +1614,10 @@ if ($partitions.Count -ne 1) {
           ? 'create partition efi size=300'
           : 'create partition primary size=350',
       'select partition 1',
-      if (!usesGpt) 'active',
       'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
       'assign letter=$bootLetter',
+      if (!usesGpt) 'select partition 1',
+      if (!usesGpt) 'active',
       'select disk $diskNumber',
       if (usesGpt) 'create partition msr size=16',
       if (usesGpt) 'select disk $diskNumber',
@@ -1468,18 +1723,12 @@ $disk = Get-Disk -Number $boot.DiskNumber -ErrorAction Stop
     final type = plan.virtualDiskType == VirtualDiskType.fixed
         ? 'fixed'
         : 'expandable';
-    final script =
-        '''
-create vdisk file="$filePath" maximum=$maximumMb type=$type
-select vdisk file="$filePath"
-attach vdisk
-convert mbr
-create partition primary
-select partition 1
-format fs=ntfs label="WDS_OS" quick
-assign letter=$imageLetter
-exit
-''';
+    final script = _buildVirtualDiskpartScript(
+      filePath: filePath,
+      maximumMb: maximumMb,
+      type: type,
+      imageLetter: imageLetter,
+    );
     final result = await _runDiskpartFile(script);
     if (!_diskpartSucceeded(result)) {
       throw _WtgFailure(
@@ -1508,6 +1757,24 @@ exit
       diskNumber: diskNumber,
     );
   }
+
+  static String _buildVirtualDiskpartScript({
+    required String filePath,
+    required int maximumMb,
+    required String type,
+    required String imageLetter,
+  }) =>
+      '''
+create vdisk file="$filePath" maximum=$maximumMb type=$type
+select vdisk file="$filePath"
+attach vdisk
+convert mbr
+create partition primary
+select partition 1
+format fs=ntfs label="WDS_OS" quick
+assign letter=$imageLetter
+exit
+''';
 
   Future<int?> _verifyVirtualDisk({
     required String filePath,
@@ -1804,15 +2071,52 @@ exit
     final firmware = layout.bootLayout == WtgBootLayout.legacyBios
         ? 'BIOS'
         : 'UEFI';
-    final result = await _runTracked(bcdboot.path, [
-      windowsPath,
-      '/s',
-      _driveRoot(layout.bootDrive),
-      '/f',
-      firmware,
-      '/v',
-    ], timeout: const Duration(minutes: 3));
+    final bootRoot = _driveRoot(layout.bootDrive);
+    var result = await _runTracked(
+      bcdboot.path,
+      WtgBootContract.bcdbootArguments(
+        windowsPath: windowsPath,
+        bootRoot: bootRoot,
+        firmware: firmware,
+      ),
+      timeout: const Duration(minutes: 3),
+    );
     _logLine('bcdboot exit=${result.exitCode}: ${_trimOutput(result.stdout)}');
+    final standardBootManager = File(
+      p.join(windowsPath, 'boot', 'EFI', 'bootmgfw.efi'),
+    );
+    final bcdbootOutput = '${result.stdout}\n${result.stderr}';
+    if (WtgBootContract.shouldRetryWithStandardBootFiles(
+      exitCode: result.exitCode,
+      output: bcdbootOutput,
+      hasStandardBootManager: await standardBootManager.exists(),
+    )) {
+      _logLine(
+        'BCDBoot selected unavailable EFI_EX assets from the host policy. '
+        'Retrying this Windows To Go target with its standard EFI boot files.',
+      );
+      // Do not inherit optional host servicing flags such as
+      // BFSVC_USE_EX_BINS. `/offline` without `/bootex` explicitly selects
+      // the ordinary boot files already present in the offline image.
+      result = await _runTracked(
+        bcdboot.path,
+        WtgBootContract.bcdbootArguments(
+          windowsPath: windowsPath,
+          bootRoot: bootRoot,
+          firmware: firmware,
+          forceStandardBootFiles: true,
+        ),
+        environment: WindowsSystemEnvironment.withSystemRoot({
+          'SystemRoot': WindowsSystemEnvironment.systemRoot,
+        }),
+        includeParentEnvironment: false,
+        timeout: const Duration(minutes: 3),
+      );
+      _logLine(
+        'bcdboot standard-file retry exit=${result.exitCode}: '
+        '${_trimOutput(result.stdout)}',
+      );
+    }
     if (result.exitCode != 0) {
       _logLine('bcdboot stderr: ${_trimOutput(result.stderr)}');
       return false;
@@ -2246,6 +2550,7 @@ exit
     List<String> arguments, {
     required Duration timeout,
     Map<String, String>? environment,
+    bool includeParentEnvironment = true,
     bool allowWhenCancelled = false,
   }) async {
     if (!allowWhenCancelled) _throwIfCancelled();
@@ -2262,6 +2567,7 @@ exit
       resolvedExecutable,
       arguments,
       environment: WindowsSystemEnvironment.withSystemRoot(environment),
+      includeParentEnvironment: includeParentEnvironment,
     );
     _currentProcess = process;
     if (_cancelled && !allowWhenCancelled) {
@@ -2321,9 +2627,10 @@ exit
   }
 
   void _notify(WtgProgressCallback? callback, WtgProgress progress) {
-    if (!_cancelled || progress.step == WtgStep.failed) {
-      callback?.call(progress);
-    }
+    if (_cancelled && progress.step != WtgStep.failed) return;
+    final effective = preserveWtgFailureProgress(_lastProgress, progress);
+    _lastProgress = effective;
+    callback?.call(effective);
   }
 
   void _logLine(String message) {

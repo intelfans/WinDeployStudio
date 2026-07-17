@@ -446,6 +446,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     }
 
     final name = widget.item.getName(locale);
+    final expectedSha256 = _knownImageFor(locale)?.sha256;
     final hasChina = widget.item.hasChinaMirror;
     final hasGlobal = widget.item.hasGlobalMirror;
     final sourceNotifier = ref.read(mirrorSourceProvider.notifier);
@@ -463,6 +464,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         name: name,
         url: widget.item.downloadUrl,
         mirrorLabel: tr(context, 'mirror_default_title'),
+        expectedSha256: expectedSha256,
       );
       return;
     }
@@ -492,6 +494,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         url: widget.item.chinaUrl!,
         mirrorLabel: tr(context, 'mirror_china_title'),
         mirrorLogName: '123',
+        expectedSha256: expectedSha256,
       );
       return;
     }
@@ -502,6 +505,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         url: widget.item.globalUrl!,
         mirrorLabel: tr(context, 'mirror_global_title'),
         mirrorLogName: 'Global Mirror',
+        expectedSha256: expectedSha256,
       );
     }
   }
@@ -557,6 +561,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     required String url,
     required String mirrorLabel,
     String? mirrorLogName,
+    String? expectedSha256,
   }) async {
     await _recordRecentMirror();
     final logCenter = LogCenterService();
@@ -582,11 +587,17 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         url: url,
         mirrorLabel: mirrorLabel,
         logCenter: logCenter,
+        expectedSha256: expectedSha256,
       );
       return;
     }
 
-    await WebviewHelper.openUrl(context, url, title: name);
+    await WebviewHelper.openUrl(
+      context,
+      url,
+      title: name,
+      expectedSha256: expectedSha256,
+    );
     await logCenter.logDownload(
       '[Download]\n'
       'Category=${widget.item.categoryLogName}\n'
@@ -610,6 +621,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
     required String url,
     required String mirrorLabel,
     required LogCenterService logCenter,
+    String? expectedSha256,
   }) async {
     await logCenter.logDownload(
       '[Download]\n'
@@ -626,6 +638,7 @@ class _MirrorDetailScreenState extends ConsumerState<MirrorDetailScreen> {
         fileName: _downloadFileName(url, name),
         imageName: name,
         mirrorLabel: mirrorLabel,
+        expectedSha256: expectedSha256,
       ),
     );
   }

@@ -67,6 +67,8 @@ class BootableUsbService {
   static const String _ext4BuilderExecutableName = 'wds_ext4_builder.exe';
   static const int _fat32NativeFormatLimitBytes = 32 * 1024 * 1024 * 1024;
   static const int _fat32BootPartitionSizeMb = 32760;
+  static const int _installMediaCapacityReserveBytes = 64 * 1024 * 1024;
+  static const int _wimSplitCapacityReserveBytes = 64 * 1024 * 1024;
   static const String _ext4BuilderSha256 =
       '85f4c3e74f6e005ecf94e0d688e1de6d35b715af21716151c4a23e9f52ab6184';
 
@@ -104,11 +106,27 @@ class BootableUsbService {
   Future<ProcessResult> _runPowerShell(
     List<String> arguments, {
     Map<String, String>? environment,
+    Duration? timeout,
   }) {
+    final resolvedEnvironment = WindowsSystemEnvironment.withSystemRoot(
+      environment,
+    );
+    // `Future.timeout` only stops waiting for Process.run; it leaves a stuck
+    // Storage cmdlet alive. The bounded paths below use the existing managed
+    // process runner so a timeout also terminates the direct PowerShell tree.
+    if (timeout != null) {
+      return _runLinuxUtility(
+        WindowsSystemEnvironment.powerShellExecutable,
+        arguments,
+        timeout: timeout,
+        environment: resolvedEnvironment,
+        trackForCancellation: false,
+      );
+    }
     return Process.run(
       WindowsSystemEnvironment.powerShellExecutable,
       arguments,
-      environment: WindowsSystemEnvironment.withSystemRoot(environment),
+      environment: resolvedEnvironment,
     );
   }
 
@@ -197,6 +215,23 @@ class BootableUsbService {
   );
 
   @visibleForTesting
+  static bool installMediaPartitionMatchesForTesting({
+    required Map<String, Object?> actual,
+    required int expectedDiskNumber,
+    required String expectedPartitionStyle,
+    required String expectedLabel,
+    bool? expectedEfiSystemPartition,
+    bool? expectedActive,
+  }) => _installMediaPartitionMatches(
+    actual,
+    expectedDiskNumber: expectedDiskNumber,
+    expectedPartitionStyle: expectedPartitionStyle,
+    expectedLabel: expectedLabel,
+    expectedEfiSystemPartition: expectedEfiSystemPartition,
+    expectedActive: expectedActive,
+  );
+
+  @visibleForTesting
   static bool linuxToGoCustomIconMatchesForTesting({
     required String actualDigest,
     required String expectedDigest,
@@ -210,6 +245,10 @@ class BootableUsbService {
   @visibleForTesting
   static String? linuxToGoNtfsUuidFromFsutilForTesting(String output) =>
       _extractLinuxToGoNtfsUuid(output);
+
+  @visibleForTesting
+  static bool isRemoteInstallMediaUncPathForTesting(String path) =>
+      _isRemoteInstallMediaUncPath(path);
 
   Future<String> saveLogToFile() async {
     try {
@@ -231,6 +270,15 @@ class BootableUsbService {
     ProgressCallback? onProgress,
   }) async {
     final plan = deploymentPlan;
+    var windowsInstallIsoMounted = false;
+
+    Future<void> unmountWindowsInstallIsoIfNeeded() async {
+      if (!windowsInstallIsoMounted) return;
+      windowsInstallIsoMounted = false;
+      await _unmountWindowsInstallIso(isoPath);
+    }
+
+    late final DeploymentBootMode deploymentBootMode;
     if (plan != null) {
       final compatibility = DeploymentCompatibility.evaluate(plan);
       if (!compatibility.canDeploy ||
@@ -248,10 +296,19 @@ class BootableUsbService {
         );
         return false;
       }
+      deploymentBootMode = plan.bootMode;
       bootMode = switch (plan.bootMode) {
         DeploymentBootMode.uefiGpt => BootMode.uefi,
-        DeploymentBootMode.uefiMbr => BootMode.both,
+        // UEFI + MBR is still UEFI-only. Treating it as a dual-boot target
+        // made the creator require a BIOS chain without marking the MBR
+        // partition active, so it could report a misleading success.
+        DeploymentBootMode.uefiMbr => BootMode.uefi,
         DeploymentBootMode.legacyBios => BootMode.bios,
+      };
+    } else {
+      deploymentBootMode = switch (bootMode) {
+        BootMode.uefi => DeploymentBootMode.uefiMbr,
+        BootMode.bios || BootMode.both => DeploymentBootMode.legacyBios,
       };
     }
     final diskNumber = disk.diskNumber;
@@ -272,6 +329,30 @@ class BootableUsbService {
         const CreateProgress(
           step: CreateStep.failed,
           message: 'creator_invalid_windows_iso',
+        ),
+      );
+      return false;
+    }
+
+    final mediaPreflight = await _preflightWindowsInstallMediaBeforeErase(
+      isoPath: isoPath,
+      disk: disk,
+      bootMode: bootMode,
+      sourceInspection: sourceInspection,
+    );
+    if (!mediaPreflight.success) {
+      final error =
+          mediaPreflight.error ??
+          'Windows installation media preflight did not complete.';
+      _logLine(
+        'Windows installation-media preflight failed before erase: $error',
+      );
+      _notify(
+        onProgress,
+        CreateProgress(
+          step: CreateStep.failed,
+          message: 'boot_preflight_failed',
+          error: 'i18n:${mediaPreflight.messageKey ?? 'boot_preflight_failed'}',
         ),
       );
       return false;
@@ -352,7 +433,7 @@ class BootableUsbService {
       final partitionResult = await _partitionDisk(
         disk: disk,
         bootMode: bootMode,
-        deploymentBootMode: plan?.bootMode ?? DeploymentBootMode.uefiMbr,
+        deploymentBootMode: deploymentBootMode,
         preferredDriveLetter: plan?.preferredSystemLetter ?? '',
         volumeLabel: effectiveVolumeLabel,
       );
@@ -442,7 +523,7 @@ class BootableUsbService {
         ),
       );
 
-      final mountPoint = await _mountIso(isoPath);
+      final mountPoint = await _mountWindowsInstallIso(isoPath);
       if (mountPoint == null) {
         _logLine('Mount ISO FAILED');
         final logPath = await saveLogToFile();
@@ -456,6 +537,7 @@ class BootableUsbService {
         return false;
       }
       _logLine('Mounted at: $mountPoint');
+      windowsInstallIsoMounted = true;
 
       // Step 5: Check if we need to split install.wim (>4GB FAT32 limit)
       final installWim = p.join(mountPoint, 'sources', 'install.wim');
@@ -469,16 +551,24 @@ class BootableUsbService {
       if (hasWim) {
         wimSource = installWim;
         final wimSize = await File(installWim).length();
-        if (wimSize > 4 * 1024 * 1024 * 1024) {
+        if (wimSize > WindowsIsoLayoutInspector.fat32MaximumFileBytes) {
           needSplit = true;
           _logLine('install.wim > 4GB, will split');
         }
       } else if (hasEsd) {
         wimSource = installEsd;
         final esdSize = await File(installEsd).length();
-        if (esdSize > 4 * 1024 * 1024 * 1024) {
-          needSplit = true;
-          _logLine('install.esd > 4GB, will split');
+        if (esdSize > WindowsIsoLayoutInspector.fat32MaximumFileBytes) {
+          _logLine('install.esd exceeds FAT32 and cannot be split safely.');
+          await unmountWindowsInstallIsoIfNeeded();
+          _notify(
+            onProgress,
+            const CreateProgress(
+              step: CreateStep.failed,
+              message: 'boot_split_failed',
+            ),
+          );
+          return false;
         }
       }
 
@@ -512,7 +602,7 @@ class BootableUsbService {
 
       if (!copyResult) {
         _logLine('File copy FAILED');
-        await _unmountIso(isoPath);
+        await unmountWindowsInstallIsoIfNeeded();
         final logPath = await saveLogToFile();
         _notify(
           onProgress,
@@ -539,11 +629,12 @@ class BootableUsbService {
         final splitResult = await _splitWim(
           sourcePath: wimSource,
           targetDir: '$driveLetter\\sources',
+          dismExecutable: mediaPreflight.dismExecutable,
         );
 
         if (!splitResult) {
           _logLine('WIM split FAILED');
-          await _unmountIso(isoPath);
+          await unmountWindowsInstallIsoIfNeeded();
           final logPath = await saveLogToFile();
           _notify(
             onProgress,
@@ -568,12 +659,15 @@ class BootableUsbService {
       );
 
       final bootResult = await _writeBootFiles(
-        windowsDrive: mountPoint.endsWith('\\') ? mountPoint : '$mountPoint\\',
         targetDrive: driveLetter,
         bootMode: bootMode,
+        sourceEfiBootArchitectures: mediaPreflight.efiBootArchitectures,
+        sourceEfiBootManagerArchitecture:
+            mediaPreflight.efiBootManagerArchitecture,
+        legacyBootsectExecutable: mediaPreflight.legacyBootsectExecutable,
       );
 
-      await _unmountIso(isoPath);
+      await unmountWindowsInstallIsoIfNeeded();
 
       if (!bootResult) {
         _logLine('Boot file write FAILED');
@@ -632,6 +726,7 @@ class BootableUsbService {
       final verifyResult = await _verifyBootableUsb(
         driveLetter: driveLetter,
         bootMode: bootMode,
+        expectedEfiBootArchitectures: mediaPreflight.efiBootArchitectures,
         expectedIcon: volumeIcon.payload,
         expectedVolumeLabel: effectiveVolumeLabel,
       );
@@ -664,6 +759,7 @@ class BootableUsbService {
 
       return verifyResult;
     } catch (e) {
+      await unmountWindowsInstallIsoIfNeeded();
       _logLine('EXCEPTION: $e');
       final logPath = await saveLogToFile();
       await logCenter.logError('Windows 安装盘创建异常 | 磁盘: $diskNumber | 错误: $e');
@@ -682,6 +778,298 @@ class BootableUsbService {
       );
       return false;
     }
+  }
+
+  /// Performs the media-specific checks that must finish before the selected
+  /// disk is initialized. The generic ISO inspector proves that this is a
+  /// Windows layout; this method proves that the requested boot mode can be
+  /// written to a single FAT32 removable-media volume.
+  Future<_WindowsInstallMediaPreflightResult>
+  _preflightWindowsInstallMediaBeforeErase({
+    required String isoPath,
+    required DiskInfo disk,
+    required BootMode bootMode,
+    required WindowsIsoLayoutInspection sourceInspection,
+  }) async {
+    try {
+      final isRemoteUncSource = _isRemoteInstallMediaUncPath(isoPath);
+      final source = File(
+        isRemoteUncSource ? isoPath : p.normalize(p.absolute(isoPath)),
+      );
+      if (await FileSystemEntity.type(source.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        return const _WindowsInstallMediaPreflightResult.failure(
+          'The Windows ISO source must be a regular file, not a link or directory.',
+          messageKey: 'boot_preflight_source_invalid',
+        );
+      }
+      if (isRemoteUncSource) {
+        _logLine(
+          'Windows ISO source is a non-loopback UNC path; it cannot reside on '
+          'the selected local physical target disk.',
+        );
+      } else {
+        final resolvedSourcePath = await source.resolveSymbolicLinks();
+        final sourceOnTarget = await _isWindowsInstallMediaPathOnTargetDisk(
+          resolvedSourcePath,
+          disk.diskNumber,
+        );
+        if (sourceOnTarget == null) {
+          return const _WindowsInstallMediaPreflightResult.failure(
+            'The physical disk containing the Windows ISO could not be verified.',
+            messageKey: 'boot_preflight_source_location',
+          );
+        }
+        if (sourceOnTarget) {
+          return const _WindowsInstallMediaPreflightResult.failure(
+            'The Windows ISO is stored on the target disk and would be erased.',
+            messageKey: 'boot_preflight_source_target',
+          );
+        }
+      }
+
+      final fat32Check = await _validateWindowsInstallMediaFat32Capacity(
+        sourceInspection: sourceInspection,
+        diskSizeBytes: disk.sizeBytes,
+      );
+      if (!fat32Check.success) {
+        return _WindowsInstallMediaPreflightResult.failure(
+          fat32Check.error!,
+          messageKey: fat32Check.messageKey ?? 'boot_preflight_failed',
+        );
+      }
+
+      final availableEfiArchitectures = <WindowsEfiBootArchitecture>{
+        ...sourceInspection.efiBootArchitectures,
+      };
+      final efiBootManagerArchitecture =
+          sourceInspection.efiBootManagerArchitecture;
+      if (bootMode != BootMode.bios && !sourceInspection.hasEfiBcd) {
+        return const _WindowsInstallMediaPreflightResult.failure(
+          'UEFI mode requires EFI\\Microsoft\\Boot\\BCD in the Windows ISO.',
+          messageKey: 'boot_preflight_uefi_layout',
+        );
+      }
+      if (bootMode != BootMode.bios &&
+          availableEfiArchitectures.isEmpty &&
+          efiBootManagerArchitecture == null) {
+        return const _WindowsInstallMediaPreflightResult.failure(
+          'This Windows ISO has no valid x64, ARM64, or IA32 UEFI fallback boot file.',
+          messageKey: 'boot_preflight_uefi',
+        );
+      }
+      if (bootMode != BootMode.bios &&
+          availableEfiArchitectures.isEmpty &&
+          efiBootManagerArchitecture != null) {
+        // The source has no removable-media fallback file, but its Microsoft
+        // boot manager has a verified architecture and can be copied once to
+        // the correctly named fallback path after the ISO content is copied.
+        availableEfiArchitectures.add(efiBootManagerArchitecture);
+      }
+
+      String? bootsectExecutable;
+      if (bootMode != BootMode.uefi) {
+        if (!sourceInspection.hasBiosBootManager ||
+            !sourceInspection.hasBiosBcd) {
+          return const _WindowsInstallMediaPreflightResult.failure(
+            'Legacy BIOS mode requires both bootmgr and boot\\BCD in the Windows ISO.',
+            messageKey: 'boot_preflight_legacy_layout',
+          );
+        }
+        bootsectExecutable = await _findWindowsSystemTool('bootsect.exe');
+        if (bootsectExecutable == null) {
+          return const _WindowsInstallMediaPreflightResult.failure(
+            'Legacy BIOS mode requires bootsect.exe, but it is unavailable on this computer.',
+            messageKey: 'boot_preflight_bootsect',
+          );
+        }
+      }
+
+      String? dismExecutable;
+      if (fat32Check.needsWimSplit) {
+        if (sourceInspection.imageFormat != WindowsInstallImageFormat.wim) {
+          return const _WindowsInstallMediaPreflightResult.failure(
+            'An install.esd or install.swm larger than FAT32 supports cannot be split safely. Use a Windows ISO with install.wim or a smaller image.',
+            messageKey: 'boot_preflight_fat32_file',
+          );
+        }
+        dismExecutable = await _findWindowsSystemTool('dism.exe');
+        if (dismExecutable == null) {
+          return const _WindowsInstallMediaPreflightResult.failure(
+            'install.wim must be split for FAT32, but DISM is unavailable on this computer.',
+            messageKey: 'boot_preflight_dism',
+          );
+        }
+      }
+
+      _logLine(
+        'Windows install-media preflight passed: source disk differs from '
+        'target, payload=${sourceInspection.totalFileBytes} bytes, '
+        'UEFI=${availableEfiArchitectures.map((value) => value.name).join(',')}.',
+      );
+      return _WindowsInstallMediaPreflightResult.success(
+        efiBootArchitectures: availableEfiArchitectures,
+        efiBootManagerArchitecture: efiBootManagerArchitecture,
+        legacyBootsectExecutable: bootsectExecutable,
+        dismExecutable: dismExecutable,
+        needsWimSplit: fat32Check.needsWimSplit,
+      );
+    } catch (error) {
+      return _WindowsInstallMediaPreflightResult.failure(
+        'Windows installation-media preflight failed: $error',
+        messageKey: 'boot_preflight_failed',
+      );
+    }
+  }
+
+  Future<_WindowsInstallMediaFat32Check>
+  _validateWindowsInstallMediaFat32Capacity({
+    required WindowsIsoLayoutInspection sourceInspection,
+    required int diskSizeBytes,
+  }) async {
+    if (sourceInspection.totalFileBytes <= 0 || diskSizeBytes <= 0) {
+      return const _WindowsInstallMediaFat32Check.failure(
+        'The Windows ISO payload size or target disk capacity could not be verified.',
+        messageKey: 'boot_preflight_capacity',
+      );
+    }
+
+    var needsWimSplit = false;
+    for (final file in sourceInspection.fat32OversizedFiles) {
+      final normalizedPath = file.relativePath
+          .replaceAll('/', r'\\')
+          .toLowerCase();
+      if (normalizedPath == r'sources\install.wim' &&
+          sourceInspection.imageFormat == WindowsInstallImageFormat.wim) {
+        needsWimSplit = true;
+        continue;
+      }
+      return _WindowsInstallMediaFat32Check.failure(
+        '${file.relativePath} is larger than the FAT32 single-file limit and cannot be copied to UEFI-compatible installation media.',
+        messageKey: 'boot_preflight_fat32_file',
+      );
+    }
+
+    if (sourceInspection.installImageBytes >
+            WindowsIsoLayoutInspector.fat32MaximumFileBytes &&
+        sourceInspection.imageFormat != WindowsInstallImageFormat.wim) {
+      return const _WindowsInstallMediaFat32Check.failure(
+        'The Windows install image is larger than FAT32 supports and is not an install.wim that DISM can split.',
+        messageKey: 'boot_preflight_fat32_file',
+      );
+    }
+
+    final fat32CapacityBytes = _installMediaFat32CapacityBytes(diskSizeBytes);
+    final requiredBytes =
+        sourceInspection.totalFileBytes +
+        (needsWimSplit ? _wimSplitCapacityReserveBytes : 0);
+    if (requiredBytes + _installMediaCapacityReserveBytes >
+        fat32CapacityBytes) {
+      return _WindowsInstallMediaFat32Check.failure(
+        'The target FAT32 installation-media partition is too small '
+        '(needs at least ${requiredBytes + _installMediaCapacityReserveBytes} bytes; '
+        'has $fat32CapacityBytes bytes).',
+        messageKey: 'boot_preflight_capacity',
+      );
+    }
+    return _WindowsInstallMediaFat32Check.success(needsWimSplit: needsWimSplit);
+  }
+
+  static int _installMediaFat32CapacityBytes(int diskSizeBytes) {
+    if (diskSizeBytes <= 0) return 0;
+    final cappedSizeMb = _fat32PartitionSizeMbForDisk(diskSizeBytes);
+    return cappedSizeMb == null ? diskSizeBytes : cappedSizeMb * 1024 * 1024;
+  }
+
+  static bool _isRemoteInstallMediaUncPath(String path) {
+    final normalized = path.trim().replaceAll('/', r'\');
+    if (!normalized.startsWith(r'\\')) return false;
+    final components = normalized.substring(2).split(r'\');
+    if (components.length < 2 || components.first.trim().isEmpty) return false;
+    final host = components.first.trim().toLowerCase();
+    final localNames = <String>{
+      'localhost',
+      '127.0.0.1',
+      '[::1]',
+      '::1',
+      Platform.localHostname.toLowerCase(),
+      (Platform.environment['COMPUTERNAME'] ?? '').trim().toLowerCase(),
+    }..remove('');
+    return !localNames.contains(host);
+  }
+
+  /// Resolves the source only for the Windows install-media preflight.  It is
+  /// deliberately separate from the Linux raw-write resolver so hardening a
+  /// Windows installer does not alter the Linux To Go creation path.
+  Future<bool?> _isWindowsInstallMediaPathOnTargetDisk(
+    String path,
+    int targetDiskNumber,
+  ) async {
+    try {
+      final result = await _runPowerShell(
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$volume = Get-Volume -FilePath $env:WDS_SOURCE_PATH -ErrorAction Stop
+$partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
+if ($partitions.Count -ne 1) {
+  throw "Source path did not resolve to exactly one physical partition."
+}
+[int]$partitions[0].DiskNumber''',
+        ],
+        environment: {...Platform.environment, 'WDS_SOURCE_PATH': path},
+        timeout: const Duration(seconds: 10),
+      );
+      if (result.exitCode != 0) {
+        _logLine('Windows ISO source disk resolution failed: ${result.stderr}');
+        return null;
+      }
+      final sourceDiskNumber = int.tryParse(result.stdout.toString().trim());
+      return sourceDiskNumber == null
+          ? null
+          : sourceDiskNumber == targetDiskNumber;
+    } catch (error) {
+      _logLine('Windows ISO source disk resolution error: $error');
+      return null;
+    }
+  }
+
+  Future<String?> _findWindowsSystemTool(String executableName) async {
+    final inboxPath = p.join(
+      WindowsSystemEnvironment.systemRoot,
+      'System32',
+      executableName,
+    );
+    if (await File(inboxPath).exists()) return inboxPath;
+
+    try {
+      final wherePath = p.join(
+        WindowsSystemEnvironment.systemRoot,
+        'System32',
+        'where.exe',
+      );
+      final result = await _runLinuxUtility(
+        wherePath,
+        [executableName],
+        timeout: const Duration(seconds: 8),
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+        trackForCancellation: false,
+      );
+      if (result.exitCode != 0) return null;
+      for (final line
+          in result.stdout
+              .toString()
+              .split(RegExp(r'\r?\n'))
+              .map((value) => value.trim())) {
+        if (line.isNotEmpty && await File(line).exists()) return line;
+      }
+    } catch (error) {
+      _logLine('System tool lookup failed for $executableName: $error');
+    }
+    return null;
   }
 
   Future<bool> createLinuxIsoUsb({
@@ -1508,10 +1896,16 @@ class BootableUsbService {
       _logLine('ISOHybrid preflight failed: ${inspection.error}');
       return false;
     }
+    final efiArchitectures = inspection.efiArchitectures
+        .map((value) => value.name)
+        .join(', ');
     _logLine(
-      'ISOHybrid preflight: ISO9660/El Torito/EFI valid, '
+      'ISOHybrid preflight: ISO9660/El Torito valid, '
       'catalog LBA=${inspection.bootCatalogLba}, '
-      'EFI image LBA=${inspection.efiImageLba}',
+      'legacy=${inspection.hasLegacyBiosBoot}, '
+      'uefi=${inspection.hasUefiBoot}, '
+      'EFI image LBA=${inspection.efiImageLba}, '
+      'EFI architectures=${efiArchitectures.isEmpty ? 'not advertised' : efiArchitectures}',
     );
     return true;
   }
@@ -1542,11 +1936,11 @@ class BootableUsbService {
           error: 'The target disk size or identity changed before writing.',
         );
       }
-      if (imageBytes <= 0 || imageBytes >= targetBytes) {
+      if (imageBytes <= 0 || imageBytes > targetBytes) {
         return _LinuxRawWriteResult(
           success: false,
           error:
-              'The Linux image must be smaller than the target disk '
+              'The Linux image must not be larger than the target disk '
               '(image=$imageBytes bytes, target=$targetBytes bytes).',
         );
       }
@@ -1670,12 +2064,11 @@ if ($partitions.Count -ne 1) {
     if (initialization.exitCode != 0) {
       final stderr = initialization.stderr.toString();
       final stdout = initialization.stdout.toString();
-      return _LinuxToGoPartitionResult(
-        success: false,
-        error: stderr.trim().isNotEmpty
-            ? stderr
-            : (stdout.isEmpty ? 'Disk initialization failed.' : stdout),
+      final detail = _summarizePowerShellFailure(
+        stderr.trim().isNotEmpty ? stderr : stdout,
+        fallback: 'Disk initialization failed.',
       );
+      return _LinuxToGoPartitionResult(success: false, error: detail);
     }
     final initializedDisk = await diskSafety.refreshDisk(currentDisk);
     if (initializedDisk == null ||
@@ -3110,8 +3503,8 @@ if ($ExpectedSerial -and $ExpectedSerial.Trim().ToUpperInvariant() -notin @('N/A
   throw "Target disk has no reliable physical identity."
 }
 
-if ($ExpectedIsoLength -ge [int64]$disk.Size) {
-  throw "ISO image must be smaller than the target disk."
+if ($ExpectedIsoLength -gt [int64]$disk.Size) {
+  throw "ISO image is larger than the target disk."
 }
 $sourceVolume = Get-Volume -FilePath $IsoPath -ErrorAction Stop
 $sourcePartitions = @(Get-Partition -Volume $sourceVolume -ErrorAction Stop)
@@ -3759,12 +4152,12 @@ Write-Output "WDS_DISK_ONLINE"
     if (initialization.exitCode != 0) {
       final stderr = initialization.stderr.toString();
       final stdout = initialization.stdout.toString();
-      final detail = stderr.trim().isNotEmpty ? stderr : stdout;
-      _logLine('Disk initialization failed: $detail');
-      return _DiskPartResult(
-        success: false,
-        error: detail.isEmpty ? 'Disk initialization failed.' : detail,
+      final detail = _summarizePowerShellFailure(
+        stderr.trim().isNotEmpty ? stderr : stdout,
+        fallback: 'Disk initialization failed.',
       );
+      _logLine('Disk initialization failed: $detail');
+      return _DiskPartResult(success: false, error: detail);
     }
     final initializedDisk = await diskSafety.refreshDisk(currentDisk);
     if (initializedDisk == null ||
@@ -3814,11 +4207,13 @@ Write-Output "WDS_DISK_ONLINE"
       driveLetter: driveLetter,
       expectedPartitionStyle: useGpt ? 'GPT' : 'MBR',
       expectedLabel: label,
+      expectedEfiSystemPartition: useGpt,
+      expectedActive: deploymentBootMode == DeploymentBootMode.legacyBios,
     )) {
       _logLine('Install media partition postcondition check failed');
       return const _DiskPartResult(
         success: false,
-        error: 'Created partition does not match the requested layout.',
+        error: 'i18n:boot_partition_layout_not_ready',
       );
     }
 
@@ -3835,19 +4230,25 @@ Write-Output "WDS_DISK_ONLINE"
   }) {
     final normalizedLetter = _normalizePreferredLetter(preferredDriveLetter);
     final fat32PartitionSizeMb = _fat32PartitionSizeMbForDisk(diskSizeBytes);
-    final primaryPartition = fat32PartitionSizeMb == null
-        ? 'create partition primary'
-        : 'create partition primary size=$fat32PartitionSizeMb';
+    final useGpt = deploymentBootMode == DeploymentBootMode.uefiGpt;
+    final partitionKind = useGpt ? 'efi' : 'primary';
+    final partitionCommand = fat32PartitionSizeMb == null
+        ? 'create partition $partitionKind'
+        : 'create partition $partitionKind size=$fat32PartitionSizeMb';
     final commands = <String>[
       'select disk $diskNumber',
-      primaryPartition,
-      // DiskPart does not reliably move focus from the disk to a new
-      // partition on every Windows build. Formatting and assigning require
-      // an explicit partition focus.
+      // A UEFI + GPT installation disk uses one full-size ESP. This keeps the
+      // normal removable-media fallback path while retaining a mountable FAT32
+      // volume for the installation files.
+      partitionCommand,
+      // Some DiskPart builds do not select the corresponding volume after
+      // creating a partition. Select it explicitly before formatting.
       'select partition 1',
-      if (deploymentBootMode == DeploymentBootMode.legacyBios) 'active',
       'format fs=fat32 label="$volumeLabel" quick',
       normalizedLetter == null ? 'assign' : 'assign letter=$normalizedLetter',
+      if (deploymentBootMode == DeploymentBootMode.legacyBios)
+        'select partition 1',
+      if (deploymentBootMode == DeploymentBootMode.legacyBios) 'active',
       'exit',
     ];
     return '${commands.join('\n')}\n';
@@ -3866,40 +4267,115 @@ Write-Output "WDS_DISK_ONLINE"
     required String driveLetter,
     required String expectedPartitionStyle,
     required String expectedLabel,
+    required bool expectedEfiSystemPartition,
+    required bool expectedActive,
   }) async {
     try {
       final letter = driveLetter.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
       final result = await _runPowerShell(
         [
           '-NoProfile',
+          '-NonInteractive',
           '-ExecutionPolicy',
           'Bypass',
           '-Command',
-          r'''$partition = Get-Partition -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
-$volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
-$disk = Get-Disk -Number $partition.DiskNumber -ErrorAction Stop
-[PSCustomObject]@{
-  DiskNumber = $partition.DiskNumber
-  PartitionStyle = $disk.PartitionStyle.ToString()
-  Label = $volume.FileSystemLabel
-  FileSystem = $volume.FileSystem
-} | ConvertTo-Json -Compress''',
+          r'''$deadline = (Get-Date).AddSeconds(25)
+$lastError = ''
+while ((Get-Date) -lt $deadline) {
+  try {
+    $partition = Get-Partition -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+    $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
+    $disk = Get-Disk -Number $partition.DiskNumber -ErrorAction Stop
+    $label = if ($volume.FileSystemLabel) { $volume.FileSystemLabel.ToString() } else { '' }
+    $fileSystem = if ($volume.FileSystem) { $volume.FileSystem.ToString() } else { '' }
+    $gptType = if ($partition.GptType) { $partition.GptType.ToString() } else { '' }
+    $isEfiSystemPartition = $gptType -eq 'C12A7328-F81F-11D2-BA4B-00A0C93EC93B'
+    $actual = [PSCustomObject]@{
+      DiskNumber = $partition.DiskNumber
+      PartitionStyle = $disk.PartitionStyle.ToString()
+      Label = $label
+      FileSystem = $fileSystem
+      EfiSystemPartition = [bool]$isEfiSystemPartition
+      IsActive = [bool]$partition.IsActive
+    }
+    if ($actual.DiskNumber -eq [int]$env:WDS_EXPECTED_DISK_NUMBER -and
+        $actual.PartitionStyle.ToUpperInvariant() -eq $env:WDS_EXPECTED_PARTITION_STYLE.ToUpperInvariant() -and
+        $actual.Label.ToUpperInvariant() -eq $env:WDS_EXPECTED_LABEL.ToUpperInvariant() -and
+        $actual.FileSystem.ToUpperInvariant() -eq 'FAT32' -and
+        $actual.EfiSystemPartition -eq [bool]::Parse($env:WDS_EXPECTED_EFI_SYSTEM_PARTITION) -and
+        $actual.IsActive -eq [bool]::Parse($env:WDS_EXPECTED_ACTIVE)) {
+      $actual | ConvertTo-Json -Compress
+      exit 0
+    }
+    $lastError = "Observed disk=$($actual.DiskNumber), style=$($actual.PartitionStyle), label=$($actual.Label), filesystem=$($actual.FileSystem)."
+  } catch {
+    $lastError = $_.Exception.Message
+  }
+  Start-Sleep -Milliseconds 500
+}
+if ($lastError) { Write-Error $lastError }
+exit 1''',
         ],
-        environment: {...Platform.environment, 'WDS_DRIVE_LETTER': letter},
-      ).timeout(const Duration(seconds: 8));
-      if (result.exitCode != 0) return false;
-      final data = jsonDecode(result.stdout.toString());
+        environment: {
+          ...Platform.environment,
+          'WDS_DRIVE_LETTER': letter,
+          'WDS_EXPECTED_DISK_NUMBER': '$diskNumber',
+          'WDS_EXPECTED_PARTITION_STYLE': expectedPartitionStyle,
+          'WDS_EXPECTED_LABEL': expectedLabel,
+          'WDS_EXPECTED_EFI_SYSTEM_PARTITION': '$expectedEfiSystemPartition',
+          'WDS_EXPECTED_ACTIVE': '$expectedActive',
+        },
+        timeout: const Duration(seconds: 35),
+      );
+      final stdout = result.stdout.toString().trim();
+      final stderr = result.stderr.toString().trim();
+      if (result.exitCode != 0 || stdout.isEmpty) {
+        _logLine(
+          'Install media partition verification output: '
+          '${stderr.isNotEmpty ? stderr : stdout}',
+        );
+        return false;
+      }
+      final data = jsonDecode(stdout);
       return data is Map &&
-          data['DiskNumber'].toString() == diskNumber.toString() &&
-          data['PartitionStyle'].toString().toUpperCase() ==
-              expectedPartitionStyle.toUpperCase() &&
-          data['Label'].toString().toUpperCase() ==
-              expectedLabel.toUpperCase() &&
-          data['FileSystem'].toString().toUpperCase() == 'FAT32';
+          _installMediaPartitionMatches(
+            data,
+            expectedDiskNumber: diskNumber,
+            expectedPartitionStyle: expectedPartitionStyle,
+            expectedLabel: expectedLabel,
+            expectedEfiSystemPartition: expectedEfiSystemPartition,
+            expectedActive: expectedActive,
+          );
     } catch (error) {
       _logLine('Install media partition verification error: $error');
       return false;
     }
+  }
+
+  static bool _installMediaPartitionMatches(
+    Map<dynamic, dynamic> actual, {
+    required int expectedDiskNumber,
+    required String expectedPartitionStyle,
+    required String expectedLabel,
+    bool? expectedEfiSystemPartition,
+    bool? expectedActive,
+  }) {
+    final efiMatches =
+        expectedEfiSystemPartition == null ||
+        actual['EfiSystemPartition'].toString().toLowerCase() ==
+            expectedEfiSystemPartition.toString().toLowerCase();
+    final activeMatches =
+        expectedActive == null ||
+        actual['IsActive'].toString().toLowerCase() ==
+            expectedActive.toString().toLowerCase();
+    return actual['DiskNumber'].toString() == expectedDiskNumber.toString() &&
+        actual['PartitionStyle'].toString().toUpperCase() ==
+            expectedPartitionStyle.toUpperCase() &&
+        actual['Label'].toString().toUpperCase() ==
+            expectedLabel.toUpperCase() &&
+        actual['FileSystem'].toString().toUpperCase() == 'FAT32' &&
+        efiMatches &&
+        activeMatches;
   }
 
   static String? _normalizePreferredLetter(String value) {
@@ -3929,7 +4405,8 @@ exit 1''',
           'WDS_LETTER': letter,
           'WDS_DISK_NUMBER': '$diskNumber',
         },
-      ).timeout(const Duration(seconds: 8));
+        timeout: const Duration(seconds: 8),
+      );
       return result.exitCode == 0;
     } catch (_) {
       return false;
@@ -3947,21 +4424,52 @@ exit 1''',
 
   Future<String?> _findDriveLetterForDisk(int diskNumber) async {
     try {
-      final result = await _runPowerShell([
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Get-Partition -DiskNumber $diskNumber -ErrorAction Stop | '
-            'Where-Object { \$_.DriveLetter } | '
-            'Sort-Object PartitionNumber | '
-            'Select-Object -First 1 -ExpandProperty DriveLetter',
-      ]);
+      final result = await _runPowerShell(
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''$deadline = (Get-Date).AddSeconds(25)
+$lastError = ''
+while ((Get-Date) -lt $deadline) {
+  try {
+    $letter = Get-Partition -DiskNumber ([int]$env:WDS_DISK_NUMBER) -ErrorAction Stop |
+      Where-Object { $_.DriveLetter } |
+      Sort-Object PartitionNumber |
+      Select-Object -First 1 -ExpandProperty DriveLetter
+    if ($letter) {
+      Write-Output $letter
+      exit 0
+    }
+    $lastError = 'The new volume does not have a drive letter yet.'
+  } catch {
+    $lastError = $_.Exception.Message
+  }
+  Start-Sleep -Milliseconds 500
+}
+if ($lastError) { Write-Error $lastError }
+exit 1''',
+        ],
+        environment: {
+          ...Platform.environment,
+          'WDS_DISK_NUMBER': '$diskNumber',
+        },
+        timeout: const Duration(seconds: 35),
+      );
       if (result.exitCode == 0) {
-        final letter = result.stdout.toString().trim();
-        if (letter.isNotEmpty) return '$letter:';
+        final letter = _normalizePreferredLetter(result.stdout.toString());
+        if (letter != null) return '$letter:';
+      } else {
+        _logLine(
+          'Drive-letter discovery output: '
+          '${result.stderr.toString().trim()}',
+        );
       }
-    } catch (_) {}
+    } catch (error) {
+      _logLine('Drive-letter discovery error: $error');
+    }
 
     return null;
   }
@@ -3975,11 +4483,12 @@ exit 1''',
     try {
       final result = await _runPowerShell([
         '-NoProfile',
+        '-NonInteractive',
         '-ExecutionPolicy',
         'Bypass',
         '-Command',
         'Get-Volume -DriveLetter ${driveLetter.replaceAll(":", "")} | Select-Object -ExpandProperty FileSystem',
-      ]);
+      ], timeout: const Duration(seconds: 10));
       return result.exitCode == 0 &&
           result.stdout.toString().trim().toUpperCase() ==
               fileSystem.toUpperCase();
@@ -3989,6 +4498,94 @@ exit 1''',
   }
 
   // --- ISO Mounting ---
+
+  // Windows installation-media creation needs bounded mount operations because
+  // this path has already repartitioned the selected USB drive when the second
+  // mount occurs. Keep it separate from the Linux To Go mount helper below so
+  // its behavior remains unchanged.
+  Future<String?> _mountWindowsInstallIso(String isoPath) async {
+    var mounted = false;
+    // The cleanup path must also run if the stale-mount probe itself fails.
+    // Dismount-DiskImage can time out while an existing image remains mounted.
+    var mountMayExist = true;
+    try {
+      final escapedPath = isoPath.replaceAll("'", "''");
+      _logLine('Mounting Windows installation ISO: $isoPath');
+      await _runPowerShell([
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
+      ], timeout: const Duration(seconds: 10));
+      final mountResult = await _runPowerShell([
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        "Mount-DiskImage -ImagePath '$escapedPath' -PassThru -ErrorAction Stop | Out-Null",
+      ], timeout: const Duration(seconds: 30));
+      if (mountResult.exitCode != 0) {
+        _logLine(
+          'Windows installation ISO mount failed: ${mountResult.stderr}',
+        );
+      } else {
+        mounted = true;
+        final deadline = DateTime.now().add(const Duration(seconds: 20));
+        while (DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          final remaining = deadline.difference(DateTime.now());
+          if (remaining <= Duration.zero) break;
+          final volumeResult = await _runPowerShell(
+            [
+              '-NoProfile',
+              '-NonInteractive',
+              '-ExecutionPolicy',
+              'Bypass',
+              '-Command',
+              "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
+            ],
+            timeout: remaining > const Duration(seconds: 4)
+                ? const Duration(seconds: 4)
+                : remaining,
+          );
+          final letter = volumeResult.stdout.toString().trim();
+          if (volumeResult.exitCode == 0 &&
+              RegExp(r'^[A-Za-z]$').hasMatch(letter)) {
+            return '${letter.toUpperCase()}:\\';
+          }
+        }
+        _logLine(
+          'Windows installation ISO mount did not receive a drive letter.',
+        );
+      }
+    } catch (error) {
+      _logLine('Windows installation ISO mount error: $error');
+    }
+    if (mounted || mountMayExist) await _unmountWindowsInstallIso(isoPath);
+    return null;
+  }
+
+  Future<void> _unmountWindowsInstallIso(String isoPath) async {
+    try {
+      final escapedPath = isoPath.replaceAll("'", "''");
+      final result = await _runPowerShell([
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
+      ], timeout: const Duration(seconds: 15));
+      if (result.exitCode != 0) {
+        _logLine('Windows installation ISO unmount warning: ${result.stderr}');
+      }
+    } catch (error) {
+      _logLine('Windows installation ISO unmount error: $error');
+    }
+  }
 
   Future<String?> _mountIso(String isoPath) async {
     try {
@@ -4325,16 +4922,49 @@ exit 1''',
   Future<bool> _splitWim({
     required String sourcePath,
     required String targetDir,
+    required String? dismExecutable,
   }) async {
     try {
+      if (dismExecutable == null || dismExecutable.isEmpty) return false;
       final targetPath = p.join(targetDir, 'install.swm');
-      final result = await Process.run('dism', [
-        '/Split-Image',
-        '/ImageFile:$sourcePath',
-        '/SWMFile:$targetPath',
-        '/FileSize:3800',
-      ]);
-      return result.exitCode == 0;
+      final result = await _runLinuxUtility(
+        dismExecutable,
+        [
+          '/Split-Image',
+          '/ImageFile:$sourcePath',
+          '/SWMFile:$targetPath',
+          '/FileSize:3800',
+        ],
+        timeout: const Duration(minutes: 30),
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+        trackForCancellation: false,
+      );
+      if (result.exitCode != 0) return false;
+      final fragments = <File>[];
+      await for (final entity in Directory(
+        targetDir,
+      ).list(followLinks: false)) {
+        if (entity is! File) continue;
+        final fileName = p.basename(entity.path).toLowerCase();
+        if (RegExp(r'^install\d*\.swm$').hasMatch(fileName)) {
+          fragments.add(entity);
+        }
+      }
+      if (fragments.isEmpty) return false;
+      for (final fragment in fragments) {
+        final sizeBytes = await fragment.length();
+        if (sizeBytes <= 0 ||
+            sizeBytes > WindowsIsoLayoutInspector.fat32MaximumFileBytes) {
+          _logLine(
+            'Invalid split WIM fragment: ${fragment.path} ($sizeBytes bytes)',
+          );
+          return false;
+        }
+      }
+      _logLine(
+        'WIM split verification OK: ${fragments.length} SWM fragment(s).',
+      );
+      return true;
     } catch (_) {
       return false;
     }
@@ -4343,157 +4973,134 @@ exit 1''',
   // --- Boot Files ---
 
   Future<bool> _writeBootFiles({
-    required String windowsDrive,
     required String targetDrive,
     required BootMode bootMode,
+    required Set<WindowsEfiBootArchitecture> sourceEfiBootArchitectures,
+    required WindowsEfiBootArchitecture? sourceEfiBootManagerArchitecture,
+    required String? legacyBootsectExecutable,
   }) async {
     try {
       _logLine('Writing boot files: target=$targetDrive');
 
-      // Step 1: Write MBR boot code with bootsect
+      // The copied setup BCD is the authoritative installer BCD. Do not create
+      // an empty replacement store: it can make the volume look complete while
+      // leaving it unable to boot Windows Setup.
       if (bootMode != BootMode.uefi) {
+        if (legacyBootsectExecutable == null ||
+            legacyBootsectExecutable.isEmpty) {
+          _logLine(
+            'Legacy boot chain requested but bootsect.exe was not preflighted.',
+          );
+          return false;
+        }
         _logLine('Step 1: bootsect /nt60 $targetDrive /mbr');
-        final bootsectResult = await Process.run('bootsect', [
-          '/nt60',
-          targetDrive,
-          '/mbr',
-        ]).timeout(const Duration(seconds: 30));
+        final bootsectResult = await _runLinuxUtility(
+          legacyBootsectExecutable,
+          ['/nt60', targetDrive, '/mbr'],
+          timeout: const Duration(seconds: 30),
+          environment: WindowsSystemEnvironment.withSystemRoot(),
+          trackForCancellation: false,
+        );
         _logLine('bootsect exit: ${bootsectResult.exitCode}');
         _logLine('bootsect stdout: ${bootsectResult.stdout}');
         if (bootsectResult.exitCode != 0) {
           _logLine('bootsect stderr: ${bootsectResult.stderr}');
+          return false;
         }
       } else {
         _logLine('Step 1: skipped bootsect for UEFI-only mode');
       }
 
-      // Step 2: Try bcdboot (fast if \Windows exists on ISO)
-      final windowsDir = '${windowsDrive}Windows';
-      if (await Directory(windowsDir).exists()) {
-        _logLine('Step 2: bcdboot (standard path)');
-        final result = await Process.run('bcdboot', [
-          windowsDir,
-          '/s',
-          targetDrive,
-          '/f',
-          'ALL',
-        ]).timeout(const Duration(seconds: 60));
-        _logLine('bcdboot exit: ${result.exitCode}');
-        _logLine('bcdboot stdout: ${result.stdout}');
-        if (result.exitCode != 0) {
-          _logLine('bcdboot failed, falling back to bootsect-only');
-        }
-        // Don't return yet — need to verify EFI files exist below
-      }
-
-      // Step 3: For slim ISOs (Tiny10 etc) - bcdboot needs DISM mount which is slow
-      // Instead, try bcdboot with /s pointing to the ISO's boot directory
-      // The bootmgr + BCD from ISO should be enough for BIOS boot
-      _logLine('Step 3: Trying bcdboot with boot dir');
-      final bootDir = '${targetDrive}boot';
-      if (await Directory(bootDir).exists()) {
-        // Try creating BCD store manually if missing
-        final bcdPath = '$targetDrive\\boot\\BCD';
-        if (!await File(bcdPath).exists()) {
-          _logLine('BCD not found, creating with bcdedit...');
-          await _createBcdStore(targetDrive);
-        }
-      }
-
-      // Verify: bootsect + bootmgr from ISO = bootable for BIOS
-      // UEFI boot needs \efi\boot\bootx64.efi which was copied from ISO
+      // A Legacy installer needs the copied boot manager and BCD in addition
+      // to a successful bootsect call above.
       final hasBootmgr = await File('$targetDrive\\bootmgr').exists();
-      var hasEfiBoot =
-          await File('$targetDrive\\efi\\boot\\bootx64.efi').exists() ||
-          await File('$targetDrive\\efi\\boot\\bootaa64.efi').exists();
-      _logLine('Boot files: bootmgr=$hasBootmgr, efi=$hasEfiBoot');
-
-      // If EFI boot file missing, try to fix it
-      if (!hasEfiBoot) {
-        _logLine('EFI boot file missing, attempting repair...');
-
-        // Try 1: Copy bootmgfw.efi from efi\microsoft\boot to efi\boot\bootx64.efi
-        final bootmgfwPath = '$targetDrive\\efi\\microsoft\\boot\\bootmgfw.efi';
-        if (await File(bootmgfwPath).exists()) {
-          _logLine('Found bootmgfw.efi, copying to efi\\boot');
-          final efiBootDir = '$targetDrive\\efi\\boot';
-          await Directory(efiBootDir).create(recursive: true);
-          await File(bootmgfwPath).copy('$efiBootDir\\bootx64.efi');
-          hasEfiBoot = true;
-        }
-
-        // Try 1b: Copy bootmgfw.efi as bootaa64.efi for ARM64
-        if (!hasEfiBoot) {
-          final bootmgfwPath2 =
-              '$targetDrive\\efi\\microsoft\\boot\\bootmgfw.efi';
-          if (await File(bootmgfwPath2).exists()) {
-            final efiBootDir = '$targetDrive\\efi\\boot';
-            await Directory(efiBootDir).create(recursive: true);
-            await File(bootmgfwPath2).copy('$efiBootDir\\bootaa64.efi');
-            hasEfiBoot = true;
-          }
-        }
-
-        // Try 2: bcdboot with /f UEFI specifically
-        if (!hasEfiBoot) {
-          final windowsDir2 = '${windowsDrive}Windows';
-          if (await Directory(windowsDir2).exists()) {
-            _logLine('Trying bcdboot /f UEFI...');
-            final uefiResult = await Process.run('bcdboot', [
-              windowsDir2,
-              '/s',
-              targetDrive,
-              '/f',
-              'UEFI',
-            ]).timeout(const Duration(seconds: 60));
-            _logLine('bcdboot UEFI exit: ${uefiResult.exitCode}');
-            hasEfiBoot =
-                await File('$targetDrive\\efi\\boot\\bootx64.efi').exists() ||
-                await File('$targetDrive\\efi\\boot\\bootaa64.efi').exists();
-          }
-        }
-
-        // Try 3: Check if ISO had efi\boot and re-copy it
-        if (!hasEfiBoot) {
-          _logLine('EFI still missing after repair attempts');
-        }
+      final bcd = File('$targetDrive\\boot\\BCD');
+      final hasBiosBcd = await bcd.exists() && await bcd.length() > 0;
+      if (bootMode != BootMode.uefi && (!hasBootmgr || !hasBiosBcd)) {
+        _logLine(
+          'Legacy boot files missing: bootmgr=$hasBootmgr, bcd=$hasBiosBcd',
+        );
+        return false;
       }
 
-      _logLine('Final: bootmgr=$hasBootmgr, efi=$hasEfiBoot');
-      return _bootFilesMatchMode(
-        bootMode: bootMode,
-        hasBootmgr: hasBootmgr,
-        hasEfiBoot: hasEfiBoot,
+      final efiBcd = File('$targetDrive\\efi\\microsoft\\boot\\BCD');
+      final hasEfiBcd = await efiBcd.exists() && await efiBcd.length() > 0;
+      if (bootMode != BootMode.bios && !hasEfiBcd) {
+        _logLine('UEFI boot configuration is missing: $efiBcd');
+        return false;
+      }
+
+      var efiBootArchitectures = await _targetEfiBootArchitectures(targetDrive);
+      if (bootMode != BootMode.bios && efiBootArchitectures.isEmpty) {
+        final managerArchitecture = sourceEfiBootManagerArchitecture;
+        final manager = File(
+          '$targetDrive\\efi\\microsoft\\boot\\bootmgfw.efi',
+        );
+        if (managerArchitecture == null || !await manager.exists()) {
+          _logLine(
+            'UEFI fallback is missing and no architecture-verified boot manager is available.',
+          );
+          return false;
+        }
+        final efiBootDirectory = Directory('$targetDrive\\efi\\boot');
+        await efiBootDirectory.create(recursive: true);
+        final fallback = File(
+          p.join(
+            efiBootDirectory.path,
+            _efiFallbackFileName(managerArchitecture),
+          ),
+        );
+        await manager.copy(fallback.path);
+        efiBootArchitectures = await _targetEfiBootArchitectures(targetDrive);
+      }
+
+      final expectedEfiArchitectures = <WindowsEfiBootArchitecture>{
+        ...sourceEfiBootArchitectures,
+      };
+      if (expectedEfiArchitectures.isEmpty &&
+          sourceEfiBootManagerArchitecture != null) {
+        expectedEfiArchitectures.add(sourceEfiBootManagerArchitecture);
+      }
+      final hasExpectedEfiBoot =
+          expectedEfiArchitectures.isNotEmpty &&
+          efiBootArchitectures.containsAll(expectedEfiArchitectures);
+      _logLine(
+        'Final boot files: bootmgr=$hasBootmgr, bcd=$hasBiosBcd, '
+        'efiBcd=$hasEfiBcd, '
+        'efi=${efiBootArchitectures.map((value) => value.name).join(',')}.',
       );
+      return (bootMode == BootMode.uefi || (hasBootmgr && hasBiosBcd)) &&
+          (bootMode == BootMode.bios || hasExpectedEfiBoot);
     } catch (e) {
       _logLine('Boot file exception: $e');
       return false;
     }
   }
 
-  Future<void> _createBcdStore(String targetDrive) async {
-    try {
-      final bcdPath = '$targetDrive\\boot\\BCD';
-      // bcdedit /createstore creates an empty BCD store
-      await Process.run('bcdedit', [
-        '/createstore',
-        bcdPath,
-      ]).timeout(const Duration(seconds: 10));
+  static String _efiFallbackFileName(WindowsEfiBootArchitecture architecture) =>
+      switch (architecture) {
+        WindowsEfiBootArchitecture.x64 => 'bootx64.efi',
+        WindowsEfiBootArchitecture.arm64 => 'bootaa64.efi',
+        WindowsEfiBootArchitecture.ia32 => 'bootia32.efi',
+      };
 
-      // Create boot manager entry
-      await Process.run('bcdedit', [
-        '/store',
-        bcdPath,
-        '/create',
-        '{bootmgr}',
-        '/d',
-        'Windows Boot Manager',
-      ]).timeout(const Duration(seconds: 10));
-
-      _logLine('BCD store created');
-    } catch (e) {
-      _logLine('BCD create error: $e');
+  Future<Set<WindowsEfiBootArchitecture>> _targetEfiBootArchitectures(
+    String targetDrive,
+  ) async {
+    final found = <WindowsEfiBootArchitecture>{};
+    for (final architecture in WindowsEfiBootArchitecture.values) {
+      final path = p.join(
+        targetDrive,
+        'efi',
+        'boot',
+        _efiFallbackFileName(architecture),
+      );
+      if (await WindowsIsoLayoutInspector.readEfiArchitecture(path) ==
+          architecture) {
+        found.add(architecture);
+      }
     }
+    return found;
   }
 
   // --- Verification ---
@@ -4501,23 +5108,44 @@ exit 1''',
   Future<bool> _verifyBootableUsb({
     required String driveLetter,
     required BootMode bootMode,
+    required Set<WindowsEfiBootArchitecture> expectedEfiBootArchitectures,
     required _VolumeIconPayload? expectedIcon,
     required String expectedVolumeLabel,
   }) async {
     final errors = <String>[];
 
-    // Core boot files (required for BIOS/both)
+    // Legacy boot media must retain the setup boot manager and the BCD copied
+    // from the ISO. A file-only bootmgr check can otherwise report success for
+    // a disk with an empty or missing BCD store.
     final hasBootmgr = await File('$driveLetter\\bootmgr').exists();
-    if (bootMode != BootMode.uefi && !hasBootmgr) {
-      errors.add('bootmgr missing');
+    final bcd = File('$driveLetter\\boot\\BCD');
+    final hasBiosBcd = await bcd.exists() && await bcd.length() > 0;
+    if (bootMode != BootMode.uefi && (!hasBootmgr || !hasBiosBcd)) {
+      errors.add(
+        'Legacy boot chain incomplete (bootmgr=$hasBootmgr, bcd=$hasBiosBcd)',
+      );
     }
 
-    // EFI boot (required for UEFI/both)
-    final hasEfiBoot =
-        await File('$driveLetter\\EFI\\Boot\\bootx64.efi').exists() ||
-        await File('$driveLetter\\EFI\\Boot\\bootaa64.efi').exists();
-    if (bootMode != BootMode.bios && !hasEfiBoot) {
-      errors.add('EFI boot file missing');
+    final efiBcd = File('$driveLetter\\efi\\microsoft\\boot\\BCD');
+    final hasEfiBcd = await efiBcd.exists() && await efiBcd.length() > 0;
+    if (bootMode != BootMode.bios && !hasEfiBcd) {
+      errors.add('UEFI boot configuration missing (efi\\microsoft\\boot\\BCD)');
+    }
+
+    // Verify each architecture advertised by the source inspection. This
+    // includes IA32, which was previously ignored, and avoids accepting an
+    // ARM64 boot manager incorrectly copied under the x64 fallback name.
+    final actualEfiArchitectures = await _targetEfiBootArchitectures(
+      driveLetter,
+    );
+    if (bootMode != BootMode.bios &&
+        (expectedEfiBootArchitectures.isEmpty ||
+            !actualEfiArchitectures.containsAll(
+              expectedEfiBootArchitectures,
+            ))) {
+      errors.add(
+        'EFI fallback missing for ${expectedEfiBootArchitectures.map((value) => value.name).join(', ')}',
+      );
     }
 
     // Install image (required)
@@ -4582,21 +5210,6 @@ exit 1''',
     }
 
     return errors.isEmpty;
-  }
-
-  bool _bootFilesMatchMode({
-    required BootMode bootMode,
-    required bool hasBootmgr,
-    required bool hasEfiBoot,
-  }) {
-    switch (bootMode) {
-      case BootMode.bios:
-        return hasBootmgr;
-      case BootMode.uefi:
-        return hasEfiBoot;
-      case BootMode.both:
-        return hasBootmgr && hasEfiBoot;
-    }
   }
 
   Future<_LinuxToGoVolumeIdentityPreparation> _prepareLinuxToGoVolumeIdentity(
@@ -4891,6 +5504,69 @@ class _DiskPartResult {
   final String? error;
 
   const _DiskPartResult({required this.success, this.driveLetter, this.error});
+}
+
+class _WindowsInstallMediaPreflightResult {
+  final String? error;
+  final String? messageKey;
+  final Set<WindowsEfiBootArchitecture> efiBootArchitectures;
+  final WindowsEfiBootArchitecture? efiBootManagerArchitecture;
+  final String? legacyBootsectExecutable;
+  final String? dismExecutable;
+  final bool needsWimSplit;
+
+  const _WindowsInstallMediaPreflightResult._({
+    this.error,
+    this.messageKey,
+    this.efiBootArchitectures = const <WindowsEfiBootArchitecture>{},
+    this.efiBootManagerArchitecture,
+    this.legacyBootsectExecutable,
+    this.dismExecutable,
+    this.needsWimSplit = false,
+  });
+
+  const _WindowsInstallMediaPreflightResult.success({
+    required Set<WindowsEfiBootArchitecture> efiBootArchitectures,
+    required WindowsEfiBootArchitecture? efiBootManagerArchitecture,
+    required String? legacyBootsectExecutable,
+    required String? dismExecutable,
+    required bool needsWimSplit,
+  }) : this._(
+         efiBootArchitectures: efiBootArchitectures,
+         efiBootManagerArchitecture: efiBootManagerArchitecture,
+         legacyBootsectExecutable: legacyBootsectExecutable,
+         dismExecutable: dismExecutable,
+         needsWimSplit: needsWimSplit,
+       );
+
+  const _WindowsInstallMediaPreflightResult.failure(
+    String error, {
+    required String messageKey,
+  }) : this._(error: error, messageKey: messageKey);
+
+  bool get success => error == null;
+}
+
+class _WindowsInstallMediaFat32Check {
+  final String? error;
+  final String? messageKey;
+  final bool needsWimSplit;
+
+  const _WindowsInstallMediaFat32Check._({
+    this.error,
+    this.messageKey,
+    this.needsWimSplit = false,
+  });
+
+  const _WindowsInstallMediaFat32Check.success({required bool needsWimSplit})
+    : this._(needsWimSplit: needsWimSplit);
+
+  const _WindowsInstallMediaFat32Check.failure(
+    String error, {
+    required String messageKey,
+  }) : this._(error: error, messageKey: messageKey);
+
+  bool get success => error == null;
 }
 
 class _VolumeIconPayload {

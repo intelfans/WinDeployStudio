@@ -19,18 +19,32 @@ The project is distributed under the MIT License.
   - Create Windows installation USB drives and write bootable Linux ISOHybrid images.
   - Parse Windows ISO images and list available editions.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS for Windows media, with a preferred partition drive letter and custom volume label/icon.
-  - Validate Linux ISOHybrid images before erasing the target disk.
+  - Validate Linux ISOHybrid images before erasing the target disk and show only the Legacy BIOS, UEFI, and standard EFI fallback CPU architectures detected in the selected image.
+  - Linux media is a byte-for-byte ISOHybrid write. It preserves the ISO's own partition and boot layout; it does not convert UEFI/MBR/Legacy boot modes and does not create a persistence or remaining-space partition. Secure Boot compatibility depends on the image signature and target firmware, so it is reported neither inferred nor guaranteed.
   - Bind every destructive operation to the selected external disk and revalidate it immediately before writing.
 
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
+  - Windows target-image support follows this matrix for standard compatible images:
+
+    | Image family | Direct | VHD | VHDX | Notes |
+    |:---|:---:|:---:|:---:|:---|
+    | Windows 7 | Yes | Enterprise/Ultimate only | No | x86 targets require Legacy BIOS; x64 targets may use UEFI. |
+    | Windows 8 | Yes | Yes | Yes | VHD/VHDX are available after the image is identified as Windows 8. |
+    | Windows 8.1 | Yes | Yes | Yes | WIMBoot remains a direct-deployment-only option. |
+    | Windows 10/11 | Yes | Yes | Yes | CompactOS is available only for these generations. |
+    | Windows Server | Yes | Yes | Server 2012+ only | Server 2008 R2 supports VHD but not VHDX; Server 2012 and later support both. Client-only options are excluded. |
+
+    The matrix describes deployment-mode availability, not a guarantee that every USB controller, firmware combination, or Server edition will boot.
+  - Windows To Go accepts standard ISO layouts containing `boot.wim` and `install.wim` or `install.esd`. WIMBoot additionally requires `install.wim`; split `install.swm` images and images missing required BIOS/EFI boot files are rejected before the target disk is changed.
   - Validate supported persistent Linux To Go layouts for verified x64 Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
   - Classify Linux To Go images when selected and again immediately before erasing the target. Every accepted profile requires x64 UEFI, a real kernel/initrd, Live payloads, and a GRUB entry that can be safely updated. Ubuntu/casper uses its `writable` persistence image; Debian Live and Deepin Live require `boot=live` and use their `persistence` / `persistence.conf` protocol. Deepin 25 layouts with the current Linglong marker are included.
   - Reject unsupported distributions and unsafe Debian Live layouts before the target disk is changed; use Linux installation media for images outside the validated profiles.
   - Stop before modifying the target disk when the image does not meet a verified profile or the release does not include a required, compliant persistence component. Use Linux installation media for other distributions and layouts.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
-  - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing.
-  - Configure local-disk visibility, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, VHD/VHDX drive-letter repair, .NET Framework 3.5, and deployment drive letters where supported. UEFI deployments automatically use an NTFS Windows volume with a separate FAT32 EFI partition.
+  - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing. The selection controls the disk layout, not the target firmware: use UEFI + GPT for modern UEFI firmware, select UEFI + MBR only when that firmware explicitly supports MBR booting, and use Legacy BIOS only on traditional BIOS hardware.
+  - Configure local-disk visibility, simplified first-run settings, UASP, CompactOS, WIMBoot, VHD/VHDX drive-letter repair, .NET Framework 3.5, and deployment drive letters where supported. “Simplify first-run setup” uses supported unattended settings to hide selected pages; it does not promise to bypass every OOBE step or switch Windows into Audit Mode. WinRE is preserved; offline removal is not offered because custom recovery layouts cannot be safely assumed.
+  - UASP disabling is an expert troubleshooting setting only. Use it only after confirming that the USB bridge can fall back to BOT; an UAS-only device can lose access to its own boot drive. CompactOS is available only for Windows 10/11 client images and trades lower disk usage for longer deployment and additional I/O overhead. .NET Framework 3.5 is enabled offline only from `sources\\sxs` in the selected ISO; the source must match the target image’s version, architecture, and language.
   - Optionally inject Windows INF drivers offline.
   - Build a separate Windows boot partition and verify BCD, virtual-disk binding, and fallback UEFI boot files.
   - Revalidate disk identity, capacity, model, and bus type before destructive operations, preferring a reliable hardware serial number and failing closed when no stable identity is available.
@@ -315,18 +329,32 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
   - 从 ISO 创建 Windows 安装 U 盘，或写入可启动的 Linux ISOHybrid 镜像。
   - 自动解析 Windows ISO，列出可安装版本。
   - Windows 安装盘可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并可指定分区盘符、自定义卷标和图标。
-  - 在擦除目标磁盘前验证 Linux ISOHybrid 结构。
+  - 在擦除目标磁盘前验证 Linux ISOHybrid 结构，并仅显示在所选镜像中检测到的 Legacy BIOS、UEFI 与标准 EFI 回退启动文件 CPU 架构。
+  - Linux 安装盘为 ISOHybrid 原样逐字节写入：保留镜像自身的分区和启动布局，不会转换 UEFI/MBR/Legacy 启动模式，也不会创建持久化或剩余空间分区。Secure Boot 兼容性取决于镜像签名和目标固件，程序不会推断或保证其可用性。
   - 每次破坏性操作都绑定到用户选择的外接磁盘，并在写入前再次核验。
 
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。
+  - 对标准且结构完整的 Windows 镜像，支持范围如下：
+
+    | 镜像系列 | 直接部署 | VHD | VHDX | 说明 |
+    |:---|:---:|:---:|:---:|:---|
+    | Windows 7 | 支持 | 仅 Enterprise/Ultimate | 不支持 | x86 目标需要 Legacy BIOS；x64 目标可使用 UEFI。 |
+    | Windows 8 | 支持 | 支持 | 支持 | 正确识别为 Windows 8 后支持三种部署方式。 |
+    | Windows 8.1 | 支持 | 支持 | 支持 | WIMBoot 仅限直接部署。 |
+    | Windows 10/11 | 支持 | 支持 | 支持 | CompactOS 仅适用于这些版本。 |
+    | Windows Server | 支持 | 支持 | 仅 Server 2012 及更高版本 | Server 2008 R2 支持 VHD 但不支持 VHDX；Server 2012 及更高版本支持两者，并排除仅适用于客户端的选项。 |
+
+    该矩阵表示部署方式的可用性，不保证每一种 USB 控制器、固件组合或 Server 版本都能成功启动。
+  - Windows To Go 接受包含 `boot.wim` 以及 `install.wim` 或 `install.esd` 的标准 ISO 结构；WIMBoot 还要求使用 `install.wim`。分卷 `install.swm` 镜像或缺少 BIOS/EFI 必需启动文件的镜像，会在修改目标磁盘前被拒绝。
   - 在修改磁盘前验证已通过布局检查的 x64 Ubuntu/casper、Debian Live 与 Deepin Live 持久化 Linux To Go 镜像。
   - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；所有可接受配置都必须具备 x64 UEFI、真实内核/initrd、Live 文件系统和可安全注入参数的 GRUB 启动项。Ubuntu/casper 使用 `writable` 持久化镜像；Debian Live 与 Deepin Live 需要 `boot=live` 并使用独立的 `persistence` / `persistence.conf` 协议，已包含使用当前 Linglong 标记的 Deepin 25 布局。
   - 不受支持的发行版与不安全的 Debian Live 布局会在修改目标磁盘前被拒绝；验证范围外的镜像请使用 Linux 安装盘。
   - 不符合已验证配置、或当前发行版未包含所需且合规持久化组件时，会在修改目标磁盘前停止操作；其他发行版和布局请使用 Linux 安装盘。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
-  - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。
-  - 在支持的组合中配置本地磁盘可见性、OOBE/Audit、WinRE、UASP、CompactOS、WIMBoot、VHD/VHDX 盘符修复、.NET Framework 3.5 和部署盘符。UEFI 部署会自动采用 NTFS Windows 卷与独立 FAT32 EFI 分区。
+  - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。该选择只决定写盘布局，不保证目标固件一定可启动：现代 UEFI 固件使用 UEFI + GPT；只有固件明确支持从 MBR 启动时才选择 UEFI + MBR；传统 BIOS 设备才选择 Legacy BIOS。
+  - 在支持的组合中配置本地磁盘可见性、简化首次设置、UASP、CompactOS、WIMBoot、VHD/VHDX 盘符修复、.NET Framework 3.5 和部署盘符。“简化首次设置”使用受支持的无人参与设置隐藏部分页面，不承诺跳过全部 OOBE 步骤，也不会切换到审核模式。为保证恢复和启动修复能力，Windows To Go 会保留 WinRE，当前不提供离线删除恢复环境的选项。
+  - 禁用 UASP 仅是专家级排障选项，必须先确认 USB 桥接器能够回退到 BOT 模式；仅支持 UAS 的设备可能失去对自身启动盘的访问并无法启动。CompactOS 仅适用于 Windows 10/11 客户端镜像，以更长部署时间和部分读写开销换取更小占用。.NET Framework 3.5 只能使用所选 ISO 中 `sources\\sxs` 的离线源，且必须与目标镜像的版本、架构和语言相匹配。
   - 可选离线注入 Windows INF 驱动。
   - 为 Windows To Go 创建独立启动分区，并验证 BCD、虚拟磁盘绑定和 UEFI 回退启动文件。
   - 在清盘前重新核验磁盘号、容量、型号与总线类型，优先使用可靠硬件序列号；无法建立稳定物理身份时拒绝清盘。

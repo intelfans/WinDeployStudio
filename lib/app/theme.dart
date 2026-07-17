@@ -966,4 +966,3 @@ class _VisualStyleSpec {
     VisualStyle.win7 => 8,
   };
 }
-

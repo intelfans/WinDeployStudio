@@ -3,6 +3,53 @@ import 'package:win_deploy_studio/core/services/wtg_service.dart';
 import 'package:win_deploy_studio/features/deployment/models/deployment_plan.dart';
 
 void main() {
+  test('BootEx retry is limited to a missing EFI_EX boot manager', () {
+    const missingBootEx = '''BFSVC: Unable to open file
+W:\\Windows\\boot\\EFI_EX\\bootmgfw_EX.efi for read because the file
+does not exist. BFSVC Error: Failed to validate boot manager checksum.''';
+
+    expect(
+      WtgBootContract.shouldRetryWithStandardBootFiles(
+        exitCode: 193,
+        output: missingBootEx,
+        hasStandardBootManager: true,
+      ),
+      isTrue,
+    );
+    expect(
+      WtgBootContract.shouldRetryWithStandardBootFiles(
+        exitCode: 193,
+        output: missingBootEx,
+        hasStandardBootManager: false,
+      ),
+      isFalse,
+    );
+    expect(
+      WtgBootContract.shouldRetryWithStandardBootFiles(
+        exitCode: 5,
+        output: 'Access is denied.',
+        hasStandardBootManager: true,
+      ),
+      isFalse,
+    );
+  });
+
+  test(
+    'standard Windows To Go boot retry uses offline non-BootEx servicing',
+    () {
+      final arguments = WtgBootContract.bcdbootArguments(
+        windowsPath: r'W:\\Windows',
+        bootRoot: r'V:\\',
+        firmware: 'UEFI',
+        forceStandardBootFiles: true,
+      );
+
+      expect(arguments, containsAllInOrder([r'W:\\Windows', '/s', r'V:\\']));
+      expect(arguments, containsAllInOrder(['/f', 'UEFI', '/v', '/offline']));
+      expect(arguments, isNot(contains('/bootex')));
+    },
+  );
+
   test('direct deployment requires distinct device and osdevice bindings', () {
     final expected = WtgBootContract.expectedDevice(
       windowsDrive: r'W:\',

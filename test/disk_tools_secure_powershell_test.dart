@@ -174,6 +174,10 @@ try {
         }
       },
       skip: !Platform.isWindows,
+      // This starts a real Windows PowerShell process for each generated
+      // script. Full-suite parallelism can delay process startup well beyond
+      // the framework default even though the parser itself remains healthy.
+      timeout: const Timeout(Duration(minutes: 2)),
     );
   });
 

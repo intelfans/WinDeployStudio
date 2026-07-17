@@ -55,7 +55,15 @@ class WimImageInfo {
 class WimInfoService {
   const WimInfoService._();
 
-  static Future<List<WimImageInfo>> readImages(String imagePath) async {
+  /// Reads image metadata without leaving an untracked helper process behind.
+  ///
+  /// [cancellationSignal] is optional so deployment paths keep their existing
+  /// behavior. ISO-selection callers provide it to stop the helper before an
+  /// older ISO is dismounted for a newer selection.
+  static Future<List<WimImageInfo>> readImages(
+    String imagePath, {
+    Future<void>? cancellationSignal,
+  }) async {
     final helperPath = p.join(
       p.dirname(Platform.resolvedExecutable),
       'wds_wim_info_helper.exe',
@@ -63,16 +71,61 @@ class WimInfoService {
     if (!await File(helperPath).exists()) {
       throw StateError('WIM metadata helper is missing.');
     }
-    final result = await Process.run(
-      helperPath,
-      [imagePath],
-      environment: WindowsSystemEnvironment.withSystemRoot(),
-    ).timeout(const Duration(seconds: 60));
-    if (result.exitCode != 0) {
-      throw StateError(result.stderr.toString().trim());
+
+    final process = await Process.start(helperPath, [
+      imagePath,
+    ], environment: WindowsSystemEnvironment.withSystemRoot());
+    final stdout = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .join();
+    final stderr = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .join();
+    final exitCode = process.exitCode;
+    final outcome = await Future.any<_WimProcessOutcome>([
+      exitCode.then(_WimProcessOutcome.exited),
+      Future<_WimProcessOutcome>.delayed(
+        const Duration(seconds: 60),
+        _WimProcessOutcome.timedOut,
+      ),
+      if (cancellationSignal != null)
+        cancellationSignal.then((_) => const _WimProcessOutcome.cancelled()),
+    ]);
+
+    if (!outcome.didExit) {
+      await _terminateHelper(process);
+      try {
+        await exitCode.timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // Preserve a bounded selection path even if a third-party helper
+        // does not acknowledge normal process termination promptly.
+      }
+      await stdout.timeout(const Duration(seconds: 2), onTimeout: () => '');
+      await stderr.timeout(const Duration(seconds: 2), onTimeout: () => '');
+      if (outcome.cancelled) {
+        throw const _WimInfoReadCancelled();
+      }
+      throw StateError('WIM metadata helper timed out.');
     }
 
-    return parseHelperOutput(result.stdout.toString());
+    final output = await stdout;
+    final error = await stderr;
+    if (outcome.exitCode != 0) {
+      throw StateError(error.trim());
+    }
+    return parseHelperOutput(output);
+  }
+
+  static Future<void> _terminateHelper(Process process) async {
+    try {
+      await Process.run(
+        WindowsSystemEnvironment.taskkillExecutable,
+        ['/F', '/T', '/PID', '${process.pid}'],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {
+      process.kill();
+    }
   }
 
   /// Parses the line-oriented output emitted by the native WIMGAPI helper.
@@ -132,4 +185,22 @@ class WimInfoService {
     '12' => 'ARM64',
     _ => value,
   };
+}
+
+class _WimInfoReadCancelled implements Exception {
+  const _WimInfoReadCancelled();
+}
+
+class _WimProcessOutcome {
+  final int? exitCode;
+  final bool timedOut;
+
+  const _WimProcessOutcome._({this.exitCode, this.timedOut = false});
+
+  const _WimProcessOutcome.cancelled() : this._();
+  const _WimProcessOutcome.timedOut() : this._(timedOut: true);
+  _WimProcessOutcome.exited(int exitCode) : this._(exitCode: exitCode);
+
+  bool get didExit => exitCode != null;
+  bool get cancelled => !didExit && !timedOut;
 }

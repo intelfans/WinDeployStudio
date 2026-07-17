@@ -83,6 +83,68 @@ void main() {
     expect(unknown.hasSamePhysicalIdentity(unknown), isFalse);
   });
 
+  test('preferred drive letter selects the largest mounted data partition', () {
+    const disk = DiskInfo(
+      diskNumber: 8,
+      model: 'USB SSD',
+      friendlyName: 'USB SSD',
+      sizeBytes: 128000000000,
+      sizeFormatted: '119 GB',
+      driveLetters: ['S', 'E'],
+      partitions: [
+        DiskPartition(
+          type: 'System',
+          sizeBytes: 268435456,
+          driveLetter: 'S',
+          isSystem: true,
+        ),
+        DiskPartition(type: 'Basic', sizeBytes: 127000000000, driveLetter: 'E'),
+      ],
+    );
+
+    expect(disk.preferredDriveLetter, 'E');
+  });
+
+  test(
+    'preferred drive letter avoids an EFI volume without IsSystem metadata',
+    () {
+      const disk = DiskInfo(
+        diskNumber: 10,
+        model: 'Portable Windows',
+        friendlyName: 'Portable Windows',
+        sizeBytes: 128000000000,
+        sizeFormatted: '119 GB',
+        driveLetters: ['S', 'E'],
+        partitions: [
+          DiskPartition(type: 'System', sizeBytes: 268435456, driveLetter: 'S'),
+          DiskPartition(
+            type: 'Basic',
+            sizeBytes: 127000000000,
+            driveLetter: 'E',
+          ),
+        ],
+      );
+
+      expect(disk.preferredDriveLetter, 'E');
+    },
+  );
+
+  test(
+    'preferred drive letter falls back when partition metadata is absent',
+    () {
+      const disk = DiskInfo(
+        diskNumber: 9,
+        model: 'USB Disk',
+        friendlyName: 'USB Disk',
+        sizeBytes: 64000000000,
+        sizeFormatted: '59 GB',
+        driveLetters: ['f'],
+      );
+
+      expect(disk.preferredDriveLetter, 'F');
+    },
+  );
+
   test(
     'guarded Storage initialization clears before initializing and confirms completion',
     () {
@@ -111,20 +173,46 @@ void main() {
       final clear = script.indexOf('Clear-Disk');
       final initialize = script.indexOf('Initialize-Disk');
       final completion = script.indexOf('WDS_DISK_INITIALIZED');
+      final postClearPartitions = script.indexOf('Get-Partition', clear);
+      final zeroPartitionGuard = script.indexOf(
+        'Target disk still has partitions after it was cleared.',
+      );
+      final rawBranch = RegExp(
+        r"if\s*\(\s*\$[A-Za-z][A-Za-z0-9_]*\s*-eq\s*'RAW'\s*\)",
+      ).firstMatch(script);
+      final mismatchBranch = RegExp(
+        r'(?:elseif|else\s+if)\s*\([^)]*-ne\s*\$targetStyle',
+      ).firstMatch(script);
+      final finalStyleValidation = script.lastIndexOf(
+        'PartitionStyle.ToString().ToUpperInvariant() -ne \$targetStyle',
+      );
+      final finalPartitionCheck = script.lastIndexOf('Get-Partition');
 
       expect(script, contains(r'Assert-TargetDisk $true $true'));
-      expect(script, contains(r'Assert-TargetDisk $false $false'));
       expect(clear, greaterThanOrEqualTo(0));
-      expect(initialize, greaterThan(clear));
-      expect(completion, greaterThan(initialize));
-      expect(
-        script.indexOf(r'Assert-TargetDisk $false $false'),
-        greaterThan(clear),
+      expect(postClearPartitions, greaterThan(clear));
+      expect(zeroPartitionGuard, greaterThan(postClearPartitions));
+      expect(rawBranch, isNotNull);
+      expect(mismatchBranch, isNotNull);
+      expect(zeroPartitionGuard, lessThan(rawBranch!.start));
+      expect(rawBranch.start, greaterThan(postClearPartitions));
+      expect(mismatchBranch!.start, greaterThan(postClearPartitions));
+
+      final rawBranchBody = script.substring(
+        rawBranch.start,
+        mismatchBranch.start,
       );
-      expect(
-        script.indexOf(r'Assert-TargetDisk $false $false'),
-        lessThan(initialize),
+      final mismatchBranchBody = script.substring(
+        mismatchBranch.start,
+        finalStyleValidation,
       );
+      expect(rawBranchBody, contains('Initialize-Disk'));
+      expect(mismatchBranchBody.toLowerCase(), contains('convert'));
+      expect(mismatchBranchBody, contains(r'$targetStyle'));
+      expect(initialize, greaterThanOrEqualTo(0));
+      expect(finalStyleValidation, greaterThan(mismatchBranch.start));
+      expect(finalPartitionCheck, greaterThan(finalStyleValidation));
+      expect(completion, greaterThan(finalPartitionCheck));
       expect(initializer, contains('checkDiskSafety(disk)'));
       expect(initializer, contains('_guardedDiskInitializationScript'));
       expect(initializer, contains("stdout.contains('WDS_DISK_INITIALIZED')"));

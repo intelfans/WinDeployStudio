@@ -115,9 +115,10 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       if (_cancelToken!.cancelled) {
         state = state.copyWith(status: UpdateStatus.available);
       } else {
+        final errorKey = _service.lastDownloadErrorKey;
         state = state.copyWith(
           status: UpdateStatus.error,
-          error: trCurrent('webview_download_failed'),
+          error: trCurrent(errorKey ?? 'webview_download_failed'),
         );
       }
     }

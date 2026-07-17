@@ -233,13 +233,36 @@ class LogCenterService {
       'WinDeployStudio_Logs_$timestamp.zip',
     );
 
-    final result = await Process.run('powershell', [
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      'if (Get-ChildItem -Path "$_logsBasePath" -Recurse -File) { Compress-Archive -Path "$_logsBasePath\\*" -DestinationPath "$zipPath" -Force } else { New-Item -ItemType File -Path "$zipPath" -Force | Out-Null; Add-Content -Path "$zipPath" -Value "No log files found" }',
-    ]);
+    final result = await Process.run(
+      'powershell',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        r'''
+$base = $env:WDS_LOGS_BASE
+$zip = $env:WDS_LOGS_ZIP
+$files = @(Get-ChildItem -LiteralPath $base -Recurse -File -ErrorAction SilentlyContinue)
+if ($files.Count -gt 0) {
+  Compress-Archive -Path (Join-Path $base '*') -DestinationPath $zip -Force -ErrorAction Stop
+} else {
+  $marker = Join-Path ([IO.Path]::GetTempPath()) ('WinDeployStudio_NoLogs_' + [Guid]::NewGuid().ToString() + '.txt')
+  try {
+    Set-Content -LiteralPath $marker -Value 'No log files found.' -Encoding UTF8 -ErrorAction Stop
+    Compress-Archive -LiteralPath $marker -DestinationPath $zip -Force -ErrorAction Stop
+  } finally {
+    Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+  }
+}
+''',
+      ],
+      environment: {
+        ...Platform.environment,
+        'WDS_LOGS_BASE': _logsBasePath,
+        'WDS_LOGS_ZIP': zipPath,
+      },
+    );
 
     if (result.exitCode != 0) {
       throw Exception('Export failed: ${result.stderr}');

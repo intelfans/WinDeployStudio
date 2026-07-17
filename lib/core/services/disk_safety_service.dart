@@ -44,6 +44,51 @@ class DiskInfo {
     this.partitions = const [],
   });
 
+  /// Returns the volume that is most appropriate for a user-facing operation.
+  ///
+  /// A removable disk can expose a small EFI/recovery partition before its
+  /// actual data volume.  The old callers used `driveLetters.first`, which
+  /// made a benchmark write to that small partition (or fail immediately when
+  /// it had no free space).  Prefer a mounted, non-system partition with the
+  /// largest reported capacity and retain the legacy ordering only when
+  /// partition metadata is unavailable.
+  String? get preferredDriveLetter {
+    final mounted = partitions
+        .where(
+          (partition) =>
+              partition.driveLetter != null &&
+              partition.driveLetter!.trim().isNotEmpty,
+        )
+        .toList(growable: false);
+    if (mounted.isNotEmpty) {
+      final ranked = [...mounted]
+        ..sort((left, right) {
+          final systemOrder = (_isBootOrReservedPartition(left) ? 1 : 0)
+              .compareTo(_isBootOrReservedPartition(right) ? 1 : 0);
+          if (systemOrder != 0) return systemOrder;
+          final sizeOrder = right.sizeBytes.compareTo(left.sizeBytes);
+          if (sizeOrder != 0) return sizeOrder;
+          return (left.driveLetter ?? '').compareTo(right.driveLetter ?? '');
+        });
+      return ranked.first.driveLetter!.trim().toUpperCase();
+    }
+
+    for (final letter in driveLetters) {
+      final normalized = letter.trim().replaceAll(':', '').toUpperCase();
+      if (normalized.length == 1) return normalized;
+    }
+    return null;
+  }
+
+  static bool _isBootOrReservedPartition(DiskPartition partition) {
+    if (partition.isSystem) return true;
+    final type = partition.type.trim().toLowerCase();
+    return type.contains('system') ||
+        type.contains('efi') ||
+        type.contains('recovery') ||
+        type.contains('reserved');
+  }
+
   @override
   String toString() =>
       'Disk $diskNumber: $model ($sizeFormatted) S/N: $serialNumber';
@@ -497,12 +542,13 @@ do {
   Update-Disk -Number $disk.Number -ErrorAction Stop | Out-Null
   Start-Sleep -Milliseconds 150
   $disk = Assert-TargetDisk $false $false
-  if ($disk.PartitionStyle.ToString().ToUpperInvariant() -eq 'RAW') {
+  $partitions = @(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue)
+  if ($partitions.Count -eq 0) {
     break
   }
 } while ([DateTime]::UtcNow -lt $deadline)
-if ($disk.PartitionStyle.ToString().ToUpperInvariant() -ne 'RAW') {
-  throw 'Target disk did not become RAW after it was cleared.'
+if (@(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue).Count -ne 0) {
+  throw 'Target disk still has partitions after it was cleared.'
 }
 
 # The disk signature/unique ID can legitimately change after Clear-Disk.
@@ -511,7 +557,25 @@ Assert-PersistentIdentity $disk
 if ($disk.IsOffline) {
   Set-Disk -Number $disk.Number -IsOffline $false -ErrorAction Stop | Out-Null
 }
-Initialize-Disk -Number $disk.Number -PartitionStyle $targetStyle -ErrorAction Stop | Out-Null
+$clearedStyle = $disk.PartitionStyle.ToString().ToUpperInvariant()
+if ($clearedStyle -eq 'RAW') {
+  Initialize-Disk -Number $disk.Number -PartitionStyle $targetStyle -ErrorAction Stop | Out-Null
+} elseif ($clearedStyle -ne $targetStyle -and $clearedStyle -in @('GPT', 'MBR')) {
+  # Some USB bridges report an empty MBR/GPT disk instead of RAW after
+  # Clear-Disk. Convert only this known, empty state; final style and zero
+  # partition checks below remain authoritative.
+  $diskpartInput = @(
+    "select disk $($disk.Number)",
+    "convert $($targetStyle.ToLowerInvariant())",
+    'exit'
+  ) -join [Environment]::NewLine
+  $diskpartInput | & "$env:SystemRoot\System32\diskpart.exe"
+  if ($LASTEXITCODE -ne 0) {
+    throw "DiskPart could not convert empty $clearedStyle disk to $targetStyle."
+  }
+} elseif ($clearedStyle -ne $targetStyle) {
+  throw "Target disk has unsupported cleared style $clearedStyle."
+}
 Update-Disk -Number $disk.Number -ErrorAction Stop | Out-Null
 $initialized = Get-Disk -Number $disk.Number -ErrorAction Stop
 if ($initialized.PartitionStyle.ToString().ToUpperInvariant() -ne $targetStyle) {

@@ -272,6 +272,10 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
       'webview_managed_download_tracking':
           '请保持 WinDeploy Studio 打开，下载会在此页面持续显示。',
       'webview_managed_download_no_location': '未选择保存位置，下载未开始。',
+      'download_error_redirect_blocked': '下载重定向不受信任，已停止下载。',
+      'download_error_response_timeout': '下载服务器响应超时，请稍后重试。',
+      'download_error_incomplete': '下载未完成，请继续或重新开始下载。',
+      'download_error_integrity_failed': '下载文件未通过 SHA-256 校验，已删除。',
     },
     'zh_TW' => const {
       'webview_managed_download_title': '正在準備下載',
@@ -286,6 +290,10 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
       'webview_managed_download_tracking':
           '請保持 WinDeploy Studio 開啟，下載會在此頁面持續顯示。',
       'webview_managed_download_no_location': '未選擇儲存位置，下載尚未開始。',
+      'download_error_redirect_blocked': '下載重新導向不受信任，已停止下載。',
+      'download_error_response_timeout': '下載伺服器回應逾時，請稍後再試。',
+      'download_error_incomplete': '下載未完成，請繼續或重新開始下載。',
+      'download_error_integrity_failed': '下載檔案未通過 SHA-256 驗證，已刪除。',
     },
     'ru' => const {
       'webview_managed_download_title': 'Ваша загрузка подготавливается',
@@ -304,6 +312,14 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'Не закрывайте WinDeploy Studio, пока эта страница отслеживает передачу.',
       'webview_managed_download_no_location':
           'Место сохранения не выбрано, поэтому загрузка не началась.',
+      'download_error_redirect_blocked':
+          'Ненадежное перенаправление загрузки было заблокировано.',
+      'download_error_response_timeout':
+          'Сервер загрузки не ответил вовремя. Повторите попытку позже.',
+      'download_error_incomplete':
+          'Загрузка не завершена. Возобновите ее или начните заново.',
+      'download_error_integrity_failed':
+          'Загруженный файл не прошел проверку SHA-256 и был удален.',
     },
     'fr' => const {
       'webview_managed_download_title':
@@ -323,6 +339,14 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'Laissez WinDeploy Studio ouvert pendant que cette page suit le transfert.',
       'webview_managed_download_no_location':
           'Aucun emplacement d’enregistrement n’a été sélectionné, le téléchargement n’a pas démarré.',
+      'download_error_redirect_blocked':
+          'Une redirection de téléchargement non fiable a été bloquée.',
+      'download_error_response_timeout':
+          'Le serveur de téléchargement n’a pas répondu à temps. Réessayez plus tard.',
+      'download_error_incomplete':
+          'Le téléchargement est incomplet. Reprenez-le ou recommencez.',
+      'download_error_integrity_failed':
+          'Le fichier téléchargé a échoué à la vérification SHA-256 et a été supprimé.',
     },
     'de' => const {
       'webview_managed_download_title': 'Ihr Download wird vorbereitet',
@@ -341,6 +365,14 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'Lassen Sie WinDeploy Studio geöffnet, während diese Seite die Übertragung verfolgt.',
       'webview_managed_download_no_location':
           'Es wurde kein Speicherort ausgewählt, daher wurde der Download nicht gestartet.',
+      'download_error_redirect_blocked':
+          'Eine nicht vertrauenswürdige Download-Weiterleitung wurde blockiert.',
+      'download_error_response_timeout':
+          'Der Downloadserver hat nicht rechtzeitig geantwortet. Bitte versuchen Sie es später erneut.',
+      'download_error_incomplete':
+          'Der Download ist unvollständig. Setzen Sie ihn fort oder starten Sie ihn neu.',
+      'download_error_integrity_failed':
+          'Die heruntergeladene Datei hat die SHA-256-Prüfung nicht bestanden und wurde gelöscht.',
     },
     'es' => const {
       'webview_managed_download_title': 'Tu descarga se está preparando',
@@ -359,6 +391,14 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'Mantén WinDeploy Studio abierto mientras esta página sigue la transferencia.',
       'webview_managed_download_no_location':
           'No se seleccionó una ubicación para guardar, por lo que la descarga no se inició.',
+      'download_error_redirect_blocked':
+          'Se bloqueó una redirección de descarga no confiable.',
+      'download_error_response_timeout':
+          'El servidor de descarga no respondió a tiempo. Inténtalo de nuevo más tarde.',
+      'download_error_incomplete':
+          'La descarga está incompleta. Reanúdala o vuelve a iniciarla.',
+      'download_error_integrity_failed':
+          'El archivo descargado no superó la comprobación SHA-256 y se eliminó.',
     },
     'pt' => const {
       'webview_managed_download_title': 'Seu download está sendo preparado',
@@ -377,6 +417,14 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'Mantenha o WinDeploy Studio aberto enquanto esta página acompanha a transferência.',
       'webview_managed_download_no_location':
           'Nenhum local para salvar foi selecionado, então o download não foi iniciado.',
+      'download_error_redirect_blocked':
+          'Um redirecionamento de download não confiável foi bloqueado.',
+      'download_error_response_timeout':
+          'O servidor de download não respondeu a tempo. Tente novamente mais tarde.',
+      'download_error_incomplete':
+          'O download está incompleto. Retome-o ou inicie-o novamente.',
+      'download_error_integrity_failed':
+          'O arquivo baixado falhou na verificação SHA-256 e foi removido.',
     },
     'ar' => const {
       'webview_managed_download_title': 'يجري إعداد التنزيل',
@@ -393,6 +441,13 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'أبقِ WinDeploy Studio مفتوحًا بينما تتعقب هذه الصفحة النقل.',
       'webview_managed_download_no_location':
           'لم يتم اختيار موقع للحفظ، لذلك لم يبدأ التنزيل.',
+      'download_error_redirect_blocked': 'تم حظر إعادة توجيه تنزيل غير موثوقة.',
+      'download_error_response_timeout':
+          'لم يستجب خادم التنزيل في الوقت المحدد. حاول مرة أخرى لاحقًا.',
+      'download_error_incomplete':
+          'التنزيل غير مكتمل. استأنفه أو ابدأه من جديد.',
+      'download_error_integrity_failed':
+          'فشل الملف الذي تم تنزيله في تحقق SHA-256 وتم حذفه.',
     },
     'ko' => const {
       'webview_managed_download_title': '다운로드를 준비하고 있습니다',
@@ -409,6 +464,11 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           '이 페이지에서 전송을 추적하는 동안 WinDeploy Studio를 열어 두세요.',
       'webview_managed_download_no_location':
           '저장 위치를 선택하지 않아 다운로드가 시작되지 않았습니다.',
+      'download_error_redirect_blocked': '신뢰할 수 없는 다운로드 리디렉션이 차단되었습니다.',
+      'download_error_response_timeout':
+          '다운로드 서버가 제시간에 응답하지 않았습니다. 잠시 후 다시 시도하세요.',
+      'download_error_incomplete': '다운로드가 완료되지 않았습니다. 다시 시작하거나 이어서 받으세요.',
+      'download_error_integrity_failed': '다운로드한 파일이 SHA-256 검증에 실패하여 삭제되었습니다.',
     },
     'ja' => const {
       'webview_managed_download_title': 'ダウンロードを準備しています',
@@ -425,6 +485,12 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'このページが転送を追跡している間は、WinDeploy Studio を開いたままにしてください。',
       'webview_managed_download_no_location':
           '保存先が選択されなかったため、ダウンロードは開始されませんでした。',
+      'download_error_redirect_blocked': '信頼できないダウンロードのリダイレクトをブロックしました。',
+      'download_error_response_timeout':
+          'ダウンロードサーバーが時間内に応答しませんでした。後でもう一度お試しください。',
+      'download_error_incomplete': 'ダウンロードが完了していません。再開するか、最初からやり直してください。',
+      'download_error_integrity_failed':
+          'ダウンロードしたファイルは SHA-256 検証に失敗したため削除されました。',
     },
     _ => const {
       'webview_managed_download_title': 'Your download is being prepared',
@@ -443,6 +509,14 @@ Map<String, String> _managedDownloadStringsForCode(String code) {
           'Keep WinDeploy Studio open while this page tracks the transfer.',
       'webview_managed_download_no_location':
           'No save location was selected, so the download did not start.',
+      'download_error_redirect_blocked':
+          'An untrusted download redirect was blocked.',
+      'download_error_response_timeout':
+          'The download server did not respond in time. Please try again later.',
+      'download_error_incomplete':
+          'The download is incomplete. Resume it or start again.',
+      'download_error_integrity_failed':
+          'The downloaded file did not pass SHA-256 verification and was deleted.',
     },
   };
 }
@@ -454,66 +528,110 @@ Map<String, String> _updateSourceStringsForCode(String code) {
       'update_github_fallback': 'GitHub Release（备用）',
       'update_github_release': 'GitHub Release（备用）',
       'update_source_unavailable': 'SourceForge 暂不可用',
+      'update_download_trust_required':
+          '此版本未提供可验证的 GitHub Release SHA-256 校验值，已停止自动下载。请在发布页手动下载并核验文件。',
+      'update_download_integrity_failed':
+          '下载的更新未通过 GitHub Release SHA-256 校验，文件已删除，未启动安装程序。',
     },
     'zh_TW' => const {
       'update_sourceforge_recommended': 'SourceForge（推薦）',
       'update_github_fallback': 'GitHub Release（備用）',
       'update_github_release': 'GitHub Release（備用）',
       'update_source_unavailable': 'SourceForge 暫時無法使用',
+      'update_download_trust_required':
+          '此版本未提供可驗證的 GitHub Release SHA-256 雜湊，已停止自動下載。請在發布頁手動下載並驗證檔案。',
+      'update_download_integrity_failed':
+          '下載的更新未通過 GitHub Release SHA-256 驗證，檔案已刪除，未啟動安裝程式。',
     },
     'ru' => const {
       'update_sourceforge_recommended': 'SourceForge (рекомендуется)',
       'update_github_fallback': 'GitHub Release (резерв)',
       'update_github_release': 'GitHub Release (резерв)',
       'update_source_unavailable': 'SourceForge недоступен',
+      'update_download_trust_required':
+          'Для этого выпуска нет проверяемой SHA-256 из GitHub Release. Автоматическая загрузка остановлена. Скачайте файл со страницы выпуска и проверьте его вручную.',
+      'update_download_integrity_failed':
+          'Загруженное обновление не прошло проверку SHA-256 GitHub Release. Файл удален, установщик не был запущен.',
     },
     'fr' => const {
       'update_sourceforge_recommended': 'SourceForge (recommandé)',
       'update_github_fallback': 'GitHub Release (secours)',
       'update_github_release': 'GitHub Release (secours)',
       'update_source_unavailable': 'SourceForge indisponible',
+      'update_download_trust_required':
+          'Cette version ne fournit pas de SHA-256 vérifiable depuis GitHub Release. Le téléchargement automatique a été arrêté. Téléchargez et vérifiez le fichier manuellement depuis la page de publication.',
+      'update_download_integrity_failed':
+          'La mise à jour téléchargée ne correspond pas au SHA-256 de GitHub Release. Le fichier a été supprimé et le programme d’installation n’a pas été lancé.',
     },
     'de' => const {
       'update_sourceforge_recommended': 'SourceForge (empfohlen)',
       'update_github_fallback': 'GitHub Release (Alternative)',
       'update_github_release': 'GitHub Release (Alternative)',
       'update_source_unavailable': 'SourceForge nicht verfügbar',
+      'update_download_trust_required':
+          'Für diese Version ist kein überprüfbarer SHA-256-Wert von GitHub Release verfügbar. Der automatische Download wurde gestoppt. Laden und prüfen Sie die Datei manuell auf der Release-Seite.',
+      'update_download_integrity_failed':
+          'Das heruntergeladene Update stimmt nicht mit dem SHA-256 von GitHub Release überein. Die Datei wurde gelöscht und das Installationsprogramm nicht gestartet.',
     },
     'es' => const {
       'update_sourceforge_recommended': 'SourceForge (recomendado)',
       'update_github_fallback': 'GitHub Release (alternativo)',
       'update_github_release': 'GitHub Release (alternativo)',
       'update_source_unavailable': 'SourceForge no disponible',
+      'update_download_trust_required':
+          'Esta versión no ofrece un SHA-256 verificable de GitHub Release. La descarga automática se detuvo. Descarga y verifica el archivo manualmente desde la página de lanzamiento.',
+      'update_download_integrity_failed':
+          'La actualización descargada no coincide con el SHA-256 de GitHub Release. El archivo se eliminó y el instalador no se inició.',
     },
     'pt' => const {
       'update_sourceforge_recommended': 'SourceForge (recomendado)',
       'update_github_fallback': 'GitHub Release (alternativo)',
       'update_github_release': 'GitHub Release (alternativo)',
       'update_source_unavailable': 'SourceForge indisponível',
+      'update_download_trust_required':
+          'Esta versão não fornece um SHA-256 verificável do GitHub Release. O download automático foi interrompido. Baixe e verifique o arquivo manualmente na página da versão.',
+      'update_download_integrity_failed':
+          'A atualização baixada não corresponde ao SHA-256 do GitHub Release. O arquivo foi removido e o instalador não foi iniciado.',
     },
     'ar' => const {
       'update_sourceforge_recommended': 'SourceForge (موصى به)',
       'update_github_fallback': 'إصدار GitHub (احتياطي)',
       'update_github_release': 'إصدار GitHub (احتياطي)',
       'update_source_unavailable': 'SourceForge غير متاح',
+      'update_download_trust_required':
+          'لا يتوفر لهذا الإصدار SHA-256 قابل للتحقق من GitHub Release. تم إيقاف التنزيل التلقائي. نزّل الملف وتحقق منه يدويًا من صفحة الإصدار.',
+      'update_download_integrity_failed':
+          'لا يطابق التحديث الذي تم تنزيله SHA-256 المنشور في GitHub Release. حُذف الملف ولم يبدأ برنامج التثبيت.',
     },
     'ko' => const {
       'update_sourceforge_recommended': 'SourceForge (권장)',
       'update_github_fallback': 'GitHub 릴리스 (대체)',
       'update_github_release': 'GitHub 릴리스 (대체)',
       'update_source_unavailable': 'SourceForge를 사용할 수 없음',
+      'update_download_trust_required':
+          '이 릴리스에는 GitHub 릴리스에서 확인 가능한 SHA-256 값이 없습니다. 자동 다운로드를 중단했습니다. 릴리스 페이지에서 파일을 수동으로 내려받아 확인하세요.',
+      'update_download_integrity_failed':
+          '내려받은 업데이트가 GitHub 릴리스 SHA-256과 일치하지 않습니다. 파일을 삭제했으며 설치 프로그램을 시작하지 않았습니다.',
     },
     'ja' => const {
       'update_sourceforge_recommended': 'SourceForge（推奨）',
       'update_github_fallback': 'GitHub リリース（代替）',
       'update_github_release': 'GitHub リリース（代替）',
       'update_source_unavailable': 'SourceForge は利用できません',
+      'update_download_trust_required':
+          'このリリースには GitHub Release で検証可能な SHA-256 がありません。自動ダウンロードを停止しました。リリースページから手動でダウンロードして確認してください。',
+      'update_download_integrity_failed':
+          'ダウンロードした更新プログラムが GitHub Release の SHA-256 と一致しません。ファイルを削除し、インストーラーは開始していません。',
     },
     _ => const {
       'update_sourceforge_recommended': 'SourceForge (Recommended)',
       'update_github_fallback': 'GitHub Release (Fallback)',
       'update_github_release': 'GitHub Release (Fallback)',
       'update_source_unavailable': 'SourceForge unavailable',
+      'update_download_trust_required':
+          'This release does not provide a verifiable GitHub Release SHA-256 digest. Automatic download was stopped. Download and verify the file manually from the release page.',
+      'update_download_integrity_failed':
+          'The downloaded update did not match the GitHub Release SHA-256 digest. The file was deleted and the installer was not started.',
     },
   };
 }
@@ -821,6 +939,7 @@ const _en = <String, String>{
   'wtg_step_partitioning': 'Partitioning Disk',
   'wtg_step_mounting': 'Mounting ISO',
   'wtg_step_applying': 'Applying Windows Image',
+  'wtg_step_configuring': 'Configuring Windows To Go',
   'wtg_step_boot': 'Writing Boot Files',
   'wtg_step_verifying': 'Verifying',
   'wtg_step_complete_title': 'Step 7: Complete',
@@ -1230,6 +1349,8 @@ const _en = <String, String>{
   'boot_cleaning': 'Cleaning disk...',
   'boot_access_denied': 'Access denied - please run as Administrator',
   'boot_partition_failed': 'Partition failed: {error}',
+  'boot_partition_layout_not_ready':
+      'The new volume did not become ready in time. Please retry.',
   'boot_format_verifying': 'Verifying format...',
   'boot_format_failed': 'Format failed',
   'boot_mounting': 'Mounting ISO...',
@@ -1254,9 +1375,12 @@ const _en = <String, String>{
   'wtg_svc_mounting': 'Mounting ISO...',
   'wtg_svc_mount_failed': 'Failed to mount ISO',
   'wtg_svc_applying': 'Applying Windows image...',
+  'wtg_svc_configuring': 'Configuring Windows To Go...',
   'wtg_svc_no_wim': 'No install.wim or install.esd found',
   'wtg_svc_no_partition': 'Could not find Windows partition',
   'wtg_svc_apply_failed': 'Failed to apply Windows image',
+  'wtg_svc_config_failed': 'Offline Windows configuration failed',
+  'wtg_svc_winre_failed': 'Failed to configure Windows Recovery Environment',
   'wtg_svc_writing_boot': 'Writing boot files...',
   'wtg_svc_boot_failed': 'Failed to write boot files',
   'wtg_svc_verifying': 'Verifying Windows To Go...',
@@ -1722,6 +1846,7 @@ const _zh = <String, String>{
   'wtg_step_partitioning': '正在分区磁盘',
   'wtg_step_mounting': '正在挂载 ISO',
   'wtg_step_applying': '正在应用 Windows 镜像',
+  'wtg_step_configuring': '正在配置 Windows To Go',
   'wtg_step_boot': '正在写入引导文件',
   'wtg_step_verifying': '正在验证',
   'wtg_step_complete_title': '步骤 7：完成',
@@ -2089,6 +2214,7 @@ const _zh = <String, String>{
   'boot_cleaning': '正在清理磁盘...',
   'boot_access_denied': '访问被拒绝 - 请以管理员身份运行',
   'boot_partition_failed': '分区失败：{error}',
+  'boot_partition_layout_not_ready': '新建卷未能及时就绪，请重试。',
   'boot_format_verifying': '正在验证格式...',
   'boot_format_failed': '格式化失败',
   'boot_mounting': '正在挂载 ISO...',
@@ -2111,9 +2237,12 @@ const _zh = <String, String>{
   'wtg_svc_mounting': '正在挂载 ISO...',
   'wtg_svc_mount_failed': 'ISO 挂载失败',
   'wtg_svc_applying': '正在应用 Windows 镜像...',
+  'wtg_svc_configuring': '正在配置 Windows To Go...',
   'wtg_svc_no_wim': '未找到 install.wim 或 install.esd',
   'wtg_svc_no_partition': '无法找到 Windows 分区',
   'wtg_svc_apply_failed': 'Windows 镜像应用失败',
+  'wtg_svc_config_failed': 'Windows 离线配置失败',
+  'wtg_svc_winre_failed': 'Windows 恢复环境配置失败',
   'wtg_svc_writing_boot': '正在写入引导文件...',
   'wtg_svc_boot_failed': '引导文件写入失败',
   'wtg_svc_verifying': '正在验证 Windows To Go...',
@@ -2563,6 +2692,7 @@ const _ru = <String, String>{
   'wtg_step_partitioning': 'Разметка диска',
   'wtg_step_mounting': 'Монтирование ISO',
   'wtg_step_applying': 'Применение образа Windows',
+  'wtg_step_configuring': 'Настройка Windows To Go',
   'wtg_step_boot': 'Запись загрузочных файлов',
   'wtg_step_verifying': 'Проверка',
   'wtg_step_complete_title': 'Шаг 7: Завершено',
@@ -2968,6 +3098,8 @@ const _ru = <String, String>{
   'boot_cleaning': 'Очистка диска...',
   'boot_access_denied': 'Доступ запрещён — запустите от имени администратора',
   'boot_partition_failed': 'Ошибка разметки: {error}',
+  'boot_partition_layout_not_ready':
+      'Новый том не был готов вовремя. Повторите попытку.',
   'boot_format_verifying': 'Проверка формата...',
   'boot_format_failed': 'Ошибка форматирования',
   'boot_mounting': 'Монтирование ISO...',
@@ -2990,9 +3122,12 @@ const _ru = <String, String>{
   'wtg_svc_mounting': 'Монтирование ISO...',
   'wtg_svc_mount_failed': 'Ошибка монтирования ISO',
   'wtg_svc_applying': 'Применение образа Windows...',
+  'wtg_svc_configuring': 'Настройка Windows To Go...',
   'wtg_svc_no_wim': 'Файл install.wim или install.esd не найден',
   'wtg_svc_no_partition': 'Не удалось найти раздел Windows',
   'wtg_svc_apply_failed': 'Ошибка применения образа Windows',
+  'wtg_svc_config_failed': 'Не удалось настроить автономную систему Windows',
+  'wtg_svc_winre_failed': 'Не удалось настроить среду восстановления Windows',
   'wtg_svc_writing_boot': 'Запись загрузочных файлов...',
   'wtg_svc_boot_failed': 'Ошибка записи загрузочных файлов',
   'wtg_svc_verifying': 'Проверка Windows To Go...',
@@ -3490,6 +3625,7 @@ const _fr = <String, String>{
   'wtg_step_partitioning': 'Partitionnement du disque',
   'wtg_step_mounting': 'Montage de l\'ISO',
   'wtg_step_applying': 'Application de l\'image Windows',
+  'wtg_step_configuring': 'Configuration de Windows To Go',
   'wtg_step_boot': 'Écriture des fichiers de démarrage',
   'wtg_step_verifying': 'Vérification',
   'wtg_step_complete_title': 'Étape 7 : Terminé',
@@ -3893,6 +4029,8 @@ const _fr = <String, String>{
   'boot_access_denied':
       'Accès refusé - veuillez exécuter en tant qu\'administrateur',
   'boot_partition_failed': 'Échec de la partition : {error}',
+  'boot_partition_layout_not_ready':
+      'Le nouveau volume n\'a pas été prêt à temps. Réessayez.',
   'boot_format_verifying': 'Vérification du format...',
   'boot_format_failed': 'Échec du formatage',
   'boot_mounting': 'Montage de l\'ISO...',
@@ -3915,9 +4053,13 @@ const _fr = <String, String>{
   'wtg_svc_mounting': 'Montage de l\'ISO...',
   'wtg_svc_mount_failed': 'Échec du montage de l\'ISO',
   'wtg_svc_applying': 'Application de l\'image Windows...',
+  'wtg_svc_configuring': 'Configuration de Windows To Go...',
   'wtg_svc_no_wim': 'Aucun install.wim ou install.esd trouvé',
   'wtg_svc_no_partition': 'Impossible de trouver la partition Windows',
   'wtg_svc_apply_failed': 'Échec de l\'application de l\'image Windows',
+  'wtg_svc_config_failed': 'Échec de la configuration hors ligne de Windows',
+  'wtg_svc_winre_failed':
+      'Échec de la configuration de l\'environnement de récupération Windows',
   'wtg_svc_writing_boot': 'Écriture des fichiers de démarrage...',
   'wtg_svc_boot_failed': 'Échec de l\'écriture des fichiers de démarrage',
   'wtg_svc_verifying': 'Vérification de Windows To Go...',
@@ -4399,6 +4541,7 @@ const _ja = <String, String>{
   'wtg_step_partitioning': 'ディスクのパーティショニング',
   'wtg_step_mounting': 'ISOのマウント',
   'wtg_step_applying': 'Windowsイメージの適用',
+  'wtg_step_configuring': 'Windows To Go の構成',
   'wtg_step_boot': 'ブートファイルの書き込み',
   'wtg_step_verifying': '検証中',
   'wtg_step_complete_title': 'ステップ7：完了',
@@ -4778,6 +4921,7 @@ const _ja = <String, String>{
   'boot_cleaning': 'ディスクをクリーンアップ中...',
   'boot_access_denied': 'アクセスが拒否されました - 管理者として実行してください',
   'boot_partition_failed': 'パーティション作成に失敗しました：{error}',
+  'boot_partition_layout_not_ready': '新しいボリュームの準備が時間内に完了しませんでした。再試行してください。',
   'boot_format_verifying': 'フォーマットを検証中...',
   'boot_format_failed': 'フォーマットに失敗しました',
   'boot_mounting': 'ISOをマウント中...',
@@ -4800,9 +4944,12 @@ const _ja = <String, String>{
   'wtg_svc_mounting': 'ISOをマウント中...',
   'wtg_svc_mount_failed': 'ISOのマウントに失敗しました',
   'wtg_svc_applying': 'Windowsイメージを適用中...',
+  'wtg_svc_configuring': 'Windows To Go を構成中...',
   'wtg_svc_no_wim': 'install.wimまたはinstall.esdが見つかりません',
   'wtg_svc_no_partition': 'Windowsパーティションが見つかりません',
   'wtg_svc_apply_failed': 'Windowsイメージの適用に失敗しました',
+  'wtg_svc_config_failed': 'オフライン Windows の構成に失敗しました',
+  'wtg_svc_winre_failed': 'Windows 回復環境の構成に失敗しました',
   'wtg_svc_writing_boot': 'ブートファイルを書き込み中...',
   'wtg_svc_boot_failed': 'ブートファイルの書き込みに失敗しました',
   'wtg_svc_verifying': 'Windows To Goを検証中...',
@@ -5236,6 +5383,7 @@ const _zhTW = <String, String>{
   'wtg_step_partitioning': '正在分割磁碟',
   'wtg_step_mounting': '正在掛載 ISO',
   'wtg_step_applying': '正在套用 Windows 映像',
+  'wtg_step_configuring': '正在設定 Windows To Go',
   'wtg_step_boot': '正在寫入開機檔案',
   'wtg_step_verifying': '正在驗證',
   'wtg_step_complete_title': '步驟 7：完成',
@@ -5604,6 +5752,7 @@ const _zhTW = <String, String>{
   'boot_cleaning': '正在清理磁碟...',
   'boot_access_denied': '存取被拒 - 請以系統管理員身分執行',
   'boot_partition_failed': '分割區建立失敗：{error}',
+  'boot_partition_layout_not_ready': '新建立體磁碟區未能及時就緒，請重試。',
   'boot_format_verifying': '正在驗證格式...',
   'boot_format_failed': '格式化失敗',
   'boot_mounting': '正在掛載 ISO...',
@@ -5626,9 +5775,12 @@ const _zhTW = <String, String>{
   'wtg_svc_mounting': '正在掛載 ISO...',
   'wtg_svc_mount_failed': 'ISO 掛載失敗',
   'wtg_svc_applying': '正在套用 Windows 映像...',
+  'wtg_svc_configuring': '正在設定 Windows To Go...',
   'wtg_svc_no_wim': '未找到 install.wim 或 install.esd',
   'wtg_svc_no_partition': '無法找到 Windows 分割區',
   'wtg_svc_apply_failed': 'Windows 映像套用失敗',
+  'wtg_svc_config_failed': 'Windows 離線設定失敗',
+  'wtg_svc_winre_failed': 'Windows 復原環境設定失敗',
   'wtg_svc_writing_boot': '正在寫入開機檔案...',
   'wtg_svc_boot_failed': '開機檔案寫入失敗',
   'wtg_svc_verifying': '正在驗證 Windows To Go...',
@@ -6086,6 +6238,7 @@ const _es = <String, String>{
   'wtg_step_partitioning': 'Particionando disco',
   'wtg_step_mounting': 'Montando ISO',
   'wtg_step_applying': 'Aplicando imagen de Windows',
+  'wtg_step_configuring': 'Configurando Windows To Go',
   'wtg_step_boot': 'Escribiendo archivos de arranque',
   'wtg_step_verifying': 'Verificando',
   'wtg_step_complete_title': 'Paso 7: Completado',
@@ -6478,6 +6631,8 @@ const _es = <String, String>{
   'boot_cleaning': 'Limpiando disco...',
   'boot_access_denied': 'Acceso denegado, ejecute como administrador',
   'boot_partition_failed': 'Error al crear partición: {error}',
+  'boot_partition_layout_not_ready':
+      'El nuevo volumen no estuvo listo a tiempo. Inténtalo de nuevo.',
   'boot_format_verifying': 'Verificando formato...',
   'boot_format_failed': 'Error en el formateo',
   'boot_mounting': 'Montando ISO...',
@@ -6500,9 +6655,13 @@ const _es = <String, String>{
   'wtg_svc_mounting': 'Montando ISO...',
   'wtg_svc_mount_failed': 'Error al montar ISO',
   'wtg_svc_applying': 'Aplicando imagen de Windows...',
+  'wtg_svc_configuring': 'Configurando Windows To Go...',
   'wtg_svc_no_wim': 'No se encontró install.wim ni install.esd',
   'wtg_svc_no_partition': 'No se encontró la partición de Windows',
   'wtg_svc_apply_failed': 'Error al aplicar la imagen de Windows',
+  'wtg_svc_config_failed': 'Error en la configuración sin conexión de Windows',
+  'wtg_svc_winre_failed':
+      'Error al configurar el entorno de recuperación de Windows',
   'wtg_svc_writing_boot': 'Escribiendo archivos de arranque...',
   'wtg_svc_boot_failed': 'Error al escribir archivos de arranque',
   'wtg_svc_verifying': 'Verificando Windows To Go...',
@@ -6989,6 +7148,7 @@ const _ar = <String, String>{
   'wtg_step_partitioning': 'تقسيم القرص',
   'wtg_step_mounting': 'تركيب ISO',
   'wtg_step_applying': 'تطبيق صورة Windows',
+  'wtg_step_configuring': 'إعداد Windows To Go',
   'wtg_step_boot': 'كتابة ملفات الإقلاع',
   'wtg_step_verifying': 'التحقق',
   'wtg_step_complete_title': 'الخطوة 7: اكتمل',
@@ -7378,6 +7538,8 @@ const _ar = <String, String>{
   'boot_cleaning': 'تنظيف القرص...',
   'boot_access_denied': 'تم رفض الوصول، يرجى التشغيل كمسؤول',
   'boot_partition_failed': 'فشل إنشاء القسم: {error}',
+  'boot_partition_layout_not_ready':
+      'لم تصبح وحدة التخزين الجديدة جاهزة في الوقت المحدد. حاول مرة أخرى.',
   'boot_format_verifying': 'التحقق من التنسيق...',
   'boot_format_failed': 'فشل التنسيق',
   'boot_mounting': 'تركيب ISO...',
@@ -7400,9 +7562,12 @@ const _ar = <String, String>{
   'wtg_svc_mounting': 'تركيب ISO...',
   'wtg_svc_mount_failed': 'فشل تركيب ISO',
   'wtg_svc_applying': 'تطبيق صورة Windows...',
+  'wtg_svc_configuring': 'جارٍ إعداد Windows To Go...',
   'wtg_svc_no_wim': 'لم يتم العثور على install.wim أو install.esd',
   'wtg_svc_no_partition': 'لم يتم العثور على قسم Windows',
   'wtg_svc_apply_failed': 'فشل تطبيق صورة Windows',
+  'wtg_svc_config_failed': 'فشل إعداد Windows دون اتصال',
+  'wtg_svc_winre_failed': 'فشل إعداد بيئة استرداد Windows',
   'wtg_svc_writing_boot': 'كتابة ملفات الإقلاع...',
   'wtg_svc_boot_failed': 'فشل كتابة ملفات الإقلاع',
   'wtg_svc_verifying': 'التحقق من Windows To Go...',
@@ -7885,6 +8050,7 @@ const _pt = <String, String>{
   'wtg_step_partitioning': 'Particionando disco',
   'wtg_step_mounting': 'Montando ISO',
   'wtg_step_applying': 'Aplicando imagem do Windows',
+  'wtg_step_configuring': 'Configurando o Windows To Go',
   'wtg_step_boot': 'Gravando arquivos de boot',
   'wtg_step_verifying': 'Verificando',
   'wtg_step_complete_title': 'Passo 7: Concluído',
@@ -8280,6 +8446,8 @@ const _pt = <String, String>{
   'boot_cleaning': 'Limpando disco...',
   'boot_access_denied': 'Acesso negado, execute como administrador',
   'boot_partition_failed': 'Falha ao criar partição: {error}',
+  'boot_partition_layout_not_ready':
+      'O novo volume não ficou pronto a tempo. Tente novamente.',
   'boot_format_verifying': 'Verificando formato...',
   'boot_format_failed': 'Falha na formatação',
   'boot_mounting': 'Montando ISO...',
@@ -8303,9 +8471,13 @@ const _pt = <String, String>{
   'wtg_svc_mounting': 'Montando ISO...',
   'wtg_svc_mount_failed': 'Falha ao montar ISO',
   'wtg_svc_applying': 'Aplicando imagem do Windows...',
+  'wtg_svc_configuring': 'Configurando o Windows To Go...',
   'wtg_svc_no_wim': 'install.wim ou install.esd não encontrado',
   'wtg_svc_no_partition': 'Partição do Windows não encontrada',
   'wtg_svc_apply_failed': 'Falha ao aplicar imagem do Windows',
+  'wtg_svc_config_failed': 'Falha na configuração offline do Windows',
+  'wtg_svc_winre_failed':
+      'Falha ao configurar o Ambiente de Recuperação do Windows',
   'wtg_svc_writing_boot': 'Gravando arquivos de boot...',
   'wtg_svc_boot_failed': 'Falha ao gravar arquivos de boot',
   'wtg_svc_verifying': 'Verificando Windows To Go...',
@@ -8802,6 +8974,7 @@ const _de = <String, String>{
   'wtg_step_partitioning': 'Datenträger wird partitioniert',
   'wtg_step_mounting': 'ISO wird eingehängt',
   'wtg_step_applying': 'Windows-Abbild wird angewendet',
+  'wtg_step_configuring': 'Windows To Go wird konfiguriert',
   'wtg_step_boot': 'Startdateien werden geschrieben',
   'wtg_step_verifying': 'Überprüfung',
   'wtg_step_complete_title': 'Schritt 7: Abgeschlossen',
@@ -9207,6 +9380,8 @@ const _de = <String, String>{
   'boot_access_denied':
       'Zugriff verweigert – bitte als Administrator ausführen',
   'boot_partition_failed': 'Partitionierung fehlgeschlagen: {error}',
+  'boot_partition_layout_not_ready':
+      'Das neue Volume war nicht rechtzeitig bereit. Bitte erneut versuchen.',
   'boot_format_verifying': 'Format wird überprüft...',
   'boot_format_failed': 'Formatierung fehlgeschlagen',
   'boot_mounting': 'ISO wird eingehängt...',
@@ -9229,9 +9404,13 @@ const _de = <String, String>{
   'wtg_svc_mounting': 'ISO wird eingehängt...',
   'wtg_svc_mount_failed': 'ISO konnte nicht eingehängt werden',
   'wtg_svc_applying': 'Windows-Abbild wird angewendet...',
+  'wtg_svc_configuring': 'Windows To Go wird konfiguriert...',
   'wtg_svc_no_wim': 'install.wim oder install.esd nicht gefunden',
   'wtg_svc_no_partition': 'Windows-Partition nicht gefunden',
   'wtg_svc_apply_failed': 'Windows-Abbild konnte nicht angewendet werden',
+  'wtg_svc_config_failed': 'Offline-Windows-Konfiguration fehlgeschlagen',
+  'wtg_svc_winre_failed':
+      'Windows-Wiederherstellungsumgebung konnte nicht konfiguriert werden',
   'wtg_svc_writing_boot': 'Startdateien werden geschrieben...',
   'wtg_svc_boot_failed': 'Startdateien konnten nicht geschrieben werden',
   'wtg_svc_verifying': 'Windows To Go wird überprüft...',
@@ -9712,6 +9891,7 @@ const _ko = <String, String>{
   'wtg_step_partitioning': '디스크 파티션 중',
   'wtg_step_mounting': 'ISO 마운트 중',
   'wtg_step_applying': 'Windows 이미지 적용 중',
+  'wtg_step_configuring': 'Windows To Go 구성 중',
   'wtg_step_boot': '부트 파일 쓰기 중',
   'wtg_step_verifying': '검증 중',
   'wtg_step_complete_title': '7단계: 완료',
@@ -10088,6 +10268,7 @@ const _ko = <String, String>{
   'boot_cleaning': '디스크 정리 중...',
   'boot_access_denied': '접근 거부됨 - 관리자로 실행하세요',
   'boot_partition_failed': '파티션 생성 실패: {error}',
+  'boot_partition_layout_not_ready': '새 볼륨이 제시간에 준비되지 않았습니다. 다시 시도하세요.',
   'boot_format_verifying': '포맷 검증 중...',
   'boot_format_failed': '포맷 실패',
   'boot_mounting': 'ISO 마운트 중...',
@@ -10110,9 +10291,12 @@ const _ko = <String, String>{
   'wtg_svc_mounting': 'ISO 마운트 중...',
   'wtg_svc_mount_failed': 'ISO 마운트 실패',
   'wtg_svc_applying': 'Windows 이미지 적용 중...',
+  'wtg_svc_configuring': 'Windows To Go 구성 중...',
   'wtg_svc_no_wim': 'install.wim 또는 install.esd를 찾을 수 없습니다',
   'wtg_svc_no_partition': 'Windows 파티션을 찾을 수 없습니다',
   'wtg_svc_apply_failed': 'Windows 이미지 적용 실패',
+  'wtg_svc_config_failed': '오프라인 Windows 구성 실패',
+  'wtg_svc_winre_failed': 'Windows 복구 환경 구성 실패',
   'wtg_svc_writing_boot': '부트 파일 쓰기 중...',
   'wtg_svc_boot_failed': '부트 파일 쓰기 실패',
   'wtg_svc_verifying': 'Windows To Go 검증 중...',

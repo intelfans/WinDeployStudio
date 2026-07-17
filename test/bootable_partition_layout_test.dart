@@ -51,7 +51,7 @@ void main() {
     );
 
     expectPartitionOnlyScript(script);
-    expect(script, contains('create partition primary'));
+    expect(script, contains('create partition efi'));
     expect(script, contains('format fs=fat32 label="WDS_BOOT" quick'));
   });
 
@@ -85,23 +85,26 @@ void main() {
   });
 
   test(
-    'install media explicitly selects the new partition before formatting it',
+    'install media explicitly selects its new partition before formatting',
     () {
       final script = scriptFor(
         currentStyle: 'Unknown',
         bootMode: DeploymentBootMode.uefiGpt,
       );
 
-      // Newer DiskPart builds can retain disk focus after `create partition`.
-      // Formatting and drive-letter assignment require the new partition/volume
-      // to be the active focus rather than relying on that implicit behavior.
       expect(
         script,
         contains(
-          'create partition primary\n'
+          'create partition efi\n'
           'select partition 1\n'
           'format fs=fat32 label="WDS_BOOT" quick\n'
           'assign',
+        ),
+      );
+      expect(
+        script,
+        isNot(
+          contains('create partition efi\nformat fs=fat32 label="WDS_BOOT"'),
         ),
       );
     },
@@ -117,7 +120,7 @@ void main() {
     expect(
       script,
       contains(
-        'create partition primary size=32760\n'
+        'create partition efi size=32760\n'
         'select partition 1\n'
         'format fs=fat32 label="WDS_BOOT" quick',
       ),
@@ -133,13 +136,29 @@ void main() {
         diskSizeBytes: 32 * 1024 * 1024 * 1024,
       );
 
-      expect(script, contains('create partition primary\nselect partition 1'));
-      expect(script, isNot(contains('create partition primary size=')));
+      expect(
+        script,
+        contains('create partition efi\nselect partition 1\nformat fs=fat32'),
+      );
+      expect(script, isNot(contains('create partition efi size=')));
     },
   );
 
   test(
-    'legacy install media selects its partition before marking it active',
+    'UEFI + MBR keeps an MBR primary partition without a BIOS active flag',
+    () {
+      final script = scriptFor(
+        currentStyle: 'Unknown',
+        bootMode: DeploymentBootMode.uefiMbr,
+      );
+
+      expect(script, contains('create partition primary'));
+      expect(script, isNot(contains('\nactive\n')));
+    },
+  );
+
+  test(
+    'legacy install media selects its partition before formatting and activation',
     () {
       final script = scriptFor(
         currentStyle: 'Unknown',
@@ -151,10 +170,43 @@ void main() {
         contains(
           'create partition primary\n'
           'select partition 1\n'
-          'active\n'
-          'format fs=fat32 label="WDS_BOOT" quick',
+          'format fs=fat32 label="WDS_BOOT" quick\n'
+          'assign\n'
+          'select partition 1\n'
+          'active',
         ),
       );
+    },
+  );
+
+  test(
+    'install-media postcondition accepts only the requested FAT32 volume',
+    () {
+      const expected = <String, Object?>{
+        'DiskNumber': 7,
+        'PartitionStyle': 'GPT',
+        'Label': 'WDS_BOOT',
+        'FileSystem': 'FAT32',
+        'EfiSystemPartition': true,
+        'IsActive': false,
+      };
+      bool matches(Map<String, Object?> actual) =>
+          BootableUsbService.installMediaPartitionMatchesForTesting(
+            actual: actual,
+            expectedDiskNumber: 7,
+            expectedPartitionStyle: 'gpt',
+            expectedLabel: 'wds_boot',
+            expectedEfiSystemPartition: true,
+            expectedActive: false,
+          );
+
+      expect(matches(expected), isTrue);
+      expect(matches({...expected, 'Label': ''}), isFalse);
+      expect(matches({...expected, 'FileSystem': ''}), isFalse);
+      expect(matches({...expected, 'DiskNumber': 8}), isFalse);
+      expect(matches({...expected, 'PartitionStyle': 'MBR'}), isFalse);
+      expect(matches({...expected, 'EfiSystemPartition': false}), isFalse);
+      expect(matches({...expected, 'IsActive': true}), isFalse);
     },
   );
 
@@ -187,33 +239,36 @@ void main() {
     expect(scriptForStyle('GPT'), scriptForStyle('Unknown'));
   });
 
-  test('Linux To Go selects both created partitions before formatting', () {
-    final script = BootableUsbService.linuxToGoDiskpartScriptForTesting(
-      diskNumber: 7,
-      bootPartitionSizeMb: 2048,
-      bootLetter: 'S',
-      liveLetter: 'W',
-      liveVolumeLabel: 'WDS_LTG',
-      currentPartitionStyle: 'Unknown',
-    );
+  test(
+    'Linux To Go explicitly selects each new partition before formatting',
+    () {
+      final script = BootableUsbService.linuxToGoDiskpartScriptForTesting(
+        diskNumber: 7,
+        bootPartitionSizeMb: 2048,
+        bootLetter: 'S',
+        liveLetter: 'W',
+        liveVolumeLabel: 'WDS_LTG',
+        currentPartitionStyle: 'Unknown',
+      );
 
-    expect(
-      script,
-      contains(
-        'create partition efi size=2048\n'
-        'select partition 1\n'
-        'format fs=fat32 label="WDS_LTG" quick',
-      ),
-    );
-    expect(
-      script,
-      contains(
-        'create partition primary\n'
-        'select partition 2\n'
-        'format fs=ntfs label="WDS_LTG" quick',
-      ),
-    );
-  });
+      expect(
+        script,
+        contains(
+          'create partition efi size=2048\n'
+          'select partition 1\n'
+          'format fs=fat32 label="WDS_LTG" quick',
+        ),
+      );
+      expect(
+        script,
+        contains(
+          'create partition primary\n'
+          'select partition 2\n'
+          'format fs=ntfs label="WDS_LTG" quick',
+        ),
+      );
+    },
+  );
 
   test('Windows To Go GPT script leaves disk initialization to Storage', () {
     final script = WtgService.diskpartScriptForTesting(
@@ -266,64 +321,126 @@ void main() {
     expect(mbrFromGpt, mbrFromMbr);
   });
 
-  test('Windows To Go selects each formatted partition explicitly', () {
-    final script = WtgService.diskpartScriptForTesting(
-      diskNumber: 7,
-      bootLayout: WtgBootLayout.uefiGpt,
-      currentPartitionStyle: 'Unknown',
-      bootLetter: 'S',
-      storageLetter: 'W',
-      bootLabel: 'WDS_BOOT',
-      storageLabel: 'WDS_STORAGE',
-    );
+  test(
+    'Windows To Go GPT explicitly selects each new partition before formatting',
+    () {
+      final script = WtgService.diskpartScriptForTesting(
+        diskNumber: 7,
+        bootLayout: WtgBootLayout.uefiGpt,
+        currentPartitionStyle: 'Unknown',
+        bootLetter: 'S',
+        storageLetter: 'W',
+        bootLabel: 'WDS_BOOT',
+        storageLabel: 'WDS_STORAGE',
+      );
 
-    expect(
-      script,
-      contains(
-        'create partition efi size=300\n'
-        'select partition 1\n'
-        'format fs=fat32 label="WDS_BOOT" quick',
-      ),
-    );
-    expect(
-      script,
-      contains(
-        'create partition primary\n'
-        'select partition 3\n'
-        'format fs=ntfs label="WDS_STORAGE" quick',
-      ),
-    );
-  });
+      expect(
+        script,
+        contains(
+          'create partition efi size=300\n'
+          'select partition 1\n'
+          'format fs=fat32 label="WDS_BOOT" quick',
+        ),
+      );
+      expect(
+        script,
+        contains(
+          'create partition primary\n'
+          'select partition 3\n'
+          'format fs=ntfs label="WDS_STORAGE" quick',
+        ),
+      );
+    },
+  );
 
-  test('Windows To Go MBR layout selects its boot and storage partitions', () {
-    final script = WtgService.diskpartScriptForTesting(
-      diskNumber: 7,
-      bootLayout: WtgBootLayout.uefiMbr,
-      currentPartitionStyle: 'Unknown',
-      bootLetter: 'S',
-      storageLetter: 'W',
-      bootLabel: 'WDS_BOOT',
-      storageLabel: 'WDS_STORAGE',
-    );
+  test(
+    'Windows To Go MBR marks its boot partition active after formatting',
+    () {
+      final script = WtgService.diskpartScriptForTesting(
+        diskNumber: 7,
+        bootLayout: WtgBootLayout.uefiMbr,
+        currentPartitionStyle: 'Unknown',
+        bootLetter: 'S',
+        storageLetter: 'W',
+        bootLabel: 'WDS_BOOT',
+        storageLabel: 'WDS_STORAGE',
+      );
 
-    expect(
-      script,
-      contains(
-        'create partition primary size=350\n'
-        'select partition 1\n'
-        'active\n'
-        'format fs=fat32 label="WDS_BOOT" quick',
-      ),
-    );
-    expect(
-      script,
-      contains(
-        'create partition primary\n'
-        'select partition 2\n'
-        'format fs=ntfs label="WDS_STORAGE" quick',
-      ),
-    );
-  });
+      expect(
+        script,
+        contains(
+          'create partition primary size=350\n'
+          'select partition 1\n'
+          'format fs=fat32 label="WDS_BOOT" quick\n'
+          'assign letter=S\n'
+          'select partition 1\n'
+          'active',
+        ),
+      );
+      expect(
+        script,
+        contains(
+          'create partition primary\n'
+          'select partition 2\n'
+          'format fs=ntfs label="WDS_STORAGE" quick',
+        ),
+      );
+    },
+  );
+
+  test(
+    'Windows To Go legacy BIOS selects each MBR partition before formatting',
+    () {
+      final script = WtgService.diskpartScriptForTesting(
+        diskNumber: 7,
+        bootLayout: WtgBootLayout.legacyBios,
+        currentPartitionStyle: 'Unknown',
+        bootLetter: 'S',
+        storageLetter: 'W',
+        bootLabel: 'WDS_BOOT',
+        storageLabel: 'WDS_STORAGE',
+      );
+
+      expect(
+        script,
+        contains(
+          'create partition primary size=350\n'
+          'select partition 1\n'
+          'format fs=ntfs label="WDS_BOOT" quick',
+        ),
+      );
+      expect(
+        script,
+        contains(
+          'create partition primary\n'
+          'select partition 2\n'
+          'format fs=ntfs label="WDS_STORAGE" quick',
+        ),
+      );
+    },
+  );
+
+  test(
+    'Windows To Go virtual disk selects its new partition before formatting',
+    () {
+      final script = WtgService.virtualDiskpartScriptForTesting(
+        filePath: r'S:\WinDeploy.vhdx',
+        maximumMb: 32768,
+        type: 'expandable',
+        imageLetter: 'V',
+      );
+
+      expect(
+        script,
+        contains(
+          'create partition primary\n'
+          'select partition 1\n'
+          'format fs=ntfs label="WDS_OS" quick\n'
+          'assign letter=V',
+        ),
+      );
+    },
+  );
 
   test(
     'all media partition flows initialize the selected disk before DiskPart creates partitions',
@@ -351,6 +468,101 @@ void main() {
         flowStart: 'Future<_WtgPartitionLayout> _partitionDisk({',
         flowEnd: 'static String _buildWtgDiskpartScript',
       );
+    },
+  );
+
+  test('install-media verification tolerates delayed Storage enumeration', () {
+    final source = File(
+      'lib/core/services/bootable_usb_service.dart',
+    ).readAsStringSync();
+    final start = source.indexOf('Future<bool> _verifyInstallMediaPartition');
+    final end = source.indexOf(
+      'static String? _normalizePreferredLetter',
+      start,
+    );
+    expect(start, greaterThanOrEqualTo(0));
+    expect(end, greaterThan(start));
+    final verifier = source.substring(start, end);
+
+    expect(verifier, contains("AddSeconds(25)"));
+    expect(verifier, contains('Start-Sleep -Milliseconds 500'));
+    expect(verifier, contains('Duration(seconds: 35)'));
+    expect(verifier, contains('WDS_EXPECTED_DISK_NUMBER'));
+    expect(verifier, contains('WDS_EXPECTED_PARTITION_STYLE'));
+    expect(verifier, contains('WDS_EXPECTED_LABEL'));
+    expect(verifier, contains("FileSystem.ToUpperInvariant() -eq 'FAT32'"));
+    expect(verifier, contains('verification output'));
+  });
+
+  test('install-media drive-letter discovery waits for mount propagation', () {
+    final source = File(
+      'lib/core/services/bootable_usb_service.dart',
+    ).readAsStringSync();
+    final start = source.indexOf('Future<String?> _findDriveLetterForDisk');
+    final end = source.indexOf('// --- Formatting ---', start);
+    expect(start, greaterThanOrEqualTo(0));
+    expect(end, greaterThan(start));
+    final discovery = source.substring(start, end);
+
+    expect(discovery, contains("AddSeconds(25)"));
+    expect(discovery, contains('Start-Sleep -Milliseconds 500'));
+    expect(discovery, contains('Duration(seconds: 35)'));
+    expect(discovery, contains('WDS_DISK_NUMBER'));
+  });
+
+  test(
+    'install-media Storage checks use a managed timeout that terminates a stuck PowerShell child',
+    () {
+      final source = File(
+        'lib/core/services/bootable_usb_service.dart',
+      ).readAsStringSync();
+      final runnerStart = source.indexOf(
+        'Future<ProcessResult> _runPowerShell',
+      );
+      final runnerEnd = source.indexOf('void cancel()', runnerStart);
+      expect(runnerStart, greaterThanOrEqualTo(0));
+      expect(runnerEnd, greaterThan(runnerStart));
+      final runner = source.substring(runnerStart, runnerEnd);
+
+      expect(runner, contains('Duration? timeout'));
+      expect(runner, contains('if (timeout != null)'));
+      expect(runner, contains('_runLinuxUtility('));
+      expect(runner, contains('trackForCancellation: false'));
+
+      final verifierStart = source.indexOf(
+        'Future<bool> _verifyInstallMediaPartition',
+      );
+      final verifierEnd = source.indexOf(
+        'static String? _normalizePreferredLetter',
+        verifierStart,
+      );
+      final verifier = source.substring(verifierStart, verifierEnd);
+      expect(verifier, contains('timeout: const Duration(seconds: 35)'));
+      expect(verifier, isNot(contains(').timeout(')));
+
+      final discoveryStart = source.indexOf(
+        'Future<String?> _findDriveLetterForDisk',
+      );
+      final discoveryEnd = source.indexOf(
+        '// --- Formatting ---',
+        discoveryStart,
+      );
+      final discovery = source.substring(discoveryStart, discoveryEnd);
+      expect(discovery, contains('timeout: const Duration(seconds: 35)'));
+      expect(discovery, isNot(contains(').timeout(')));
+
+      final managedRunnerStart = source.indexOf(
+        'Future<ProcessResult> _runLinuxUtility',
+      );
+      final managedRunnerEnd = source.indexOf(
+        'static const String _linuxRawWriteScript',
+        managedRunnerStart,
+      );
+      final managedRunner = source.substring(
+        managedRunnerStart,
+        managedRunnerEnd,
+      );
+      expect(managedRunner, contains('await _terminateProcessTree(process'));
     },
   );
 }

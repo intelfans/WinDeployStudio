@@ -273,7 +273,10 @@ class _DownloadTile extends StatelessWidget {
       case DownloadStatus.completed:
         return tr(context, 'dl_done');
       case DownloadStatus.error:
-        return tr(context, 'dl_failed');
+        return tr(
+          context,
+          item.error?.localizationKey ?? 'webview_download_failed',
+        );
       case DownloadStatus.cancelled:
         return tr(context, 'dl_cancelled');
     }

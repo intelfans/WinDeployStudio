@@ -187,38 +187,32 @@ void main() {
     },
   );
 
-  test(
-    'accepts a compressed KIWI initrd only when the bounded archive listing '
-    'proves every required capability',
-    () async {
-      await _writeKiwiLayout(
-        testRoot,
-        initrdBytes: const [0x28, 0xb5, 0x2f],
-      );
+  test('accepts a compressed KIWI initrd only when the bounded archive listing '
+      'proves every required capability', () async {
+    await _writeKiwiLayout(testRoot, initrdBytes: const [0x28, 0xb5, 0x2f]);
 
-      final result = await LinuxKiwiImagePreflightService.inspectMountedRoot(
-        testRoot.path,
-        initrdEntryLister: const _StaticInitrdEntryLister(
-          LinuxInitrdEntryListing.success({
-            'sbin/kiwi-live-root',
-            'lib/kiwi-live-lib.sh',
-            'usr/lib/dracut/modules.d/55kiwi-live/parse-kiwi-live.sh',
-            'usr/sbin/fdisk',
-            'usr/bin/partx',
-            'usr/sbin/mkfs.ext4',
-            'usr/bin/mount',
-            'usr/sbin/blkid',
-            'usr/lib/modules/test/kernel/fs/overlayfs/overlay.ko.zst',
-            'usr/lib/modules/test/kernel/fs/ext4/ext4.ko.zst',
-            'usr/lib/modules/test/kernel/fs/isofs/isofs.ko.zst',
-          }),
-        ),
-      );
+    final result = await LinuxKiwiImagePreflightService.inspectMountedRoot(
+      testRoot.path,
+      initrdEntryLister: const _StaticInitrdEntryLister(
+        LinuxInitrdEntryListing.success({
+          'sbin/kiwi-live-root',
+          'lib/kiwi-live-lib.sh',
+          'usr/lib/dracut/modules.d/55kiwi-live/parse-kiwi-live.sh',
+          'usr/sbin/fdisk',
+          'usr/bin/partx',
+          'usr/sbin/mkfs.ext4',
+          'usr/bin/mount',
+          'usr/sbin/blkid',
+          'usr/lib/modules/test/kernel/fs/overlayfs/overlay.ko.zst',
+          'usr/lib/modules/test/kernel/fs/ext4/ext4.ko.zst',
+          'usr/lib/modules/test/kernel/fs/isofs/isofs.ko.zst',
+        }),
+      ),
+    );
 
-      expect(result.status, LinuxKiwiImageStatus.supported);
-      expect(result.image!.initrdCapabilities.isComplete, isTrue);
-    },
-  );
+    expect(result.status, LinuxKiwiImageStatus.supported);
+    expect(result.image!.initrdCapabilities.isComplete, isTrue);
+  });
 
   test(
     'rejects a KIWI initrd that lacks a required disk-boot capability',

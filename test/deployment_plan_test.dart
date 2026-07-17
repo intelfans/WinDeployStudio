@@ -14,6 +14,7 @@ void main() {
         imageBuild: '26100',
         imageArchitecture: 'x64',
         windowsGeneration: WindowsGeneration.windows11,
+        windowsProductFamily: WindowsProductFamily.server,
         bootMode: DeploymentBootMode.uefiMbr,
         deploymentMode: DeploymentMode.vhdx,
         virtualDiskType: VirtualDiskType.fixed,
@@ -54,8 +55,71 @@ void main() {
         WindowsGeneration.windows81,
       );
       expect(
+        DeploymentPlan.detectWindowsGeneration(build: '9200'),
+        WindowsGeneration.windows8,
+      );
+      expect(
         DeploymentPlan.detectWindowsGeneration(build: '7601'),
         WindowsGeneration.windows7,
+      );
+    });
+
+    test('identifies Server release names that do not include a build', () {
+      expect(
+        DeploymentPlan.detectWindowsGeneration(version: 'Windows Server 2012'),
+        WindowsGeneration.windows8,
+      );
+      expect(
+        DeploymentPlan.detectWindowsGeneration(
+          version: 'Windows Server 2012 R2',
+        ),
+        WindowsGeneration.windows81,
+      );
+      expect(
+        DeploymentPlan.detectWindowsGeneration(version: 'Windows Server 2022'),
+        WindowsGeneration.windows10,
+      );
+      expect(
+        DeploymentPlan.detectWindowsGeneration(version: 'Windows Server 2025'),
+        WindowsGeneration.windows11,
+      );
+    });
+
+    test('identifies Server product family from WIM metadata', () {
+      expect(
+        DeploymentPlan.detectWindowsProductFamily(
+          installationType: 'Server',
+          edition: 'ServerStandard',
+          name: 'Windows Server 2022 Standard',
+        ),
+        WindowsProductFamily.server,
+      );
+      expect(
+        DeploymentPlan.detectWindowsProductFamily(
+          edition: 'ServerDatacenterCore',
+        ),
+        WindowsProductFamily.server,
+      );
+      expect(
+        DeploymentPlan.detectWindowsProductFamily(
+          name: 'Windows Server 2019 Datacenter',
+        ),
+        WindowsProductFamily.server,
+      );
+      expect(
+        DeploymentPlan.detectWindowsProductFamily(
+          installationType: 'Client',
+          edition: 'EnterpriseS',
+          name: 'Windows 10 Enterprise LTSC 2021',
+        ),
+        WindowsProductFamily.client,
+      );
+      expect(
+        DeploymentPlan.detectWindowsProductFamily(
+          installationType: 'Client',
+          name: 'Windows Server label from a customized ISO',
+        ),
+        WindowsProductFamily.client,
       );
     });
   });
@@ -63,6 +127,7 @@ void main() {
   group('DeploymentCompatibility', () {
     DeploymentPlan windowsPlan({
       WindowsGeneration generation = WindowsGeneration.windows11,
+      WindowsProductFamily productFamily = WindowsProductFamily.client,
       DeploymentMode mode = DeploymentMode.direct,
       DeploymentBootMode bootMode = DeploymentBootMode.uefiGpt,
       bool wimBoot = false,
@@ -79,12 +144,16 @@ void main() {
         imagePath: r'D:\Images\Windows.iso',
         windowsGeneration: generation,
         deploymentMode: mode,
+        virtualDiskFileName: mode == DeploymentMode.vhd
+            ? 'WinDeploy.vhd'
+            : 'WinDeploy.vhdx',
         bootMode: bootMode,
         wimBoot: wimBoot,
         compactOs: compactOs,
         imageArchitecture: architecture,
         imageName: imageName,
         imageEdition: imageEdition,
+        windowsProductFamily: productFamily,
         preferredSystemLetter: systemLetter,
         preferredBootLetter: bootLetter,
       );
@@ -170,6 +239,24 @@ void main() {
       );
     });
 
+    test('fails closed for unrecognized and 32-bit ARM architectures', () {
+      final unknown = DeploymentCompatibility.evaluate(
+        windowsPlan(architecture: 'mips64'),
+      );
+      final arm32 = DeploymentCompatibility.evaluate(
+        windowsPlan(architecture: 'arm'),
+      );
+
+      expect(
+        unknown.errors.map((issue) => issue.code),
+        contains('unsupported_architecture'),
+      );
+      expect(
+        arm32.errors.map((issue) => issue.code),
+        contains('unsupported_architecture'),
+      );
+    });
+
     test('allows WIMBoot only for direct Windows 8.1 deployment', () {
       final supported = DeploymentCompatibility.evaluate(
         windowsPlan(generation: WindowsGeneration.windows81, wimBoot: true),
@@ -196,6 +283,97 @@ void main() {
       expect(
         report.errors.map((issue) => issue.code),
         contains('compact_scope'),
+      );
+    });
+
+    test('rejects obsolete offline WinRE removal before deployment', () {
+      final report = DeploymentCompatibility.evaluate(
+        windowsPlan().copyWith(disableWinRe: true),
+      );
+
+      expect(
+        report.errors.map((issue) => issue.code),
+        contains('offline_winre_unsupported'),
+      );
+    });
+
+    test('allows Windows 8 virtual-disk deployment', () {
+      final plan = windowsPlan(
+        generation: WindowsGeneration.windows8,
+        mode: DeploymentMode.vhdx,
+        imageName: 'Windows 8 Pro',
+        imageEdition: 'Professional',
+      );
+
+      expect(DeploymentCompatibility.evaluate(plan).canDeploy, isTrue);
+      expect(
+        DeploymentCompatibility.deploymentModesFor(plan),
+        DeploymentMode.values,
+      );
+    });
+
+    test('allows Server native VHD using Server 2008 R2 metadata', () {
+      final plan = windowsPlan(
+        generation: WindowsGeneration.windows7,
+        productFamily: WindowsProductFamily.server,
+        mode: DeploymentMode.vhd,
+        imageName: 'Windows Server 2008 R2 Standard',
+        imageEdition: 'ServerStandard',
+      );
+
+      final report = DeploymentCompatibility.evaluate(plan);
+      expect(report.canDeploy, isTrue);
+      expect(DeploymentCompatibility.deploymentModesFor(plan), const [
+        DeploymentMode.direct,
+        DeploymentMode.vhd,
+      ]);
+    });
+
+    test('rejects client-only To Go features for Windows Server', () {
+      final compactServer = DeploymentCompatibility.evaluate(
+        windowsPlan(
+          generation: WindowsGeneration.windows10,
+          productFamily: WindowsProductFamily.server,
+          compactOs: true,
+          imageName: 'Windows Server 2022 Standard',
+          imageEdition: 'ServerStandard',
+        ),
+      );
+      final wimBootServer = DeploymentCompatibility.evaluate(
+        windowsPlan(
+          generation: WindowsGeneration.windows81,
+          productFamily: WindowsProductFamily.server,
+          wimBoot: true,
+          imageName: 'Windows Server 2012 R2 Standard',
+          imageEdition: 'ServerStandard',
+        ),
+      );
+
+      expect(
+        compactServer.errors.map((issue) => issue.code),
+        contains('compact_scope'),
+      );
+      expect(
+        wimBootServer.errors.map((issue) => issue.code),
+        contains('wimboot_scope'),
+      );
+      expect(
+        DeploymentCompatibility.supportsCompactOs(
+          windowsPlan(
+            generation: WindowsGeneration.windows10,
+            productFamily: WindowsProductFamily.server,
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        DeploymentCompatibility.supportsWimBoot(
+          windowsPlan(
+            generation: WindowsGeneration.windows81,
+            productFamily: WindowsProductFamily.server,
+          ),
+        ),
+        isFalse,
       );
     });
 

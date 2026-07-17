@@ -26,8 +26,25 @@ void main() {
       expect(result.isValid, isTrue, reason: result.error);
       expect(result.bootCatalogLba, 20);
       expect(result.efiImageLba, 30);
+      expect(result.hasLegacyBiosBoot, isTrue);
+      expect(result.hasUefiBoot, isTrue);
     },
   );
+
+  test('returns a distinct cancellation result before starting I/O', () async {
+    final image = File('${testRoot.path}${Platform.pathSeparator}valid.iso');
+    await image.writeAsBytes(_buildIsoHybridFixture(), flush: true);
+    final cancellation = LinuxIsoHybridInspectionCancellationToken()..cancel();
+
+    final result = await LinuxIsoHybridInspector.inspect(
+      image.path,
+      cancellationToken: cancellation,
+    );
+
+    expect(result.isValid, isFalse);
+    expect(result.wasCancelled, isTrue);
+    expect(result.error, isNull);
+  });
 
   test('rejects a hybrid MBR without ISO9660 descriptors', () async {
     final bytes = _buildIsoHybridFixture();
@@ -53,18 +70,74 @@ void main() {
     expect(result.error, contains('checksum'));
   });
 
-  test('rejects El Torito media without an EFI section', () async {
+  test(
+    'accepts a BIOS-only ISOHybrid without inventing UEFI support',
+    () async {
+      final bytes = _buildIsoHybridFixture();
+      bytes.fillRange(20 * 2048 + 64, 20 * 2048 + 128, 0);
+      final image = File(
+        '${testRoot.path}${Platform.pathSeparator}bios-only.iso',
+      );
+      await image.writeAsBytes(bytes, flush: true);
+
+      final result = await LinuxIsoHybridInspector.inspect(image.path);
+
+      expect(result.isValid, isTrue, reason: result.error);
+      expect(result.hasLegacyBiosBoot, isTrue);
+      expect(result.hasUefiBoot, isFalse);
+      expect(result.efiImageLba, 0);
+    },
+  );
+
+  test(
+    'reports standard x64 EFI fallback when the image advertises it',
+    () async {
+      final bytes = _buildIsoHybridFixture();
+      _writeAscii(bytes, 30 * 2048 + 128, 'BOOTX64 EFI');
+      final image = File('${testRoot.path}${Platform.pathSeparator}x64.iso');
+      await image.writeAsBytes(bytes, flush: true);
+
+      final result = await LinuxIsoHybridInspector.inspect(image.path);
+
+      expect(result.isValid, isTrue, reason: result.error);
+      expect(result.efiArchitectures, contains(LinuxEfiArchitecture.x64));
+    },
+  );
+
+  test(
+    'reports a UEFI-only image without inventing Legacy BIOS support',
+    () async {
+      final bytes = _buildIsoHybridFixture();
+      const catalog = 20 * 2048;
+      bytes[catalog + 1] = 0xef;
+      _writeUint32(bytes, catalog + 32 + 8, 30);
+      bytes.fillRange(catalog + 64, catalog + 128, 0);
+      _recalculateCatalogChecksum(bytes);
+      final image = File(
+        '${testRoot.path}${Platform.pathSeparator}uefi-only.iso',
+      );
+      await image.writeAsBytes(bytes, flush: true);
+
+      final result = await LinuxIsoHybridInspector.inspect(image.path);
+
+      expect(result.isValid, isTrue, reason: result.error);
+      expect(result.hasLegacyBiosBoot, isFalse);
+      expect(result.hasUefiBoot, isTrue);
+    },
+  );
+
+  test('rejects a malformed declared EFI boot image', () async {
     final bytes = _buildIsoHybridFixture();
-    bytes.fillRange(20 * 2048 + 64, 20 * 2048 + 128, 0);
+    bytes[30 * 2048] = 0;
     final image = File(
-      '${testRoot.path}${Platform.pathSeparator}bios-only.iso',
+      '${testRoot.path}${Platform.pathSeparator}bad-efi-image.iso',
     );
     await image.writeAsBytes(bytes, flush: true);
 
     final result = await LinuxIsoHybridInspector.inspect(image.path);
 
     expect(result.isValid, isFalse);
-    expect(result.error, contains('EFI'));
+    expect(result.error, contains('FAT boot image'));
   });
 
   test('raw verification timeout scales with image size', () {
@@ -154,6 +227,8 @@ Uint8List _buildIsoHybridFixture() {
   bytes[fat + 1] = 0x3c;
   bytes[fat + 2] = 0x90;
   _writeUint16(bytes, fat + 11, 512);
+  bytes[fat + 13] = 1;
+  _writeUint16(bytes, fat + 19, 4);
   _writeAscii(bytes, fat + 54, 'FAT16   ');
   bytes[fat + 510] = 0x55;
   bytes[fat + 511] = 0xaa;
@@ -163,6 +238,18 @@ Uint8List _buildIsoHybridFixture() {
 
 void _writeAscii(Uint8List bytes, int offset, String value) {
   bytes.setRange(offset, offset + value.length, value.codeUnits);
+}
+
+void _recalculateCatalogChecksum(Uint8List bytes) {
+  const catalog = 20 * 2048;
+  _writeUint16(bytes, catalog + 28, 0);
+  var sum = 0;
+  for (var offset = 0; offset < 32; offset += 2) {
+    sum =
+        (sum + bytes[catalog + offset] + (bytes[catalog + offset + 1] << 8)) &
+        0xffff;
+  }
+  _writeUint16(bytes, catalog + 28, (-sum) & 0xffff);
 }
 
 void _writeUint16(Uint8List bytes, int offset, int value) {

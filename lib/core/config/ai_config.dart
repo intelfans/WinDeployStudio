@@ -5,8 +5,10 @@ class AiConfig {
 
   static const defaultProxyUrl =
       'https://windeploystudio.bob-0910.workers.dev/';
+  static const connectionTimeout = Duration(seconds: 15);
   static const requestTimeout = Duration(seconds: 30);
   static const streamIdleTimeout = Duration(seconds: 60);
+  static const transientRetryDelay = Duration(milliseconds: 450);
 
   static const _prefKeyProxyUrl = 'ai_proxy_url';
 

@@ -97,50 +97,14 @@ class WindowsDeploymentService {
       _log('OPTION disableWinRe: not requested');
       return true;
     }
-
-    final windowsDirectory = p.join(_driveRoot(windowsDrive), 'Windows');
-    _log('OPTION disableWinRe: executing REAgentC for $windowsDirectory');
-    final disableResult = await _run('reagentc', [
-      '/disable',
-      '/target',
-      windowsDirectory,
-    ], timeout: const Duration(minutes: 2));
-    if (!_succeeded(disableResult, 'REAgentC disable')) return false;
-
-    final recoveryImages = <File>[
-      File(p.join(windowsDirectory, 'System32', 'Recovery', 'Winre.wim')),
-      File(
-        p.join(_driveRoot(windowsDrive), 'Recovery', 'WindowsRE', 'Winre.wim'),
-      ),
-    ];
-    for (final image in recoveryImages) {
-      if (await image.exists()) {
-        try {
-          await image.delete();
-          _log('Removed disabled WinRE payload: ${image.path}');
-        } catch (error) {
-          _log('OPTION disableWinRe FAILED deleting ${image.path}: $error');
-          return false;
-        }
-      }
-    }
-
-    final infoResult = await _run('reagentc', [
-      '/info',
-      '/target',
-      windowsDirectory,
-    ], timeout: const Duration(minutes: 1));
-    if (!_succeeded(infoResult, 'REAgentC status query')) return false;
-
-    for (final image in recoveryImages) {
-      if (await image.exists()) {
-        _log('OPTION disableWinRe FAILED verification: ${image.path} exists');
-        return false;
-      }
-    }
-
+    // REAgentC /disable is online-only.  Running it against an offline image
+    // with an invented /target argument used to turn a selected optimization
+    // into a late deployment failure after the target disk had been erased.
+    // Keep the recovery environment intact instead of pretending it can be
+    // safely removed during image creation.
     _log(
-      'OPTION disableWinRe VERIFIED: REAgentC succeeded and no WinRE payload remains',
+      'OPTION disableWinRe SKIPPED: offline WinRE removal is unsupported; '
+      'the recovery environment was preserved.',
     );
     return true;
   }
@@ -233,9 +197,16 @@ class WindowsDeploymentService {
       if (!await _setDword(partmgrKey, 'SanPolicy', sanPolicy)) return false;
 
       if (plan.disableUasp) {
-        _log('OPTION disableUasp: setting UASPStor service Start=4');
         final uaspKey = '$hiveRoot\\$controlSet\\Services\\UASPStor';
-        if (!await _setDword(uaspKey, 'Start', 4)) return false;
+        if (!await _registryKeyExists(uaspKey)) {
+          _log(
+            'OPTION disableUasp SKIPPED: UASPStor is not present in the '
+            'selected offline image.',
+          );
+        } else {
+          _log('OPTION disableUasp: setting existing UASPStor service Start=4');
+          if (!await _setDword(uaspKey, 'Start', 4)) return false;
+        }
       } else {
         _log('OPTION disableUasp: not requested');
       }
@@ -273,15 +244,15 @@ class WindowsDeploymentService {
       _log('OPTION blockLocalDisks VERIFIED: offline SAN policy is $sanPolicy');
 
       if (plan.disableUasp) {
-        final uaspValue = await _queryDword(
-          '$hiveRoot\\$controlSet\\Services\\UASPStor',
-          'Start',
-        );
-        if (uaspValue != 4) {
-          _log('OPTION disableUasp FAILED verification: Start=$uaspValue');
-          return false;
+        final uaspKey = '$hiveRoot\\$controlSet\\Services\\UASPStor';
+        if (await _registryKeyExists(uaspKey)) {
+          final uaspValue = await _queryDword(uaspKey, 'Start');
+          if (uaspValue != 4) {
+            _log('OPTION disableUasp FAILED verification: Start=$uaspValue');
+            return false;
+          }
+          _log('OPTION disableUasp VERIFIED: UASPStor Start=4');
         }
-        _log('OPTION disableUasp VERIFIED: UASPStor Start=4');
       }
 
       if (compactApplied) {
@@ -348,6 +319,11 @@ class WindowsDeploymentService {
     return int.tryParse(match.group(1)!, radix: 16);
   }
 
+  Future<bool> _registryKeyExists(String key) async {
+    final result = await _run('reg', ['query', key]);
+    return result != null && result.exitCode == 0;
+  }
+
   Future<bool> _unloadHive(String hiveRoot) async {
     for (var attempt = 1; attempt <= 3; attempt++) {
       final result = await _run('reg', ['unload', hiveRoot]);
@@ -374,17 +350,12 @@ class WindowsDeploymentService {
 <unattend xmlns="urn:schemas-microsoft-com:unattend">
   <settings pass="oobeSystem">
     <component name="Microsoft-Windows-Deployment" processorArchitecture="$architecture" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <Reseal>
-        <Mode>Audit</Mode>
-        <ForceShutdownNow>false</ForceShutdownNow>
-      </Reseal>
     </component>
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="$architecture" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
       <OOBE>
         <HideEULAPage>true</HideEULAPage>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-        <SkipMachineOOBE>true</SkipMachineOOBE>
         <SkipUserOOBE>true</SkipUserOOBE>
         <ProtectYourPC>3</ProtectYourPC>
       </OOBE>
@@ -395,7 +366,7 @@ class WindowsDeploymentService {
 
     try {
       await answerFile.writeAsString(xml, flush: true);
-      _log('OPTION skipOobe: caching Audit-mode OOBE bypass answer file');
+      _log('OPTION skipOobe: caching supported unattended OOBE settings');
       final result = await _run('dism', [
         '/English',
         '/Image:$imageRoot',
@@ -409,15 +380,17 @@ class WindowsDeploymentService {
       await target.parent.create(recursive: true);
       await answerFile.copy(target.path);
       final cached = await target.readAsString();
-      if (!cached.contains('<Mode>Audit</Mode>') ||
-          !cached.contains('<SkipMachineOOBE>true</SkipMachineOOBE>') ||
-          !cached.contains('<SkipUserOOBE>true</SkipUserOOBE>')) {
+      if (!cached.contains('<SkipUserOOBE>true</SkipUserOOBE>') ||
+          cached.contains('SkipMachineOOBE') ||
+          cached.contains('<Mode>Audit</Mode>')) {
         _log(
           'OPTION skipOobe FAILED verification: cached answer file is incomplete',
         );
         return false;
       }
-      _log('OPTION skipOobe VERIFIED: first boot is configured for Audit mode');
+      _log(
+        'OPTION skipOobe VERIFIED: supported unattended OOBE settings applied',
+      );
       return true;
     } catch (error) {
       _log('OPTION skipOobe FAILED: $error');

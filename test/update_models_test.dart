@@ -48,6 +48,67 @@ void main() {
     expect(info.bestAsset!.sha256, isNull);
   });
 
+  group('automatic updater release-digest trust', () {
+    const validDigest =
+        'a11116c0645d892d6a5a7c585ecc1fa13aa66f8c7cc6b03bf1f27bd16860cc35';
+
+    UpdateAsset githubAsset({
+      String digest = 'sha256:$validDigest',
+      String tag = 'v2.0.6',
+    }) => UpdateAsset(
+      name: 'WinDeployStudio_Setup_2.0.6.exe',
+      url:
+          'https://github.com/intelfans/WinDeployStudio/releases/download/$tag/WinDeployStudio_Setup_2.0.6.exe',
+      sizeBytes: 42,
+      contentType: 'application/octet-stream',
+      digest: digest,
+    );
+
+    test('rejects a missing or malformed GitHub SHA-256 digest', () {
+      expect(
+        UpdateService.githubReleaseDigestForAutomaticInstall(
+          githubAsset(digest: ''),
+          tagName: 'v2.0.6',
+        ),
+        isNull,
+      );
+      expect(
+        UpdateService.githubReleaseDigestForAutomaticInstall(
+          githubAsset(digest: 'sha256:not-a-sha256'),
+          tagName: 'v2.0.6',
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects a digest bound to a different GitHub release asset', () {
+      expect(
+        UpdateService.githubReleaseDigestForAutomaticInstall(
+          githubAsset(tag: 'v2.0.5'),
+          tagName: 'v2.0.6',
+        ),
+        isNull,
+      );
+    });
+
+    test('only accepts a downloaded file matching the trusted digest', () {
+      final trusted = UpdateService.githubReleaseDigestForAutomaticInstall(
+        githubAsset(),
+        tagName: 'v2.0.6',
+      );
+
+      expect(trusted, validDigest.toUpperCase());
+      expect(UpdateService.matchesTrustedSha256(validDigest, trusted!), isTrue);
+      expect(
+        UpdateService.matchesTrustedSha256(
+          'b11116c0645d892d6a5a7c585ecc1fa13aa66f8c7cc6b03bf1f27bd16860cc35',
+          trusted,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   test('selects the Chinese or English release-note section', () {
     final info = UpdateInfo(
       version: const AppVersion(1, 1, 2),

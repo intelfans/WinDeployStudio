@@ -53,5 +53,16 @@ void main() {
         'wtg_step_applying',
       );
     });
+
+    test('Windows To Go reports offline configuration separately', () {
+      expect(
+        toGoProgressTitleKey(
+          isLinux: false,
+          phase: 'configuringImage',
+          message: 'wtg_svc_configuring',
+        ),
+        'wtg_step_configuring',
+      );
+    });
   });
 }

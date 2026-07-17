@@ -36,7 +36,12 @@ void main() {
     expect(images.single.name, 'Windows 10 Enterprise LTSC 2021');
     expect(images.single.architecture, 'x64');
     expect(images.single.edition, 'EnterpriseS');
+    expect(images.single.installationType, 'Client');
     expect(images.single.language, 'en-US');
     expect(images.single.version, '10.0.19044.3324');
+    expect(
+      images.single.toMap()['description'],
+      'Windows 10 Enterprise LTSC 2021',
+    );
   });
 }

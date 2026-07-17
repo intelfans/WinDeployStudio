@@ -978,9 +978,8 @@ class DriveBenchmarkService {
   }
 
   String? _driveRootForDisk(DiskInfo disk) {
-    if (disk.driveLetters.isEmpty) return null;
-    final letter = disk.driveLetters.first.trim();
-    if (letter.isEmpty) return null;
+    final letter = disk.preferredDriveLetter;
+    if (letter == null || letter.isEmpty) return null;
     if (letter.length == 1) return '${letter.toUpperCase()}:\\';
     if (letter.endsWith(':')) return '${letter.toUpperCase()}\\';
     if (letter.endsWith('\\')) return letter;

@@ -43,4 +43,21 @@ void main() {
       );
     }
   });
+
+  test(
+    'a localized diagnostic token is resolved in every supported language',
+    () {
+      const key = 'boot_partition_layout_not_ready';
+      for (final locale in supportedLocaleCodes) {
+        final rendered = resolveCreatorProgressMessage(
+          rawMessage: 'boot_partition_failed',
+          error: 'i18n:$key',
+          translate: (value) => trByCode(locale, value),
+        );
+
+        expect(rendered, contains(trByCode(locale, key)), reason: locale);
+        expect(rendered, isNot(contains('i18n:')), reason: locale);
+      }
+    },
+  );
 }
