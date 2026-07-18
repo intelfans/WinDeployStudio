@@ -1,8 +1,14 @@
-# Arch COW Partition Helper
+# Arch COW Partition Helper (Unreleased Research Prototype)
 
-`wds_arch_cow_helper.exe` creates the bounded ext4 COW filesystem used by the
-Arch Linux To Go profile. It is a native part of the Windows application rather
-than an imported formatter or a redistributed Linux utility.
+This directory contains an internal research prototype for an ArchISO COW
+partition layout. No released WinDeploy Studio workflow invokes or supports
+this helper, and Arch Linux To Go creation is currently unsupported. It is not
+a standalone disk utility and must not be copied, invoked, or treated as a
+supported deployment path.
+
+中文说明：此目录保存的是 ArchISO COW 分区布局的内部研究原型。已发布的
+WinDeploy Studio 不会调用或支持该辅助工具，当前也不支持创建 Arch Linux To
+Go。它不是独立磁盘工具，不应复制、运行或视为受支持的部署方案。
 
 ## Safety Contract
 

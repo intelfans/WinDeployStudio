@@ -14,7 +14,7 @@
 مستودع GitHub: https://github.com/intelfans/WinDeployStudio
 
 ملاحظة حول أداة خارجية:
-يتضمن هذا الإصدار wds_ext4_builder، وهو مكوّن مدمج لإنشاء صورة استمرارية ext4 مبني من مصدر go-ext4fs المثبت بترخيص MIT لملفات x64 Ubuntu/casper وDebian Live/Kali وDeepin Live التجريبية التي اجتازت الفحص البنيوي. ما زال التحقق من الإقلاع الحقيقي وبقاء البيانات بعد إعادة التشغيل مطلوباً. يقبل صورة عادية على محرك محلي فقط ويُفحص قبل أي عمل على القرص الهدف. راجع THIRD_PARTY_NOTICES.md وtools\ext4-builder\README.md في مجلد التثبيت.
+يتضمن هذا الإصدار wds_ext4_builder، وهو مكوّن مدمج لإنشاء صورة استمرارية ext4 مبني من مصدر go-ext4fs المثبت بترخيص MIT لملفات x64 Ubuntu/casper وDebian Live/Kali وDeepin Live التجريبية التي اجتازت الفحص البنيوي. لا يدعم Linux To Go إلا أنظمة UEFI x64 وأقراص الهدف GPT؛ ولا يدعم UEFI+MBR أو BIOS التقليدي. ما زال التحقق من الإقلاع الحقيقي وبقاء البيانات بعد إعادة التشغيل مطلوباً. يقبل صورة عادية على محرك محلي فقط ويُفحص قبل أي عمل على القرص الهدف. راجع THIRD_PARTY_NOTICES.md وtools\ext4-builder\README.md في مجلد التثبيت.
 
 شكر خاص
 

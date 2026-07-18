@@ -400,6 +400,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     trailing: const SizedBox.shrink(),
                   ),
                   _SettingsTile(
+                    icon: Icons.language_outlined,
+                    title: tr(context, 'about_official_website'),
+                    subtitle: AppConstants.officialWebsite,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      onPressed: () => _launchUrl(AppConstants.officialWebsite),
+                    ),
+                  ),
+                  _SettingsTile(
                     icon: Icons.code_outlined,
                     title: tr(context, 'about_github_repository'),
                     subtitle: AppConstants.githubRepository,

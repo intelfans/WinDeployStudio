@@ -1,7 +1,7 @@
 # WinDeploy Studio 交接文档
 
-最后更新：2026-07-12  
-当前版本：2.0.6
+最后更新：2026-07-18
+当前版本：2.0.9
 目标平台：Windows 10/11 x64  
 主工作区：`D:\Dev\WinDeployStudio`
 
@@ -23,7 +23,7 @@
 | 磁盘测试 | 原生 `wds_benchmark_helper.exe` |
 | 磁盘诊断 | 原生只读 `wds_disk_diagnostics_helper.exe` + Windows Storage API |
 
-主程序 manifest 为 `asInvoker`。只有清盘、分区、写镜像和启动配置等高权限任务会启动独立 UAC 子进程；AI、设置、WebView 和普通 UI 不在管理员进程中运行。
+主程序 manifest 为 `requireAdministrator`。应用启动时会请求 UAC 授权；清盘、分区、写镜像、启动配置、AI、设置、WebView 和普通 UI 都在同一个已提升权限的应用进程中运行。若取消 UAC 授权，应用不会启动。
 
 当前工作区不是 Git 仓库。用于发布的 Git 仓库位于 `D:\WinDeployStudio`，同步前必须保留用户在该目录中的独立改动。
 
@@ -33,12 +33,12 @@
 
 | 文件 | 当前值 |
 | --- | --- |
-| `pubspec.yaml` | `2.0.6` |
-| `lib/core/constants/app_constants.dart` | `2.0.6` |
-| `windows/runner/Runner.rc` | `2.0.6` / `2,0,6,0` |
-| `installer/windows/WinDeployStudio.iss` | `2.0.6` / `2.0.6.0` |
-| `scripts/build_installer.ps1` | `WinDeployStudio_Setup_2.0.6.exe` |
-| `README.md` | 版本徽章 `2.0.6` |
+| `pubspec.yaml` | `2.0.9` |
+| `lib/core/constants/app_constants.dart` | `2.0.9` |
+| `windows/runner/Runner.rc` | `2.0.9` / `2,0,9,0` |
+| `installer/windows/WinDeployStudio.iss` | `2.0.9` / `2.0.9.0` |
+| `scripts/build_installer.ps1` | `WinDeployStudio_Setup_2.0.9.exe` |
+| `README.md` | 版本徽章 `2.0.9` |
 
 ## 3. 目录与入口
 

@@ -18,6 +18,7 @@ WinDeploy Studio をお選びいただきありがとうございます！
   🚀 To Go 環境
     ポータブル Windows 環境と、構造チェックを通過した x64 Ubuntu/casper、
     Debian Live/Kali、Deepin Live 向けの実験的な永続化 Linux To Go を作成します。
+    Linux To Go は GPT ターゲットディスクを使用する x64 UEFI システムでのみサポートされ、UEFI+MBR とレガシー BIOS はサポートされません。
     実機起動と再起動後の永続化の検証が引き続き必要です
     
   📊 ネイティブドライブテスト

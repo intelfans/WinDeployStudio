@@ -14,7 +14,7 @@ GitHub 프로필: https://github.com/intelfans
 GitHub 저장소: https://github.com/intelfans/WinDeployStudio
 
 타사 도구 안내:
-이 릴리스에는 구조 검사를 통과한 실험적 x64 Ubuntu/casper, Debian Live/Kali 및 Deepin Live 프로필용으로 고정된 MIT 라이선스 go-ext4fs 소스에서 빌드한 내장 ext4 영구 저장 이미지 도우미 wds_ext4_builder가 포함되어 있습니다. 실제 부팅과 재부팅 후 영구 저장 검증이 여전히 필요합니다. 로컬 드라이브의 일반 이미지 경로만 허용하며 대상 디스크 작업 전에 검증됩니다. 설치 폴더의 THIRD_PARTY_NOTICES.md와 tools\ext4-builder\README.md를 확인하세요.
+이 릴리스에는 구조 검사를 통과한 실험적 x64 Ubuntu/casper, Debian Live/Kali 및 Deepin Live 프로필용으로 고정된 MIT 라이선스 go-ext4fs 소스에서 빌드한 내장 ext4 영구 저장 이미지 도우미 wds_ext4_builder가 포함되어 있습니다. Linux To Go는 GPT 대상 디스크가 있는 x64 UEFI 시스템에서만 지원되며, UEFI+MBR 및 레거시 BIOS는 지원되지 않습니다. 실제 부팅과 재부팅 후 영구 저장 검증이 여전히 필요합니다. 로컬 드라이브의 일반 이미지 경로만 허용하며 대상 디스크 작업 전에 검증됩니다. 설치 폴더의 THIRD_PARTY_NOTICES.md와 tools\ext4-builder\README.md를 확인하세요.
 
 특별 감사
 

@@ -2,6 +2,36 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## v2.0.9
+
+### Reliability, Integrity, and Deployment Safety
+
+- Strengthened Windows installation-media preflight for WIM, ESD, and split
+  SWM images, BIOS/UEFI boot files, EFI architecture, FAT32 constraints, and
+  bounded ISO mount/unmount operations.
+- Added Linux ISOHybrid structural preflight and cancellation handling while
+  preserving the selected ISO's own boot and partition layout during writing.
+- Hardened ISO selection against overlapping scans and cancellation races so a
+  stale result cannot replace a newer user choice.
+- Hardened update downloads by requiring the GitHub Release asset SHA-256
+  digest before installation and comparing mirror downloads against that same
+  trusted digest.
+- Improved download cancellation, timeout handling, and known-image
+  verification without weakening HTTPS and trusted-host boundaries.
+- Isolated AI streaming generations, bounded local image scans, selected the
+  correct benchmark volume for multi-partition devices, and fixed empty-log ZIP
+  export behavior.
+
+### User Documentation
+
+- Updated release metadata and the README with the current version and the
+  automated-update integrity model.
+- Clarified that the released Windows application requests UAC approval at
+  startup and performs its disk and boot operations in one elevated process.
+- Retained the documented Linux To Go support boundary: verified x64 UEFI + GPT
+  Ubuntu/casper, Debian Live, and Deepin Live profiles only. Arch, openSUSE,
+  KIWI, BIOS, UEFI + MBR, and ARM Linux To Go creation remain unsupported.
+
 ## v2.0.6
 
 - Updated the application, Windows metadata, installer, build script, and documentation to version 2.0.6.

@@ -5,11 +5,11 @@ Windows desktop toolkit for Windows/Linux installation media, portable To Go wor
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Flutter](https://img.shields.io/badge/Flutter-Windows-02569B?logo=flutter)
-![Version](https://img.shields.io/badge/Version-2.0.6-orange)
+![Version](https://img.shields.io/badge/Version-2.0.9-orange)
 
 ## Overview
 
-WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for verified x64 Ubuntu/casper, Debian Live, and Deepin Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
+WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
 
 The project is distributed under the MIT License.
 
@@ -37,8 +37,8 @@ The project is distributed under the MIT License.
 
     The matrix describes deployment-mode availability, not a guarantee that every USB controller, firmware combination, or Server edition will boot.
   - Windows To Go accepts standard ISO layouts containing `boot.wim` and `install.wim` or `install.esd`. WIMBoot additionally requires `install.wim`; split `install.swm` images and images missing required BIOS/EFI boot files are rejected before the target disk is changed.
-  - Validate supported persistent Linux To Go layouts for verified x64 Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
-  - Classify Linux To Go images when selected and again immediately before erasing the target. Every accepted profile requires x64 UEFI, a real kernel/initrd, Live payloads, and a GRUB entry that can be safely updated. Ubuntu/casper uses its `writable` persistence image; Debian Live and Deepin Live require `boot=live` and use their `persistence` / `persistence.conf` protocol. Deepin 25 layouts with the current Linglong marker are included.
+  - Validate supported persistent Linux To Go layouts for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
+  - Classify Linux To Go images when selected and again immediately before erasing the target. Every accepted profile requires x64 UEFI + GPT, a real kernel/initrd, Live payloads, and a GRUB entry that can be safely updated. Ubuntu/casper uses its `writable` persistence image; Debian Live and Deepin Live require `boot=live` and use their `persistence` / `persistence.conf` protocol. Deepin 25 layouts with the current Linglong marker are included.
   - Reject unsupported distributions and unsafe Debian Live layouts before the target disk is changed; use Linux installation media for images outside the validated profiles.
   - Stop before modifying the target disk when the image does not meet a verified profile or the release does not include a required, compliant persistence component. Use Linux installation media for other distributions and layouts.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
@@ -221,13 +221,26 @@ Settings centralizes application preferences, localization, local paths, update 
 | Storage | 500 MB for app | Extra space for ISO files and deployment media |
 | Runtime | WebView2 for built-in web pages | Latest WebView2 Runtime |
 
-WinDeploy Studio requests administrator privileges when it starts. This gives all deployment, disk, and boot operations one elevated process and avoids opening separate elevation windows. If UAC is cancelled, the application does not start.
+WinDeploy Studio requests administrator privileges when it starts. This lets
+disk-changing and boot-configuration operations run in the same elevated
+application process. If UAC approval is cancelled, the application does not
+start.
 
 ## Download
 
 Download releases from:
 
 [https://github.com/intelfans/WinDeployStudio/releases](https://github.com/intelfans/WinDeployStudio/releases)
+
+### Update and download integrity
+
+The in-app updater reads the SHA-256 digest published for the matching GitHub
+Release installer asset. It verifies the downloaded bytes against that digest
+before an installer can run. When an update is downloaded through the project's
+mirror channel, the same GitHub Release digest is still required, so choosing a
+mirror does not weaken file-integrity verification. Downloads obtained outside
+the app should still be checked against the release's published digest before
+manual installation.
 
 ## Build From Source
 
@@ -321,7 +334,7 @@ MIT License. See [LICENSE](LICENSE).
 
 # WinDeploy Studio 中文说明
 
-WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Windows 安装盘、Linux ISOHybrid 写盘、Windows To Go、已验证的 x64 Ubuntu/casper、Debian Live 与 Deepin Live 严格 Linux To Go 布局预检、原生磁盘测试、镜像资源、工具箱、日志查看和 AI 辅助排障等场景。
+WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Windows 安装盘、Linux ISOHybrid 写盘、Windows To Go、已验证的 x64 UEFI + GPT Ubuntu/casper、Debian Live 与 Deepin Live 严格 Linux To Go 布局预检、原生磁盘测试、镜像资源、工具箱、日志查看和 AI 辅助排障等场景。
 
 ## 核心功能
 
@@ -347,8 +360,8 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
     该矩阵表示部署方式的可用性，不保证每一种 USB 控制器、固件组合或 Server 版本都能成功启动。
   - Windows To Go 接受包含 `boot.wim` 以及 `install.wim` 或 `install.esd` 的标准 ISO 结构；WIMBoot 还要求使用 `install.wim`。分卷 `install.swm` 镜像或缺少 BIOS/EFI 必需启动文件的镜像，会在修改目标磁盘前被拒绝。
-  - 在修改磁盘前验证已通过布局检查的 x64 Ubuntu/casper、Debian Live 与 Deepin Live 持久化 Linux To Go 镜像。
-  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；所有可接受配置都必须具备 x64 UEFI、真实内核/initrd、Live 文件系统和可安全注入参数的 GRUB 启动项。Ubuntu/casper 使用 `writable` 持久化镜像；Debian Live 与 Deepin Live 需要 `boot=live` 并使用独立的 `persistence` / `persistence.conf` 协议，已包含使用当前 Linglong 标记的 Deepin 25 布局。
+  - 在修改磁盘前验证已通过布局检查的 x64 UEFI + GPT Ubuntu/casper、Debian Live 与 Deepin Live 持久化 Linux To Go 镜像。
+  - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；所有可接受配置都必须具备 x64 UEFI + GPT、真实内核/initrd、Live 文件系统和可安全注入参数的 GRUB 启动项。Ubuntu/casper 使用 `writable` 持久化镜像；Debian Live 与 Deepin Live 需要 `boot=live` 并使用独立的 `persistence` / `persistence.conf` 协议，已包含使用当前 Linglong 标记的 Deepin 25 布局。
   - 不受支持的发行版与不安全的 Debian Live 布局会在修改目标磁盘前被拒绝；验证范围外的镜像请使用 Linux 安装盘。
   - 不符合已验证配置、或当前发行版未包含所需且合规持久化组件时，会在修改目标磁盘前停止操作；其他发行版和布局请使用 Linux 安装盘。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
@@ -520,13 +533,22 @@ AI 助手用于部署问答、排障建议和日志分析。对 USB 分析和随
 | 存储空间 | 应用本体约 500 MB | 为 ISO 文件和部署介质预留额外空间 |
 | 运行时 | 内置网页需要 WebView2 | 最新版 WebView2 Runtime |
 
-WinDeploy Studio 会在启动时请求管理员权限。这样部署、磁盘和启动修复操作都在同一个已提升权限的进程内执行，不会再打开单独的提权窗口。若取消 UAC 授权，应用不会启动。
+WinDeploy Studio 会在启动时请求管理员权限。这样清盘、分区、写入镜像和启动
+修复等会修改磁盘或启动配置的操作可在同一个已提升权限的应用进程中执行。若
+取消 UAC 授权，应用不会启动。
 
 ## 下载
 
 请从 GitHub Releases 下载：
 
 [https://github.com/intelfans/WinDeployStudio/releases](https://github.com/intelfans/WinDeployStudio/releases)
+
+### 更新与下载完整性
+
+应用内更新会读取对应 GitHub Release 安装包资产发布的 SHA-256 摘要，并在启动
+安装包前校验下载文件是否一致。通过项目镜像渠道下载更新时，仍必须匹配同一份
+GitHub Release 摘要，因此选择镜像不会降低完整性校验要求。若在应用外手动下载，
+安装前仍应将文件与 Release 公布的摘要进行比对。
 
 ## 从源码构建
 

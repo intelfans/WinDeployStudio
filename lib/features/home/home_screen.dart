@@ -1034,6 +1034,10 @@ class _AboutCard extends StatelessWidget {
             ),
             _InfoRow(tr(context, 'home_license'), AppConstants.licenseName),
             _InfoRow(
+              tr(context, 'about_official_website'),
+              AppConstants.officialWebsite,
+            ),
+            _InfoRow(
               tr(context, 'about_github_repository'),
               AppConstants.githubRepository,
             ),

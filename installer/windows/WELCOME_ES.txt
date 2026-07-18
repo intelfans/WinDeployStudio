@@ -17,8 +17,9 @@ Características principales:
     
   🚀 Entornos To Go
     Crear entornos Windows portátiles y Linux To Go persistente experimental para perfiles
-    x64 Ubuntu/casper, Debian Live/Kali y Deepin Live que superen la comprobación estructural;
-    aún se requiere validar el arranque real y la persistencia tras reiniciar
+    x64 Ubuntu/casper, Debian Live/Kali y Deepin Live que superen la comprobación estructural.
+    Linux To Go solo es compatible con sistemas UEFI x64 y discos de destino GPT;
+    UEFI+MBR y BIOS heredado no son compatibles; aún se requiere validar el arranque real y la persistencia tras reiniciar
     
   📊 Prueba nativa de unidades
     Medir escritura secuencial, 4K, multihilo y sostenida

@@ -17,8 +17,9 @@ Fonctionnalités principales :
     
   🚀 Environnements To Go
     Créer des environnements Windows portables et des Linux To Go persistants expérimentaux
-    pour les profils x64 Ubuntu/casper, Debian Live/Kali et Deepin Live prévalidés ;
-    un démarrage réel et une persistance après redémarrage doivent encore être vérifiés
+    pour les profils x64 Ubuntu/casper, Debian Live/Kali et Deepin Live prévalidés.
+    Linux To Go n'est pris en charge que sur les systèmes UEFI x64 avec des disques cibles GPT ;
+    UEFI+MBR et le BIOS hérité ne sont pas pris en charge ; un démarrage réel et une persistance après redémarrage doivent encore être vérifiés
     
   📊 Test natif des disques
     Mesurer l'écriture séquentielle, 4K, multithread et soutenue

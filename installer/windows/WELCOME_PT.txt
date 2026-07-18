@@ -17,8 +17,9 @@ Recursos principais:
     
   🚀 Ambientes To Go
     Criar ambientes Windows portáteis e Linux To Go persistente experimental para perfis
-    x64 Ubuntu/casper, Debian Live/Kali e Deepin Live aprovados na verificação estrutural;
-    ainda é necessário validar a inicialização real e a persistência após reiniciar
+    x64 Ubuntu/casper, Debian Live/Kali e Deepin Live aprovados na verificação estrutural.
+    Linux To Go é compatível apenas com sistemas UEFI x64 e discos de destino GPT;
+    UEFI+MBR e BIOS legado não são compatíveis; ainda é necessário validar a inicialização real e a persistência após reiniciar
     
   📊 Teste nativo de unidades
     Medir gravações sequenciais, 4K, multithread e sustentadas
