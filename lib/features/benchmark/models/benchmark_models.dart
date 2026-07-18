@@ -319,6 +319,7 @@ extension BenchmarkWorkloadProgressInfo on BenchmarkWorkload {
     BenchmarkWorkload.sequentialWrite => 'bench_phase_sequential',
     BenchmarkWorkload.random4kRead => 'benchmark_history_random_read',
     BenchmarkWorkload.random4kWrite => 'bench_phase_random4k',
+    BenchmarkWorkload.fullSequentialWrite => 'bench_phase_full',
     _ => null,
   };
 }

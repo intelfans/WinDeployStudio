@@ -14,6 +14,11 @@ class BenchmarkWorkloadChart extends StatefulWidget {
   final double secondarySlcMarkerGB;
   final BenchmarkWorkload initialWorkload;
 
+  /// The workload currently being measured. When it changes, the chart
+  /// follows it once; users can still select another workload from the menu
+  /// until the benchmark advances to a different stage.
+  final BenchmarkWorkload? activeWorkload;
+
   const BenchmarkWorkloadChart({
     super.key,
     required this.primarySeries,
@@ -23,6 +28,7 @@ class BenchmarkWorkloadChart extends StatefulWidget {
     this.primarySlcMarkerGB = 0,
     this.secondarySlcMarkerGB = 0,
     this.initialWorkload = BenchmarkWorkload.random4kWrite,
+    this.activeWorkload,
   });
 
   @override
@@ -30,7 +36,17 @@ class BenchmarkWorkloadChart extends StatefulWidget {
 }
 
 class _BenchmarkWorkloadChartState extends State<BenchmarkWorkloadChart> {
-  late BenchmarkWorkload _workload = widget.initialWorkload;
+  late BenchmarkWorkload _workload =
+      widget.activeWorkload ?? widget.initialWorkload;
+
+  @override
+  void didUpdateWidget(covariant BenchmarkWorkloadChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final activeWorkload = widget.activeWorkload;
+    if (activeWorkload != null && activeWorkload != oldWidget.activeWorkload) {
+      _workload = activeWorkload;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +60,8 @@ class _BenchmarkWorkloadChartState extends State<BenchmarkWorkloadChart> {
         .toSet();
     final workloads = BenchmarkWorkload.values
         .where((workload) {
-          if (!primaryWorkloads.contains(workload)) return false;
+          final isActive = workload == widget.activeWorkload;
+          if (!primaryWorkloads.contains(workload) && !isActive) return false;
           return widget.secondarySeries.isEmpty ||
               secondaryWorkloads.contains(workload);
         })
@@ -67,6 +84,7 @@ class _BenchmarkWorkloadChartState extends State<BenchmarkWorkloadChart> {
       children: [
         if (workloads.isNotEmpty) ...[
           DropdownButtonFormField<BenchmarkWorkload>(
+            key: ValueKey('benchmark-workload-selector-${_workload.name}'),
             initialValue: _workload,
             decoration: InputDecoration(
               labelText: tr(context, BenchmarkHistoryKeys.measurements),

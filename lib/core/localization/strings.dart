@@ -6,6 +6,7 @@ import 'debug_dialog_strings.dart';
 import 'deployment_strings.dart';
 import 'visual_style_strings.dart';
 import 'ai_benchmark_strings.dart';
+import 'ai_settings_strings.dart';
 
 const _prefKey = 'language_code';
 
@@ -148,10 +149,99 @@ Map<String, String> _withDeploymentStrings(
   ..._managedDownloadStringsForCode(code),
   ..._updateSourceStringsForCode(code),
   ...visualStyleStringsForCode(code),
+  ...aiSettingsStringsForCode(code),
+  ...aiSearchStatusStringsForCode(code),
   ...deploymentStringsForCode(code),
   ...debugDialogStringsForCode(code),
   ...aiBenchmarkStringsForCode(code),
 });
+
+Map<String, String> aiSearchStatusStringsForCode(String code) {
+  return switch (normalizeLocaleCode(code)) {
+    'zh' => const {
+      'ai_search_requested': '已请求联网搜索',
+      'ai_search_searching': '正在联网搜索',
+      'ai_search_used': '已使用联网搜索',
+      'ai_search_not_used': '本次未使用联网搜索',
+      'ai_search_unavailable': '当前服务不支持可验证的联网搜索',
+    },
+    'zh_TW' => const {
+      'ai_search_requested': '已請求網路搜尋',
+      'ai_search_searching': '正在網路搜尋',
+      'ai_search_used': '已使用網路搜尋',
+      'ai_search_not_used': '本次未使用網路搜尋',
+      'ai_search_unavailable': '目前服務不支援可驗證的網路搜尋',
+    },
+    'ru' => const {
+      'ai_search_requested': 'Запрошен веб-поиск',
+      'ai_search_searching': 'Выполняется веб-поиск',
+      'ai_search_used': 'Использован веб-поиск',
+      'ai_search_not_used': 'Веб-поиск не использован',
+      'ai_search_unavailable': 'Сервис не поддерживает проверяемый веб-поиск',
+    },
+    'fr' => const {
+      'ai_search_requested': 'Recherche Web demandée',
+      'ai_search_searching': 'Recherche Web en cours',
+      'ai_search_used': 'Recherche Web utilisée',
+      'ai_search_not_used': 'Recherche Web non utilisée',
+      'ai_search_unavailable':
+          'Le service ne prend pas en charge une recherche Web vérifiable',
+    },
+    'de' => const {
+      'ai_search_requested': 'Websuche angefordert',
+      'ai_search_searching': 'Websuche läuft',
+      'ai_search_used': 'Websuche verwendet',
+      'ai_search_not_used': 'Websuche nicht verwendet',
+      'ai_search_unavailable':
+          'Der Dienst unterstützt keine überprüfbare Websuche',
+    },
+    'es' => const {
+      'ai_search_requested': 'Búsqueda web solicitada',
+      'ai_search_searching': 'Buscando en la web',
+      'ai_search_used': 'Búsqueda web utilizada',
+      'ai_search_not_used': 'No se utilizó la búsqueda web',
+      'ai_search_unavailable':
+          'El servicio no admite búsquedas web verificables',
+    },
+    'pt' => const {
+      'ai_search_requested': 'Pesquisa na web solicitada',
+      'ai_search_searching': 'Pesquisando na web',
+      'ai_search_used': 'Pesquisa na web usada',
+      'ai_search_not_used': 'A pesquisa na web não foi usada',
+      'ai_search_unavailable':
+          'O serviço não oferece pesquisa na web verificável',
+    },
+    'ar' => const {
+      'ai_search_requested': 'تم طلب البحث على الويب',
+      'ai_search_searching': 'جارٍ البحث على الويب',
+      'ai_search_used': 'تم استخدام البحث على الويب',
+      'ai_search_not_used': 'لم يُستخدم البحث على الويب',
+      'ai_search_unavailable': 'الخدمة لا تدعم بحثًا قابلاً للتحقق على الويب',
+    },
+    'ko' => const {
+      'ai_search_requested': '웹 검색 요청됨',
+      'ai_search_searching': '웹 검색 중',
+      'ai_search_used': '웹 검색 사용됨',
+      'ai_search_not_used': '이번에는 웹 검색을 사용하지 않음',
+      'ai_search_unavailable': '서비스가 검증 가능한 웹 검색을 지원하지 않음',
+    },
+    'ja' => const {
+      'ai_search_requested': 'ウェブ検索をリクエスト済み',
+      'ai_search_searching': 'ウェブ検索中',
+      'ai_search_used': 'ウェブ検索を使用',
+      'ai_search_not_used': '今回はウェブ検索を未使用',
+      'ai_search_unavailable': 'このサービスは検証可能なウェブ検索に非対応',
+    },
+    _ => const {
+      'ai_search_requested': 'Web search requested',
+      'ai_search_searching': 'Searching the web',
+      'ai_search_used': 'Web search used',
+      'ai_search_not_used': 'Web search not used',
+      'ai_search_unavailable':
+          'This service does not support verifiable web search',
+    },
+  };
+}
 
 Map<String, String> _knownIsoVerificationStringsForCode(String code) {
   return switch (normalizeLocaleCode(code)) {
@@ -1141,21 +1231,21 @@ const _en = <String, String>{
   'ai_please_wait': 'Please wait for the current response to finish...',
 
   'ai_settings_section': 'AI Assistant',
-  'ai_proxy_url': 'AI Proxy URL',
+  'ai_proxy_url': 'AI Service Endpoint',
   'ai_proxy_url_desc':
-      'Use an OpenAI-compatible proxy endpoint. Leave empty or reset to use the built-in endpoint.',
+      'Use an OpenAI-compatible AI service endpoint. The app automatically follows standard Windows network settings. Leave empty or reset to use the built-in endpoint.',
   'ai_proxy_url_loading': 'Loading...',
-  'ai_proxy_url_invalid': 'Enter a valid HTTP or HTTPS URL',
+  'ai_proxy_url_invalid': 'Enter a valid HTTPS URL',
   'ai_error_unauthorized': 'AI service is not authorized.',
   'ai_error_rate_limited': 'Too many requests. Please try again later.',
   'ai_error_unavailable': 'AI service is temporarily unavailable.',
   'ai_error_http': 'AI service error ({status}).',
   'ai_error_timeout':
-      'AI service connection timed out. Check your network or change the AI proxy URL in Settings.',
+      'AI service connection timed out. Check your network or the AI service endpoint in Settings.',
   'ai_error_unreachable':
-      'Cannot connect to the AI service. Your network may be unable to reach the built-in workers.dev proxy. Change the AI proxy URL in Settings and try again.',
+      'Cannot reach the AI service. Check your network, Windows network settings, or a reachable AI service endpoint in Settings and try again.',
   'ai_error_tls':
-      'AI service TLS connection failed. Check system time, network proxy, or change the AI proxy URL.',
+      'AI service TLS connection failed. Check system time, trusted certificates, or the AI service endpoint.',
   'ai_error_connection': 'AI service connection failed: {error}',
   'settings_edit': 'Edit',
   'settings_save': 'Save',
@@ -2033,23 +2123,20 @@ const _zh = <String, String>{
   'ai_please_wait': '请等待当前回复完成...',
 
   'ai_settings_section': 'AI \u52A9\u624B',
-  'ai_proxy_url': 'AI \u4EE3\u7406\u5730\u5740',
+  'ai_proxy_url': 'AI 服务端点',
   'ai_proxy_url_desc':
-      '\u4F7F\u7528\u517C\u5BB9 OpenAI \u7684\u4EE3\u7406\u7AEF\u70B9\u3002\u7559\u7A7A\u6216\u6062\u590D\u9ED8\u8BA4\u5C06\u4F7F\u7528\u5185\u7F6E\u7AEF\u70B9\u3002',
+      '使用兼容 OpenAI 的 AI 服务端点。应用会自动遵循标准 Windows 网络设置；留空或恢复默认将使用内置端点。',
   'ai_proxy_url_loading': '\u6B63\u5728\u52A0\u8F7D...',
-  'ai_proxy_url_invalid':
-      '\u8BF7\u8F93\u5165\u6709\u6548\u7684 HTTP \u6216 HTTPS \u5730\u5740',
+  'ai_proxy_url_invalid': '请输入有效的 HTTPS 地址',
   'ai_error_unauthorized': 'AI \u670D\u52A1\u672A\u6388\u6743\u3002',
   'ai_error_rate_limited':
       '\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002',
   'ai_error_unavailable': 'AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\u3002',
   'ai_error_http': 'AI \u670D\u52A1\u9519\u8BEF\uFF08{status}\uFF09\u3002',
-  'ai_error_timeout':
-      'AI \u670D\u52A1\u8FDE\u63A5\u8D85\u65F6\u3002\u8BF7\u68C0\u67E5\u7F51\u7EDC\uFF0C\u6216\u5728\u8BBE\u7F6E\u4E2D\u66F4\u6362 AI \u4EE3\u7406\u5730\u5740\u3002',
+  'ai_error_timeout': 'AI 服务连接超时。请检查网络或设置中的 AI 服务端点。',
   'ai_error_unreachable':
-      '\u65E0\u6CD5\u8FDE\u63A5 AI \u670D\u52A1\u3002\u5F53\u524D\u7F51\u7EDC\u53EF\u80FD\u65E0\u6CD5\u8BBF\u95EE\u5185\u7F6E workers.dev \u4EE3\u7406\uFF0C\u8BF7\u5728\u8BBE\u7F6E\u4E2D\u66F4\u6362 AI \u4EE3\u7406\u5730\u5740\u540E\u91CD\u8BD5\u3002',
-  'ai_error_tls':
-      'AI \u670D\u52A1 TLS \u8FDE\u63A5\u5931\u8D25\u3002\u8BF7\u68C0\u67E5\u7CFB\u7EDF\u65F6\u95F4\u3001\u7F51\u7EDC\u4EE3\u7406\uFF0C\u6216\u66F4\u6362 AI \u4EE3\u7406\u5730\u5740\u3002',
+      '无法连接 AI 服务。请检查网络、Windows 网络设置，或在设置中配置可用的 AI 服务端点后重试。',
+  'ai_error_tls': 'AI 服务 TLS 连接失败。请检查系统时间、受信任证书或 AI 服务端点。',
   'ai_error_connection': 'AI \u670D\u52A1\u8FDE\u63A5\u5931\u8D25\uFF1A{error}',
   'settings_edit': '\u7F16\u8F91',
   'settings_save': '\u4FDD\u5B58',
@@ -2893,12 +2980,11 @@ const _ru = <String, String>{
   'ai_please_wait': 'Пожалуйста, дождитесь завершения текущего ответа...',
 
   'ai_settings_section': 'AI-\u043F\u043E\u043C\u043E\u0449\u043D\u0438\u043A',
-  'ai_proxy_url': 'URL AI-\u043F\u0440\u043E\u043A\u0441\u0438',
+  'ai_proxy_url': 'Конечная точка AI-сервиса',
   'ai_proxy_url_desc':
-      '\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 OpenAI-\u0441\u043E\u0432\u043C\u0435\u0441\u0442\u0438\u043C\u044B\u0439 \u043F\u0440\u043E\u043A\u0441\u0438-endpoint. \u041E\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u043F\u0443\u0441\u0442\u044B\u043C \u0438\u043B\u0438 \u0441\u0431\u0440\u043E\u0441\u044C\u0442\u0435, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 endpoint.',
+      'Используйте совместимую с OpenAI конечную точку AI-сервиса. Оставьте поле пустым или сбросьте его, чтобы использовать встроенную точку.',
   'ai_proxy_url_loading': '\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430...',
-  'ai_proxy_url_invalid':
-      '\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 HTTP- \u0438\u043B\u0438 HTTPS-\u0430\u0434\u0440\u0435\u0441',
+  'ai_proxy_url_invalid': 'Введите действительный HTTPS-адрес',
   'ai_error_unauthorized':
       'AI-\u0441\u0435\u0440\u0432\u0438\u0441 \u043D\u0435 \u0430\u0432\u0442\u043E\u0440\u0438\u0437\u043E\u0432\u0430\u043D.',
   'ai_error_rate_limited':
@@ -2908,9 +2994,9 @@ const _ru = <String, String>{
   'ai_error_http':
       '\u041E\u0448\u0438\u0431\u043A\u0430 AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0430 ({status}).',
   'ai_error_timeout':
-      '\u0412\u0440\u0435\u043C\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443 \u0438\u0441\u0442\u0435\u043A\u043B\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0435\u0442\u044C \u0438\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u0435 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445.',
+      'Время подключения к AI-сервису истекло. Проверьте сеть или конечную точку AI-сервиса в настройках.',
   'ai_error_unreachable':
-      '\u041D\u0435 \u0443\u0434\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443. \u0421\u0435\u0442\u044C \u043C\u043E\u0436\u0435\u0442 \u043D\u0435 \u0434\u043E\u0441\u0442\u0438\u0433\u0430\u0442\u044C \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u043A\u0441\u0438 workers.dev. \u0418\u0437\u043C\u0435\u043D\u0438\u0442\u0435 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435.',
+      '\u041D\u0435 \u0443\u0434\u0430\u0435\u0442\u0441\u044F \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C\u0441\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A \u0441\u0435\u0442\u0438 \u0438\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0438\u0442\u0435 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0438 \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u043F\u044B\u0442\u043A\u0443.',
   'ai_error_tls':
       'TLS-\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443 \u0441\u0431\u043E\u0439\u043D\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F, \u0441\u0435\u0442\u0435\u0432\u043E\u0439 \u043F\u0440\u043E\u043A\u0441\u0438 \u0438\u043B\u0438 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438.',
   'ai_error_connection':
@@ -3835,21 +3921,21 @@ const _fr = <String, String>{
   'ai_please_wait': 'Veuillez attendre la fin de la réponse en cours...',
 
   'ai_settings_section': 'Assistant IA',
-  'ai_proxy_url': 'URL du proxy IA',
+  'ai_proxy_url': 'Point de terminaison du service IA',
   'ai_proxy_url_desc':
-      'Utilisez un point de terminaison proxy compatible OpenAI. Laissez vide ou reinitialisez pour utiliser le point de terminaison integre.',
+      'Utilisez un point de terminaison de service IA compatible OpenAI. Laissez vide ou reinitialisez pour utiliser le point integre.',
   'ai_proxy_url_loading': 'Chargement...',
-  'ai_proxy_url_invalid': 'Saisissez une URL HTTP ou HTTPS valide',
+  'ai_proxy_url_invalid': 'Saisissez une URL HTTPS valide',
   'ai_error_unauthorized': 'Le service IA n est pas autorise.',
   'ai_error_rate_limited': 'Trop de requetes. Reessayez plus tard.',
   'ai_error_unavailable': 'Le service IA est temporairement indisponible.',
   'ai_error_http': 'Erreur du service IA ({status}).',
   'ai_error_timeout':
-      'La connexion au service IA a expire. Verifiez le reseau ou changez l URL du proxy IA dans les parametres.',
+      'La connexion au service IA a expire. Verifiez le reseau ou le point de terminaison du service IA dans les parametres.',
   'ai_error_unreachable':
-      'Impossible de se connecter au service IA. Votre reseau peut ne pas atteindre le proxy workers.dev integre. Changez l URL du proxy IA dans les parametres et reessayez.',
+      'Impossible de joindre le service IA. Verifiez le reseau, les parametres reseau Windows ou un point de terminaison du service IA accessible dans les parametres.',
   'ai_error_tls':
-      'Echec de la connexion TLS au service IA. Verifiez l heure systeme, le proxy reseau ou changez l URL du proxy IA.',
+      'Echec de la connexion TLS au service IA. Verifiez l heure systeme, les certificats approuves ou le point de terminaison du service IA.',
   'ai_error_connection': 'Echec de connexion au service IA : {error}',
   'settings_edit': 'Modifier',
   'settings_save': 'Enregistrer',
@@ -4735,12 +4821,11 @@ const _ja = <String, String>{
   'ai_please_wait': '現在の回答が完了するまでお待ちください...',
 
   'ai_settings_section': 'AI \u30A2\u30B7\u30B9\u30BF\u30F3\u30C8',
-  'ai_proxy_url': 'AI \u30D7\u30ED\u30AD\u30B7 URL',
+  'ai_proxy_url': 'AI サービスエンドポイント',
   'ai_proxy_url_desc':
-      'OpenAI \u4E92\u63DB\u306E\u30D7\u30ED\u30AD\u30B7\u30A8\u30F3\u30C9\u30DD\u30A4\u30F3\u30C8\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002\u7A7A\u6B04\u307E\u305F\u306F\u30EA\u30BB\u30C3\u30C8\u3067\u5185\u8535\u30A8\u30F3\u30C9\u30DD\u30A4\u30F3\u30C8\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002',
+      'OpenAI 互換の AI サービスエンドポイントを使用します。空欄のままにするかリセットすると、内蔵エンドポイントを使用します。',
   'ai_proxy_url_loading': '\u8AAD\u307F\u8FBC\u307F\u4E2D...',
-  'ai_proxy_url_invalid':
-      '\u6709\u52B9\u306A HTTP \u307E\u305F\u306F HTTPS URL \u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044',
+  'ai_proxy_url_invalid': '有効な HTTPS URL を入力してください',
   'ai_error_unauthorized':
       'AI \u30B5\u30FC\u30D3\u30B9\u304C\u8A8D\u8A3C\u3055\u308C\u3066\u3044\u307E\u305B\u3093\u3002',
   'ai_error_rate_limited':
@@ -4750,11 +4835,11 @@ const _ja = <String, String>{
   'ai_error_http':
       'AI \u30B5\u30FC\u30D3\u30B9\u30A8\u30E9\u30FC\uFF08{status}\uFF09\u3002',
   'ai_error_timeout':
-      'AI \u30B5\u30FC\u30D3\u30B9\u3078\u306E\u63A5\u7D9A\u304C\u30BF\u30A4\u30E0\u30A2\u30A6\u30C8\u3057\u307E\u3057\u305F\u3002\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3092\u78BA\u8A8D\u3059\u308B\u304B\u3001\u8A2D\u5B9A\u3067 AI \u30D7\u30ED\u30AD\u30B7 URL \u3092\u5909\u66F4\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+      'AI サービスへの接続がタイムアウトしました。ネットワークまたは設定の AI サービスエンドポイントを確認してください。',
   'ai_error_unreachable':
-      'AI \u30B5\u30FC\u30D3\u30B9\u306B\u63A5\u7D9A\u3067\u304D\u307E\u305B\u3093\u3002\u73FE\u5728\u306E\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u3067\u306F\u5185\u8535 workers.dev \u30D7\u30ED\u30AD\u30B7\u306B\u5230\u9054\u3067\u304D\u306A\u3044\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059\u3002\u8A2D\u5B9A\u3067 AI \u30D7\u30ED\u30AD\u30B7 URL \u3092\u5909\u66F4\u3057\u3066\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+      'AI サービスに接続できません。ネットワーク、Windows のネットワーク設定、または到達可能な AI サービスエンドポイントを確認してください。',
   'ai_error_tls':
-      'AI \u30B5\u30FC\u30D3\u30B9\u306E TLS \u63A5\u7D9A\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002\u30B7\u30B9\u30C6\u30E0\u6642\u523B\u3001\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u30D7\u30ED\u30AD\u30B7\u3001\u307E\u305F\u306F AI \u30D7\u30ED\u30AD\u30B7 URL \u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002',
+      'AI サービスの TLS 接続に失敗しました。システム時刻、信頼できる証明書、または AI サービスエンドポイントを確認してください。',
   'ai_error_connection':
       'AI \u30B5\u30FC\u30D3\u30B9\u63A5\u7D9A\u5931\u6557\uFF1A{error}',
   'settings_edit': '\u7DE8\u96C6',
@@ -5574,24 +5659,20 @@ const _zhTW = <String, String>{
   'ai_please_wait': '請等待目前回覆完成...',
 
   'ai_settings_section': 'AI \u52A9\u624B',
-  'ai_proxy_url': 'AI \u4EE3\u7406\u4F4D\u5740',
-  'ai_proxy_url_desc':
-      '\u4F7F\u7528\u76F8\u5BB9 OpenAI \u7684\u4EE3\u7406\u7AEF\u9EDE\u3002\u7559\u7A7A\u6216\u6062\u5FA9\u9810\u8A2D\u5C07\u4F7F\u7528\u5167\u5EFA\u7AEF\u9EDE\u3002',
+  'ai_proxy_url': 'AI 服務端點',
+  'ai_proxy_url_desc': '使用相容 OpenAI 的 AI 服務端點。留空或恢復預設將使用內建端點。',
   'ai_proxy_url_loading': '\u6B63\u5728\u8F09\u5165...',
-  'ai_proxy_url_invalid':
-      '\u8ACB\u8F38\u5165\u6709\u6548\u7684 HTTP \u6216 HTTPS \u4F4D\u5740',
+  'ai_proxy_url_invalid': '請輸入有效的 HTTPS 位址',
   'ai_error_unauthorized': 'AI \u670D\u52D9\u672A\u6388\u6B0A\u3002',
   'ai_error_rate_limited':
       '\u8ACB\u6C42\u904E\u65BC\u983B\u7E41\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002',
   'ai_error_unavailable':
       'AI \u670D\u52D9\u66AB\u6642\u7121\u6CD5\u4F7F\u7528\u3002',
   'ai_error_http': 'AI \u670D\u52D9\u932F\u8AA4\uFF08{status}\uFF09\u3002',
-  'ai_error_timeout':
-      'AI \u670D\u52D9\u9023\u7DDA\u903E\u6642\u3002\u8ACB\u6AA2\u67E5\u7DB2\u8DEF\uFF0C\u6216\u5728\u8A2D\u5B9A\u4E2D\u66F4\u63DB AI \u4EE3\u7406\u4F4D\u5740\u3002',
+  'ai_error_timeout': 'AI 服務連線逾時。請檢查網路或設定中的 AI 服務端點。',
   'ai_error_unreachable':
-      '\u7121\u6CD5\u9023\u7DDA AI \u670D\u52D9\u3002\u76EE\u524D\u7DB2\u8DEF\u53EF\u80FD\u7121\u6CD5\u5B58\u53D6\u5167\u5EFA workers.dev \u4EE3\u7406\uFF0C\u8ACB\u5728\u8A2D\u5B9A\u4E2D\u66F4\u63DB AI \u4EE3\u7406\u4F4D\u5740\u5F8C\u91CD\u8A66\u3002',
-  'ai_error_tls':
-      'AI \u670D\u52D9 TLS \u9023\u7DDA\u5931\u6557\u3002\u8ACB\u6AA2\u67E5\u7CFB\u7D71\u6642\u9593\u3001\u7DB2\u8DEF\u4EE3\u7406\uFF0C\u6216\u66F4\u63DB AI \u4EE3\u7406\u4F4D\u5740\u3002',
+      '無法連線 AI 服務。請檢查網路、Windows 網路設定，或在設定中配置可用的 AI 服務端點後重試。',
+  'ai_error_tls': 'AI 服務 TLS 連線失敗。請檢查系統時間、受信任憑證或 AI 服務端點。',
   'ai_error_connection': 'AI \u670D\u52D9\u9023\u7DDA\u5931\u6557\uFF1A{error}',
   'settings_edit': '\u7DE8\u8F2F',
   'settings_save': '\u5132\u5B58',
@@ -6444,21 +6525,21 @@ const _es = <String, String>{
   'ai_please_wait': 'Por favor espere a que termine la respuesta actual...',
 
   'ai_settings_section': 'Asistente IA',
-  'ai_proxy_url': 'URL del proxy IA',
+  'ai_proxy_url': 'Punto de conexion del servicio de IA',
   'ai_proxy_url_desc':
-      'Use un endpoint proxy compatible con OpenAI. Dejelo vacio o restablezcalo para usar el endpoint integrado.',
+      'Use un punto de conexion del servicio de IA compatible con OpenAI. Dejelo vacio o restablezcalo para usar el punto integrado.',
   'ai_proxy_url_loading': 'Cargando...',
-  'ai_proxy_url_invalid': 'Introduce una URL HTTP o HTTPS valida',
+  'ai_proxy_url_invalid': 'Introduce una URL HTTPS valida',
   'ai_error_unauthorized': 'El servicio de IA no esta autorizado.',
   'ai_error_rate_limited': 'Demasiadas solicitudes. Intentalo mas tarde.',
   'ai_error_unavailable': 'El servicio de IA no esta disponible temporalmente.',
   'ai_error_http': 'Error del servicio de IA ({status}).',
   'ai_error_timeout':
-      'La conexion al servicio de IA agoto el tiempo. Revisa la red o cambia la URL del proxy IA en Ajustes.',
+      'La conexion al servicio de IA agoto el tiempo. Revisa la red o el punto de conexion del servicio de IA en Ajustes.',
   'ai_error_unreachable':
-      'No se puede conectar al servicio de IA. Es posible que la red no alcance el proxy workers.dev integrado. Cambia la URL del proxy IA en Ajustes e intentalo de nuevo.',
+      'No se puede acceder al servicio de IA. Comprueba la red, la configuracion de red de Windows o un punto de conexion del servicio de IA accesible en Ajustes.',
   'ai_error_tls':
-      'Fallo la conexion TLS del servicio de IA. Revisa la hora del sistema, el proxy de red o cambia la URL del proxy IA.',
+      'Fallo la conexion TLS del servicio de IA. Revisa la hora del sistema, los certificados de confianza o el punto de conexion del servicio de IA.',
   'ai_error_connection': 'Error de conexion del servicio de IA: {error}',
   'settings_edit': 'Editar',
   'settings_save': 'Guardar',
@@ -7352,21 +7433,21 @@ const _ar = <String, String>{
   'ai_please_wait': 'يرجى الانتظار حتى تنتهي الاستجابة الحالية...',
 
   'ai_settings_section': 'AI Assistant',
-  'ai_proxy_url': 'AI Proxy URL',
+  'ai_proxy_url': 'AI Service Endpoint',
   'ai_proxy_url_desc':
-      'Use an OpenAI-compatible proxy endpoint. Leave empty or reset to use the built-in endpoint.',
+      'Use an OpenAI-compatible AI service endpoint. Leave empty or reset to use the built-in endpoint.',
   'ai_proxy_url_loading': 'Loading...',
-  'ai_proxy_url_invalid': 'Enter a valid HTTP or HTTPS URL',
+  'ai_proxy_url_invalid': 'Enter a valid HTTPS URL',
   'ai_error_unauthorized': 'AI service is not authorized.',
   'ai_error_rate_limited': 'Too many requests. Please try again later.',
   'ai_error_unavailable': 'AI service is temporarily unavailable.',
   'ai_error_http': 'AI service error ({status}).',
   'ai_error_timeout':
-      'AI service connection timed out. Check your network or change the AI proxy URL in Settings.',
+      'AI service connection timed out. Check your network or the AI service endpoint in Settings.',
   'ai_error_unreachable':
-      'Cannot connect to the AI service. Your network may be unable to reach the built-in workers.dev proxy. Change the AI proxy URL in Settings and try again.',
+      'Cannot reach the AI service. Check your network, Windows network settings, or a reachable AI service endpoint in Settings and try again.',
   'ai_error_tls':
-      'AI service TLS connection failed. Check system time, network proxy, or change the AI proxy URL.',
+      'AI service TLS connection failed. Check system time, trusted certificates, or the AI service endpoint.',
   'ai_error_connection': 'AI service connection failed: {error}',
   'settings_edit': 'Edit',
   'settings_save': 'Save',
@@ -8260,21 +8341,21 @@ const _pt = <String, String>{
   'ai_please_wait': 'Por favor, aguarde a resposta atual terminar...',
 
   'ai_settings_section': 'Assistente IA',
-  'ai_proxy_url': 'URL do proxy de IA',
+  'ai_proxy_url': 'Endpoint do servico de IA',
   'ai_proxy_url_desc':
-      'Use um endpoint proxy compativel com OpenAI. Deixe em branco ou redefina para usar o endpoint integrado.',
+      'Use um endpoint de servico de IA compativel com OpenAI. Deixe em branco ou redefina para usar o endpoint integrado.',
   'ai_proxy_url_loading': 'Carregando...',
-  'ai_proxy_url_invalid': 'Insira uma URL HTTP ou HTTPS valida',
+  'ai_proxy_url_invalid': 'Insira uma URL HTTPS valida',
   'ai_error_unauthorized': 'O servico de IA nao esta autorizado.',
   'ai_error_rate_limited': 'Muitas solicitacoes. Tente novamente mais tarde.',
   'ai_error_unavailable': 'O servico de IA esta temporariamente indisponivel.',
   'ai_error_http': 'Erro do servico de IA ({status}).',
   'ai_error_timeout':
-      'A conexao com o servico de IA expirou. Verifique a rede ou altere a URL do proxy de IA nas Configuracoes.',
+      'A conexao com o servico de IA expirou. Verifique a rede ou o endpoint do servico de IA nas Configuracoes.',
   'ai_error_unreachable':
-      'Nao foi possivel conectar ao servico de IA. Sua rede pode nao alcancar o proxy workers.dev integrado. Altere a URL do proxy de IA nas Configuracoes e tente novamente.',
+      'Nao foi possivel acessar o servico de IA. Verifique a rede, as configuracoes de rede do Windows ou um endpoint acessivel do servico de IA nas Configuracoes.',
   'ai_error_tls':
-      'Falha na conexao TLS do servico de IA. Verifique a hora do sistema, o proxy de rede ou altere a URL do proxy de IA.',
+      'Falha na conexao TLS do servico de IA. Verifique a hora do sistema, certificados confiaveis ou o endpoint do servico de IA.',
   'ai_error_connection': 'Falha na conexao do servico de IA: {error}',
   'settings_edit': 'Editar',
   'settings_save': 'Salvar',
@@ -9190,22 +9271,22 @@ const _de = <String, String>{
   'ai_please_wait':
       'Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist...',
   'ai_settings_section': 'KI-Assistent',
-  'ai_proxy_url': 'KI-Proxy-URL',
+  'ai_proxy_url': 'KI-Dienst-Endpunkt',
   'ai_proxy_url_desc':
-      'Verwenden Sie einen OpenAI-kompatiblen Proxy-Endpunkt. Leer lassen oder zuruecksetzen, um den integrierten Endpunkt zu nutzen.',
+      'Verwenden Sie einen OpenAI-kompatiblen KI-Dienst-Endpunkt. Leer lassen oder zuruecksetzen, um den integrierten Endpunkt zu nutzen.',
   'ai_proxy_url_loading': 'Wird geladen...',
-  'ai_proxy_url_invalid': 'Geben Sie eine gueltige HTTP- oder HTTPS-URL ein',
+  'ai_proxy_url_invalid': 'Geben Sie eine gueltige HTTPS-URL ein',
   'ai_error_unauthorized': 'Der KI-Dienst ist nicht autorisiert.',
   'ai_error_rate_limited':
       'Zu viele Anfragen. Bitte versuchen Sie es spaeter erneut.',
   'ai_error_unavailable': 'Der KI-Dienst ist voruebergehend nicht verfuegbar.',
   'ai_error_http': 'KI-Dienstfehler ({status}).',
   'ai_error_timeout':
-      'Zeitueberschreitung bei der Verbindung zum KI-Dienst. Pruefen Sie das Netzwerk oder aendern Sie die KI-Proxy-URL in den Einstellungen.',
+      'Zeitueberschreitung bei der Verbindung zum KI-Dienst. Pruefen Sie das Netzwerk oder den KI-Dienst-Endpunkt in den Einstellungen.',
   'ai_error_unreachable':
-      'Keine Verbindung zum KI-Dienst moeglich. Ihr Netzwerk erreicht den integrierten workers.dev-Proxy moeglicherweise nicht. Aendern Sie die KI-Proxy-URL in den Einstellungen und versuchen Sie es erneut.',
+      'Der KI-Dienst ist nicht erreichbar. Pruefen Sie das Netzwerk, die Windows-Netzwerkeinstellungen oder einen erreichbaren KI-Dienst-Endpunkt in den Einstellungen.',
   'ai_error_tls':
-      'TLS-Verbindung zum KI-Dienst fehlgeschlagen. Pruefen Sie Systemzeit, Netzwerkproxy oder aendern Sie die KI-Proxy-URL.',
+      'TLS-Verbindung zum KI-Dienst fehlgeschlagen. Pruefen Sie Systemzeit, vertrauenswuerdige Zertifikate oder den KI-Dienst-Endpunkt.',
   'ai_error_connection': 'Verbindung zum KI-Dienst fehlgeschlagen: {error}',
   'settings_edit': 'Bearbeiten',
   'settings_save': 'Speichern',
@@ -10090,12 +10171,11 @@ const _ko = <String, String>{
   'ai_please_wait': '현재 응답이 완료될 때까지 기다려 주세요...',
 
   'ai_settings_section': 'AI \uC5B4\uC2DC\uC2A4\uD134\uD2B8',
-  'ai_proxy_url': 'AI \uD504\uB85D\uC2DC URL',
+  'ai_proxy_url': 'AI 서비스 엔드포인트',
   'ai_proxy_url_desc':
-      'OpenAI \uD638\uD658 \uD504\uB85D\uC2DC \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB97C \uC0AC\uC6A9\uD569\uB2C8\uB2E4. \uBE44\uC6CC \uB450\uAC70\uB098 \uCD08\uAE30\uD654\uD558\uBA74 \uB0B4\uC7A5 \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uB97C \uC0AC\uC6A9\uD569\uB2C8\uB2E4.',
+      'OpenAI 호환 AI 서비스 엔드포인트를 사용합니다. 비워 두거나 초기화하면 내장 엔드포인트를 사용합니다.',
   'ai_proxy_url_loading': '\uB85C\uB529 \uC911...',
-  'ai_proxy_url_invalid':
-      '\uC62C\uBC14\uB978 HTTP \uB610\uB294 HTTPS URL\uC744 \uC785\uB825\uD558\uC138\uC694',
+  'ai_proxy_url_invalid': '올바른 HTTPS URL을 입력하세요',
   'ai_error_unauthorized':
       'AI \uC11C\uBE44\uC2A4\uAC00 \uC778\uC99D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.',
   'ai_error_rate_limited':
@@ -10103,12 +10183,11 @@ const _ko = <String, String>{
   'ai_error_unavailable':
       'AI \uC11C\uBE44\uC2A4\uB97C \uC77C\uC2DC\uC801\uC73C\uB85C \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.',
   'ai_error_http': 'AI \uC11C\uBE44\uC2A4 \uC624\uB958({status}).',
-  'ai_error_timeout':
-      'AI \uC11C\uBE44\uC2A4 \uC5F0\uACB0 \uC2DC\uAC04\uC774 \uCD08\uACFC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uB124\uD2B8\uC6CC\uD06C\uB97C \uD655\uC778\uD558\uAC70\uB098 \uC124\uC815\uC5D0\uC11C AI \uD504\uB85D\uC2DC URL\uC744 \uBCC0\uACBD\uD558\uC138\uC694.',
+  'ai_error_timeout': 'AI 서비스 연결 시간이 초과되었습니다. 네트워크 또는 설정의 AI 서비스 엔드포인트를 확인하세요.',
   'ai_error_unreachable':
-      'AI \uC11C\uBE44\uC2A4\uC5D0 \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD604\uC7AC \uB124\uD2B8\uC6CC\uD06C\uC5D0\uC11C \uB0B4\uC7A5 workers.dev \uD504\uB85D\uC2DC\uC5D0 \uC811\uADFC\uD558\uC9C0 \uBABB\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC124\uC815\uC5D0\uC11C AI \uD504\uB85D\uC2DC URL\uC744 \uBCC0\uACBD\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.',
+      'AI 서비스에 연결할 수 없습니다. 네트워크, Windows 네트워크 설정 또는 설정의 접근 가능한 AI 서비스 엔드포인트를 확인하세요.',
   'ai_error_tls':
-      'AI \uC11C\uBE44\uC2A4 TLS \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC2DC\uC2A4\uD15C \uC2DC\uAC04, \uB124\uD2B8\uC6CC\uD06C \uD504\uB85D\uC2DC \uB610\uB294 AI \uD504\uB85D\uC2DC URL\uC744 \uD655\uC778\uD558\uC138\uC694.',
+      'AI 서비스 TLS 연결에 실패했습니다. 시스템 시간, 신뢰할 수 있는 인증서 또는 AI 서비스 엔드포인트를 확인하세요.',
   'ai_error_connection':
       'AI \uC11C\uBE44\uC2A4 \uC5F0\uACB0 \uC2E4\uD328: {error}',
   'settings_edit': '\uD3B8\uC9D1',

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:win_deploy_studio/features/ai_assistant/models/chat_models.dart';
 import 'package:win_deploy_studio/features/ai_assistant/providers/chat_provider.dart';
 import 'package:win_deploy_studio/features/ai_assistant/services/ai_service.dart';
 
@@ -82,6 +83,61 @@ void main() {
     expect(firstSession.messages.last.content, isEmpty);
     expect(firstSession.messages.last.isStreaming, isFalse);
   });
+
+  test(
+    'persists the provider-confirmed web-search status on the reply',
+    () async {
+      final service = _ControlledAiService();
+      final notifier = ChatNotifier(
+        service,
+        loadHistory: false,
+        persistHistory: false,
+      );
+      addTearDown(notifier.dispose);
+      notifier.createNewSession();
+      notifier.setSearchMode(SearchMode.force);
+
+      final request = notifier.sendMessage('find current release notes');
+      await _waitForRequests(service, 1);
+      service.requests.single.addSearchStatus(AiSearchStatus.searching);
+      expect(
+        notifier.state.activeSession!.messages.last.searchStatus,
+        AiSearchStatus.searching,
+      );
+      service.requests.single.addSearchStatus(AiSearchStatus.used);
+      service.requests.single.complete();
+      await request;
+
+      expect(
+        notifier.state.activeSession!.messages.last.searchStatus,
+        AiSearchStatus.used,
+      );
+    },
+  );
+
+  test(
+    'a single message can force search without changing the picker mode',
+    () async {
+      final service = _ControlledAiService();
+      final notifier = ChatNotifier(
+        service,
+        loadHistory: false,
+        persistHistory: false,
+      );
+      addTearDown(notifier.dispose);
+      notifier.createNewSession();
+      notifier.setSearchMode(SearchMode.off);
+
+      final request = notifier.sendMessage(
+        'search a current driver release',
+        searchMode: SearchMode.force,
+      );
+      await _waitForRequests(service, 1);
+      expect(service.requests.single.searchMode, SearchMode.force);
+      service.requests.single.complete();
+      await request;
+    },
+  );
 }
 
 Future<void> _waitForRequests(_ControlledAiService service, int count) async {
@@ -105,6 +161,7 @@ class _ControlledAiService implements AiMessageService {
     required void Function() onComplete,
     required void Function(String error) onError,
     required void Function(List<SearchSource> sources) onSources,
+    required void Function(AiSearchStatus status) onSearchStatus,
     SearchMode searchMode = SearchMode.off,
     CancelToken? cancelToken,
   }) {
@@ -113,6 +170,8 @@ class _ControlledAiService implements AiMessageService {
       onComplete: onComplete,
       onError: onError,
       onSources: onSources,
+      onSearchStatus: onSearchStatus,
+      searchMode: searchMode,
       cancelToken: cancelToken,
     );
     requests.add(request);
@@ -125,6 +184,8 @@ class _ControlledRequest {
   final void Function() _onComplete;
   final void Function(String error) _onError;
   final void Function(List<SearchSource> sources) _onSources;
+  final void Function(AiSearchStatus status) _onSearchStatus;
+  final SearchMode searchMode;
   final CancelToken? cancelToken;
   final Completer<void> done = Completer<void>();
 
@@ -133,6 +194,8 @@ class _ControlledRequest {
     required this._onComplete,
     required this._onError,
     required this._onSources,
+    required this._onSearchStatus,
+    required this.searchMode,
     required this.cancelToken,
   });
 
@@ -141,6 +204,8 @@ class _ControlledRequest {
   void addError(String error) => _onError(error);
 
   void addSources(List<SearchSource> sources) => _onSources(sources);
+
+  void addSearchStatus(AiSearchStatus status) => _onSearchStatus(status);
 
   void complete() {
     _onComplete();

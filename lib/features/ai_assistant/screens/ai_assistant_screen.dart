@@ -69,7 +69,12 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     _initialPromptSent = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        ref.read(chatProvider.notifier).sendMessage(widget.initialPrompt!);
+        ref
+            .read(chatProvider.notifier)
+            .sendMessage(
+              widget.initialPrompt!,
+              systemPrompt: getSystemPrompt(context),
+            );
       }
     });
   }
@@ -273,28 +278,6 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                         ),
                       ),
                     ),
-                    if (!compact) ...[
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(
-                            tokens.compactRadius,
-                          ),
-                        ),
-                        child: Text(
-                          'MiMo 2.5 Pro',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -503,25 +486,34 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_ms_update'),
-                onTap: () =>
-                    _handleSend(tr(context, 'ai_search_ms_update_prompt')),
+                onTap: () => _handleSend(
+                  tr(context, 'ai_search_ms_update_prompt'),
+                  forceSearch: true,
+                ),
               ),
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_canary'),
-                onTap: () =>
-                    _handleSend(tr(context, 'ai_search_canary_prompt')),
+                onTap: () => _handleSend(
+                  tr(context, 'ai_search_canary_prompt'),
+                  forceSearch: true,
+                ),
               ),
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_wtg_tutorial'),
-                onTap: () =>
-                    _handleSend(tr(context, 'ai_search_wtg_tutorial_prompt')),
+                onTap: () => _handleSend(
+                  tr(context, 'ai_search_wtg_tutorial_prompt'),
+                  forceSearch: true,
+                ),
               ),
               _QuickActionChip(
                 icon: Icons.search_rounded,
                 label: tr(context, 'ai_search_rufus'),
-                onTap: () => _handleSend(tr(context, 'ai_search_rufus_prompt')),
+                onTap: () => _handleSend(
+                  tr(context, 'ai_search_rufus_prompt'),
+                  forceSearch: true,
+                ),
               ),
             ],
           ),
@@ -530,7 +522,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     );
   }
 
-  void _handleSend(String text) {
+  void _handleSend(String text, {bool forceSearch = false}) {
     if (ref.read(chatProvider).isGenerating) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -542,7 +534,11 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     }
     ref
         .read(chatProvider.notifier)
-        .sendMessage(text, systemPrompt: getSystemPrompt(context));
+        .sendMessage(
+          text,
+          systemPrompt: getSystemPrompt(context),
+          searchMode: forceSearch ? SearchMode.force : null,
+        );
   }
 
   Future<void> _handleAnalyzeLogs() async {

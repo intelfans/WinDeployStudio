@@ -72,6 +72,20 @@ void main() {
     );
   });
 
+  test('records from different physical disks can be compared', () {
+    final baseline = benchmarkTestRecord(
+      benchmarkTestResult(serialNumber: 'SERIAL-A', uniqueId: 'DISK-A'),
+      id: 'baseline',
+    );
+    final candidate = benchmarkTestRecord(
+      benchmarkTestResult(serialNumber: 'SERIAL-B', uniqueId: 'DISK-B'),
+      id: 'candidate',
+    );
+
+    expect(service.compatibilityFor(baseline, candidate).isCompatible, isTrue);
+    expect(service.compare(baseline, candidate).metrics, isNotEmpty);
+  });
+
   test('missing measurements remain N/A instead of becoming zero', () {
     final baselineMeasurements = benchmarkTestMeasurements()
         .where(

@@ -774,7 +774,7 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricTile(
-                label: 'Full P10',
+                label: tr(context, BenchmarkHistoryKeys.fullWriteP10),
                 value:
                     result.fullWriteStatus == BenchmarkFullWriteStatus.completed
                     ? _formatSpeed(result.fullWriteP10MBps)
@@ -806,6 +806,7 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
           const SizedBox(height: 14),
           BenchmarkWorkloadChart(
             primarySeries: series,
+            activeWorkload: _isRunning ? progress?.workload : null,
             primarySlcMarkerGB: result?.slcStatus == BenchmarkSlcStatus.detected
                 ? result!.slcCacheInflectionGB
                 : 0,
@@ -839,11 +840,10 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
 
   String _fullWriteScopeText(BuildContext context, String driveRoot) {
     final volume = driveRoot.isEmpty ? '--' : driveRoot;
-    if (Localizations.localeOf(context).languageCode == 'zh') {
-      return 'Full 会写入所选卷 $volume 的可用空间，并保留安全余量。';
-    }
-    return 'Full writes the selected volume available space ($volume), '
-        'with a safety reserve.';
+    return tr(
+      context,
+      BenchmarkHistoryKeys.fullWriteScope,
+    ).replaceAll('{volume}', volume);
   }
 
   String _historySaveFailureText(BuildContext context) {

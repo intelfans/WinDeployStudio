@@ -120,7 +120,7 @@ class BenchmarkHistoryDetailScreen extends StatelessWidget {
                       '${(result.multiThreadNormalizedEfficiency * 100).toStringAsFixed(0)}%',
                 ),
                 _Value(
-                  label: 'Full P10',
+                  label: tr(context, BenchmarkHistoryKeys.fullWriteP10),
                   value:
                       result.fullWriteStatus ==
                           BenchmarkFullWriteStatus.completed

@@ -40,6 +40,15 @@ class _BenchmarkCurveChartState extends State<BenchmarkCurveChart> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    // Comparison curves need two unambiguous series colors. Keep the theme
+    // palette for single-record charts, while using a warm pair that remains
+    // distinguishable in both light and dark themes for side-by-side results.
+    final primaryColor = widget.secondary.isEmpty
+        ? colors.primary
+        : _comparisonPrimaryColor(colors.brightness);
+    final secondaryColor = widget.secondary.isEmpty
+        ? colors.tertiary
+        : _comparisonSecondaryColor(colors.brightness);
     if (widget.primary.isEmpty && widget.secondary.isEmpty) {
       return SizedBox(
         height: 220,
@@ -87,8 +96,8 @@ class _BenchmarkCurveChartState extends State<BenchmarkCurveChart> {
             spacing: 18,
             runSpacing: 6,
             children: [
-              _Legend(color: colors.primary, label: widget.primaryLabel),
-              _Legend(color: colors.tertiary, label: widget.secondaryLabel),
+              _Legend(color: primaryColor, label: widget.primaryLabel),
+              _Legend(color: secondaryColor, label: widget.secondaryLabel),
             ],
           ),
           const SizedBox(height: 8),
@@ -100,8 +109,8 @@ class _BenchmarkCurveChartState extends State<BenchmarkCurveChart> {
               primary: widget.primary,
               secondary: widget.secondary,
               metric: _metric,
-              primaryColor: colors.primary,
-              secondaryColor: colors.tertiary,
+              primaryColor: primaryColor,
+              secondaryColor: secondaryColor,
               gridColor: colors.outlineVariant,
               textColor: colors.onSurfaceVariant,
               primaryMarkerX: widget.primaryMarkerX,
@@ -117,6 +126,18 @@ class _BenchmarkCurveChartState extends State<BenchmarkCurveChart> {
     );
   }
 }
+
+// A darker gold/red pair is needed on light surfaces for readable chart
+// strokes; the brighter pair preserves the same meaning in dark mode.
+Color _comparisonPrimaryColor(Brightness brightness) =>
+    brightness == Brightness.dark
+    ? const Color(0xFFFFD740)
+    : const Color(0xFF9C6500);
+
+Color _comparisonSecondaryColor(Brightness brightness) =>
+    brightness == Brightness.dark
+    ? const Color(0xFFFF8A80)
+    : const Color(0xFFB3261E);
 
 class _Legend extends StatelessWidget {
   final Color color;

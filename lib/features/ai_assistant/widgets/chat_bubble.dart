@@ -101,6 +101,8 @@ class ChatBubble extends StatelessWidget {
                   ],
                 ),
               ),
+            if (!isUser && message.searchStatus != AiSearchStatus.none)
+              _SearchStatusWidget(status: message.searchStatus),
             if (!isUser && message.sources.isNotEmpty) ...[
               const SizedBox(height: 8),
               _SourcesWidget(sources: message.sources),
@@ -186,6 +188,60 @@ class ChatBubble extends StatelessWidget {
           if (ctx.mounted) WebviewHelper.openUrl(ctx, href);
         }
       },
+    );
+  }
+}
+
+class _SearchStatusWidget extends StatelessWidget {
+  final AiSearchStatus status;
+
+  const _SearchStatusWidget({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (icon, key, color) = switch (status) {
+      AiSearchStatus.requested => (
+        Icons.language_rounded,
+        'ai_search_requested',
+        colorScheme.onSurfaceVariant,
+      ),
+      AiSearchStatus.searching => (
+        Icons.travel_explore_rounded,
+        'ai_search_searching',
+        colorScheme.primary,
+      ),
+      AiSearchStatus.used => (
+        Icons.verified_rounded,
+        'ai_search_used',
+        Colors.green,
+      ),
+      AiSearchStatus.notUsed => (
+        Icons.info_outline_rounded,
+        'ai_search_not_used',
+        colorScheme.onSurfaceVariant,
+      ),
+      AiSearchStatus.unavailable => (
+        Icons.cloud_off_rounded,
+        'ai_search_unavailable',
+        colorScheme.error,
+      ),
+      AiSearchStatus.none => (
+        Icons.language_rounded,
+        'ai_search_requested',
+        colorScheme.onSurfaceVariant,
+      ),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(tr(context, key), style: TextStyle(fontSize: 11, color: color)),
+        ],
+      ),
     );
   }
 }

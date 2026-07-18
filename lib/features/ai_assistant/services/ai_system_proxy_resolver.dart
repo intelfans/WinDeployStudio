@@ -1,199 +1,182 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
-enum AiProxySource { direct, environment, windowsSettings }
+enum AiNetworkRouteSource { direct, environment, windowsSystem }
 
-class AiProxyResolution {
+/// A standard network route selected for one HTTPS request.
+///
+/// [instruction] uses the `HttpClient.findProxy` directive format and is
+/// intentionally limited to `DIRECT` or an unauthenticated HTTP CONNECT
+/// route. TLS validation remains entirely under Dart's normal validation.
+class AiNetworkRoute {
   final String instruction;
-  final AiProxySource source;
+  final AiNetworkRouteSource source;
 
-  const AiProxyResolution({required this.instruction, required this.source});
+  const AiNetworkRoute({required this.instruction, required this.source});
 
   bool get isDirect => instruction == 'DIRECT';
-
-  /// A loopback proxy is normally supplied by a local app such as Clash.
-  /// It must be treated as transient: the OS setting or inherited environment
-  /// can outlive the local listener after that app exits.
-  bool get isLoopbackProxy =>
-      AiSystemProxyResolver.isLoopbackProxyInstruction(instruction);
 }
 
-/// Resolves a secure HTTP CONNECT proxy for the AI transport.
+/// Resolves the normal desktop network route for an AI request.
 ///
-/// Dart honours HTTPS_PROXY when explicitly asked to do so, but it does not
-/// automatically read the Windows Internet Settings proxy used by browsers.
-/// This resolver supports that common desktop setup without accepting a PAC
-/// script or weakening TLS verification.
-class AiSystemProxyResolver {
-  AiSystemProxyResolver._();
+/// The order follows standard user and operating-system configuration:
+/// environment variables (including their exclusions), the Windows system
+/// resolver (static settings, PAC, WPAD and exceptions), then direct access.
+/// No application-specific network software is detected or treated specially.
+class AiSystemNetworkResolver {
+  AiSystemNetworkResolver._();
 
-  static const _internetSettingsKey =
-      r'HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings';
+  static const _resolutionTimeout = Duration(seconds: 4);
 
-  static Future<AiProxyResolution> resolveFor(Uri target) async {
-    final environmentInstruction = HttpClient.findProxyFromEnvironment(target);
+  static Future<AiNetworkRoute> resolveFor(Uri target) async {
+    final environmentInstruction = _environmentInstructionFor(target);
     if (!_isDirect(environmentInstruction)) {
-      return _useIfAvailable(
-        AiProxyResolution(
-          instruction: environmentInstruction,
-          source: AiProxySource.environment,
-        ),
+      return AiNetworkRoute(
+        instruction: environmentInstruction,
+        source: AiNetworkRouteSource.environment,
       );
     }
 
-    if (!Platform.isWindows) {
-      return const AiProxyResolution(
+    // An explicit environment network configuration may intentionally bypass
+    // this host through NO_PROXY. Do not override it with a Windows route.
+    if (_hasEnvironmentNetworkConfiguration()) {
+      return const AiNetworkRoute(
         instruction: 'DIRECT',
-        source: AiProxySource.direct,
+        source: AiNetworkRouteSource.environment,
       );
     }
 
-    try {
-      final results = await Future.wait([
-        _readWindowsSetting('ProxyEnable'),
-        _readWindowsSetting('ProxyServer'),
-      ]);
-      final instruction = windowsProxyInstruction(
-        proxyEnabledOutput: results[0],
-        proxyServerOutput: results[1],
-        scheme: target.scheme,
-      );
-      if (instruction != null) {
-        return _useIfAvailable(
-          AiProxyResolution(
-            instruction: instruction,
-            source: AiProxySource.windowsSettings,
-          ),
+    if (Platform.isWindows) {
+      final instruction = await _readWindowsSystemRoute(target);
+      if (instruction != null && !_isDirect(instruction)) {
+        return AiNetworkRoute(
+          instruction: instruction,
+          source: AiNetworkRouteSource.windowsSystem,
         );
       }
-    } catch (_) {
-      // A denied or unavailable registry query should never prevent a direct
-      // HTTPS request. The regular connection diagnostics handle that path.
     }
 
-    return const AiProxyResolution(
+    return const AiNetworkRoute(
       instruction: 'DIRECT',
-      source: AiProxySource.direct,
+      source: AiNetworkRouteSource.direct,
     );
   }
 
-  static Future<String> _readWindowsSetting(String name) async {
-    final result = await Process.run('reg.exe', [
-      'query',
-      _internetSettingsKey,
-      '/v',
-      name,
-    ]);
-    if (result.exitCode != 0) return '';
-    return result.stdout.toString();
+  static bool _hasEnvironmentNetworkConfiguration() {
+    const names = {'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY'};
+    return Platform.environment.entries.any(
+      (entry) =>
+          names.contains(entry.key.toUpperCase()) &&
+          entry.value.trim().isNotEmpty,
+    );
+  }
+
+  static String _environmentInstructionFor(Uri target) {
+    final standard = HttpClient.findProxyFromEnvironment(target);
+    if (!_isDirect(standard) || _environmentNoProxyMatches(target)) {
+      return standard;
+    }
+
+    // ALL_PROXY is a widely used standard environment setting that is not
+    // represented by every Dart runtime's built-in resolver. Treat it exactly
+    // like an HTTP CONNECT route while preserving NO_PROXY exclusions.
+    final allProxy = _environmentValue('ALL_PROXY');
+    return allProxy == null
+        ? standard
+        : systemRouteInstruction(allProxy) ?? standard;
+  }
+
+  static String? _environmentValue(String name) {
+    for (final entry in Platform.environment.entries) {
+      if (entry.key.toUpperCase() == name && entry.value.trim().isNotEmpty) {
+        return entry.value.trim();
+      }
+    }
+    return null;
+  }
+
+  static bool _environmentNoProxyMatches(Uri target) {
+    final raw = _environmentValue('NO_PROXY');
+    if (raw == null) return false;
+    final host = target.host.toLowerCase();
+    return raw.split(',').map((entry) => entry.trim().toLowerCase()).any((
+      entry,
+    ) {
+      if (entry.isEmpty) return false;
+      if (entry == '*') return true;
+      final value = entry.startsWith('.') ? entry.substring(1) : entry;
+      final hasSinglePortSeparator =
+          ':'.allMatches(value).length == 1 && !value.startsWith('[');
+      final candidate = hasSinglePortSeparator
+          ? value.substring(0, value.lastIndexOf(':'))
+          : value.replaceAll(RegExp(r'^\[|\]$'), '');
+      return candidate.isNotEmpty &&
+          (host == candidate || host.endsWith('.$candidate'));
+    });
+  }
+
+  /// Lets Windows evaluate the exact URL through its standard resolver. That
+  /// includes static proxy settings, ProxyOverride, PAC and WPAD when enabled
+  /// by the user or organisation. The URL is passed via an environment value,
+  /// never interpolated into a command string.
+  static Future<String?> _readWindowsSystemRoute(Uri target) async {
+    Process? process;
+    try {
+      process = await Process.start(
+        'powershell.exe',
+        [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          r'''
+$target = [Uri]$env:WDS_AI_NETWORK_TARGET
+$proxy = [System.Net.WebRequest]::GetSystemWebProxy()
+if ($proxy.IsBypassed($target)) {
+  [Console]::Out.Write('DIRECT')
+  exit 0
+}
+$resolved = $proxy.GetProxy($target)
+if ($null -eq $resolved -or $resolved.AbsoluteUri -eq $target.AbsoluteUri) {
+  [Console]::Out.Write('DIRECT')
+} else {
+  [Console]::Out.Write($resolved.AbsoluteUri)
+}
+''',
+        ],
+        environment: {
+          ...Platform.environment,
+          'WDS_AI_NETWORK_TARGET': target.toString(),
+        },
+      );
+      final stdout = process.stdout.transform(utf8.decoder).join();
+      final stderr = process.stderr.transform(utf8.decoder).join();
+      final exitCode = await process.exitCode.timeout(_resolutionTimeout);
+      final output = await stdout;
+      await stderr;
+      if (exitCode != 0) return null;
+      return systemRouteInstruction(output);
+    } on TimeoutException {
+      process?.kill();
+      return null;
+    } on ProcessException {
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   static bool _isDirect(String instruction) =>
       instruction.trim().toUpperCase() == 'DIRECT';
 
-  /// Avoid sending an AI request to a stale local proxy after its owner exits.
-  /// Only loopback endpoints are probed, so this never adds a reachability
-  /// probe for a user-managed remote corporate proxy.
-  static Future<AiProxyResolution> _useIfAvailable(
-    AiProxyResolution resolution,
-  ) async {
-    final endpoint = loopbackProxyEndpoint(resolution.instruction);
-    if (endpoint == null) return resolution;
-
-    try {
-      final socket = await Socket.connect(
-        endpoint.host,
-        endpoint.port,
-        timeout: const Duration(milliseconds: 600),
-      );
-      socket.destroy();
-      return resolution;
-    } on SocketException {
-      return const AiProxyResolution(
-        instruction: 'DIRECT',
-        source: AiProxySource.direct,
-      );
-    } on TimeoutException {
-      return const AiProxyResolution(
-        instruction: 'DIRECT',
-        source: AiProxySource.direct,
-      );
-    }
-  }
-
-  /// Returns a local HTTP CONNECT proxy endpoint, if [instruction] represents
-  /// one. Kept public for focused tests and diagnostics.
-  static ({String host, int port})? loopbackProxyEndpoint(String instruction) {
-    final match = RegExp(
-      r'^\s*PROXY\s+(\[[^\]]+\]|[^:\s;]+):(\d+)(?:\s*;.*)?$',
-      caseSensitive: false,
-    ).firstMatch(instruction);
-    if (match == null) return null;
-    final host = match.group(1)!.replaceAll(RegExp(r'^\[|\]$'), '');
-    final port = int.tryParse(match.group(2)!);
-    if (port == null || port <= 0 || port > 65535) return null;
-    final normalizedHost = host.toLowerCase();
-    if (normalizedHost != 'localhost' &&
-        normalizedHost != '::1' &&
-        normalizedHost != '127.0.0.1') {
-      return null;
-    }
-    return (host: host, port: port);
-  }
-
-  static bool isLoopbackProxyInstruction(String instruction) =>
-      loopbackProxyEndpoint(instruction) != null;
-
-  /// Parses `reg query` output into a Dart [HttpClient.findProxy] directive.
-  /// Only standard HTTP CONNECT proxies are accepted; unsupported or malformed
-  /// values fall back to direct HTTPS instead of silently changing security.
-  static String? windowsProxyInstruction({
-    required String proxyEnabledOutput,
-    required String proxyServerOutput,
-    required String scheme,
-  }) {
-    if (!RegExp(
-      r'REG_DWORD\s+0x1\b',
-      caseSensitive: false,
-    ).hasMatch(proxyEnabledOutput)) {
-      return null;
-    }
-
-    final valueMatch = RegExp(
-      r'REG_SZ\s+(.+)$',
-      caseSensitive: false,
-      multiLine: true,
-    ).firstMatch(proxyServerOutput);
-    final rawValue = valueMatch?.group(1)?.trim();
-    if (rawValue == null || rawValue.isEmpty) return null;
-
-    final candidate = _selectProxyValue(rawValue, scheme);
-    if (candidate == null) return null;
-    return _toHttpConnectDirective(candidate);
-  }
-
-  static String? _selectProxyValue(String rawValue, String scheme) {
-    final entries = rawValue
-        .split(';')
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toList(growable: false);
-    if (entries.isEmpty) return null;
-
-    String? fallback;
-    for (final entry in entries) {
-      final separator = entry.indexOf('=');
-      if (separator < 1) {
-        fallback ??= entry;
-        continue;
-      }
-      final key = entry.substring(0, separator).trim().toLowerCase();
-      final value = entry.substring(separator + 1).trim();
-      if (value.isEmpty) continue;
-      if (key == scheme.toLowerCase()) return value;
-      if (key == 'http') fallback ??= value;
-    }
-    return fallback;
+  /// Parses the bounded output of Windows' standard system proxy resolver.
+  /// Kept public for focused tests without invoking a Windows process.
+  static String? systemRouteInstruction(String output) {
+    final value = output.trim();
+    if (value.isEmpty) return null;
+    if (_isDirect(value)) return 'DIRECT';
+    return _toHttpConnectDirective(value);
   }
 
   static String? _toHttpConnectDirective(String value) {
@@ -205,9 +188,10 @@ class AiSystemProxyResolver {
 
     final uri = Uri.tryParse(candidate);
     if (uri == null ||
+        uri.scheme.toLowerCase() != 'http' ||
         uri.host.isEmpty ||
         uri.userInfo.isNotEmpty ||
-        uri.path.isNotEmpty && uri.path != '/') {
+        (uri.path.isNotEmpty && uri.path != '/')) {
       return null;
     }
 

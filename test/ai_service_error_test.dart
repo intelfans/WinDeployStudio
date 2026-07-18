@@ -5,6 +5,14 @@ import 'package:win_deploy_studio/features/ai_assistant/services/ai_service.dart
 
 void main() {
   group('AiService network error classification', () {
+    test('adds Bearer authorization only for a valid configured key', () {
+      expect(AiService.buildAuthorizationHeaders(null), isEmpty);
+      expect(AiService.buildAuthorizationHeaders('sk-example\nvalue'), isEmpty);
+      expect(AiService.buildAuthorizationHeaders(' sk-example-value '), {
+        'Authorization': 'Bearer sk-example-value',
+      });
+    });
+
     test('classifies request timeout separately', () {
       expect(
         AiService.networkErrorKey(TimeoutException('request timed out')),
@@ -21,19 +29,19 @@ void main() {
       );
     });
 
-    test('classifies unreachable proxy errors separately', () {
+    test('classifies unreachable network errors separately', () {
       expect(
         AiService.networkErrorKey(StateError('Connection refused')),
         'ai_error_unreachable',
       );
     });
 
-    test('retries only failures before an HTTP response exists', () {
+    test('retries only transient network failures before an HTTP response', () {
       expect(
         AiService.shouldRetryTransportFailure(
           StateError('Connection terminated during handshake'),
         ),
-        isTrue,
+        isFalse,
       );
       expect(
         AiService.shouldRetryTransportFailure(

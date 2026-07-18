@@ -15,6 +15,7 @@ import '../update/screens/update_dialog.dart';
 import '../../shared/widgets/app_compact_label.dart';
 import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/special_thanks_section.dart';
+import '../ai_assistant/services/ai_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -32,12 +33,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Timer? _intelLogoResetTimer;
   int _easterEggTapCount = 0;
   int _intelLogoTapCount = 0;
-  String? _aiProxyUrl;
+  String? _aiEndpointUrl;
+  bool _aiApiKeyConfigured = false;
+  String? _aiModel;
 
   @override
   void initState() {
     super.initState();
-    _loadAiProxyUrl();
+    _loadAiPreferences();
   }
 
   @override
@@ -47,9 +50,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAiProxyUrl() async {
-    final url = await AiConfig.getProxyUrl();
-    if (mounted) setState(() => _aiProxyUrl = url);
+  Future<void> _loadAiPreferences() async {
+    final url = await AiConfig.getEndpointUrl();
+    final apiKey = await AiConfig.getApiKey();
+    final model = await AiConfig.getModel();
+    if (mounted) {
+      setState(() {
+        _aiEndpointUrl = url;
+        _aiApiKeyConfigured = apiKey != null;
+        // The built-in worker has an internal model fallback. Do not expose
+        // that implementation detail as a provider-branded default in UI.
+        _aiModel =
+            url == AiConfig.defaultEndpointUrl && model == AiConfig.defaultModel
+            ? null
+            : model.isEmpty
+            ? null
+            : model;
+      });
+    }
   }
 
   void _handleEasterEggTap() {
@@ -290,9 +308,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: Icons.smart_toy_outlined,
                     title: tr(context, 'ai_proxy_url'),
                     subtitle:
-                        _aiProxyUrl ?? tr(context, 'ai_proxy_url_loading'),
+                        _aiEndpointUrl ?? tr(context, 'ai_proxy_url_loading'),
                     trailing: FilledButton.tonal(
-                      onPressed: _showAiProxyDialog,
+                      onPressed: _showAiEndpointDialog,
+                      child: Text(tr(context, 'settings_edit')),
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.key_outlined,
+                    title: tr(context, 'ai_api_key'),
+                    subtitle: _aiApiKeyConfigured
+                        ? tr(context, 'ai_api_key_saved')
+                        : tr(context, 'ai_api_key_not_set'),
+                    trailing: FilledButton.tonal(
+                      onPressed: _showAiApiKeyDialog,
+                      child: Text(tr(context, 'settings_edit')),
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.auto_awesome_outlined,
+                    title: tr(context, 'ai_model'),
+                    subtitle: _aiModel ?? tr(context, 'ai_model_not_set'),
+                    trailing: FilledButton.tonal(
+                      onPressed: _showAiModelDialog,
                       child: Text(tr(context, 'settings_edit')),
                     ),
                   ),
@@ -560,9 +598,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _showAiProxyDialog() async {
+  Future<void> _showAiEndpointDialog() async {
     final controller = TextEditingController(
-      text: _aiProxyUrl ?? AiConfig.defaultProxyUrl,
+      text: _aiEndpointUrl ?? AiConfig.defaultEndpointUrl,
     );
     var errorText = '';
 
@@ -572,17 +610,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             Future<void> save() async {
-              final normalized = AiConfig.normalizeProxyUrl(controller.text);
+              final normalized = AiConfig.normalizeEndpointUrl(controller.text);
               if (normalized.isNotEmpty &&
-                  !AiConfig.isValidProxyUrl(normalized)) {
+                  !AiConfig.isValidEndpointUrl(normalized)) {
                 setDialogState(() {
                   errorText = tr(context, 'ai_proxy_url_invalid');
                 });
                 return;
               }
               try {
-                await AiConfig.setProxyUrl(normalized);
-                await _loadAiProxyUrl();
+                await AiConfig.setEndpointUrl(normalized);
+                await _loadAiPreferences();
                 if (dialogContext.mounted) Navigator.of(dialogContext).pop();
               } catch (_) {
                 setDialogState(() {
@@ -592,8 +630,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             }
 
             Future<void> reset() async {
-              await AiConfig.resetProxyUrl();
-              await _loadAiProxyUrl();
+              await AiConfig.resetEndpointUrl();
+              await _loadAiPreferences();
               if (dialogContext.mounted) Navigator.of(dialogContext).pop();
             }
 
@@ -613,7 +651,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         autofocus: true,
                         decoration: InputDecoration(
                           labelText: tr(context, 'ai_proxy_url'),
-                          hintText: AiConfig.defaultProxyUrl,
+                          hintText: AiConfig.defaultEndpointUrl,
                           errorText: errorText.isEmpty ? null : errorText,
                           border: const OutlineInputBorder(),
                         ),
@@ -629,6 +667,249 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: reset,
                   child: Text(tr(context, 'settings_reset_default')),
                 ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(tr(context, 'detail_cancel')),
+                ),
+                FilledButton(
+                  onPressed: save,
+                  child: Text(tr(context, 'settings_save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+  }
+
+  Future<void> _showAiApiKeyDialog() async {
+    final controller = TextEditingController();
+    var obscureText = true;
+    var errorText = '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> save() async {
+              try {
+                await AiConfig.setApiKey(controller.text);
+                await _loadAiPreferences();
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              } catch (error) {
+                setDialogState(() {
+                  errorText = error is StateError
+                      ? tr(context, 'ai_api_key_endpoint_required')
+                      : tr(context, 'ai_api_key_invalid');
+                });
+              }
+            }
+
+            Future<void> clear() async {
+              await AiConfig.clearApiKey();
+              await _loadAiPreferences();
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            }
+
+            return AlertDialog(
+              title: Text(tr(context, 'ai_api_key')),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tr(context, 'ai_api_key_desc')),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: controller,
+                        autofocus: true,
+                        obscureText: obscureText,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'ai_api_key'),
+                          hintText: _aiApiKeyConfigured ? '••••••••' : null,
+                          errorText: errorText.isEmpty ? null : errorText,
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            tooltip: obscureText
+                                ? tr(context, 'ai_api_key_show')
+                                : tr(context, 'ai_api_key_hide'),
+                            icon: Icon(
+                              obscureText
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () => setDialogState(
+                              () => obscureText = !obscureText,
+                            ),
+                          ),
+                        ),
+                        onSubmitted: (_) => save(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                if (_aiApiKeyConfigured)
+                  TextButton(
+                    onPressed: clear,
+                    child: Text(tr(context, 'ai_api_key_clear')),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(tr(context, 'detail_cancel')),
+                ),
+                FilledButton(
+                  onPressed: save,
+                  child: Text(tr(context, 'settings_save')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+  }
+
+  Future<void> _showAiModelDialog() async {
+    final controller = TextEditingController(text: _aiModel ?? '');
+    var errorText = '';
+    var loadingModels = false;
+    var availableModels = <String>[];
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> refreshModels() async {
+              setDialogState(() {
+                loadingModels = true;
+                errorText = '';
+              });
+              try {
+                final models = await AiService().fetchModels();
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    availableModels = models;
+                    loadingModels = false;
+                  });
+                }
+              } catch (_) {
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    loadingModels = false;
+                    errorText = tr(context, 'ai_models_load_failed');
+                  });
+                }
+              }
+            }
+
+            Future<void> save() async {
+              try {
+                await AiConfig.setModel(controller.text);
+                await _loadAiPreferences();
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              } catch (_) {
+                setDialogState(() {
+                  errorText = tr(context, 'ai_model_invalid');
+                });
+              }
+            }
+
+            final current = controller.text.trim();
+            return AlertDialog(
+              title: Text(tr(context, 'ai_model')),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tr(context, 'ai_model_desc')),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: controller,
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'ai_model'),
+                          errorText: errorText.isEmpty ? null : errorText,
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setDialogState(() {}),
+                        onSubmitted: (_) => save(),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: OutlinedButton.icon(
+                          onPressed: loadingModels ? null : refreshModels,
+                          icon: loadingModels
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.refresh),
+                          label: Text(
+                            loadingModels
+                                ? tr(context, 'ai_model_loading')
+                                : tr(context, 'ai_models_refresh'),
+                          ),
+                        ),
+                      ),
+                      if (availableModels.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          tr(context, 'ai_model_select'),
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          initialValue: availableModels.contains(current)
+                              ? current
+                              : null,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            for (final model in availableModels)
+                              DropdownMenuItem<String>(
+                                value: model,
+                                child: Text(
+                                  model,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              controller.text = value;
+                              controller.selection = TextSelection.collapsed(
+                                offset: value.length,
+                              );
+                              setDialogState(() {});
+                            }
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   child: Text(tr(context, 'detail_cancel')),

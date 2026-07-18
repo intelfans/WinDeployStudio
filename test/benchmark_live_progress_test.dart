@@ -21,6 +21,10 @@ void main() {
         BenchmarkWorkload.random4kWrite.livePhaseTitleKey,
         'bench_phase_random4k',
       );
+      expect(
+        BenchmarkWorkload.fullSequentialWrite.livePhaseTitleKey,
+        'bench_phase_full',
+      );
     });
 
     test('keeps the active workload on a live progress update', () {
@@ -43,6 +47,7 @@ void main() {
           'bench_phase_sequential',
           'benchmark_history_random_read',
           'bench_phase_random4k',
+          'bench_phase_full',
         };
 
         for (final locale in supportedLocaleCodes) {

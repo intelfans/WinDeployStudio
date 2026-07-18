@@ -30,21 +30,19 @@ class _BenchmarkComparisonScreenState extends State<BenchmarkComparisonScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text(
-            baseline.device.friendlyName.isEmpty
-                ? baseline.device.model
-                : baseline.device.friendlyName,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${_available(context, baseline.device.serialNumber)}  |  '
-            '${baseline.disk.sizeFormatted}',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _DeviceSummary(
+                label: tr(context, BenchmarkHistoryKeys.baseline),
+                result: baseline,
+              ),
+              _DeviceSummary(
+                label: tr(context, BenchmarkHistoryKeys.candidate),
+                result: candidate,
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           _ComparisonTable(comparison: comparison),
@@ -58,9 +56,11 @@ class _BenchmarkComparisonScreenState extends State<BenchmarkComparisonScreen> {
                 secondarySeries: candidate.sampleSeries,
                 primaryLabel:
                     '${tr(context, BenchmarkHistoryKeys.baseline)}: '
+                    '${_deviceLabel(baseline)} | '
                     '${dateFormat.format(baseline.completedAt)}',
                 secondaryLabel:
                     '${tr(context, BenchmarkHistoryKeys.candidate)}: '
+                    '${_deviceLabel(candidate)} | '
                     '${dateFormat.format(candidate.completedAt)}',
                 primarySlcMarkerGB:
                     baseline.slcStatus == BenchmarkSlcStatus.detected
@@ -73,6 +73,63 @@ class _BenchmarkComparisonScreenState extends State<BenchmarkComparisonScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _DeviceSummary extends StatelessWidget {
+  final String label;
+  final BenchmarkResult result;
+
+  const _DeviceSummary({required this.label, required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final name = result.device.friendlyName.isEmpty
+        ? result.device.model
+        : result.device.friendlyName;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 480),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerLow,
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_available(context, result.device.serialNumber)}  |  '
+                '${result.disk.sizeFormatted}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -194,6 +251,13 @@ String _available(BuildContext context, String value) {
   return normalized.isEmpty || normalized.toUpperCase() == 'N/A'
       ? tr(context, BenchmarkHistoryKeys.unknown)
       : normalized;
+}
+
+String _deviceLabel(BenchmarkResult result) {
+  final name = result.device.friendlyName.isEmpty
+      ? result.device.model
+      : result.device.friendlyName;
+  return name.isEmpty ? result.device.uniqueId : name;
 }
 
 String _metricLabel(BuildContext context, BenchmarkMetricDelta metric) {

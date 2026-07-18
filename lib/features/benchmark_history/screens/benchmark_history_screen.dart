@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../core/localization/strings.dart';
 import '../../benchmark/models/benchmark_models.dart';
@@ -11,7 +14,21 @@ import '../services/benchmark_history_service.dart';
 import 'benchmark_comparison_screen.dart';
 import 'benchmark_history_detail_screen.dart';
 
-enum _ExportFormat { csv, json }
+enum _ExportFormat { csv, json, html }
+
+enum _DeleteTarget { range, all }
+
+final RegExp _invalidFileNameCharacters = RegExp(r'[<>:"/\\|?*\x00-\x1F]');
+
+String _safeFileComponent(String value, {required String fallback}) {
+  final sanitized = value
+      .replaceAll(_invalidFileNameCharacters, '_')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .replaceFirst(RegExp(r'[. ]+$'), '');
+  if (sanitized.isEmpty) return fallback;
+  return sanitized.length <= 48 ? sanitized : sanitized.substring(0, 48);
+}
 
 class BenchmarkHistoryScreen extends ConsumerStatefulWidget {
   const BenchmarkHistoryScreen({super.key});
@@ -101,30 +118,115 @@ class _BenchmarkHistoryScreenState
 
   Future<void> _export(_ExportFormat format) async {
     if (_records.isEmpty || _working) return;
-    final selected = _selectedIds.isEmpty
-        ? _records.map((record) => record.id).toList(growable: false)
-        : _selectedIds.toList(growable: false);
+    var selected = _selectedRecordIds();
+    if (selected.isEmpty) {
+      final picked = await _pickRecordsForExport();
+      if (!mounted || picked == null || picked.isEmpty) return;
+      selected = picked;
+    }
+    final selectedRecords = _records
+        .where((record) => selected.contains(record.id))
+        .toList(growable: false);
+    if (selectedRecords.isEmpty) return;
     final extension = format.name;
-    final destination = await FilePicker.saveFile(
-      dialogTitle: format == _ExportFormat.csv
-          ? tr(context, BenchmarkHistoryKeys.exportCsv)
-          : tr(context, BenchmarkHistoryKeys.exportJson),
-      fileName:
-          'wds_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.$extension',
-      type: FileType.custom,
-      allowedExtensions: [extension],
+    final titleKey = switch (format) {
+      _ExportFormat.csv => BenchmarkHistoryKeys.exportCsv,
+      _ExportFormat.json => BenchmarkHistoryKeys.exportJson,
+      _ExportFormat.html => BenchmarkHistoryKeys.exportHtml,
+    };
+    final localeCode = localeCodeFromLocale(Localizations.localeOf(context));
+
+    if (selectedRecords.length == 1) {
+      final destination = await FilePicker.saveFile(
+        dialogTitle: tr(context, titleKey),
+        fileName: _exportFileName(selectedRecords.single, extension),
+        type: FileType.custom,
+        allowedExtensions: [extension],
+      );
+      if (destination == null || !mounted) return;
+      await _runAction(() async {
+        await _writeExport(
+          format: format,
+          destination: destination,
+          recordId: selectedRecords.single.id,
+          localeCode: localeCode,
+        );
+        if (mounted) _showMessage(BenchmarkHistoryKeys.exportComplete);
+        return null;
+      }, reload: false);
+      return;
+    }
+
+    final directory = await FilePicker.getDirectoryPath(
+      dialogTitle: tr(context, titleKey),
     );
-    if (destination == null || !mounted) return;
+    if (directory == null || !mounted) return;
     await _runAction(() async {
-      if (format == _ExportFormat.csv) {
-        await _service.exportCsv(destination, ids: selected);
-      } else {
-        await _service.exportJson(destination, ids: selected);
+      for (final record in selectedRecords) {
+        final destination = await _uniqueExportPath(
+          directory,
+          _exportFileName(record, extension),
+        );
+        await _writeExport(
+          format: format,
+          destination: destination,
+          recordId: record.id,
+          localeCode: localeCode,
+        );
       }
-      if (!mounted) return null;
-      _showMessage(BenchmarkHistoryKeys.exportComplete);
+      if (mounted) _showMessage(BenchmarkHistoryKeys.exportComplete);
       return null;
     }, reload: false);
+  }
+
+  Future<void> _writeExport({
+    required _ExportFormat format,
+    required String destination,
+    required String recordId,
+    required String localeCode,
+  }) async {
+    switch (format) {
+      case _ExportFormat.csv:
+        await _service.exportCsv(destination, ids: [recordId]);
+      case _ExportFormat.json:
+        await _service.exportJson(destination, ids: [recordId]);
+      case _ExportFormat.html:
+        await _service.exportHtml(
+          destination,
+          ids: [recordId],
+          localeCode: localeCode,
+        );
+    }
+  }
+
+  String _exportFileName(BenchmarkHistoryRecord record, String extension) {
+    final result = record.result;
+    final deviceName = result.device.friendlyName.trim().isNotEmpty
+        ? result.device.friendlyName
+        : result.device.model;
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(result.completedAt);
+    final device = _safeFileComponent(deviceName, fallback: 'disk');
+    final id = _safeFileComponent(record.id, fallback: 'record');
+    return 'WinDeployStudio_Benchmark_${timestamp}_${device}_$id.$extension';
+  }
+
+  Future<String> _uniqueExportPath(String directory, String fileName) async {
+    final extension = p.extension(fileName);
+    final stem = p.basenameWithoutExtension(fileName);
+    var candidate = p.join(directory, fileName);
+    var suffix = 2;
+    while (await File(candidate).exists()) {
+      candidate = p.join(directory, '$stem-$suffix$extension');
+      suffix++;
+    }
+    return candidate;
+  }
+
+  List<String> _selectedRecordIds() {
+    return _records
+        .where((record) => _selectedIds.contains(record.id))
+        .map((record) => record.id)
+        .toList(growable: false);
   }
 
   Future<void> _deleteOne(BenchmarkHistoryRecord record) async {
@@ -164,6 +266,21 @@ class _BenchmarkHistoryScreenState
     );
     if (confirmed != true) return;
     await _runAction(_service.deleteAll);
+  }
+
+  Future<void> _deleteSelected() async {
+    final ids = _selectedRecordIds();
+    if (ids.isEmpty) return;
+    final confirmed = await _confirm(
+      titleKey: BenchmarkHistoryKeys.deleteSelectedTitle,
+      bodyKey: BenchmarkHistoryKeys.deleteSelectedBody,
+    );
+    if (confirmed != true) return;
+    await _runAction(() async {
+      final deleted = await _service.deleteMany(ids);
+      _selectedIds.removeAll(ids);
+      return deleted;
+    });
   }
 
   Future<void> _runAction(
@@ -209,36 +326,25 @@ class _BenchmarkHistoryScreenState
       setState(() => _selectedIds.remove(record.id));
       return;
     }
-    if (_selectedIds.length >= 2) {
-      _showMessage(BenchmarkHistoryKeys.selectionLimit, isError: true);
-      return;
-    }
-    if (_selectedIds.isNotEmpty) {
-      final first = _records.firstWhere(
-        (candidate) => candidate.id == _selectedIds.first,
-      );
-      final compatibility = _service.compatibilityFor(first, record);
-      if (!compatibility.isCompatible) {
-        _showMessage(
-          compatibility.incompatibility ==
-                  BenchmarkComparisonIncompatibility.differentDevice
-              ? BenchmarkHistoryKeys.sameDeviceOnly
-              : BenchmarkHistoryKeys.actionFailed,
-          isError: true,
-        );
-        return;
-      }
-    }
     setState(() => _selectedIds.add(record.id));
   }
 
-  void _compareSelected() {
-    if (_selectedIds.length != 2) {
+  Future<void> _compareSelected() async {
+    if (_records.length < 2) {
       _showMessage(BenchmarkHistoryKeys.selectTwo, isError: true);
       return;
     }
+    final currentSelection = _selectedRecordIds();
+    final selectedIds = currentSelection.length == 2
+        ? currentSelection
+        : await _pickRecordsForComparison();
+    if (!mounted || selectedIds == null || selectedIds.length != 2) return;
+    await _openComparison(selectedIds);
+  }
+
+  Future<void> _openComparison(List<String> selectedIds) async {
     final selected =
-        _selectedIds
+        selectedIds
             .map((id) => _records.firstWhere((record) => record.id == id))
             .toList()
           ..sort(
@@ -252,14 +358,45 @@ class _BenchmarkHistoryScreenState
           builder: (_) => BenchmarkComparisonScreen(comparison: comparison),
         ),
       );
-    } on BenchmarkComparisonException catch (error) {
-      _showMessage(
-        error.reason == BenchmarkComparisonIncompatibility.differentDevice
-            ? BenchmarkHistoryKeys.sameDeviceOnly
-            : BenchmarkHistoryKeys.actionFailed,
-        isError: true,
-      );
+    } on BenchmarkComparisonException {
+      _showMessage(BenchmarkHistoryKeys.actionFailed, isError: true);
     }
+  }
+
+  Future<List<String>?> _pickRecordsForComparison() {
+    final currentSelection = _selectedRecordIds();
+    final initial = currentSelection.length == 1
+        ? currentSelection
+        : const <String>[];
+    return showDialog<List<String>>(
+      context: context,
+      builder: (_) => _HistoryRecordSelectionDialog(
+        records: _records,
+        initialSelection: initial,
+        minSelection: 2,
+        maxSelection: 2,
+        titleKey: BenchmarkHistoryKeys.comparisonSelectTitle,
+        hintKey: BenchmarkHistoryKeys.comparisonSelectHint,
+        countKey: BenchmarkHistoryKeys.comparisonSelectionCount,
+        confirmKey: BenchmarkHistoryKeys.compare,
+        confirmIcon: Icons.compare_arrows_rounded,
+      ),
+    );
+  }
+
+  Future<List<String>?> _pickRecordsForExport() {
+    return showDialog<List<String>>(
+      context: context,
+      builder: (_) => _HistoryRecordSelectionDialog(
+        records: _records,
+        initialSelection: const <String>[],
+        minSelection: 1,
+        titleKey: BenchmarkHistoryKeys.export,
+        countKey: BenchmarkHistoryKeys.selected,
+        confirmKey: BenchmarkHistoryKeys.export,
+        confirmIcon: Icons.download_rounded,
+      ),
+    );
   }
 
   void _showMessage(String messageKey, {bool isError = false}) {
@@ -345,139 +482,188 @@ class _BenchmarkHistoryScreenState
               '${DateFormat.yMd().format(_dateRange!.end)}';
     return Material(
       color: colors.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tr(context, BenchmarkHistoryKeys.historySubtitle),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 1120;
+          final description = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr(context, BenchmarkHistoryKeys.historySubtitle),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (_selectedIds.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${_selectedIds.length} '
+                  '${tr(context, BenchmarkHistoryKeys.selected)}',
+                  style: TextStyle(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
-                  if (_selectedIds.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_selectedIds.length} '
-                      '${tr(context, BenchmarkHistoryKeys.selected)}',
-                      style: TextStyle(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+              ],
+            ],
+          );
+          final actions = _buildToolbarActions(
+            context,
+            dateText,
+            scrollable: compact,
+          );
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      description,
+                      const SizedBox(height: 12),
+                      actions,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: description),
+                      const SizedBox(width: 12),
+                      actions,
+                    ],
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildToolbarActions(
+    BuildContext context,
+    String dateText, {
+    required bool scrollable,
+  }) {
+    final actionRow = Row(
+      key: const ValueKey('benchmark-history-toolbar-actions'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _working ? null : _pickDateRange,
+          icon: const Icon(Icons.date_range_rounded),
+          label: Text(dateText),
+        ),
+        if (_dateRange != null) ...[
+          const SizedBox(width: 6),
+          IconButton(
+            tooltip: tr(context, BenchmarkHistoryKeys.clearDates),
+            onPressed: _working
+                ? null
+                : () async {
+                    setState(() => _dateRange = null);
+                    await _load();
+                  },
+            icon: const Icon(Icons.filter_alt_off_rounded),
+          ),
+        ],
+        const SizedBox(width: 8),
+        FilledButton.icon(
+          onPressed: _records.length >= 2 && !_working
+              ? _compareSelected
+              : null,
+          icon: const Icon(Icons.compare_arrows_rounded),
+          label: Text(tr(context, BenchmarkHistoryKeys.compare)),
+        ),
+        const SizedBox(width: 8),
+        PopupMenuButton<_ExportFormat>(
+          tooltip: tr(context, BenchmarkHistoryKeys.export),
+          enabled: _records.isNotEmpty && !_working,
+          onSelected: _export,
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: _ExportFormat.csv,
+              child: ListTile(
+                leading: const Icon(Icons.table_view_rounded),
+                title: Text(tr(context, BenchmarkHistoryKeys.exportCsv)),
+                contentPadding: EdgeInsets.zero,
               ),
             ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                reverse: true,
-                child: Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: _working ? null : _pickDateRange,
-                      icon: const Icon(Icons.date_range_rounded),
-                      label: Text(dateText),
-                    ),
-                    if (_dateRange != null) ...[
-                      const SizedBox(width: 6),
-                      IconButton(
-                        tooltip: tr(context, BenchmarkHistoryKeys.clearDates),
-                        onPressed: _working
-                            ? null
-                            : () async {
-                                setState(() => _dateRange = null);
-                                await _load();
-                              },
-                        icon: const Icon(Icons.filter_alt_off_rounded),
-                      ),
-                    ],
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _selectedIds.length == 2
-                          ? _compareSelected
-                          : null,
-                      icon: const Icon(Icons.compare_arrows_rounded),
-                      label: Text(tr(context, BenchmarkHistoryKeys.compare)),
-                    ),
-                    const SizedBox(width: 8),
-                    PopupMenuButton<_ExportFormat>(
-                      tooltip: tr(context, BenchmarkHistoryKeys.export),
-                      enabled: _records.isNotEmpty && !_working,
-                      onSelected: _export,
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: _ExportFormat.csv,
-                          child: ListTile(
-                            leading: const Icon(Icons.table_view_rounded),
-                            title: Text(
-                              tr(context, BenchmarkHistoryKeys.exportCsv),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _ExportFormat.json,
-                          child: ListTile(
-                            leading: const Icon(Icons.data_object_rounded),
-                            title: Text(
-                              tr(context, BenchmarkHistoryKeys.exportJson),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ],
-                      child: _ToolbarButton(
-                        icon: Icons.download_rounded,
-                        label: tr(context, BenchmarkHistoryKeys.export),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    PopupMenuButton<String>(
-                      tooltip: tr(context, BenchmarkHistoryKeys.delete),
-                      enabled: !_working && _records.isNotEmpty,
-                      onSelected: (value) {
-                        if (value == 'range') _deleteRange();
-                        if (value == 'all') _deleteAll();
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'range',
-                          child: ListTile(
-                            leading: const Icon(Icons.date_range_rounded),
-                            title: Text(
-                              tr(context, BenchmarkHistoryKeys.deleteRange),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'all',
-                          child: ListTile(
-                            leading: const Icon(Icons.delete_sweep_rounded),
-                            title: Text(
-                              tr(context, BenchmarkHistoryKeys.deleteAll),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ],
-                      child: _ToolbarButton(
-                        icon: Icons.delete_outline_rounded,
-                        label: tr(context, BenchmarkHistoryKeys.delete),
-                      ),
-                    ),
-                  ],
-                ),
+            PopupMenuItem(
+              value: _ExportFormat.json,
+              child: ListTile(
+                leading: const Icon(Icons.data_object_rounded),
+                title: Text(tr(context, BenchmarkHistoryKeys.exportJson)),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            PopupMenuItem(
+              value: _ExportFormat.html,
+              child: ListTile(
+                leading: const Icon(Icons.stacked_line_chart_rounded),
+                title: Text(tr(context, BenchmarkHistoryKeys.exportHtml)),
+                contentPadding: EdgeInsets.zero,
               ),
             ),
           ],
+          child: _ToolbarButton(
+            icon: Icons.download_rounded,
+            label: tr(context, BenchmarkHistoryKeys.export),
+          ),
         ),
+        const SizedBox(width: 8),
+        _buildDeleteControls(context),
+      ],
+    );
+    if (!scrollable) return actionRow;
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        reverse: true,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: Align(alignment: Alignment.centerRight, child: actionRow),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteControls(BuildContext context) {
+    final enabled = !_working && _records.isNotEmpty;
+    if (_selectedRecordIds().isNotEmpty) {
+      return FilledButton.icon(
+        onPressed: enabled ? _deleteSelected : null,
+        icon: const Icon(Icons.delete_outline_rounded),
+        label: Text(tr(context, BenchmarkHistoryKeys.delete)),
+      );
+    }
+    return PopupMenuButton<_DeleteTarget>(
+      tooltip: tr(context, BenchmarkHistoryKeys.delete),
+      enabled: enabled,
+      onSelected: (target) async {
+        switch (target) {
+          case _DeleteTarget.range:
+            await _deleteRange();
+          case _DeleteTarget.all:
+            await _deleteAll();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _DeleteTarget.range,
+          child: ListTile(
+            leading: const Icon(Icons.date_range_rounded),
+            title: Text(tr(context, BenchmarkHistoryKeys.deleteRange)),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        PopupMenuItem(
+          value: _DeleteTarget.all,
+          child: ListTile(
+            leading: const Icon(Icons.delete_sweep_rounded),
+            title: Text(tr(context, BenchmarkHistoryKeys.deleteAll)),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+      child: _ToolbarButton(
+        icon: Icons.delete_outline_rounded,
+        label: tr(context, BenchmarkHistoryKeys.delete),
       ),
     );
   }
@@ -553,6 +739,170 @@ class _BenchmarkHistoryScreenState
           ],
         ),
       ),
+    );
+  }
+}
+
+class _HistoryRecordSelectionDialog extends StatefulWidget {
+  final List<BenchmarkHistoryRecord> records;
+  final List<String> initialSelection;
+  final int minSelection;
+  final int? maxSelection;
+  final String titleKey;
+  final String? hintKey;
+  final String countKey;
+  final String confirmKey;
+  final IconData confirmIcon;
+
+  const _HistoryRecordSelectionDialog({
+    required this.records,
+    required this.initialSelection,
+    required this.minSelection,
+    this.maxSelection,
+    required this.titleKey,
+    this.hintKey,
+    required this.countKey,
+    required this.confirmKey,
+    required this.confirmIcon,
+  }) : assert(minSelection > 0),
+       assert(maxSelection == null || maxSelection >= minSelection);
+
+  @override
+  State<_HistoryRecordSelectionDialog> createState() =>
+      _HistoryRecordSelectionDialogState();
+}
+
+class _HistoryRecordSelectionDialogState
+    extends State<_HistoryRecordSelectionDialog> {
+  late final Set<String> _selectedIds;
+
+  @override
+  void initState() {
+    super.initState();
+    final validIds = widget.records.map((record) => record.id).toSet();
+    final initial = widget.initialSelection.where(validIds.contains);
+    _selectedIds =
+        (widget.maxSelection == null
+                ? initial
+                : initial.take(widget.maxSelection!))
+            .toSet();
+  }
+
+  void _toggle(String id, bool selected) {
+    setState(() {
+      if (selected) {
+        if (widget.maxSelection == null ||
+            _selectedIds.length < widget.maxSelection!) {
+          _selectedIds.add(id);
+        }
+      } else {
+        _selectedIds.remove(id);
+      }
+    });
+  }
+
+  List<String> _selectionInRecordOrder() {
+    return widget.records
+        .where((record) => _selectedIds.contains(record.id))
+        .map((record) => record.id)
+        .toList(growable: false);
+  }
+
+  bool get _canConfirm {
+    return _selectedIds.length >= widget.minSelection &&
+        (widget.maxSelection == null ||
+            _selectedIds.length <= widget.maxSelection!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final media = MediaQuery.sizeOf(context);
+    final count = widget.maxSelection == null
+        ? '${_selectedIds.length} ${tr(context, widget.countKey)}'
+        : '${_selectedIds.length}/${widget.maxSelection} '
+              '${tr(context, widget.countKey)}';
+    return AlertDialog(
+      title: Text(tr(context, widget.titleKey)),
+      content: SizedBox(
+        width: media.width.clamp(320, 720).toDouble(),
+        height: (media.height * .62).clamp(280, 560).toDouble(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.hintKey != null) ...[
+              Text(
+                tr(context, widget.hintKey!),
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              count,
+              style: TextStyle(
+                color: _canConfirm ? colors.primary : colors.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.separated(
+                itemCount: widget.records.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final record = widget.records[index];
+                  final result = record.result;
+                  final title = result.device.friendlyName.isEmpty
+                      ? result.device.model
+                      : result.device.friendlyName;
+                  final serial = result.device.serialNumber.trim();
+                  final identity = serial.isEmpty || serial == 'N/A'
+                      ? result.device.uniqueId
+                      : serial;
+                  final checked = _selectedIds.contains(record.id);
+                  final atLimit =
+                      !checked &&
+                      widget.maxSelection != null &&
+                      _selectedIds.length >= widget.maxSelection!;
+                  return CheckboxListTile(
+                    value: checked,
+                    onChanged: atLimit
+                        ? null
+                        : (value) => _toggle(record.id, value ?? false),
+                    title: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${DateFormat.yMd().add_Hm().format(result.completedAt)}  |  '
+                      '${tr(context, result.mode.titleKey)}  |  '
+                      '${identity.isEmpty ? tr(context, BenchmarkHistoryKeys.unknown) : identity}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(tr(context, BenchmarkHistoryKeys.cancel)),
+        ),
+        FilledButton.icon(
+          onPressed: _canConfirm
+              ? () => Navigator.of(context).pop(_selectionInRecordOrder())
+              : null,
+          icon: Icon(widget.confirmIcon),
+          label: Text(tr(context, widget.confirmKey)),
+        ),
+      ],
     );
   }
 }

@@ -2,73 +2,66 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/features/ai_assistant/services/ai_system_proxy_resolver.dart';
 
 void main() {
-  group('AiSystemProxyResolver Windows settings parser', () {
-    test('uses a standard single HTTPS proxy', () {
+  group('AiSystemNetworkResolver route parser', () {
+    test('returns a safe route from the active system configuration', () async {
+      final route = await AiSystemNetworkResolver.resolveFor(
+        Uri.parse('https://service.example/v1/chat/completions'),
+      );
+
       expect(
-        AiSystemProxyResolver.windowsProxyInstruction(
-          proxyEnabledOutput: 'ProxyEnable    REG_DWORD    0x1',
-          proxyServerOutput: 'ProxyServer    REG_SZ    127.0.0.1:7890',
-          scheme: 'https',
-        ),
-        'PROXY 127.0.0.1:7890',
+        route.instruction == 'DIRECT' || route.instruction.startsWith('PROXY '),
+        isTrue,
       );
     });
 
-    test('selects HTTPS from a protocol-specific proxy value', () {
+    test('keeps an explicit direct system route', () {
       expect(
-        AiSystemProxyResolver.windowsProxyInstruction(
-          proxyEnabledOutput: 'ProxyEnable    REG_DWORD    0x1',
-          proxyServerOutput:
-              'ProxyServer    REG_SZ    http=127.0.0.1:8080;https=proxy.example:8443',
-          scheme: 'https',
-        ),
-        'PROXY proxy.example:8443',
+        AiSystemNetworkResolver.systemRouteInstruction('DIRECT'),
+        'DIRECT',
       );
     });
 
-    test('ignores disabled and malformed proxy values', () {
+    test('converts a standard system route to an HTTP CONNECT directive', () {
       expect(
-        AiSystemProxyResolver.windowsProxyInstruction(
-          proxyEnabledOutput: 'ProxyEnable    REG_DWORD    0x0',
-          proxyServerOutput: 'ProxyServer    REG_SZ    127.0.0.1:7890',
-          scheme: 'https',
+        AiSystemNetworkResolver.systemRouteInstruction(
+          'http://network.example:8443/',
+        ),
+        'PROXY network.example:8443',
+      );
+      expect(
+        AiSystemNetworkResolver.systemRouteInstruction(
+          'http://[2001:db8::1]:8080/',
+        ),
+        'PROXY [2001:db8::1]:8080',
+      );
+    });
+
+    test('rejects unsafe or unsupported system route values', () {
+      expect(AiSystemNetworkResolver.systemRouteInstruction(''), isNull);
+      expect(
+        AiSystemNetworkResolver.systemRouteInstruction(
+          'http://user:pass@network.example:8080/',
         ),
         isNull,
       );
       expect(
-        AiSystemProxyResolver.windowsProxyInstruction(
-          proxyEnabledOutput: 'ProxyEnable    REG_DWORD    0x1',
-          proxyServerOutput: 'ProxyServer    REG_SZ    user:pass@proxy:7890',
-          scheme: 'https',
+        AiSystemNetworkResolver.systemRouteInstruction(
+          'socks5://network.example:1080/',
+        ),
+        isNull,
+      );
+      expect(
+        AiSystemNetworkResolver.systemRouteInstruction(
+          'https://network.example:8443/',
+        ),
+        isNull,
+      );
+      expect(
+        AiSystemNetworkResolver.systemRouteInstruction(
+          'http://network.example:8080/path',
         ),
         isNull,
       );
     });
-
-    test(
-      'recognizes only loopback HTTP CONNECT proxies for stale detection',
-      () {
-        expect(
-          AiSystemProxyResolver.loopbackProxyEndpoint('PROXY 127.0.0.1:7890'),
-          (host: '127.0.0.1', port: 7890),
-        );
-        expect(
-          AiSystemProxyResolver.isLoopbackProxyInstruction('PROXY [::1]:7890'),
-          isTrue,
-        );
-        expect(
-          AiSystemProxyResolver.isLoopbackProxyInstruction(
-            'PROXY localhost:7890; DIRECT',
-          ),
-          isTrue,
-        );
-        expect(
-          AiSystemProxyResolver.isLoopbackProxyInstruction(
-            'PROXY proxy.example:8443',
-          ),
-          isFalse,
-        );
-      },
-    );
   });
 }

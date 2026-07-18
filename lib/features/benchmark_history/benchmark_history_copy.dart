@@ -10,8 +10,10 @@ abstract final class BenchmarkHistoryKeys {
   static const export = 'benchmark_history_export';
   static const exportCsv = 'benchmark_history_export_csv';
   static const exportJson = 'benchmark_history_export_json';
+  static const exportHtml = 'benchmark_history_export_html';
   static const exportComplete = 'benchmark_history_export_complete';
   static const delete = 'benchmark_history_delete';
+  static const deleteSelected = 'benchmark_history_delete_selected';
   static const deleteRange = 'benchmark_history_delete_range';
   static const deleteAll = 'benchmark_history_delete_all';
   static const deleteRecordTitle = 'benchmark_history_delete_record_title';
@@ -20,6 +22,8 @@ abstract final class BenchmarkHistoryKeys {
   static const deleteRecordBody = 'benchmark_history_delete_record_body';
   static const deleteRangeBody = 'benchmark_history_delete_range_body';
   static const deleteAllBody = 'benchmark_history_delete_all_body';
+  static const deleteSelectedTitle = 'benchmark_history_delete_selected_title';
+  static const deleteSelectedBody = 'benchmark_history_delete_selected_body';
   static const cancel = 'detail_cancel';
   static const confirmDelete = 'benchmark_history_confirm_delete';
   static const empty = 'benchmark_history_empty';
@@ -27,6 +31,12 @@ abstract final class BenchmarkHistoryKeys {
   static const loadFailed = 'benchmark_history_load_failed';
   static const actionFailed = 'benchmark_history_action_failed';
   static const selectTwo = 'benchmark_history_select_two';
+  static const comparisonSelectTitle =
+      'benchmark_history_comparison_select_title';
+  static const comparisonSelectHint =
+      'benchmark_history_comparison_select_hint';
+  static const comparisonSelectionCount =
+      'benchmark_history_comparison_selection_count';
   static const sameDeviceOnly = 'benchmark_history_same_device_only';
   static const selectionLimit = 'benchmark_history_selection_limit';
   static const selected = 'benchmark_history_selected';
@@ -89,6 +99,8 @@ abstract final class BenchmarkHistoryKeys {
   static const workloadMultitasking = 'benchmark_history_workload_multitasking';
   static const workloadFullSequentialWrite =
       'benchmark_history_workload_full_sequential_write';
+  static const fullWriteP10 = 'benchmark_history_full_write_p10';
+  static const fullWriteScope = 'benchmark_full_write_scope';
 
   static String workload(BenchmarkWorkload workload) {
     return switch (workload) {
@@ -116,8 +128,10 @@ const benchmarkHistoryLocalizationKeys = <String>[
   BenchmarkHistoryKeys.export,
   BenchmarkHistoryKeys.exportCsv,
   BenchmarkHistoryKeys.exportJson,
+  BenchmarkHistoryKeys.exportHtml,
   BenchmarkHistoryKeys.exportComplete,
   BenchmarkHistoryKeys.delete,
+  BenchmarkHistoryKeys.deleteSelected,
   BenchmarkHistoryKeys.deleteRange,
   BenchmarkHistoryKeys.deleteAll,
   BenchmarkHistoryKeys.deleteRecordTitle,
@@ -126,12 +140,17 @@ const benchmarkHistoryLocalizationKeys = <String>[
   BenchmarkHistoryKeys.deleteRecordBody,
   BenchmarkHistoryKeys.deleteRangeBody,
   BenchmarkHistoryKeys.deleteAllBody,
+  BenchmarkHistoryKeys.deleteSelectedTitle,
+  BenchmarkHistoryKeys.deleteSelectedBody,
   BenchmarkHistoryKeys.confirmDelete,
   BenchmarkHistoryKeys.empty,
   BenchmarkHistoryKeys.emptySubtitle,
   BenchmarkHistoryKeys.loadFailed,
   BenchmarkHistoryKeys.actionFailed,
   BenchmarkHistoryKeys.selectTwo,
+  BenchmarkHistoryKeys.comparisonSelectTitle,
+  BenchmarkHistoryKeys.comparisonSelectHint,
+  BenchmarkHistoryKeys.comparisonSelectionCount,
   BenchmarkHistoryKeys.sameDeviceOnly,
   BenchmarkHistoryKeys.selectionLimit,
   BenchmarkHistoryKeys.selected,
@@ -182,4 +201,6 @@ const benchmarkHistoryLocalizationKeys = <String>[
   BenchmarkHistoryKeys.workloadSoftwareInstall,
   BenchmarkHistoryKeys.workloadMultitasking,
   BenchmarkHistoryKeys.workloadFullSequentialWrite,
+  BenchmarkHistoryKeys.fullWriteP10,
+  BenchmarkHistoryKeys.fullWriteScope,
 ];

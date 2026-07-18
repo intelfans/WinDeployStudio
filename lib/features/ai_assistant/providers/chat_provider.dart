@@ -227,7 +227,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(searchMode: mode);
   }
 
-  Future<void> sendMessage(String content, {String? systemPrompt}) async {
+  Future<void> sendMessage(
+    String content, {
+    String? systemPrompt,
+    SearchMode? searchMode,
+  }) async {
     if (state.isGenerating) return;
     if (content.trim().isEmpty) return;
 
@@ -254,10 +258,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     _updateSession(updatedSession);
 
+    final selectedSearchMode = searchMode ?? state.searchMode;
+
     final assistantMessage = ChatMessage(
       role: 'assistant',
       content: '',
       isStreaming: true,
+      searchStatus: selectedSearchMode == SearchMode.off
+          ? AiSearchStatus.none
+          : AiSearchStatus.requested,
     );
     final withAssistant = [...updatedSession.messages, assistantMessage];
     _updateSession(updatedSession.copyWith(messages: withAssistant));
@@ -285,7 +294,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       await _aiService.sendMessage(
         messages: apiMessages,
         cancelToken: cancelToken,
-        searchMode: state.searchMode,
+        searchMode: selectedSearchMode,
         onChunk: (chunk) {
           if (!_isCurrentGeneration(generation)) return;
           generation.buffer += chunk;
@@ -305,6 +314,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
             sessionId: generation.sessionId,
             messageId: generation.messageId,
             sources: sourceMaps,
+          );
+        },
+        onSearchStatus: (status) {
+          if (!_isCurrentGeneration(generation)) return;
+          _updateMessage(
+            sessionId: generation.sessionId,
+            messageId: generation.messageId,
+            searchStatus: status,
           );
         },
         onComplete: () {
@@ -398,6 +415,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     String? content,
     bool? isStreaming,
     List<Map<String, String>>? sources,
+    AiSearchStatus? searchStatus,
   }) {
     final sessionIndex = state.sessions.indexWhere(
       (session) => session.id == sessionId,
@@ -414,6 +432,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       content: content,
       isStreaming: isStreaming,
       sources: sources,
+      searchStatus: searchStatus,
     );
     _updateSession(
       session.copyWith(messages: messages, updatedAt: DateTime.now()),
