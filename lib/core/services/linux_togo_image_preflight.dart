@@ -5,8 +5,8 @@ import 'dart:isolate';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
-import 'windows_system_environment.dart';
 import 'windows_iso_preflight.dart';
+import 'windows_iso_mount_service.dart';
 
 /// The result of determining whether an ISO can create a persistent Linux To
 /// Go workspace without relying on its filename.
@@ -37,6 +37,8 @@ enum LinuxToGoImageIssue {
   noPatchableBootConfig,
   bootFileTooLarge,
   debianLiveMissingNtfsSupport,
+  installerImage,
+  archIsoUnsupported,
   unknownLayout,
 }
 
@@ -57,6 +59,8 @@ extension LinuxToGoImageIssueLocalization on LinuxToGoImageIssue {
     LinuxToGoImageIssue.bootFileTooLarge => 'linux_togo_boot_file_too_large',
     LinuxToGoImageIssue.debianLiveMissingNtfsSupport =>
       'linux_togo_debian_live_missing_ntfs_support',
+    LinuxToGoImageIssue.installerImage => 'linux_togo_installer_image',
+    LinuxToGoImageIssue.archIsoUnsupported => 'linux_togo_arch_iso_unsupported',
     LinuxToGoImageIssue.unknownLayout => 'linux_togo_unsupported_iso',
   };
 }
@@ -271,8 +275,8 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
       if (cached != null) return cached;
     }
 
-    final mountPoint = await _mountIso(isoPath);
-    if (mountPoint == null) {
+    final lease = await WindowsIsoMountService.instance.acquire(isoPath);
+    if (lease == null) {
       return const LinuxToGoImageInspection.inspectionFailed(
         LinuxToGoImageIssue.mountFailed,
         diagnostic:
@@ -283,9 +287,12 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
     try {
       final inspection = includeContentManifest
           ? await Isolate.run(
-              () => _inspectMountedRootInWorker(mountPoint, stat.size),
+              () => _inspectMountedRootInWorker(lease.mountPoint, stat.size),
             )
-          : await inspectMountedRoot(mountPoint, sourceSizeBytes: stat.size);
+          : await inspectMountedRoot(
+              lease.mountPoint,
+              sourceSizeBytes: stat.size,
+            );
       if (includeContentManifest && inspection.canCreate) {
         _deploymentCache[cacheKey] = inspection;
         while (_deploymentCache.length > 4) {
@@ -299,7 +306,7 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
         diagnostic: '$error',
       );
     } finally {
-      await _unmountIso(isoPath);
+      await lease.release();
     }
   }
 
@@ -359,6 +366,16 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
         );
       }
 
+      // ArchISO is a genuine Live image, but its COW partition and initrd
+      // protocol are different from the Ubuntu/Debian/Deepin writer below.
+      // Refuse it explicitly instead of presenting a misleading generic
+      // "missing Live filesystem" error until a dedicated writer is shipped.
+      if (await Directory(p.join(mountedRoot, 'arch')).exists()) {
+        return const LinuxToGoImageInspection.unsupported(
+          LinuxToGoImageIssue.archIsoUnsupported,
+        );
+      }
+
       final casperDirectory = Directory(p.join(mountedRoot, 'casper'));
       final hasCasperDirectory = await casperDirectory.exists();
       final kernel = File(p.join(mountedRoot, _casperKernelRelativePath));
@@ -366,6 +383,15 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
       final hasCasperKernel = await _isRegularFile(kernel.path);
       final hasCasperInitrd = await _isRegularFile(initrd.path);
       if (!hasCasperDirectory && !hasCasperKernel && !hasCasperInitrd) {
+        final hasInstallerMarkers =
+            await Directory(p.join(mountedRoot, 'dists')).exists() &&
+            (await Directory(p.join(mountedRoot, 'install')).exists() ||
+                await Directory(p.join(mountedRoot, 'isolinux')).exists());
+        if (hasInstallerMarkers) {
+          return const LinuxToGoImageInspection.unsupported(
+            LinuxToGoImageIssue.installerImage,
+          );
+        }
         return const LinuxToGoImageInspection.unsupported(
           LinuxToGoImageIssue.unknownLayout,
         );
@@ -851,76 +877,6 @@ class LinuxToGoImagePreflightService implements LinuxToGoImagePreflight {
   static Future<bool> _isRegularFile(String path) async =>
       await FileSystemEntity.type(path, followLinks: false) ==
       FileSystemEntityType.file;
-
-  String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
-
-  Future<String?> _mountIso(String isoPath) async {
-    var mounted = false;
-    try {
-      final quotedPath = _psQuote(isoPath);
-      final mount = await Process.run(
-        WindowsSystemEnvironment.powerShellExecutable,
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          'Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop',
-        ],
-        environment: WindowsSystemEnvironment.withSystemRoot(),
-      ).timeout(const Duration(seconds: 15));
-      if (mount.exitCode != 0) return null;
-      mounted = true;
-
-      // Larger modern ISO files can take longer than the previous 2.5-second
-      // window before Windows assigns their volume letter.
-      for (var attempt = 0; attempt < 20; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        final volume = await Process.run(
-          WindowsSystemEnvironment.powerShellExecutable,
-          [
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-Command',
-            'Get-DiskImage -ImagePath $quotedPath | Get-Volume | '
-                'Select-Object -ExpandProperty DriveLetter',
-          ],
-          environment: WindowsSystemEnvironment.withSystemRoot(),
-        ).timeout(const Duration(seconds: 5));
-        final letter = volume.stdout.toString().trim();
-        if (volume.exitCode == 0 && RegExp(r'^[A-Za-z]$').hasMatch(letter)) {
-          return '$letter:\\';
-        }
-      }
-    } catch (_) {
-      // A failed mount is a non-destructive inspection failure.
-    }
-    if (mounted) await _unmountIso(isoPath);
-    return null;
-  }
-
-  Future<void> _unmountIso(String isoPath) async {
-    try {
-      final quotedPath = _psQuote(isoPath);
-      await Process.run(
-        WindowsSystemEnvironment.powerShellExecutable,
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          'Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue',
-        ],
-        environment: WindowsSystemEnvironment.withSystemRoot(),
-      ).timeout(const Duration(seconds: 10));
-    } catch (_) {
-      // The source image was only read, so an unmount failure is diagnostic.
-    }
-  }
 
   static String _cacheKey(String path, FileStat stat) =>
       '${p.normalize(p.absolute(path))}|${stat.size}|${stat.modified.microsecondsSinceEpoch}';

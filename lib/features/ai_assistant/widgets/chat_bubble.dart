@@ -5,6 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 import '../../../core/localization/strings.dart';
 import '../../../shared/webview/webview_helper.dart';
 import '../models/chat_models.dart';
+import '../utils/chat_content_normalizer.dart';
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
@@ -15,6 +16,7 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
     final colorScheme = Theme.of(context).colorScheme;
+    final displayContent = normalizeChatDisplayContent(message.content);
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -73,7 +75,7 @@ class ChatBubble extends StatelessWidget {
                 ),
                 child: message.content.isEmpty && message.isStreaming
                     ? _buildTypingIndicator(context, colorScheme)
-                    : _buildContent(context, colorScheme),
+                    : _buildContent(context, colorScheme, displayContent),
               ),
             ),
             if (!isUser && !message.isStreaming)
@@ -84,7 +86,7 @@ class ChatBubble extends StatelessWidget {
                   children: [
                     GestureDetector(
                       onTap: () {
-                        Clipboard.setData(ClipboardData(text: message.content));
+                        Clipboard.setData(ClipboardData(text: displayContent));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(tr(context, 'copied')),
@@ -134,9 +136,13 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, ColorScheme colorScheme) {
+  Widget _buildContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    String displayContent,
+  ) {
     return MarkdownBody(
-      data: message.content,
+      data: displayContent,
       selectable: true,
       extensionSet: md.ExtensionSet.gitHubFlavored,
       styleSheet: MarkdownStyleSheet(
@@ -199,6 +205,12 @@ class _SearchStatusWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // An unavailable optional search backend is an internal fallback state,
+    // not an actionable error. Keep requested/searching/used/notUsed visible,
+    // but avoid showing the legacy red warning to users.
+    if (status == AiSearchStatus.unavailable) {
+      return const SizedBox.shrink();
+    }
     final colorScheme = Theme.of(context).colorScheme;
     final (icon, key, color) = switch (status) {
       AiSearchStatus.requested => (
@@ -222,9 +234,9 @@ class _SearchStatusWidget extends StatelessWidget {
         colorScheme.onSurfaceVariant,
       ),
       AiSearchStatus.unavailable => (
-        Icons.cloud_off_rounded,
-        'ai_search_unavailable',
-        colorScheme.error,
+        Icons.info_outline_rounded,
+        'ai_search_not_used',
+        colorScheme.onSurfaceVariant,
       ),
       AiSearchStatus.none => (
         Icons.language_rounded,

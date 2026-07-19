@@ -16,6 +16,7 @@ import 'background_file_hash_service.dart';
 import 'disk_safety_service.dart';
 import 'file_logger_service.dart';
 import 'wim_info_service.dart';
+import 'windows_iso_mount_service.dart';
 import 'windows_iso_preflight.dart';
 import 'windows_system_environment.dart';
 
@@ -430,6 +431,7 @@ class WtgService {
   bool _cancelled = false;
   Process? _currentProcess;
   String? _currentIsoPath;
+  WindowsIsoMountLease? _currentMountLease;
   WtgProgress? _lastProgress;
 
   WtgService(this.ref) {
@@ -455,12 +457,22 @@ class WtgService {
   Future<List<Map<String, dynamic>>> getWimImages(String isoPath) async {
     _debugLogs.clear();
     _cancelled = false;
-    String? mountPoint;
+    WindowsIsoMountLease? mountLease;
     try {
-      mountPoint = await _mountIso(isoPath);
-      if (mountPoint == null) return const [];
+      mountLease = await WindowsIsoMountService.instance.acquire(
+        isoPath,
+        isCancelled: () => _cancelled,
+        mountTimeout: const Duration(minutes: 2),
+      );
+      if (mountLease == null) return const [];
+      final mountPoint = mountLease.mountPoint;
+      // Selection only needs the setup markers, WIM format, and boot
+      // capabilities. The complete FAT32 file scan is repeated by the
+      // destructive preflight immediately before writing; doing it here too
+      // makes large Tiny10/Server images appear to hang on first selection.
       final layout = await WindowsIsoLayoutInspector.inspectMountedRoot(
         mountPoint,
+        scanFiles: false,
       );
       if (!layout.isValid ||
           layout.imagePath == null ||
@@ -469,13 +481,33 @@ class WtgService {
         return const [];
       }
       final images = await WimInfoService.readImages(layout.imagePath!);
-      return images.map((image) => image.toMap()).toList(growable: false);
+      final hasNetFx3Source = await _hasNetFx3Payload(
+        Directory(p.join(mountPoint, 'sources', 'sxs')),
+      );
+      final hasLegacyBiosBoot = layout.hasBiosBootManager && layout.hasBiosBcd;
+      final hasUefiBoot =
+          layout.hasEfiBcd &&
+          (layout.efiBootArchitectures.isNotEmpty ||
+              layout.efiBootManagerArchitecture != null);
+      return images
+          .map(
+            (image) => <String, dynamic>{
+              ...image.toMap(),
+              'hasNetFx3Source': hasNetFx3Source,
+              'hasLegacyBiosBoot': hasLegacyBiosBoot,
+              'hasUefiBoot': hasUefiBoot,
+              'efiBootArchitectures': layout.efiBootArchitectures
+                  .map((architecture) => architecture.name)
+                  .toList(growable: false),
+            },
+          )
+          .toList(growable: false);
     } catch (error) {
       _debugLogs.add(error.toString());
       _logLine('WIM metadata query failed: $error');
       return const [];
     } finally {
-      if (mountPoint != null) await _unmountIso(isoPath);
+      await mountLease?.release();
     }
   }
 
@@ -2410,55 +2442,24 @@ exit
     if (!await File(isoPath).exists()) return null;
     _notifyInternalMount();
     try {
-      await _runTracked(
-        'powershell',
-        const [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          r'Dismount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction SilentlyContinue | Out-Null',
-        ],
-        environment: {...Platform.environment, 'WDS_ISO': isoPath},
-        timeout: const Duration(seconds: 20),
+      await _currentMountLease?.release();
+      _currentMountLease = null;
+      final lease = await WindowsIsoMountService.instance.acquire(
+        isoPath,
+        isCancelled: () => _cancelled,
+        mountTimeout: const Duration(minutes: 2),
+        volumeTimeout: const Duration(seconds: 30),
       );
-      final mount = await _runTracked(
-        'powershell',
-        const [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          r'Mount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction Stop | Out-Null',
-        ],
-        environment: {...Platform.environment, 'WDS_ISO': isoPath},
-        timeout: const Duration(minutes: 2),
-      );
-      if (mount.exitCode != 0) return null;
-      for (var attempt = 0; attempt < 30; attempt++) {
-        _throwIfCancelled();
-        final result = await _runTracked(
-          'powershell',
-          const [
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-Command',
-            r'(Get-DiskImage -ImagePath $env:WDS_ISO -ErrorAction Stop | Get-Volume -ErrorAction Stop).DriveLetter',
-          ],
-          environment: {...Platform.environment, 'WDS_ISO': isoPath},
-          timeout: const Duration(seconds: 10),
+      if (lease == null) {
+        _logLine(
+          'ISO mount failed: '
+          '${WindowsIsoMountService.instance.lastDiagnostic ?? 'Unknown error'}',
         );
-        final letter = _letterOnly(result.stdout.toString());
-        if (result.exitCode == 0 && letter.isNotEmpty) {
-          _currentIsoPath = isoPath;
-          return '$letter:\\';
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 350));
+        return null;
       }
+      _currentMountLease = lease;
+      _currentIsoPath = isoPath;
+      return lease.mountPoint;
     } on _WtgFailure {
       rethrow;
     } catch (error) {
@@ -2473,20 +2474,13 @@ exit
 
   Future<void> _unmountIso(String isoPath) async {
     try {
-      await _runTracked(
-        'powershell',
-        const [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          r'Dismount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction SilentlyContinue | Out-Null',
-        ],
-        environment: {...Platform.environment, 'WDS_ISO': isoPath},
-        timeout: const Duration(seconds: 30),
-        allowWhenCancelled: true,
-      );
+      final lease = _currentMountLease;
+      if (lease != null &&
+          p.normalize(p.absolute(lease.isoPath)).toLowerCase() ==
+              p.normalize(p.absolute(isoPath)).toLowerCase()) {
+        await lease.release();
+        _currentMountLease = null;
+      }
     } catch (error) {
       _logLine('ISO unmount warning: $error');
     }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import '../../features/logs/services/log_center_service.dart';
 import 'wim_info_service.dart';
+import 'windows_iso_mount_service.dart';
 import 'windows_iso_preflight.dart';
 import 'windows_system_environment.dart';
 
@@ -18,6 +19,10 @@ class IsoMetadata {
   final String? language;
   final String? edition;
   final bool isValidWindowsIso;
+  final bool hasLegacyBiosBoot;
+  final bool hasEfiBcd;
+  final Set<WindowsEfiBootArchitecture> efiBootArchitectures;
+  final WindowsEfiBootArchitecture? efiBootManagerArchitecture;
 
   const IsoMetadata({
     required this.filePath,
@@ -29,7 +34,17 @@ class IsoMetadata {
     this.language,
     this.edition,
     this.isValidWindowsIso = false,
+    this.hasLegacyBiosBoot = false,
+    this.hasEfiBcd = false,
+    this.efiBootArchitectures = const <WindowsEfiBootArchitecture>{},
+    this.efiBootManagerArchitecture,
   });
+
+  bool get canBootLegacy => hasLegacyBiosBoot;
+
+  bool get canBootUefi =>
+      hasEfiBcd &&
+      (efiBootArchitectures.isNotEmpty || efiBootManagerArchitecture != null);
 
   String get displaySize {
     if (fileSize < 1024 * 1024) {
@@ -172,12 +187,22 @@ class IsoParseService {
 
     // Step 2: Mount ISO
     _report(operation, onProgress, 'mount', 0);
-    final mountPoint = await _mountIso(operation, isoPath);
-    if (mountPoint == null) {
+    final mountLease = await WindowsIsoMountService.instance.acquire(
+      isoPath,
+      isCancelled: () => operation.isCancelled,
+    );
+    if (mountLease == null) {
       debugPrint('Mount failed or cancelled');
+      await LogCenterService().logIso('ISO 挂载失败或被取消 | 文件: $fileName');
+      // Linux installation-media selection deliberately uses the same
+      // lightweight parser only to rule out Windows images. Preserve the
+      // filename/size fallback for that flow, while Windows mode still
+      // rejects the non-validated result before USB selection.
       return operation.isCancelled ? null : fastResult;
     }
+    final mountPoint = mountLease.mountPoint;
     Map<String, String>? dismInfo;
+    WindowsIsoLayoutInspection? sourceLayout;
     try {
       if (operation.isCancelled) return null;
       _report(operation, onProgress, 'mount', 100);
@@ -187,12 +212,17 @@ class IsoParseService {
       final layout = await WindowsIsoLayoutInspector.inspectMountedRoot(
         mountPoint,
         isCancelled: () => operation.isCancelled,
+        scanFiles: false,
       );
       if (operation.isCancelled) return null;
       if (!layout.isValid || layout.imagePath == null) {
         debugPrint('Windows setup layout not found: ${layout.error}');
+        await logCenter.logIso(
+          'Windows ISO 布局无效 | 文件: $fileName | 原因: ${layout.error ?? '未知'}',
+        );
         return fastResult;
       }
+      sourceLayout = layout;
       _report(operation, onProgress, 'detect', 100);
       if (operation.isCancelled) return null;
 
@@ -210,14 +240,7 @@ class IsoParseService {
           'language': image.language,
           'edition': image.name.isEmpty ? image.edition : image.name,
         };
-        final buildNumber = int.tryParse(image.build) ?? 0;
-        if (buildNumber >= 22000) {
-          dismInfo['version'] = 'Windows 11 (Build ${image.build})';
-        } else if (buildNumber >= 10240) {
-          dismInfo['version'] = 'Windows 10 (Build ${image.build})';
-        } else if (image.version.isNotEmpty) {
-          dismInfo['version'] = image.version;
-        }
+        dismInfo['version'] = _displayWindowsVersion(image);
       } else {
         debugPrint(
           'Split WIM layout detected; skipping optional WIM metadata.',
@@ -227,11 +250,12 @@ class IsoParseService {
     } catch (error) {
       if (!operation.isCancelled) {
         debugPrint('WIM metadata read failed: $error');
+        await logCenter.logIso('WIM 元数据读取失败 | 文件: $fileName | 原因: $error');
         _report(operation, onProgress, 'info', 100);
       }
     } finally {
       _report(operation, onProgress, 'cleanup', 0, allowCancelled: true);
-      await _unmount(operation, isoPath);
+      await mountLease.release();
       _report(operation, onProgress, 'cleanup', 100, allowCancelled: true);
     }
 
@@ -255,6 +279,14 @@ class IsoParseService {
         language: dismInfo['language'],
         edition: dismInfo['edition'],
         isValidWindowsIso: true,
+        hasLegacyBiosBoot:
+            sourceLayout?.hasBiosBootManager == true &&
+            sourceLayout?.hasBiosBcd == true,
+        hasEfiBcd: sourceLayout?.hasEfiBcd ?? false,
+        efiBootArchitectures:
+            sourceLayout?.efiBootArchitectures ??
+            const <WindowsEfiBootArchitecture>{},
+        efiBootManagerArchitecture: sourceLayout?.efiBootManagerArchitecture,
       );
     }
 
@@ -265,6 +297,14 @@ class IsoParseService {
       windowsVersion: fastResult.windowsVersion,
       buildNumber: fastResult.buildNumber,
       isValidWindowsIso: true,
+      hasLegacyBiosBoot:
+          sourceLayout?.hasBiosBootManager == true &&
+          sourceLayout?.hasBiosBcd == true,
+      hasEfiBcd: sourceLayout?.hasEfiBcd ?? false,
+      efiBootArchitectures:
+          sourceLayout?.efiBootArchitectures ??
+          const <WindowsEfiBootArchitecture>{},
+      efiBootManagerArchitecture: sourceLayout?.efiBootManagerArchitecture,
     );
   }
 
@@ -276,6 +316,28 @@ class IsoParseService {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  String _displayWindowsVersion(WimImageInfo image) {
+    final build = int.tryParse(image.build) ?? 0;
+    final labels = '${image.name}\n${image.description}'.toLowerCase();
+    final isServer =
+        image.installationType.toLowerCase().contains('server') ||
+        labels.contains('windows server');
+    if (isServer) {
+      final name = image.name.trim();
+      return name.isNotEmpty
+          ? '$name (Build ${image.build})'
+          : 'Windows Server (Build ${image.build})';
+    }
+    if (build >= 22000) return 'Windows 11 (Build ${image.build})';
+    if (build >= 10240) return 'Windows 10 (Build ${image.build})';
+    if (build == 9600) return 'Windows 8.1 (Build ${image.build})';
+    if (build == 9200) return 'Windows 8 (Build ${image.build})';
+    if (build >= 7600 && build < 9200) {
+      return 'Windows 7 (Build ${image.build})';
+    }
+    return image.version.isNotEmpty ? image.version : image.name;
   }
 
   void _report(
@@ -294,6 +356,9 @@ class IsoParseService {
 
   String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
+  // Legacy tracked-process implementation retained for parser cancellation
+  // regression coverage while production mounts use the shared coordinator.
+  // ignore: unused_element
   Future<String?> _mountIso(
     _IsoParseOperation operation,
     String isoPath,
@@ -308,37 +373,65 @@ class IsoParseService {
         '-ExecutionPolicy',
         'Bypass',
         '-Command',
-        "Mount-DiskImage -ImagePath $quotedPath",
-      ], timeout: const Duration(seconds: 15));
+        "Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop",
+      ], timeout: const Duration(seconds: 30));
 
-      if (result == null || result.exitCode != 0) return null;
+      if (result == null || result.exitCode != 0) {
+        await _logPowerShellFailure('挂载', isoPath, result);
+        return null;
+      }
       mounted = true;
       if (operation.isCancelled) return null;
 
-      // Retry getting drive letter
-      for (int i = 0; i < 5; i++) {
+      // Mount-DiskImage returns before Automount/Storage has necessarily
+      // published the volume. Poll for a usable drive letter for up to 20s.
+      final deadline = DateTime.now().add(const Duration(seconds: 20));
+      while (DateTime.now().isBefore(deadline)) {
+        final remaining = deadline.difference(DateTime.now());
         if (!await _waitOrCancel(
           operation,
-          const Duration(milliseconds: 500),
+          remaining > const Duration(milliseconds: 400)
+              ? const Duration(milliseconds: 400)
+              : remaining,
         )) {
           return null;
         }
-        final r = await _runPowerShell(operation, [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          "Get-DiskImage -ImagePath $quotedPath | Get-Volume | Select-Object -ExpandProperty DriveLetter",
-        ], timeout: const Duration(seconds: 5));
+        final volumeCommand = [
+          '\$image = Get-DiskImage -ImagePath $quotedPath -ErrorAction Stop;',
+          '\$letters = @(\$image | Get-Volume -ErrorAction SilentlyContinue | '
+              'Where-Object { \$_.DriveLetter } | '
+              'Select-Object -ExpandProperty DriveLetter);',
+          'if (\$letters.Count -eq 0) { '
+              '\$letters = @(\$image | Get-Disk -ErrorAction SilentlyContinue | '
+              'Get-Partition -ErrorAction SilentlyContinue | '
+              'Get-Volume -ErrorAction SilentlyContinue | '
+              'Where-Object { \$_.DriveLetter } | '
+              'Select-Object -ExpandProperty DriveLetter); }',
+          '\$letters',
+        ].join(' ');
+        final r = await _runPowerShell(
+          operation,
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            volumeCommand,
+          ],
+          timeout: remaining > const Duration(seconds: 4)
+              ? const Duration(seconds: 4)
+              : remaining,
+        );
         if (r != null && r.exitCode == 0) {
-          final letter = r.stdout.toString().trim();
+          final letter = _extractDriveLetter(r.stdout.toString());
           if (letter.isNotEmpty) {
             mountHandedToCaller = true;
             return '$letter:\\';
           }
         }
       }
+      await _logPowerShellFailure('获取挂载盘符', isoPath, null);
       return null;
     } catch (e) {
       debugPrint('Mount error: $e');
@@ -351,6 +444,32 @@ class IsoParseService {
         await _unmount(operation, isoPath);
       }
     }
+  }
+
+  String _extractDriveLetter(String output) {
+    for (final token in output.trim().split(RegExp(r'\s+'))) {
+      final value = token.trim();
+      if (RegExp(r'^[A-Za-z]$').hasMatch(value)) return value.toUpperCase();
+    }
+    return '';
+  }
+
+  Future<void> _logPowerShellFailure(
+    String phase,
+    String isoPath,
+    ProcessResult? result,
+  ) async {
+    final stdout = result?.stdout.toString().trim() ?? '';
+    final stderr = result?.stderr.toString().trim() ?? '';
+    final detail = (stderr.isNotEmpty ? stderr : stdout)
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final bounded = detail.length > 500 ? detail.substring(0, 500) : detail;
+    final message = bounded.isEmpty
+        ? 'ISO $phase失败 | 文件: ${p.basename(isoPath)}'
+        : 'ISO $phase失败 | 文件: ${p.basename(isoPath)} | $bounded';
+    debugPrint(message);
+    await LogCenterService().logIso(message);
   }
 
   Future<void> _unmount(_IsoParseOperation operation, String isoPath) async {

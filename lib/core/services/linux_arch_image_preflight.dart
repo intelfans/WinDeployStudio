@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'linux_initrd_entry_lister.dart';
 import 'windows_iso_preflight.dart';
+import 'windows_iso_mount_service.dart';
 
 /// Result of inspecting an ArchISO layout for the dedicated three-partition
 /// Linux To Go writer.
@@ -153,7 +154,11 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
   static const _kernelRelativePath = 'arch/boot/x86_64/vmlinuz-linux';
   static const _initrdRelativePath = 'arch/boot/x86_64/initramfs-linux.img';
   static const _livePayloadRelativePath = 'arch/x86_64/airootfs.sfs';
-  static const _loaderEntriesRelativePath = 'loader/entries';
+  static const _bootConfigRelativePaths = <String>[
+    'loader/entries',
+    'boot/grub/grub.cfg',
+    'boot/grub/loopback.cfg',
+  ];
   static const _maximumBootConfigBytes = 1024 * 1024;
   static const _maximumBootConfigFiles = 64;
 
@@ -171,15 +176,15 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
         LinuxArchImageIssue.sourceNotRegularFile,
       );
     }
-    final mountPoint = await _mountIso(isoPath);
-    if (mountPoint == null) {
+    final lease = await WindowsIsoMountService.instance.acquire(isoPath);
+    if (lease == null) {
       return const LinuxArchImageInspection.inspectionFailed(
         LinuxArchImageIssue.mountFailed,
       );
     }
     try {
       return await inspectMountedRoot(
-        mountPoint,
+        lease.mountPoint,
         initrdEntryLister: initrdEntryLister,
       );
     } catch (error) {
@@ -188,7 +193,7 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
         diagnostic: '$error',
       );
     } finally {
-      await _unmountIso(isoPath);
+      await lease.release();
     }
   }
 
@@ -318,30 +323,46 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
   static Future<LinuxArchBootEntry?> _findEligibleBootEntry(
     String mountedRoot,
   ) async {
-    final directory = Directory(
-      p.join(mountedRoot, _loaderEntriesRelativePath),
-    );
-    if (!await directory.exists()) return null;
     var inspected = 0;
-    await for (final entity in directory.list(followLinks: false)) {
-      if (entity is! File ||
-          ++inspected > _maximumBootConfigFiles ||
-          !entity.path.toLowerCase().endsWith('.conf') ||
-          !await _isRegularFile(entity.path)) {
-        continue;
+    for (final configPath in _bootConfigRelativePaths) {
+      final path = p.join(mountedRoot, configPath);
+      final directory = Directory(path);
+      if (await directory.exists()) {
+        await for (final entity in directory.list(followLinks: false)) {
+          if (entity is! File ||
+              ++inspected > _maximumBootConfigFiles ||
+              !entity.path.toLowerCase().endsWith('.conf') ||
+              !await _isRegularFile(entity.path) ||
+              await entity.length() > _maximumBootConfigBytes) {
+            continue;
+          }
+          try {
+            final candidate = _parseEligibleBootEntry(
+              await entity.readAsString(),
+              p.relative(entity.path, from: mountedRoot).replaceAll('\\', '/'),
+            );
+            if (candidate != null) return candidate;
+          } catch (_) {
+            // Continue past one malformed entry.
+          }
+        }
+      } else {
+        final entity = File(path);
+        if (!await _isRegularFile(path) ||
+            ++inspected > _maximumBootConfigFiles ||
+            await entity.length() > _maximumBootConfigBytes) {
+          continue;
+        }
+        try {
+          final candidate = _parseEligibleBootEntry(
+            await entity.readAsString(),
+            configPath,
+          );
+          if (candidate != null) return candidate;
+        } catch (_) {
+          // Continue past one malformed config.
+        }
       }
-      if (await entity.length() > _maximumBootConfigBytes) continue;
-      String content;
-      try {
-        content = await entity.readAsString();
-      } catch (_) {
-        continue;
-      }
-      final relative = p
-          .relative(entity.path, from: mountedRoot)
-          .replaceAll('\\', '/');
-      final candidate = _parseEligibleBootEntry(content, relative);
-      if (candidate != null) return candidate;
     }
     return null;
   }
@@ -365,10 +386,12 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
       switch (key) {
         case 'linux':
           if (kernel != null) return null;
-          kernel = _normalizeStaticPath(value);
+          final parts = value.split(RegExp(r'\s+'));
+          kernel = _normalizeStaticPath(parts.first);
+          if (parts.length > 1) options = parts.skip(1).join(' ');
         case 'initrd':
           if (initrd != null) return null;
-          initrd = _normalizeStaticPath(value);
+          initrd = _normalizeStaticPath(value.split(RegExp(r'\s+')).first);
         case 'options':
           if (options != null) return null;
           options = value;
@@ -401,10 +424,16 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
     final devices = tokens
         .where((token) => token.toLowerCase().startsWith('archisodevice='))
         .toList(growable: false);
+    final searchUuids = tokens
+        .where((token) => token.toLowerCase().startsWith('archisosearchuuid='))
+        .toList(growable: false);
     if (baseDirs.length != 1 ||
         baseDirs.single.toLowerCase() != 'archisobasedir=arch' ||
-        devices.length != 1 ||
-        devices.single.length == 'archisodevice='.length) {
+        devices.length + searchUuids.length != 1 ||
+        (devices.isNotEmpty &&
+            devices.single.length == 'archisodevice='.length) ||
+        (searchUuids.isNotEmpty &&
+            searchUuids.single.length == 'archisosearchuuid='.length)) {
       return false;
     }
     return !tokens.any((token) {
@@ -458,57 +487,6 @@ class LinuxArchImagePreflightService implements LinuxArchImagePreflight {
   static Future<bool> _isRegularFile(String path) async =>
       await FileSystemEntity.type(path, followLinks: false) ==
       FileSystemEntityType.file;
-
-  String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
-
-  Future<String?> _mountIso(String isoPath) async {
-    try {
-      final quotedPath = _psQuote(isoPath);
-      final mount = await Process.run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Mount-DiskImage -ImagePath $quotedPath -ErrorAction Stop',
-      ]).timeout(const Duration(seconds: 15));
-      if (mount.exitCode != 0) return null;
-
-      for (var attempt = 0; attempt < 5; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        final volume = await Process.run('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          'Get-DiskImage -ImagePath $quotedPath | Get-Volume | '
-              'Select-Object -ExpandProperty DriveLetter',
-        ]);
-        final letter = volume.stdout.toString().trim();
-        if (volume.exitCode == 0 && letter.isNotEmpty) return '$letter:\\';
-      }
-    } catch (_) {
-      // The source image is only inspected, never changed.
-    }
-    return null;
-  }
-
-  Future<void> _unmountIso(String isoPath) async {
-    try {
-      final quotedPath = _psQuote(isoPath);
-      await Process.run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Dismount-DiskImage -ImagePath $quotedPath -ErrorAction SilentlyContinue',
-      ]).timeout(const Duration(seconds: 10));
-    } catch (_) {
-      // A failed read-only mount cleanup is non-destructive.
-    }
-  }
 }
 
 class _ArchFileScan {

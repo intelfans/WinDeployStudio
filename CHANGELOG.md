@@ -2,6 +2,25 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## v2.1.0
+
+### Guided Tour And Verification Baseline
+
+- Finalized the production first-run App Tour with complete and single-section
+  flows, free exploration time, secondary-page introductions, and correct
+  return-to-parent navigation.
+- Start the complete App Tour automatically on first launch and once after each
+  application version update, while suppressing repeat prompts after it is
+  completed or ended for the current version.
+- Simplified the Settings tour finish state: the navigation step keeps only
+  **End tour** and **Open**, while the detailed step keeps **End tour** and
+  **Start exploring**.
+- Documented the verified feature baseline. Windows/Linux Installation Media
+  and Windows/Linux To Go creation remain pending the next real-device
+  validation cycle and are kept isolated from the verified baseline.
+- Updated application, Windows metadata, installer metadata, AI prompt, and
+  README version references to 2.1.0.
+
 ## v2.0.9
 
 ### Reliability, Integrity, and Deployment Safety

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:win_deploy_studio/app/theme.dart';
+import 'package:win_deploy_studio/core/config/ai_config.dart';
 import 'package:win_deploy_studio/core/localization/strings.dart';
 import 'package:win_deploy_studio/features/ai_assistant/screens/ai_assistant_screen.dart';
 import 'package:win_deploy_studio/features/logs/screens/logs_screen.dart';
@@ -34,10 +35,49 @@ void main() {
 
     await _pumpScreen(tester, const SettingsScreen());
     expect(find.text(trCurrent('settings_title')), findsOneWidget);
+    expect(find.text(trCurrent('update_channel')), findsNothing);
     _expectNoFlutterExceptions(tester);
 
     await _pumpScreen(tester, const MirrorScreen());
     expect(find.text(trCurrent('images_title')), findsOneWidget);
+    _expectNoFlutterExceptions(tester);
+  });
+
+  testWidgets('default AI service locks credential and model editing', (
+    tester,
+  ) async {
+    await _pumpScreen(tester, const SettingsScreen());
+
+    final endpointEdit = tester.widget<FilledButton>(
+      find.byKey(const Key('settings-ai-endpoint-edit')),
+    );
+    final apiKeyEdit = tester.widget<FilledButton>(
+      find.byKey(const Key('settings-ai-api-key-edit')),
+    );
+    final modelEdit = tester.widget<FilledButton>(
+      find.byKey(const Key('settings-ai-model-edit')),
+    );
+
+    expect(endpointEdit.onPressed, isNotNull);
+    expect(apiKeyEdit.onPressed, isNull);
+    expect(modelEdit.onPressed, isNull);
+    expect(find.text(trCurrent('ai_default')), findsNWidgets(2));
+
+    await AiConfig.setEndpointUrl('https://example.com/v1/');
+    await _pumpScreen(
+      tester,
+      const SettingsScreen(key: ValueKey('custom-ai-settings')),
+    );
+
+    final customApiKeyEdit = tester.widget<FilledButton>(
+      find.byKey(const Key('settings-ai-api-key-edit')),
+    );
+    final customModelEdit = tester.widget<FilledButton>(
+      find.byKey(const Key('settings-ai-model-edit')),
+    );
+    expect(customApiKeyEdit.onPressed, isNotNull);
+    expect(customModelEdit.onPressed, isNotNull);
+    expect(find.text(trCurrent('ai_default')), findsNothing);
     _expectNoFlutterExceptions(tester);
   });
 

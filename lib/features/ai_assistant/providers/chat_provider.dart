@@ -336,10 +336,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
         },
         onError: (error) {
           if (!_isCurrentGeneration(generation)) return;
+          final partialResponse = generation.buffer.trimRight();
           _updateMessage(
             sessionId: generation.sessionId,
             messageId: generation.messageId,
-            content: '${trCurrent('creator_error')}: $error',
+            // A transport failure can arrive after the provider has already
+            // streamed useful content. Keep that response available instead
+            // of replacing it with the error state.
+            content: partialResponse.isEmpty
+                ? '${trCurrent('creator_error')}: $error'
+                : '$partialResponse\n\n${trCurrent('creator_error')}: $error',
             isStreaming: false,
           );
           _finishGeneration(generation);

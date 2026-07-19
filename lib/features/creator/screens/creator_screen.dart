@@ -222,14 +222,20 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               },
             )
             .timeout(
-              const Duration(seconds: 30),
-              onTimeout: () {
+              selectedLinuxMode
+                  ? const Duration(seconds: 60)
+                  : const Duration(seconds: 120),
+              onTimeout: () async {
                 debugPrint('ISO parse overall timeout');
                 if (_isCurrentIsoSelection(
                   selectionRequest,
                   selectedLinuxMode,
                 )) {
-                  unawaited(isoService.cancel());
+                  // Wait for the old mount/helper process and dismount to
+                  // settle before re-enabling the picker. Otherwise a quick
+                  // second click is queued behind stale cleanup and appears
+                  // to be ignored.
+                  await isoService.cancel();
                 }
                 return null;
               },
@@ -332,6 +338,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _linuxIsoInspection = null;
         _currentStep = 1;
         _isoSelectionErrorKey = null;
+        _bootMode = _preferredBootModeForIso(metadata!);
       });
       unawaited(
         _verifyKnownIso(metadata.filePath, verificationRequest, selectedLocale),
@@ -359,6 +366,16 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     return mounted &&
         request == _isoSelectionRequest &&
         _isLinuxMode == isLinuxMode;
+  }
+
+  DeploymentBootMode _preferredBootModeForIso(IsoMetadata iso) {
+    if (!iso.canBootUefi && iso.canBootLegacy) {
+      return DeploymentBootMode.legacyBios;
+    }
+    if (!iso.canBootLegacy && iso.canBootUefi) {
+      return DeploymentBootMode.uefiGpt;
+    }
+    return _bootMode;
   }
 
   void _showIsoSelectionError(String messageKey) {
@@ -805,6 +822,17 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
+              _CreatorNotice(
+                icon: Icons.info_outline,
+                text: tr(
+                  context,
+                  _isLinuxMode
+                      ? 'creator_linux_install_iso_required'
+                      : 'creator_windows_install_iso_required',
+                ),
               ),
               if (_isoSelectionErrorKey != null) ...[
                 const SizedBox(height: 16),
@@ -1073,14 +1101,17 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                             ButtonSegment(
                               value: DeploymentBootMode.uefiGpt,
                               label: Text(tr(context, 'deploy_boot_uefi_gpt')),
+                              enabled: _selectedIso?.canBootUefi ?? true,
                             ),
                             ButtonSegment(
                               value: DeploymentBootMode.uefiMbr,
                               label: Text(tr(context, 'deploy_boot_uefi_mbr')),
+                              enabled: _selectedIso?.canBootUefi ?? true,
                             ),
                             ButtonSegment(
                               value: DeploymentBootMode.legacyBios,
                               label: Text(tr(context, 'deploy_boot_legacy')),
+                              enabled: _selectedIso?.canBootLegacy ?? true,
                             ),
                           ],
                           selected: {_bootMode},
@@ -1088,6 +1119,20 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                               setState(() => _bootMode = value.first),
                         ),
                       ),
+                      if (_selectedIso != null &&
+                          (!_selectedIso!.canBootUefi ||
+                              !_selectedIso!.canBootLegacy)) ...[
+                        const SizedBox(height: 8),
+                        _CreatorNotice(
+                          icon: Icons.info_outline,
+                          text: tr(
+                            context,
+                            _selectedIso!.canBootUefi
+                                ? 'deploy_image_uefi_only'
+                                : 'deploy_image_legacy_only',
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: _preferredDriveLetter,
@@ -1674,6 +1719,34 @@ class _IsoSelectionError extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CreatorNotice extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _CreatorNotice({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colors.secondaryContainer.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: colors.onSecondaryContainer),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }

@@ -8,6 +8,7 @@ import '../core/localization/strings.dart';
 import 'localization.dart';
 import 'routes.dart';
 import 'theme.dart';
+import '../features/onboarding/onboarding_overlay.dart';
 
 class WinDeployStudioApp extends ConsumerStatefulWidget {
   const WinDeployStudioApp({
@@ -26,6 +27,7 @@ class WinDeployStudioApp extends ConsumerStatefulWidget {
 class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
   bool _initialized = false;
   bool _langPageShown = false;
+  bool _onboardingScheduled = false;
 
   @override
   void initState() {
@@ -42,7 +44,11 @@ class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
     }
 
     _initialized = true;
-    if (!hasSelectedLanguage) _scheduleLanguagePage();
+    if (!hasSelectedLanguage) {
+      _scheduleLanguagePage();
+    } else {
+      _scheduleOnboardingIfNeeded();
+    }
   }
 
   Future<void> _init() async {
@@ -54,6 +60,7 @@ class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
       _scheduleLanguagePage();
     } else {
       setState(() => _initialized = true);
+      _scheduleOnboardingIfNeeded();
     }
   }
 
@@ -73,6 +80,17 @@ class _WinDeployStudioAppState extends ConsumerState<WinDeployStudioApp> {
         fullscreenDialog: true,
       ),
     );
+    _scheduleOnboardingIfNeeded();
+  }
+
+  void _scheduleOnboardingIfNeeded() {
+    if (_onboardingScheduled) return;
+    _onboardingScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || await OnboardingOverlay.hasCompleted()) return;
+      if (!mounted) return;
+      await OnboardingOverlay.show(context, markCompletedOnExit: true);
+    });
   }
 
   @override

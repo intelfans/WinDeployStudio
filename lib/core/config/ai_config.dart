@@ -7,13 +7,29 @@ import '../services/user_data_protection_service.dart';
 class AiConfig {
   AiConfig._();
 
-  static const defaultEndpointUrl =
-      'https://windeploystudio.bob-0910.workers.dev/';
+  static const defaultEndpointUrl = 'https://ai.xueyanzhang.top/';
+
+  // These were built-in endpoints in released builds. Treating one as a
+  // custom provider after an upgrade would incorrectly permit a user key to
+  // be associated with it, so saved values migrate back to the current
+  // built-in endpoint.
+  static const _retiredBuiltInEndpointUrls = <String>{
+    'https://windeploystudio.bob-0910.workers.dev/',
+  };
+
+  static const _directApiRouteSuffixes = <String>{
+    '/chat/completions',
+    '/responses',
+    '/models',
+  };
 
   static const defaultModel = 'mimo-v2.5-pro';
   static const maxModelListResponseBytes = 2 * 1024 * 1024;
   static const connectionTimeout = Duration(seconds: 15);
-  static const requestTimeout = Duration(seconds: 30);
+  // Gateways are allowed a little longer to return response headers. This is
+  // important for OpenAI-compatible relays that buffer an upstream response
+  // before forwarding it; stream-idle handling remains separate below.
+  static const requestTimeout = Duration(seconds: 60);
   static const streamIdleTimeout = Duration(seconds: 60);
   static const errorResponseTimeout = Duration(seconds: 10);
   static const transientRetryDelay = Duration(milliseconds: 450);
@@ -26,8 +42,28 @@ class AiConfig {
   static const _prefKeyModelEndpoint = 'ai_model_endpoint';
   static const _protectedValuePrefix = 'dpapi:v1:';
 
+  static bool _isRetiredBuiltInEndpoint(String endpointUrl) =>
+      _retiredBuiltInEndpointUrls.contains(normalizeEndpointUrl(endpointUrl));
+
+  static Future<void> _clearRetiredEndpointBindings(
+    SharedPreferences prefs,
+  ) async {
+    final apiKeyEndpoint = prefs.getString(_prefKeyApiKeyEndpoint);
+    if (apiKeyEndpoint != null && _isRetiredBuiltInEndpoint(apiKeyEndpoint)) {
+      await prefs.remove(_prefKeyApiKey);
+      await prefs.remove(_prefKeyApiKeyEndpoint);
+    }
+
+    final modelEndpoint = prefs.getString(_prefKeyModelEndpoint);
+    if (modelEndpoint != null && _isRetiredBuiltInEndpoint(modelEndpoint)) {
+      await prefs.remove(_prefKeyModel);
+      await prefs.remove(_prefKeyModelEndpoint);
+    }
+  }
+
   static Future<String> getEndpointUrl() async {
     final prefs = await SharedPreferences.getInstance();
+    await _clearRetiredEndpointBindings(prefs);
     final saved =
         prefs.getString(_prefKeyEndpointUrl) ??
         prefs.getString(_legacyPrefKeyEndpointUrl);
@@ -35,6 +71,13 @@ class AiConfig {
 
     final normalized = normalizeEndpointUrl(saved);
     if (!isValidEndpointUrl(normalized)) {
+      await clearApiKey();
+      await clearModel();
+      await prefs.remove(_prefKeyEndpointUrl);
+      await prefs.remove(_legacyPrefKeyEndpointUrl);
+      return defaultEndpointUrl;
+    }
+    if (_isRetiredBuiltInEndpoint(normalized)) {
       await clearApiKey();
       await clearModel();
       await prefs.remove(_prefKeyEndpointUrl);
@@ -51,9 +94,12 @@ class AiConfig {
   static Future<void> setEndpointUrl(String value) async {
     final prefs = await SharedPreferences.getInstance();
     final normalized = normalizeEndpointUrl(value);
-    if (normalized.isEmpty || normalized == defaultEndpointUrl) {
+    final retiredBuiltInEndpoint = _isRetiredBuiltInEndpoint(normalized);
+    if (normalized.isEmpty ||
+        normalized == defaultEndpointUrl ||
+        retiredBuiltInEndpoint) {
       final current = await getEndpointUrl();
-      if (current != defaultEndpointUrl) {
+      if (current != defaultEndpointUrl || retiredBuiltInEndpoint) {
         await clearApiKey();
         await clearModel();
       }
@@ -86,11 +132,15 @@ class AiConfig {
   /// corrupt preference never reaches the HTTP layer or an error message.
   static Future<String?> getApiKey({String? endpointUrl}) async {
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(_prefKeyApiKey);
-    if (stored == null || stored.trim().isEmpty) return null;
     final targetEndpoint = normalizeEndpointUrl(
       endpointUrl ?? await getEndpointUrl(),
     );
+    if (!shouldSendApiKey(targetEndpoint)) {
+      await clearApiKey();
+      return null;
+    }
+    final stored = prefs.getString(_prefKeyApiKey);
+    if (stored == null || stored.trim().isEmpty) return null;
     final boundEndpoint = prefs.getString(_prefKeyApiKeyEndpoint);
 
     try {
@@ -177,6 +227,10 @@ class AiConfig {
     final endpoint = normalizeEndpointUrl(
       endpointUrl ?? await getEndpointUrl(),
     );
+    if (_isRetiredBuiltInEndpoint(endpoint)) {
+      await clearModel();
+      return defaultModel;
+    }
     final saved = prefs.getString(_prefKeyModel)?.trim();
     if (saved == null || !isValidModelId(saved)) {
       if (saved != null) await clearModel();
@@ -204,6 +258,10 @@ class AiConfig {
     final endpoint = normalizeEndpointUrl(
       endpointUrl ?? await getEndpointUrl(),
     );
+    if (_isRetiredBuiltInEndpoint(endpoint)) {
+      await clearModel();
+      return;
+    }
     if (normalized == defaultModel && endpoint == defaultEndpointUrl) {
       await clearModel();
     } else {
@@ -226,8 +284,11 @@ class AiConfig {
 
   /// Keys belong to the endpoint the user explicitly configured. The built-in
   /// service is deliberately never sent a user-provided credential.
-  static bool shouldSendApiKey(String endpointUrl) =>
-      normalizeEndpointUrl(endpointUrl) != defaultEndpointUrl;
+  static bool shouldSendApiKey(String endpointUrl) {
+    final normalized = normalizeEndpointUrl(endpointUrl);
+    return normalized != defaultEndpointUrl &&
+        !_isRetiredBuiltInEndpoint(normalized);
+  }
 
   static String normalizeEndpointUrl(String value) {
     var normalized = value.trim();
@@ -244,7 +305,13 @@ class AiConfig {
     if (uri == null || uri.scheme.toLowerCase() != 'https') {
       return normalized;
     }
-    final path = uri.path.endsWith('/') ? uri.path : '${uri.path}/';
+    final pathWithoutTrailingSlash = uri.path.replaceFirst(RegExp(r'/+$'), '');
+    final isDirectApiRoute = _directApiRouteSuffixes.any(
+      pathWithoutTrailingSlash.endsWith,
+    );
+    final path = isDirectApiRoute
+        ? pathWithoutTrailingSlash
+        : (uri.path.endsWith('/') ? uri.path : '${uri.path}/');
     return uri.replace(scheme: 'https', path: path).toString();
   }
 

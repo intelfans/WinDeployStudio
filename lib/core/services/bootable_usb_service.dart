@@ -14,6 +14,7 @@ import 'in_memory_powershell.dart';
 import 'linux_driver_staging_service.dart';
 import 'linux_media_preflight.dart';
 import 'linux_togo_image_preflight.dart';
+import 'windows_iso_mount_service.dart';
 import 'windows_iso_preflight.dart';
 import 'windows_system_environment.dart';
 import '../../features/deployment/models/deployment_plan.dart';
@@ -100,6 +101,7 @@ class BootableUsbService {
   bool _cancelRequested = false;
   Process? _activeLinuxRawWriteProcess;
   Process? _activeLinuxUtilityProcess;
+  WindowsIsoMountLease? _linuxIsoMountLease;
 
   BootableUsbService(this.ref);
 
@@ -4588,73 +4590,39 @@ exit 1''',
   }
 
   Future<String?> _mountIso(String isoPath) async {
-    try {
-      final escapedPath = isoPath.replaceAll("'", "''");
-      _logLine('Mounting ISO: $isoPath');
-
-      // Clean up any stale mount
-      await _runPowerShell([
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
-      ]).timeout(const Duration(seconds: 10));
-
-      // Mount
-      final mountResult = await _runPowerShell([
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Mount-DiskImage -ImagePath '$escapedPath' -PassThru | Out-Null",
-      ]).timeout(const Duration(seconds: 30));
+    _logLine('Mounting ISO: $isoPath');
+    await _linuxIsoMountLease?.release();
+    _linuxIsoMountLease = null;
+    final lease = await WindowsIsoMountService.instance.acquire(
+      isoPath,
+      isCancelled: () => _cancelRequested,
+      mountTimeout: const Duration(minutes: 2),
+      volumeTimeout: const Duration(seconds: 30),
+    );
+    if (lease == null) {
       _logLine(
-        'Mount exit: ${mountResult.exitCode}, stderr: ${mountResult.stderr}',
+        'Mount error: '
+        '${WindowsIsoMountService.instance.lastDiagnostic ?? 'Unknown error'}',
       );
-
-      if (mountResult.exitCode != 0) return null;
-
-      // Get drive letter with retries
-      for (int i = 0; i < 5; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        final letterResult = await _runPowerShell([
-          '-NoProfile',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
-        ]).timeout(const Duration(seconds: 10));
-        _logLine(
-          'Drive letter attempt $i: exit=${letterResult.exitCode}, out="${letterResult.stdout}"',
-        );
-        if (letterResult.exitCode == 0) {
-          final letter = letterResult.stdout.toString().trim();
-          if (letter.isNotEmpty) {
-            _logLine('Mounted at: $letter:\\');
-            return '$letter:\\';
-          }
-        }
-      }
-    } catch (e) {
-      _logLine('Mount error: $e');
+      return null;
     }
-    return null;
+    _linuxIsoMountLease = lease;
+    _logLine('Mounted at: ${lease.mountPoint}');
+    return lease.mountPoint;
   }
 
   Future<void> _unmountIso(String isoPath) async {
+    final lease = _linuxIsoMountLease;
+    if (lease == null) return;
     try {
-      final escapedPath = isoPath.replaceAll("'", "''");
-      await _runPowerShell([
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue",
-      ]).timeout(const Duration(seconds: 15));
+      if (p.normalize(p.absolute(lease.isoPath)).toLowerCase() ==
+          p.normalize(p.absolute(isoPath)).toLowerCase()) {
+        await lease.release();
+        _linuxIsoMountLease = null;
+      }
       _logLine('Unmounted OK');
-    } catch (e) {
-      _logLine('Unmount error: $e');
+    } catch (error) {
+      _logLine('Unmount error: $error');
     }
   }
 

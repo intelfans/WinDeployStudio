@@ -7,8 +7,8 @@ import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../logs/services/log_center_service.dart';
 import '../../benchmark_history/benchmark_history_copy.dart';
-import '../../benchmark_history/screens/benchmark_history_screen.dart';
 import '../../benchmark_history/widgets/benchmark_workload_chart.dart';
+import '../../../shared/widgets/app_navigation_shell.dart';
 import '../models/benchmark_models.dart';
 import '../services/benchmark_error_localization.dart';
 import '../services/native_drive_benchmark_service.dart';
@@ -264,11 +264,8 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
           alignment: WrapAlignment.end,
           children: [
             OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const BenchmarkHistoryScreen(),
-                ),
-              ),
+              key: AppNavigationKeys.benchmarkHistoryKey,
+              onPressed: () => context.go('/benchmark/history'),
               icon: const Icon(Icons.history_rounded),
               label: Text(tr(context, BenchmarkHistoryKeys.history)),
             ),

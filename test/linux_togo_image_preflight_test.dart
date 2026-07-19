@@ -188,6 +188,39 @@ void main() {
     expect(result.issue, LinuxToGoImageIssue.sourceNotRegularFile);
     expect(result.messageKey, 'linux_togo_source_not_regular_file');
   });
+
+  test(
+    'distinguishes Debian-style installer media from a Live source',
+    () async {
+      await _writeFile(p.join(testRoot.path, 'dists', 'stable', 'Release'), [
+        1,
+      ]);
+      await _writeFile(p.join(testRoot.path, 'install', 'amd', 'initrd'), [2]);
+      await _writeFile(p.join(testRoot.path, 'isolinux', 'isolinux.bin'), [3]);
+
+      final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
+        testRoot.path,
+      );
+
+      expect(result.status, LinuxToGoImageStatus.unsupported);
+      expect(result.issue, LinuxToGoImageIssue.installerImage);
+      expect(result.messageKey, 'linux_togo_installer_image');
+    },
+  );
+
+  test('explains that ArchISO Live needs its dedicated writer', () async {
+    await _writeFile(p.join(testRoot.path, 'arch', 'x86_64', 'airootfs.sfs'), [
+      1,
+    ]);
+
+    final result = await LinuxToGoImagePreflightService.inspectMountedRoot(
+      testRoot.path,
+    );
+
+    expect(result.status, LinuxToGoImageStatus.unsupported);
+    expect(result.issue, LinuxToGoImageIssue.archIsoUnsupported);
+    expect(result.messageKey, 'linux_togo_arch_iso_unsupported');
+  });
 }
 
 Future<void> _writeCasperLayout(

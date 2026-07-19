@@ -6,6 +6,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
   return switch (code) {
     'zh' => const {
       'ai_api_key': 'API Key',
+      'ai_default': '默认',
       'ai_api_key_desc': '仅发送到当前明确配置的 AI 服务端点。应用不会记录或显示完整密钥。',
       'ai_api_key_saved': '已保存（密钥已加密）',
       'ai_api_key_not_set': '未设置',
@@ -26,6 +27,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'zh_TW' => const {
       'ai_api_key': 'API Key',
+      'ai_default': '預設',
       'ai_api_key_desc': '僅傳送至目前明確設定的 AI 服務端點。應用程式不會記錄或顯示完整金鑰。',
       'ai_api_key_saved': '已儲存（金鑰已加密）',
       'ai_api_key_not_set': '未設定',
@@ -46,6 +48,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'ru' => const {
       'ai_api_key': 'API Key',
+      'ai_default': 'По умолчанию',
       'ai_api_key_desc':
           'Ключ отправляется только на явно настроенную конечную точку AI. Полный ключ не сохраняется в журналах и не отображается.',
       'ai_api_key_saved': 'Сохранён (зашифрован)',
@@ -72,6 +75,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'fr' => const {
       'ai_api_key': 'API Key',
+      'ai_default': 'Par défaut',
       'ai_api_key_desc':
           'La clé est envoyée uniquement au point de terminaison IA configuré. La clé complète n’est ni journalisée ni affichée.',
       'ai_api_key_saved': 'Enregistrée (chiffrée)',
@@ -98,6 +102,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'de' => const {
       'ai_api_key': 'API Key',
+      'ai_default': 'Standard',
       'ai_api_key_desc':
           'Der Schlüssel wird nur an den ausdrücklich konfigurierten KI-Endpunkt gesendet. Der vollständige Schlüssel wird weder protokolliert noch angezeigt.',
       'ai_api_key_saved': 'Gespeichert (verschlüsselt)',
@@ -124,6 +129,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'es' => const {
       'ai_api_key': 'API Key',
+      'ai_default': 'Predeterminado',
       'ai_api_key_desc':
           'La clave solo se envía al punto de conexión de IA configurado explícitamente. La clave completa no se registra ni se muestra.',
       'ai_api_key_saved': 'Guardada (cifrada)',
@@ -150,6 +156,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'pt' => const {
       'ai_api_key': 'API Key',
+      'ai_default': 'Predefinido',
       'ai_api_key_desc':
           'A chave só é enviada para o endpoint de IA configurado explicitamente. A chave completa não é registada nem apresentada.',
       'ai_api_key_saved': 'Guardada (encriptada)',
@@ -176,6 +183,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'ar' => const {
       'ai_api_key': 'مفتاح API',
+      'ai_default': 'افتراضي',
       'ai_api_key_desc':
           'يُرسل المفتاح فقط إلى نقطة خدمة الذكاء الاصطناعي التي ضبطتها صراحةً. لا يتم تسجيل المفتاح الكامل أو عرضه.',
       'ai_api_key_saved': 'محفوظ (مشفّر)',
@@ -199,6 +207,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'ko' => const {
       'ai_api_key': 'API 키',
+      'ai_default': '기본값',
       'ai_api_key_desc':
           '키는 명시적으로 설정한 AI 서비스 엔드포인트로만 전송됩니다. 전체 키는 기록하거나 표시하지 않습니다.',
       'ai_api_key_saved': '저장됨(암호화됨)',
@@ -222,6 +231,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     'ja' => const {
       'ai_api_key': 'API キー',
+      'ai_default': 'デフォルト',
       'ai_api_key_desc':
           'キーは明示的に設定した AI サービスエンドポイントにのみ送信されます。完全なキーを記録・表示することはありません。',
       'ai_api_key_saved': '保存済み（暗号化）',
@@ -245,6 +255,7 @@ Map<String, String> aiSettingsStringsForCode(String code) {
     },
     _ => const {
       'ai_api_key': 'API Key',
+      'ai_default': 'Default',
       'ai_api_key_desc':
           'The key is sent only to the explicitly configured AI service endpoint. The full key is never logged or displayed.',
       'ai_api_key_saved': 'Saved (encrypted)',

@@ -16,6 +16,7 @@ import '../../shared/widgets/app_compact_label.dart';
 import '../../shared/widgets/app_page.dart';
 import '../../shared/widgets/special_thanks_section.dart';
 import '../ai_assistant/services/ai_service.dart';
+import '../onboarding/onboarding_overlay.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -36,6 +37,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _aiEndpointUrl;
   bool _aiApiKeyConfigured = false;
   String? _aiModel;
+
+  bool get _usesDefaultAiService =>
+      _aiEndpointUrl == null || _aiEndpointUrl == AiConfig.defaultEndpointUrl;
 
   @override
   void initState() {
@@ -302,6 +306,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 16),
               _SettingsSection(
+                title: onboardingCopy(context, 'replayTitle'),
+                children: [
+                  _SettingsTile(
+                    icon: Icons.explore_outlined,
+                    title: onboardingCopy(context, 'replayTitle'),
+                    subtitle: onboardingCopy(context, 'replayDescription'),
+                    trailing: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          key: const Key('settings-onboarding-section'),
+                          onPressed: _showOnboardingSectionPicker,
+                          icon: const Icon(Icons.view_list_outlined, size: 18),
+                          label: Text(onboardingCopy(context, 'replaySection')),
+                        ),
+                        FilledButton.tonalIcon(
+                          key: const Key('settings-onboarding-all'),
+                          onPressed: () => OnboardingOverlay.show(context),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                          label: Text(onboardingCopy(context, 'replayAll')),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _SettingsSection(
                 title: tr(context, 'ai_settings_section'),
                 children: [
                   _SettingsTile(
@@ -310,6 +344,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle:
                         _aiEndpointUrl ?? tr(context, 'ai_proxy_url_loading'),
                     trailing: FilledButton.tonal(
+                      key: const Key('settings-ai-endpoint-edit'),
                       onPressed: _showAiEndpointDialog,
                       child: Text(tr(context, 'settings_edit')),
                     ),
@@ -317,20 +352,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SettingsTile(
                     icon: Icons.key_outlined,
                     title: tr(context, 'ai_api_key'),
-                    subtitle: _aiApiKeyConfigured
+                    subtitle: _usesDefaultAiService
+                        ? tr(context, 'ai_default')
+                        : _aiApiKeyConfigured
                         ? tr(context, 'ai_api_key_saved')
                         : tr(context, 'ai_api_key_not_set'),
                     trailing: FilledButton.tonal(
-                      onPressed: _showAiApiKeyDialog,
+                      key: const Key('settings-ai-api-key-edit'),
+                      onPressed: _usesDefaultAiService
+                          ? null
+                          : _showAiApiKeyDialog,
                       child: Text(tr(context, 'settings_edit')),
                     ),
                   ),
                   _SettingsTile(
                     icon: Icons.auto_awesome_outlined,
                     title: tr(context, 'ai_model'),
-                    subtitle: _aiModel ?? tr(context, 'ai_model_not_set'),
+                    subtitle: _usesDefaultAiService
+                        ? tr(context, 'ai_default')
+                        : _aiModel ?? tr(context, 'ai_model_not_set'),
                     trailing: FilledButton.tonal(
-                      onPressed: _showAiModelDialog,
+                      key: const Key('settings-ai-model-edit'),
+                      onPressed: _usesDefaultAiService
+                          ? null
+                          : _showAiModelDialog,
                       child: Text(tr(context, 'settings_edit')),
                     ),
                   ),
@@ -345,34 +390,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     title: tr(context, 'update_current_version'),
                     subtitle: AppConstants.appVersion,
                     trailing: const SizedBox.shrink(),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.cloud_outlined,
-                    title: tr(context, 'update_channel'),
-                    subtitle: tr(context, 'update_channel_stable'),
-                    trailing: DropdownButton<UpdateChannel>(
-                      value: ref.watch(updateProvider).channel,
-                      underline: const SizedBox.shrink(),
-                      items: [
-                        DropdownMenuItem(
-                          value: UpdateChannel.stable,
-                          child: Text(tr(context, 'update_channel_stable')),
-                        ),
-                        DropdownMenuItem(
-                          value: UpdateChannel.beta,
-                          child: Text(tr(context, 'update_channel_beta')),
-                        ),
-                        DropdownMenuItem(
-                          value: UpdateChannel.nightly,
-                          child: Text(tr(context, 'update_channel_nightly')),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) {
-                          ref.read(updateProvider.notifier).setChannel(v);
-                        }
-                      },
-                    ),
                   ),
                   _SettingsTile(
                     icon: Icons.sync_outlined,
@@ -939,6 +956,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(content: Text('${tr(context, 'detail_open_failed')}: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _showOnboardingSectionPicker() async {
+    final section = await showDialog<OnboardingSection>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(onboardingCopy(context, 'replaySection')),
+        children: [
+          for (final section in OnboardingSection.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(section),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(onboardingSectionLabel(context, section)),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (section != null && mounted) {
+      await OnboardingOverlay.show(context, section: section);
     }
   }
 }

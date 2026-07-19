@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/typography.dart';
+import '../../../shared/widgets/app_navigation_shell.dart';
 import '../localization/disk_tools_localization.dart';
-import 'boot_repair_screen.dart';
-import 'disk_diagnostics_screen.dart';
 
 class DiskToolsScreen extends StatelessWidget {
   const DiskToolsScreen({super.key});
@@ -44,27 +44,21 @@ class DiskToolsScreen extends StatelessWidget {
                         SizedBox(
                           width: width,
                           child: _ToolEntry(
+                            key: AppNavigationKeys.diskDiagnosticsKey,
                             icon: Icons.monitor_heart_outlined,
                             titleKey: 'disk_tools_diagnostics_title',
                             descriptionKey: 'disk_tools_diagnostics_desc',
-                            onOpen: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const DiskDiagnosticsScreen(),
-                              ),
-                            ),
+                            onOpen: () => context.go('/disk-tools/diagnostics'),
                           ),
                         ),
                         SizedBox(
                           width: width,
                           child: _ToolEntry(
+                            key: AppNavigationKeys.bootRepairKey,
                             icon: Icons.settings_input_component_rounded,
                             titleKey: 'disk_tools_boot_repair_title',
                             descriptionKey: 'disk_tools_boot_repair_desc',
-                            onOpen: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const BootRepairScreen(),
-                              ),
-                            ),
+                            onOpen: () => context.go('/disk-tools/boot-repair'),
                           ),
                         ),
                       ],
@@ -87,6 +81,7 @@ class _ToolEntry extends StatelessWidget {
   final VoidCallback onOpen;
 
   const _ToolEntry({
+    super.key,
     required this.icon,
     required this.titleKey,
     required this.descriptionKey,

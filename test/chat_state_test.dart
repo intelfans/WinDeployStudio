@@ -138,6 +138,28 @@ void main() {
       await request;
     },
   );
+
+  test('preserves streamed text when a later request error arrives', () async {
+    final service = _ControlledAiService();
+    final notifier = ChatNotifier(
+      service,
+      loadHistory: false,
+      persistHistory: false,
+    );
+    addTearDown(notifier.dispose);
+    notifier.createNewSession();
+
+    final request = notifier.sendMessage('diagnose this');
+    await _waitForRequests(service, 1);
+    service.requests.single.addChunk('Useful partial diagnosis.');
+    service.requests.single.addError('Network interrupted.');
+    await request;
+
+    final answer = notifier.state.activeSession!.messages.last;
+    expect(answer.isStreaming, isFalse);
+    expect(answer.content, contains('Useful partial diagnosis.'));
+    expect(answer.content, contains('Network interrupted.'));
+  });
 }
 
 Future<void> _waitForRequests(_ControlledAiService service, int count) async {
@@ -201,7 +223,10 @@ class _ControlledRequest {
 
   void addChunk(String chunk) => _onChunk(chunk);
 
-  void addError(String error) => _onError(error);
+  void addError(String error) {
+    _onError(error);
+    if (!done.isCompleted) done.complete();
+  }
 
   void addSources(List<SearchSource> sources) => _onSources(sources);
 

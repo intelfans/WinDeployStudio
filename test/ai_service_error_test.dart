@@ -36,7 +36,7 @@ void main() {
       );
     });
 
-    test('retries only transient network failures before an HTTP response', () {
+    test('retries transient failures before an HTTP response', () {
       expect(
         AiService.shouldRetryTransportFailure(
           StateError('Connection terminated during handshake'),
@@ -53,6 +53,32 @@ void main() {
         AiService.shouldRetryTransportFailure(
           TimeoutException('response timed out'),
         ),
+        isTrue,
+      );
+    });
+
+    test('accepts all successful HTTP status codes for compatible APIs', () {
+      expect(AiService.isSuccessfulHttpStatusForTesting(200), isTrue);
+      expect(AiService.isSuccessfulHttpStatusForTesting(201), isTrue);
+      expect(AiService.isSuccessfulHttpStatusForTesting(204), isTrue);
+      expect(AiService.isSuccessfulHttpStatusForTesting(299), isTrue);
+      expect(AiService.isSuccessfulHttpStatusForTesting(300), isFalse);
+      expect(AiService.isSuccessfulHttpStatusForTesting(400), isFalse);
+    });
+
+    test('uses a buffered chat fallback only for stream-shape rejections', () {
+      expect(AiService.shouldFallbackToNonStreamingChatForTesting(400), isTrue);
+      expect(AiService.shouldFallbackToNonStreamingChatForTesting(422), isTrue);
+      expect(
+        AiService.shouldFallbackToNonStreamingChatForTesting(401),
+        isFalse,
+      );
+      expect(
+        AiService.shouldFallbackToNonStreamingChatForTesting(429),
+        isFalse,
+      );
+      expect(
+        AiService.shouldFallbackToNonStreamingChatForTesting(500),
         isFalse,
       );
     });

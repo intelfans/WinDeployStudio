@@ -7,13 +7,34 @@ class AppNavigationDestination {
     required this.icon,
     required this.selectedIcon,
     required this.label,
+    this.key,
     this.startsSection = false,
   });
 
   final IconData icon;
   final IconData selectedIcon;
   final String label;
+  final GlobalKey? key;
   final bool startsSection;
+}
+
+/// Stable anchors used by the first-run tour to spotlight the real navigation
+/// tiles instead of guessing their position from screen dimensions.
+class AppNavigationKeys {
+  AppNavigationKeys._();
+
+  static final destinationKeys = List<GlobalKey>.generate(
+    10,
+    (index) => GlobalKey(debugLabel: 'app-navigation-tour-$index'),
+  );
+
+  static final benchmarkHistoryKey = GlobalKey(
+    debugLabel: 'onboarding-benchmark-history',
+  );
+  static final diskDiagnosticsKey = GlobalKey(
+    debugLabel: 'onboarding-disk-diagnostics',
+  );
+  static final bootRepairKey = GlobalKey(debugLabel: 'onboarding-boot-repair');
 }
 
 class AppNavigationShell extends StatelessWidget {
@@ -276,6 +297,7 @@ class _NavigationTile extends StatelessWidget {
     };
 
     return Semantics(
+      key: destination.key,
       selected: selected,
       button: true,
       label: destination.label,

@@ -5,18 +5,36 @@ Windows desktop toolkit for Windows/Linux installation media, portable To Go wor
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Flutter](https://img.shields.io/badge/Flutter-Windows-02569B?logo=flutter)
-![Version](https://img.shields.io/badge/Version-2.0.9-orange)
+![Version](https://img.shields.io/badge/Version-2.1.0-orange)
 
 ## Overview
 
-WinDeploy Studio is a Flutter-based Windows desktop app for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live images, native drive testing, trusted image source navigation, deployment utilities, logs, and clear safety notices for advanced tools.
+WinDeploy Studio v2.1.0 is the production Windows desktop application for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, strict Linux To Go layout preflight for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live images, native drive testing, trusted image source navigation, deployment utilities, logs, an interactive first-run tour, and clear safety notices for advanced tools.
 
 The project is distributed under the MIT License.
+
+## Verification Status
+
+The following areas have completed functional verification and are treated as
+the frozen baseline for the next validation cycle:
+
+- First-run App Tour, including complete and single-section replay, free
+  exploration, secondary-page navigation, and return-to-parent behavior.
+- Image Center, disk benchmark/history, Disk Tools, logs, AI Assistant, Tools,
+  Settings, localization, and shared navigation.
+
+Windows/Linux installation media and Windows/Linux To Go creation remain the
+only areas awaiting the next round of real-device validation. Their deployment
+logic is intentionally kept separate from the verified baseline; do not infer
+hardware-level success from UI or automated tests alone. Any future change to
+shared services must be regression-tested against the frozen areas before it is
+accepted.
 
 ## Highlights
 
 - **Installation Media Creator**
   - Create Windows installation USB drives and write bootable Linux ISOHybrid images.
+  - Use a normal installation ISO for this workflow: Windows media must contain the standard Setup/WIM layout, while Linux media must be the distribution's ordinary bootable installer image. WinPE/recovery-only images are not accepted as normal Windows installation media.
   - Parse Windows ISO images and list available editions.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS for Windows media, with a preferred partition drive letter and custom volume label/icon.
   - Validate Linux ISOHybrid images before erasing the target disk and show only the Legacy BIOS, UEFI, and standard EFI fallback CPU architectures detected in the selected image.
@@ -29,17 +47,17 @@ The project is distributed under the MIT License.
 
     | Image family | Direct | VHD | VHDX | Notes |
     |:---|:---:|:---:|:---:|:---|
-    | Windows 7 | Yes | Enterprise/Ultimate only | No | x86 targets require Legacy BIOS; x64 targets may use UEFI. |
+    | Windows 7 | Yes | Enterprise/Ultimate only | No | Boot mode is derived from the ISO. Original media without a verified x64 UEFI fallback is restricted to Legacy BIOS. |
     | Windows 8 | Yes | Yes | Yes | VHD/VHDX are available after the image is identified as Windows 8. |
     | Windows 8.1 | Yes | Yes | Yes | WIMBoot remains a direct-deployment-only option. |
     | Windows 10/11 | Yes | Yes | Yes | CompactOS is available only for these generations. |
     | Windows Server | Yes | Yes | Server 2012+ only | Server 2008 R2 supports VHD but not VHDX; Server 2012 and later support both. Client-only options are excluded. |
 
     The matrix describes deployment-mode availability, not a guarantee that every USB controller, firmware combination, or Server edition will boot.
-  - Windows To Go accepts standard ISO layouts containing `boot.wim` and `install.wim` or `install.esd`. WIMBoot additionally requires `install.wim`; split `install.swm` images and images missing required BIOS/EFI boot files are rejected before the target disk is changed.
-  - Validate supported persistent Linux To Go layouts for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
+  - Windows To Go accepts normal Windows installation ISO layouts containing `boot.wim` and `install.wim` or `install.esd`. WIMBoot additionally requires `install.wim`; split `install.swm` images and images missing required BIOS/EFI boot files are rejected before the target disk is changed.
+  - Linux To Go requires an x64 **Live USB / Live ISO**, not an installer, netinst, or DVD image. Validate supported persistent layouts for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
   - Classify Linux To Go images when selected and again immediately before erasing the target. Every accepted profile requires x64 UEFI + GPT, a real kernel/initrd, Live payloads, and a GRUB entry that can be safely updated. Ubuntu/casper uses its `writable` persistence image; Debian Live and Deepin Live require `boot=live` and use their `persistence` / `persistence.conf` protocol. Deepin 25 layouts with the current Linglong marker are included.
-  - Reject unsupported distributions and unsafe Debian Live layouts before the target disk is changed; use Linux installation media for images outside the validated profiles.
+  - Reject ordinary Debian/Kali installer or netinst media, ArchISO, openSUSE/KIWI, unsupported distributions, and unsafe Debian Live layouts before the target disk is changed. Installer media remains usable in Linux Installation Media; ArchISO and other unimplemented persistence protocols are not presented as supported LTG sources.
   - Stop before modifying the target disk when the image does not meet a verified profile or the release does not include a required, compliant persistence component. Use Linux installation media for other distributions and layouts.
   - Use a five-step image, disk, deployment, advanced-options, and summary workflow before execution.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS and deploy Windows directly or into dynamic/fixed VHD/VHDX files; incompatible image and mode combinations are blocked before writing. The selection controls the disk layout, not the target firmware: use UEFI + GPT for modern UEFI firmware, select UEFI + MBR only when that firmware explicitly supports MBR booting, and use Legacy BIOS only on traditional BIOS hardware.
@@ -93,6 +111,9 @@ The project is distributed under the MIT License.
 - **Interface And Navigation**
   - Uses one consistent Windows 11-inspired interface across supported Windows 10 and Windows 11 hosts.
   - Groups primary navigation with clear visual dividers; choosing a primary destination from Disk Tools or test-history secondary pages opens that destination rather than retaining the previous subpage.
+  - Includes a production App Tour that starts automatically on first launch and once after each application version update. It highlights real navigation targets, explains each workspace and its secondary pages, then collapses into a compact guide while leaving the page interactive.
+  - Lets users skip a section or end the complete tour, confirms cross-section changes, and keeps the highlighted target sharp while the surrounding workspace is de-emphasized.
+  - Provides **Settings > App Tour** controls for replaying the complete tour or one selected section. A selected-section replay uses a focused end-tour flow instead of silently switching to another section.
 
 - **International UI**
   - Supports 11 languages:
@@ -107,6 +128,8 @@ The project is distributed under the MIT License.
     - Portuguese
     - Russian
     - Arabic
+  - App Tour controls, section guidance, exit confirmations, and Settings replay controls follow the selected UI language across all 11 languages.
+  - The AI Assistant requests answers in the selected UI language, keeps Simplified and Traditional Chinese separate, and uses one provider-neutral product-knowledge prompt so feature guidance stays consistent across languages.
 
 ## Screenshots
 
@@ -344,6 +367,7 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
 - **安装盘创建工具**
   - 从 ISO 创建 Windows 安装 U 盘，或写入可启动的 Linux ISOHybrid 镜像。
+  - 此流程应使用普通安装镜像：Windows 镜像必须包含标准 Setup/WIM 结构，Linux 镜像应为发行版提供的普通可启动安装镜像；WinPE 或仅恢复用途的镜像不视为普通 Windows 安装镜像。
   - 自动解析 Windows ISO，列出可安装版本。
   - Windows 安装盘可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并可指定分区盘符、自定义卷标和图标。
   - 在擦除目标磁盘前验证 Linux ISOHybrid 结构，并仅显示在所选镜像中检测到的 Legacy BIOS、UEFI 与标准 EFI 回退启动文件 CPU 架构。
@@ -356,17 +380,17 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
 
     | 镜像系列 | 直接部署 | VHD | VHDX | 说明 |
     |:---|:---:|:---:|:---:|:---|
-    | Windows 7 | 支持 | 仅 Enterprise/Ultimate | 不支持 | x86 目标需要 Legacy BIOS；x64 目标可使用 UEFI。 |
+    | Windows 7 | 支持 | 仅 Enterprise/Ultimate | 不支持 | 启动模式以 ISO 实际文件为准；缺少可验证 x64 UEFI 回退文件的原版镜像会限制为 Legacy BIOS。 |
     | Windows 8 | 支持 | 支持 | 支持 | 正确识别为 Windows 8 后支持三种部署方式。 |
     | Windows 8.1 | 支持 | 支持 | 支持 | WIMBoot 仅限直接部署。 |
     | Windows 10/11 | 支持 | 支持 | 支持 | CompactOS 仅适用于这些版本。 |
     | Windows Server | 支持 | 支持 | 仅 Server 2012 及更高版本 | Server 2008 R2 支持 VHD 但不支持 VHDX；Server 2012 及更高版本支持两者，并排除仅适用于客户端的选项。 |
 
     该矩阵表示部署方式的可用性，不保证每一种 USB 控制器、固件组合或 Server 版本都能成功启动。
-  - Windows To Go 接受包含 `boot.wim` 以及 `install.wim` 或 `install.esd` 的标准 ISO 结构；WIMBoot 还要求使用 `install.wim`。分卷 `install.swm` 镜像或缺少 BIOS/EFI 必需启动文件的镜像，会在修改目标磁盘前被拒绝。
-  - 在修改磁盘前验证已通过布局检查的 x64 UEFI + GPT Ubuntu/casper、Debian Live 与 Deepin Live 持久化 Linux To Go 镜像。
+  - Windows To Go 接受包含 `boot.wim` 以及 `install.wim` 或 `install.esd` 的普通 Windows 安装 ISO；WIMBoot 还要求使用 `install.wim`。分卷 `install.swm` 镜像或缺少 BIOS/EFI 必需启动文件的镜像，会在修改目标磁盘前被拒绝。
+  - Linux To Go 必须选择并下载 x64 **Live USB / Live ISO**，不能使用 installer、netinst 或 DVD 普通安装镜像；在修改磁盘前验证已通过布局检查的 x64 UEFI + GPT Ubuntu/casper、Debian Live 与 Deepin Live 持久化镜像。
   - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；所有可接受配置都必须具备 x64 UEFI + GPT、真实内核/initrd、Live 文件系统和可安全注入参数的 GRUB 启动项。Ubuntu/casper 使用 `writable` 持久化镜像；Debian Live 与 Deepin Live 需要 `boot=live` 并使用独立的 `persistence` / `persistence.conf` 协议，已包含使用当前 Linglong 标记的 Deepin 25 布局。
-  - 不受支持的发行版与不安全的 Debian Live 布局会在修改目标磁盘前被拒绝；验证范围外的镜像请使用 Linux 安装盘。
+  - Debian/Kali 普通安装版或 netinst、ArchISO、openSUSE/KIWI、不受支持的发行版及不安全的 Debian Live 布局，会在修改目标磁盘前被拒绝。普通安装镜像仍可用于 Linux 安装盘；尚未实现持久化协议的 ArchISO 等镜像不会标记为 LTG 可用。
   - 不符合已验证配置、或当前发行版未包含所需且合规持久化组件时，会在修改目标磁盘前停止操作；其他发行版和布局请使用 Linux 安装盘。
   - 执行前经过镜像、磁盘、部署方式、高级选项和配置摘要五步流程。
   - 可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并将 Windows 直接部署到分区或动态/固定 VHD、VHDX；不兼容的镜像与模式组合会在写盘前阻止。该选择只决定写盘布局，不保证目标固件一定可启动：现代 UEFI 固件使用 UEFI + GPT；只有固件明确支持从 MBR 启动时才选择 UEFI + MBR；传统 BIOS 设备才选择 Legacy BIOS。

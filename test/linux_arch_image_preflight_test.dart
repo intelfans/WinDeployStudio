@@ -58,6 +58,26 @@ void main() {
     expect(result.issue, LinuxArchImageIssue.noEligibleBootEntry);
   });
 
+  test('accepts the current ArchISO archisosearchuuid argument', () async {
+    await _writeArchLayout(
+      testRoot,
+      options: 'archisobasedir=arch archisosearchuuid=1234-ABCD',
+    );
+
+    final result = await LinuxArchImagePreflightService.inspectMountedRoot(
+      testRoot.path,
+      initrdEntryLister: const _StaticEntryLister(
+        LinuxInitrdEntryListing.success(_completeArchInitrdEntries),
+      ),
+    );
+
+    expect(result.status, LinuxArchImageStatus.supported);
+    expect(
+      result.image?.bootEntry.relativePath,
+      'loader/entries/01-archiso-x86_64-linux.conf',
+    );
+  });
+
   test('rejects an Arch initrd that cannot prove NTFS support', () async {
     await _writeArchLayout(testRoot);
 

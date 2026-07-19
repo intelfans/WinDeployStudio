@@ -512,6 +512,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     return _images.where((image) => image['index'] == index).firstOrNull;
   }
 
+  bool get _selectedImageSupportsUefi =>
+      _selectedImage?['hasUefiBoot'] as bool? ?? true;
+
+  bool get _selectedImageSupportsLegacy =>
+      _selectedImage?['hasLegacyBiosBoot'] as bool? ?? true;
+
+  bool get _selectedImageHasNetFx3Source =>
+      _selectedImage?['hasNetFx3Source'] as bool? ?? false;
+
   WindowsProductFamily _windowsProductFamilyForImage(
     Map<String, dynamic>? image,
   ) {
@@ -537,6 +546,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     }
     if (!DeploymentCompatibility.supportsWimBoot(plan)) {
       _wimBoot = false;
+    }
+    if (!_selectedImageHasNetFx3Source) {
+      _enableNetFx3 = false;
+    }
+    if (!_selectedImageSupportsUefi && _selectedImageSupportsLegacy) {
+      _bootMode = DeploymentBootMode.legacyBios;
+    } else if (!_selectedImageSupportsLegacy &&
+        _selectedImageSupportsUefi &&
+        _bootMode == DeploymentBootMode.legacyBios) {
+      _bootMode = DeploymentBootMode.uefiGpt;
     }
   }
 
@@ -966,6 +985,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _advancedNotice(
+            _isLinux ? Icons.usb_outlined : Icons.info_outline,
+            _isLinux
+                ? 'wtg_linux_live_iso_required'
+                : 'wtg_windows_install_iso_required',
+          ),
           _SelectionPanel(
             icon: Icons.disc_full_outlined,
             // Keep the empty-state prompt aligned with the selected To Go platform.
@@ -1220,14 +1245,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               ButtonSegment(
                 value: DeploymentBootMode.uefiGpt,
                 label: Text(tr(context, 'deploy_boot_uefi_gpt')),
+                enabled: _selectedImageSupportsUefi,
               ),
               ButtonSegment(
                 value: DeploymentBootMode.uefiMbr,
                 label: Text(tr(context, 'deploy_boot_uefi_mbr')),
+                enabled: _selectedImageSupportsUefi,
               ),
               ButtonSegment(
                 value: DeploymentBootMode.legacyBios,
                 label: Text(tr(context, 'deploy_boot_legacy')),
+                enabled: _selectedImageSupportsLegacy,
               ),
             ],
             selected: {_bootMode},
@@ -1236,6 +1264,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           ),
           const SizedBox(height: 12),
           _advancedNotice(Icons.info_outline, 'deploy_boot_mode_notice'),
+          if (!_selectedImageSupportsUefi || !_selectedImageSupportsLegacy) ...[
+            const SizedBox(height: 8),
+            _advancedNotice(
+              Icons.warning_amber_outlined,
+              !_selectedImageSupportsUefi
+                  ? 'deploy_image_legacy_only'
+                  : 'deploy_image_uefi_only',
+            ),
+          ],
           const SizedBox(height: 24),
           Text(
             tr(context, 'deploy_mode'),
@@ -1380,9 +1417,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                     ),
                   _switchTile(
                     'deploy_netfx3',
-                    'deploy_netfx3_desc',
+                    _selectedImageHasNetFx3Source
+                        ? 'deploy_netfx3_desc'
+                        : 'deploy_netfx3_source_missing',
                     _enableNetFx3,
-                    (value) => _enableNetFx3 = value,
+                    _selectedImageHasNetFx3Source
+                        ? (value) => _enableNetFx3 = value
+                        : null,
                   ),
                 ],
                 if (canStageLinuxDrivers)
@@ -1950,13 +1991,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     String titleKey,
     String subtitleKey,
     bool value,
-    ValueChanged<bool> update,
+    ValueChanged<bool>? update,
   ) {
     return SwitchListTile(
       title: Text(tr(context, titleKey)),
       subtitle: Text(tr(context, subtitleKey)),
       value: value,
-      onChanged: (next) => setState(() => update(next)),
+      onChanged: update == null ? null : (next) => setState(() => update(next)),
     );
   }
 

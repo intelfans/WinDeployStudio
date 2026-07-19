@@ -19,6 +19,16 @@ void main() {
         ).toString(),
         'https://service.example/v1/chat/completions',
       );
+      expect(
+        AiConfig.normalizeEndpointUrl(
+          'https://service.example/v1/chat/completions/',
+        ),
+        'https://service.example/v1/chat/completions',
+      );
+      expect(
+        AiConfig.normalizeEndpointUrl('https://service.example/v1/responses/'),
+        'https://service.example/v1/responses',
+      );
     });
 
     test('accepts only safe HTTPS service endpoints', () {
@@ -82,8 +92,76 @@ void main() {
         expect(AiConfig.isValidApiKey('sk-example\nvalue'), isFalse);
         expect(AiConfig.shouldSendApiKey(AiConfig.defaultEndpointUrl), isFalse);
         expect(
+          AiConfig.shouldSendApiKey(
+            'https://windeploystudio.bob-0910.workers.dev/',
+          ),
+          isFalse,
+        );
+        expect(
           AiConfig.shouldSendApiKey('https://provider.example/v1/'),
           isTrue,
+        );
+      },
+    );
+
+    test(
+      'migrates a saved retired built-in endpoint and its bindings',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'ai_endpoint_url': 'https://windeploystudio.bob-0910.workers.dev',
+          'ai_api_key_protected': 'dpapi:v1:retired-key',
+          'ai_api_key_endpoint':
+              'https://windeploystudio.bob-0910.workers.dev/',
+          'ai_model': 'retired-model',
+          'ai_model_endpoint': 'https://windeploystudio.bob-0910.workers.dev/',
+        });
+
+        expect(await AiConfig.getEndpointUrl(), AiConfig.defaultEndpointUrl);
+
+        final preferences = await SharedPreferences.getInstance();
+        expect(preferences.getString('ai_endpoint_url'), isNull);
+        expect(preferences.getString('ai_proxy_url'), isNull);
+        expect(preferences.getString('ai_api_key_protected'), isNull);
+        expect(preferences.getString('ai_api_key_endpoint'), isNull);
+        expect(preferences.getString('ai_model'), isNull);
+        expect(preferences.getString('ai_model_endpoint'), isNull);
+        expect(await AiConfig.getModel(), AiConfig.defaultModel);
+      },
+    );
+
+    test(
+      'clears retired endpoint bindings even without a saved endpoint',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'ai_api_key_protected': 'dpapi:v1:retired-key',
+          'ai_api_key_endpoint': 'https://windeploystudio.bob-0910.workers.dev',
+          'ai_model': 'retired-model',
+          'ai_model_endpoint': 'https://windeploystudio.bob-0910.workers.dev',
+        });
+
+        expect(await AiConfig.getEndpointUrl(), AiConfig.defaultEndpointUrl);
+
+        final preferences = await SharedPreferences.getInstance();
+        expect(preferences.getString('ai_api_key_protected'), isNull);
+        expect(preferences.getString('ai_api_key_endpoint'), isNull);
+        expect(preferences.getString('ai_model'), isNull);
+        expect(preferences.getString('ai_model_endpoint'), isNull);
+      },
+    );
+
+    test(
+      'retains a saved custom endpoint during built-in endpoint migration',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'ai_endpoint_url': 'https://provider.example/v1',
+        });
+
+        expect(await AiConfig.getEndpointUrl(), 'https://provider.example/v1/');
+
+        final preferences = await SharedPreferences.getInstance();
+        expect(
+          preferences.getString('ai_endpoint_url'),
+          'https://provider.example/v1/',
         );
       },
     );

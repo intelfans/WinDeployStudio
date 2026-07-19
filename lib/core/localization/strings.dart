@@ -163,82 +163,66 @@ Map<String, String> aiSearchStatusStringsForCode(String code) {
       'ai_search_searching': '正在联网搜索',
       'ai_search_used': '已使用联网搜索',
       'ai_search_not_used': '本次未使用联网搜索',
-      'ai_search_unavailable': '当前服务不支持可验证的联网搜索',
     },
     'zh_TW' => const {
       'ai_search_requested': '已請求網路搜尋',
       'ai_search_searching': '正在網路搜尋',
       'ai_search_used': '已使用網路搜尋',
       'ai_search_not_used': '本次未使用網路搜尋',
-      'ai_search_unavailable': '目前服務不支援可驗證的網路搜尋',
     },
     'ru' => const {
       'ai_search_requested': 'Запрошен веб-поиск',
       'ai_search_searching': 'Выполняется веб-поиск',
       'ai_search_used': 'Использован веб-поиск',
       'ai_search_not_used': 'Веб-поиск не использован',
-      'ai_search_unavailable': 'Сервис не поддерживает проверяемый веб-поиск',
     },
     'fr' => const {
       'ai_search_requested': 'Recherche Web demandée',
       'ai_search_searching': 'Recherche Web en cours',
       'ai_search_used': 'Recherche Web utilisée',
       'ai_search_not_used': 'Recherche Web non utilisée',
-      'ai_search_unavailable':
-          'Le service ne prend pas en charge une recherche Web vérifiable',
     },
     'de' => const {
       'ai_search_requested': 'Websuche angefordert',
       'ai_search_searching': 'Websuche läuft',
       'ai_search_used': 'Websuche verwendet',
       'ai_search_not_used': 'Websuche nicht verwendet',
-      'ai_search_unavailable':
-          'Der Dienst unterstützt keine überprüfbare Websuche',
     },
     'es' => const {
       'ai_search_requested': 'Búsqueda web solicitada',
       'ai_search_searching': 'Buscando en la web',
       'ai_search_used': 'Búsqueda web utilizada',
       'ai_search_not_used': 'No se utilizó la búsqueda web',
-      'ai_search_unavailable':
-          'El servicio no admite búsquedas web verificables',
     },
     'pt' => const {
       'ai_search_requested': 'Pesquisa na web solicitada',
       'ai_search_searching': 'Pesquisando na web',
       'ai_search_used': 'Pesquisa na web usada',
       'ai_search_not_used': 'A pesquisa na web não foi usada',
-      'ai_search_unavailable':
-          'O serviço não oferece pesquisa na web verificável',
     },
     'ar' => const {
       'ai_search_requested': 'تم طلب البحث على الويب',
       'ai_search_searching': 'جارٍ البحث على الويب',
       'ai_search_used': 'تم استخدام البحث على الويب',
       'ai_search_not_used': 'لم يُستخدم البحث على الويب',
-      'ai_search_unavailable': 'الخدمة لا تدعم بحثًا قابلاً للتحقق على الويب',
     },
     'ko' => const {
       'ai_search_requested': '웹 검색 요청됨',
       'ai_search_searching': '웹 검색 중',
       'ai_search_used': '웹 검색 사용됨',
       'ai_search_not_used': '이번에는 웹 검색을 사용하지 않음',
-      'ai_search_unavailable': '서비스가 검증 가능한 웹 검색을 지원하지 않음',
     },
     'ja' => const {
       'ai_search_requested': 'ウェブ検索をリクエスト済み',
       'ai_search_searching': 'ウェブ検索中',
       'ai_search_used': 'ウェブ検索を使用',
       'ai_search_not_used': '今回はウェブ検索を未使用',
-      'ai_search_unavailable': 'このサービスは検証可能なウェブ検索に非対応',
     },
     _ => const {
       'ai_search_requested': 'Web search requested',
       'ai_search_searching': 'Searching the web',
       'ai_search_used': 'Web search used',
       'ai_search_not_used': 'Web search not used',
-      'ai_search_unavailable':
-          'This service does not support verifiable web search',
     },
   };
 }
