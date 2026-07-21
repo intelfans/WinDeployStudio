@@ -7,6 +7,9 @@ void main() {
     final source = File(
       'lib/features/ai_assistant/models/chat_models.dart',
     ).readAsStringSync();
+    final providerSource = File(
+      'lib/features/ai_assistant/providers/chat_provider.dart',
+    ).readAsStringSync();
 
     expect(
       source,
@@ -24,6 +27,7 @@ void main() {
       contains('but not after success or an explicit user cancellation'),
     );
     expect(source, contains('ABSOLUTE CONTENT SAFETY'));
+    expect(providerSource, contains('_screenStoredSession'));
     expect(
       source,
       contains(

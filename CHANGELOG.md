@@ -10,7 +10,7 @@ All notable changes to WinDeploy Studio are documented here.
   service and every custom OpenAI-compatible endpoint. Response text and
   source titles are buffered until the complete result passes the local
   policy, including completion, cancellation, provider-error, and exception
-  paths.
+  paths. Saved assistant replies are screened again when chat history loads.
 - Added localized blocked-response guidance across all 11 UI languages and
   regression coverage for allowed deployment terminology and prohibited
   content categories.

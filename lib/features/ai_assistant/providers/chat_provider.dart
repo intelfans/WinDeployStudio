@@ -103,7 +103,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
               ? await UserDataProtectionService.unprotect(stored)
               : stored;
           final json = jsonDecode(content) as Map<String, dynamic>;
-          final session = ChatSession.fromJson(json);
+          final loadedSession = ChatSession.fromJson(json);
+          final screenedHistory = _screenStoredSession(loadedSession);
+          final session = screenedHistory.session;
+          if (screenedHistory.changed && file.path.endsWith('.chat')) {
+            await _saveSession(session);
+          }
           if (file.path.endsWith('.json')) {
             final encryptedCopy = sessionsById[session.id];
             final plaintextIsNewer =
@@ -388,6 +393,32 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return (
       content: blocked ? trCurrent('ai_output_safety_blocked') : content,
       blocked: blocked,
+    );
+  }
+
+  ({ChatSession session, bool changed}) _screenStoredSession(
+    ChatSession session,
+  ) {
+    var changed = false;
+    final messages = session.messages.map((message) {
+      if (message.role != 'assistant') return message;
+      final screened = _screenAssistantOutput(
+        message.content,
+        sources: message.sources,
+      );
+      if (!screened.blocked) return message;
+      changed = true;
+      return message.copyWith(
+        content: screened.content,
+        isStreaming: false,
+        sources: const [],
+      );
+    }).toList();
+    return (
+      session: changed
+          ? session.copyWith(messages: messages, updatedAt: session.updatedAt)
+          : session,
+      changed: changed,
     );
   }
 
