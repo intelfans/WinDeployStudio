@@ -29,7 +29,8 @@ void main() {
     service.requests[0].addChunk('partial old answer');
     expect(
       notifier.state.activeSession!.messages.last.content,
-      'partial old answer',
+      isEmpty,
+      reason: 'provider text must stay hidden until locally screened',
     );
 
     notifier.stopGeneration();
@@ -159,6 +160,65 @@ void main() {
     expect(answer.isStreaming, isFalse);
     expect(answer.content, contains('Useful partial diagnosis.'));
     expect(answer.content, contains('Network interrupted.'));
+  });
+
+  test('withholds safe provider output until screening completes', () async {
+    final service = _ControlledAiService();
+    final notifier = ChatNotifier(
+      service,
+      loadHistory: false,
+      persistHistory: false,
+    );
+    addTearDown(notifier.dispose);
+    notifier.createNewSession();
+
+    final request = notifier.sendMessage('Explain Windows deployment');
+    await _waitForRequests(service, 1);
+    service.requests.single.addChunk('Use a verified Windows ISO.');
+
+    expect(notifier.state.activeSession!.messages.last.content, isEmpty);
+    expect(notifier.state.activeSession!.messages.last.isStreaming, isTrue);
+
+    service.requests.single.complete();
+    await request;
+
+    expect(
+      notifier.state.activeSession!.messages.last.content,
+      'Use a verified Windows ISO.',
+    );
+  });
+
+  test('blocks disallowed output and sources from any provider', () async {
+    final service = _ControlledAiService();
+    final notifier = ChatNotifier(
+      service,
+      loadHistory: false,
+      persistHistory: false,
+    );
+    addTearDown(notifier.dispose);
+    notifier.createNewSession();
+
+    final request = notifier.sendMessage('third-party endpoint request');
+    await _waitForRequests(service, 1);
+    service.requests.single.addChunk(
+      'A political election response that must never be displayed.',
+    );
+    service.requests.single.addSources([
+      SearchSource(
+        title: 'Political election source',
+        url: 'https://example.com/election',
+      ),
+    ]);
+
+    expect(notifier.state.activeSession!.messages.last.content, isEmpty);
+
+    service.requests.single.complete();
+    await request;
+
+    final answer = notifier.state.activeSession!.messages.last;
+    expect(answer.content, isNot(contains('political election')));
+    expect(answer.content, contains('safety policy'));
+    expect(answer.sources, isEmpty);
   });
 }
 

@@ -44,16 +44,34 @@ void main() {
     expect(diskpart, greaterThan(initializer));
   }
 
-  test('UEFI install-media script leaves disk initialization to Storage', () {
-    final script = scriptFor(
-      currentStyle: 'GPT',
-      bootMode: DeploymentBootMode.uefiGpt,
-    );
+  test(
+    'UEFI GPT install-media script uses a removable-compatible FAT32 primary partition',
+    () {
+      final script = scriptFor(
+        currentStyle: 'GPT',
+        bootMode: DeploymentBootMode.uefiGpt,
+      );
 
-    expectPartitionOnlyScript(script);
-    expect(script, contains('create partition efi'));
-    expect(script, contains('format fs=fat32 label="WDS_BOOT" quick'));
-  });
+      expectPartitionOnlyScript(script);
+      expect(script, contains('create partition primary'));
+      expect(script, isNot(contains('create partition efi')));
+      expect(script, contains('format fs=fat32 label="WDS_BOOT" quick'));
+    },
+  );
+
+  test(
+    'summarizes DiskPart label failures without repeated progress noise',
+    () {
+      final summary = BootableUsbService.summarizeDiskpartFailureForTesting('''
+Microsoft DiskPart version 10.0
+    0 percent completed
+    0 percent completed
+Virtual Disk Service error:
+The label is invalid.
+''');
+      expect(summary, 'i18n:deploy_compat_invalid_volume_label');
+    },
+  );
 
   test('legacy install-media script leaves disk initialization to Storage', () {
     final script = scriptFor(
@@ -85,7 +103,7 @@ void main() {
   });
 
   test(
-    'install media explicitly selects its new partition before formatting',
+    'install media formats its selected partition before binding a drive letter',
     () {
       final script = scriptFor(
         currentStyle: 'Unknown',
@@ -95,18 +113,14 @@ void main() {
       expect(
         script,
         contains(
-          'create partition efi\n'
+          'create partition primary\n'
           'select partition 1\n'
           'format fs=fat32 label="WDS_BOOT" quick\n'
-          'assign',
+          'remove all noerr\n'
+          'assign letter=Z',
         ),
       );
-      expect(
-        script,
-        isNot(
-          contains('create partition efi\nformat fs=fat32 label="WDS_BOOT"'),
-        ),
-      );
+      expect(script, isNot(contains('select volume Z')));
     },
   );
 
@@ -120,29 +134,30 @@ void main() {
     expect(
       script,
       contains(
-        'create partition efi size=32760\n'
+        'create partition primary size=32760\n'
         'select partition 1\n'
-        'format fs=fat32 label="WDS_BOOT" quick',
+        'format fs=fat32 label="WDS_BOOT" quick\n'
+        'remove all noerr\n'
+        'assign letter=Z',
       ),
     );
   });
 
-  test(
-    'keeps FAT32 install media full-sized on a target at or below 32 GiB',
-    () {
-      final script = scriptFor(
-        currentStyle: 'Unknown',
-        bootMode: DeploymentBootMode.uefiGpt,
-        diskSizeBytes: 32 * 1024 * 1024 * 1024,
-      );
+  test('keeps FAT32 install media full-sized on a target at or below 32 GiB', () {
+    final script = scriptFor(
+      currentStyle: 'Unknown',
+      bootMode: DeploymentBootMode.uefiGpt,
+      diskSizeBytes: 32 * 1024 * 1024 * 1024,
+    );
 
-      expect(
-        script,
-        contains('create partition efi\nselect partition 1\nformat fs=fat32'),
-      );
-      expect(script, isNot(contains('create partition efi size=')));
-    },
-  );
+    expect(
+      script,
+      contains(
+        'create partition primary\nselect partition 1\nformat fs=fat32 label="WDS_BOOT" quick\nremove all noerr\nassign letter=Z',
+      ),
+    );
+    expect(script, isNot(contains('create partition primary size=')));
+  });
 
   test(
     'UEFI + MBR keeps an MBR primary partition without a BIOS active flag',
@@ -171,13 +186,29 @@ void main() {
           'create partition primary\n'
           'select partition 1\n'
           'format fs=fat32 label="WDS_BOOT" quick\n'
-          'assign\n'
+          'remove all noerr\n'
+          'assign letter=Z\n'
           'select partition 1\n'
           'active',
         ),
       );
     },
   );
+
+  test('recognizes the localized no-volume failure emitted by DiskPart', () {
+    expect(
+      BootableUsbService.noVolumeSelectedMessageForTesting(
+        '没有指定卷。\n请选择一个卷，再试一次。',
+      ),
+      isTrue,
+    );
+    expect(
+      BootableUsbService.noVolumeSelectedMessageForTesting(
+        'There is no volume selected.',
+      ),
+      isTrue,
+    );
+  });
 
   test(
     'install-media postcondition accepts only the requested FAT32 volume',
@@ -187,7 +218,7 @@ void main() {
         'PartitionStyle': 'GPT',
         'Label': 'WDS_BOOT',
         'FileSystem': 'FAT32',
-        'EfiSystemPartition': true,
+        'EfiSystemPartition': false,
         'IsActive': false,
       };
       bool matches(Map<String, Object?> actual) =>
@@ -196,7 +227,7 @@ void main() {
             expectedDiskNumber: 7,
             expectedPartitionStyle: 'gpt',
             expectedLabel: 'wds_boot',
-            expectedEfiSystemPartition: true,
+            expectedEfiSystemPartition: false,
             expectedActive: false,
           );
 
@@ -205,7 +236,7 @@ void main() {
       expect(matches({...expected, 'FileSystem': ''}), isFalse);
       expect(matches({...expected, 'DiskNumber': 8}), isFalse);
       expect(matches({...expected, 'PartitionStyle': 'MBR'}), isFalse);
-      expect(matches({...expected, 'EfiSystemPartition': false}), isFalse);
+      expect(matches({...expected, 'EfiSystemPartition': true}), isFalse);
       expect(matches({...expected, 'IsActive': true}), isFalse);
     },
   );
@@ -256,6 +287,8 @@ void main() {
         contains(
           'create partition efi size=2048\n'
           'select partition 1\n'
+          'assign letter=S\n'
+          'select volume S\n'
           'format fs=fat32 label="WDS_LTG" quick',
         ),
       );
@@ -264,6 +297,8 @@ void main() {
         contains(
           'create partition primary\n'
           'select partition 2\n'
+          'assign letter=W\n'
+          'select volume W\n'
           'format fs=ntfs label="WDS_LTG" quick',
         ),
       );
@@ -339,6 +374,8 @@ void main() {
         contains(
           'create partition efi size=300\n'
           'select partition 1\n'
+          'assign letter=S\n'
+          'select volume S\n'
           'format fs=fat32 label="WDS_BOOT" quick',
         ),
       );
@@ -347,6 +384,8 @@ void main() {
         contains(
           'create partition primary\n'
           'select partition 3\n'
+          'assign letter=W\n'
+          'select volume W\n'
           'format fs=ntfs label="WDS_STORAGE" quick',
         ),
       );
@@ -371,8 +410,9 @@ void main() {
         contains(
           'create partition primary size=350\n'
           'select partition 1\n'
-          'format fs=fat32 label="WDS_BOOT" quick\n'
           'assign letter=S\n'
+          'select volume S\n'
+          'format fs=fat32 label="WDS_BOOT" quick\n'
           'select partition 1\n'
           'active',
         ),
@@ -382,6 +422,8 @@ void main() {
         contains(
           'create partition primary\n'
           'select partition 2\n'
+          'assign letter=W\n'
+          'select volume W\n'
           'format fs=ntfs label="WDS_STORAGE" quick',
         ),
       );
@@ -406,6 +448,8 @@ void main() {
         contains(
           'create partition primary size=350\n'
           'select partition 1\n'
+          'assign letter=S\n'
+          'select volume S\n'
           'format fs=ntfs label="WDS_BOOT" quick',
         ),
       );
@@ -414,6 +458,8 @@ void main() {
         contains(
           'create partition primary\n'
           'select partition 2\n'
+          'assign letter=W\n'
+          'select volume W\n'
           'format fs=ntfs label="WDS_STORAGE" quick',
         ),
       );
@@ -435,8 +481,9 @@ void main() {
         contains(
           'create partition primary\n'
           'select partition 1\n'
-          'format fs=ntfs label="WDS_OS" quick\n'
-          'assign letter=V',
+          'assign letter=V\n'
+          'select volume V\n'
+          'format fs=ntfs label="WDS_OS" quick',
         ),
       );
     },
@@ -494,21 +541,47 @@ void main() {
     expect(verifier, contains('verification output'));
   });
 
-  test('install-media drive-letter discovery waits for mount propagation', () {
-    final source = File(
-      'lib/core/services/bootable_usb_service.dart',
-    ).readAsStringSync();
-    final start = source.indexOf('Future<String?> _findDriveLetterForDisk');
-    final end = source.indexOf('// --- Formatting ---', start);
-    expect(start, greaterThanOrEqualTo(0));
-    expect(end, greaterThan(start));
-    final discovery = source.substring(start, end);
+  test(
+    'install-media drive-letter query does not report a timeout as occupied',
+    () {
+      final source = File(
+        'lib/core/services/bootable_usb_service.dart',
+      ).readAsStringSync();
+      final start = source.indexOf(
+        'Future<_DriveLetterAvailability> _checkDriveLetterAvailability',
+      );
+      final end = source.indexOf('String _sanitizeVolumeLabel', start);
+      expect(start, greaterThanOrEqualTo(0));
+      expect(end, greaterThan(start));
+      final check = source.substring(start, end);
 
-    expect(discovery, contains("AddSeconds(25)"));
-    expect(discovery, contains('Start-Sleep -Milliseconds 500'));
-    expect(discovery, contains('Duration(seconds: 35)'));
-    expect(discovery, contains('WDS_DISK_NUMBER'));
-  });
+      expect(check, contains('Duration(seconds: 30)'));
+      expect(
+        check,
+        contains(
+          'result.exitCode == 1) return _DriveLetterAvailability.occupied',
+        ),
+      );
+      expect(check, contains('return _DriveLetterAvailability.unknown'));
+
+      final partitionStart = source.indexOf(
+        'Future<_DiskPartResult> _partitionDisk({',
+      );
+      final partitionEnd = source.indexOf(
+        'static String _buildInstallMediaDiskpartScript',
+        partitionStart,
+      );
+      final partitionFlow = source.substring(partitionStart, partitionEnd);
+      expect(
+        partitionFlow,
+        contains('availability == _DriveLetterAvailability.occupied'),
+      );
+      expect(
+        partitionFlow,
+        contains('availability == _DriveLetterAvailability.unknown'),
+      );
+    },
+  );
 
   test(
     'install-media Storage checks use a managed timeout that terminates a stuck PowerShell child',
@@ -539,17 +612,6 @@ void main() {
       final verifier = source.substring(verifierStart, verifierEnd);
       expect(verifier, contains('timeout: const Duration(seconds: 35)'));
       expect(verifier, isNot(contains(').timeout(')));
-
-      final discoveryStart = source.indexOf(
-        'Future<String?> _findDriveLetterForDisk',
-      );
-      final discoveryEnd = source.indexOf(
-        '// --- Formatting ---',
-        discoveryStart,
-      );
-      final discovery = source.substring(discoveryStart, discoveryEnd);
-      expect(discovery, contains('timeout: const Duration(seconds: 35)'));
-      expect(discovery, isNot(contains(').timeout(')));
 
       final managedRunnerStart = source.indexOf(
         'Future<ProcessResult> _runLinuxUtility',

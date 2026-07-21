@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/bootable_usb_service.dart';
@@ -31,6 +33,19 @@ void main() {
         r'C:\images\win11.iso',
       ),
       isFalse,
+    );
+  });
+
+  test('extracts a normalized local source drive for fast disk binding', () {
+    expect(
+      BootableUsbService.windowsDriveRootForTesting(
+        r'd:\ISO\Windows\Windows 8.1.iso',
+      ),
+      'D:',
+    );
+    expect(
+      BootableUsbService.windowsDriveRootForTesting(r'\\server\share\win.iso'),
+      isNull,
     );
   });
 
@@ -69,6 +84,21 @@ void main() {
       expect(updates.single.message, 'creator_invalid_windows_iso');
     },
   );
+
+  test('preflight failures use their specific localized message key', () {
+    final source = File(
+      'lib/core/services/bootable_usb_service.dart',
+    ).readAsStringSync();
+    final failureStart = source.indexOf('if (!mediaPreflight.success)');
+    final failureEnd = source.indexOf('final logCenter', failureStart);
+    expect(failureStart, greaterThanOrEqualTo(0));
+    expect(failureEnd, greaterThan(failureStart));
+    final failureFlow = source.substring(failureStart, failureEnd);
+
+    expect(failureFlow, contains('mediaPreflight.messageKey'));
+    expect(failureFlow, contains('await saveLogToFile()'));
+    expect(failureFlow, isNot(contains("error: 'i18n:")));
+  });
 
   test('Linux creation rejects a Windows source before disk access', () async {
     final safety = _CountingDiskSafetyService();

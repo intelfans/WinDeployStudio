@@ -23,6 +23,8 @@ class IsoMetadata {
   final bool hasEfiBcd;
   final Set<WindowsEfiBootArchitecture> efiBootArchitectures;
   final WindowsEfiBootArchitecture? efiBootManagerArchitecture;
+  final String? validationErrorKey;
+  final String? validationErrorDetail;
 
   const IsoMetadata({
     required this.filePath,
@@ -38,7 +40,34 @@ class IsoMetadata {
     this.hasEfiBcd = false,
     this.efiBootArchitectures = const <WindowsEfiBootArchitecture>{},
     this.efiBootManagerArchitecture,
+    this.validationErrorKey,
+    this.validationErrorDetail,
   });
+
+  IsoMetadata copyWith({
+    bool? isValidWindowsIso,
+    String? validationErrorKey,
+    String? validationErrorDetail,
+  }) {
+    return IsoMetadata(
+      filePath: filePath,
+      fileName: fileName,
+      fileSize: fileSize,
+      windowsVersion: windowsVersion,
+      buildNumber: buildNumber,
+      architecture: architecture,
+      language: language,
+      edition: edition,
+      isValidWindowsIso: isValidWindowsIso ?? this.isValidWindowsIso,
+      hasLegacyBiosBoot: hasLegacyBiosBoot,
+      hasEfiBcd: hasEfiBcd,
+      efiBootArchitectures: efiBootArchitectures,
+      efiBootManagerArchitecture: efiBootManagerArchitecture,
+      validationErrorKey: validationErrorKey ?? this.validationErrorKey,
+      validationErrorDetail:
+          validationErrorDetail ?? this.validationErrorDetail,
+    );
+  }
 
   bool get canBootLegacy => hasLegacyBiosBoot;
 
@@ -192,13 +221,23 @@ class IsoParseService {
       isCancelled: () => operation.isCancelled,
     );
     if (mountLease == null) {
-      debugPrint('Mount failed or cancelled');
-      await LogCenterService().logIso('ISO 挂载失败或被取消 | 文件: $fileName');
+      final diagnostic =
+          WindowsIsoMountService.instance.lastDiagnostic ??
+          'The mount operation was cancelled or did not return a volume.';
+      debugPrint('Mount failed or cancelled: $diagnostic');
+      await LogCenterService().logIso(
+        'ISO 挂载失败或被取消 | 文件: $fileName | 诊断: $diagnostic',
+      );
       // Linux installation-media selection deliberately uses the same
       // lightweight parser only to rule out Windows images. Preserve the
       // filename/size fallback for that flow, while Windows mode still
       // rejects the non-validated result before USB selection.
-      return operation.isCancelled ? null : fastResult;
+      return operation.isCancelled
+          ? null
+          : fastResult.copyWith(
+              validationErrorKey: 'creator_iso_mount_failed',
+              validationErrorDetail: diagnostic,
+            );
     }
     final mountPoint = mountLease.mountPoint;
     Map<String, String>? dismInfo;
@@ -220,7 +259,10 @@ class IsoParseService {
         await logCenter.logIso(
           'Windows ISO 布局无效 | 文件: $fileName | 原因: ${layout.error ?? '未知'}',
         );
-        return fastResult;
+        return fastResult.copyWith(
+          validationErrorKey: 'creator_invalid_windows_iso',
+          validationErrorDetail: layout.error,
+        );
       }
       sourceLayout = layout;
       _report(operation, onProgress, 'detect', 100);
@@ -611,6 +653,23 @@ class IsoParseService {
         lower.contains('19044') ||
         lower.contains('19043')) {
       windowsVersion = 'Windows 10';
+    } else if (lower.contains('win8.1') ||
+        lower.contains('win8_1') ||
+        lower.contains('windows 8.1') ||
+        lower.contains('windows8.1') ||
+        lower.contains('9600')) {
+      windowsVersion = 'Windows 8.1';
+    } else if (lower.contains('win8') ||
+        lower.contains('windows 8') ||
+        lower.contains('windows8') ||
+        lower.contains('9200')) {
+      windowsVersion = 'Windows 8';
+    } else if (lower.contains('win7') ||
+        lower.contains('windows 7') ||
+        lower.contains('windows7') ||
+        lower.contains('7600') ||
+        lower.contains('7601')) {
+      windowsVersion = 'Windows 7';
     } else if (lower.contains('server')) {
       windowsVersion = 'Windows Server';
     }

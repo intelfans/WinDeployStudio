@@ -10,6 +10,8 @@ class AppConstants {
       'https://intelfans.github.io/WinDeployStudio/';
   static const String githubRepository =
       'https://github.com/intelfans/WinDeployStudio';
+  static const String githubFeedbackUrl =
+      'https://github.com/intelfans/WinDeployStudio/issues/new';
   static const String globalMirrorRepository =
       'https://sourceforge.net/projects/windeploystudio/';
 

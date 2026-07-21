@@ -66,6 +66,44 @@ void main() {
     );
   });
 
+  test(
+    'physical identity falls back when a selected-disk refresh omits serial',
+    () {
+      const current = DiskInfo(
+        diskNumber: 4,
+        model: 'Portable SSD',
+        friendlyName: 'Portable SSD USB Device',
+        sizeBytes: 1000204886016,
+        sizeFormatted: '931 GB',
+        uniqueId: 'USB-UNIQUE-1234',
+        devicePath: r'\\?\PhysicalDrive4',
+        busType: 'USB',
+        isRemovable: true,
+      );
+
+      expect(base.hasSamePhysicalIdentity(current), isTrue);
+      expect(current.hasSamePhysicalIdentity(base), isTrue);
+    },
+  );
+
+  test('selected-disk safety query avoids a full physical-disk inventory', () {
+    final source = File(
+      'lib/core/services/disk_safety_service.dart',
+    ).readAsStringSync();
+    final scriptStart = source.indexOf(
+      'static const String _getDiskByNumberScript',
+    );
+    final scriptEnd = source.indexOf("''';", scriptStart);
+
+    expect(scriptStart, greaterThanOrEqualTo(0));
+    expect(scriptEnd, greaterThan(scriptStart));
+    final script = source.substring(scriptStart, scriptEnd);
+    expect(script, contains(r'Get-Disk -Number $targetNumber'));
+    expect(script, isNot(contains('Get-PhysicalDisk')));
+    expect(script, isNot(contains('Get-Partition')));
+    expect(script, contains('DriveLetters   = @()'));
+  });
+
   test('physical identity fails closed without a reliable hardware value', () {
     const unknown = DiskInfo(
       diskNumber: 4,
@@ -100,6 +138,19 @@ void main() {
         ),
         DiskPartition(type: 'Basic', sizeBytes: 127000000000, driveLetter: 'E'),
       ],
+    );
+
+    expect(disk.preferredDriveLetter, 'E');
+  });
+
+  test('preferred drive letter accepts native volume paths', () {
+    const disk = DiskInfo(
+      diskNumber: 11,
+      model: 'USB SSD',
+      friendlyName: 'USB SSD',
+      sizeBytes: 64000000000,
+      sizeFormatted: '59 GB',
+      driveLetters: ['E:\\'],
     );
 
     expect(disk.preferredDriveLetter, 'E');

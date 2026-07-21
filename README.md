@@ -39,21 +39,22 @@ accepted.
   - Select UEFI + GPT, UEFI + MBR, or Legacy BIOS for Windows media, with a preferred partition drive letter and custom volume label/icon.
   - Validate Linux ISOHybrid images before erasing the target disk and show only the Legacy BIOS, UEFI, and standard EFI fallback CPU architectures detected in the selected image.
   - Linux media is a byte-for-byte ISOHybrid write. It preserves the ISO's own partition and boot layout; it does not convert UEFI/MBR/Legacy boot modes and does not create a persistence or remaining-space partition. Secure Boot compatibility depends on the image signature and target firmware, so it is reported neither inferred nor guaranteed.
+  - Some firmware lists the same Linux USB twice because the image exposes multiple boot paths or the firmware enumerates one device more than once. The two names do not mean two copies were written. For any distribution, choose the entry that opens its normal installer; if one entry opens `grub>`, shows a blank screen, or cannot continue, return to the boot menu and try the similar USB entry. Prefer an entry explicitly marked UEFI when the computer is using UEFI mode.
   - Bind every destructive operation to the selected external disk and revalidate it immediately before writing.
 
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
-  - Windows target-image support follows this matrix for standard compatible images:
+  - Code-level image recognition and deployment-mode availability follow this matrix for standard compatible images:
 
     | Image family | Direct | VHD | VHDX | Notes |
     |:---|:---:|:---:|:---:|:---|
-    | Windows 7 | Yes | Enterprise/Ultimate only | No | Boot mode is derived from the ISO. Original media without a verified x64 UEFI fallback is restricted to Legacy BIOS. |
-    | Windows 8 | Yes | Yes | Yes | VHD/VHDX are available after the image is identified as Windows 8. |
-    | Windows 8.1 | Yes | Yes | Yes | WIMBoot remains a direct-deployment-only option. |
-    | Windows 10/11 | Yes | Yes | Yes | CompactOS is available only for these generations. |
-    | Windows Server | Yes | Yes | Server 2012+ only | Server 2008 R2 supports VHD but not VHDX; Server 2012 and later support both. Client-only options are excluded. |
+    | Windows 7 | Yes | Enterprise/Ultimate only | No | Best effort. Boot mode is derived from the ISO; original media without a verified x64 UEFI fallback is restricted to Legacy BIOS. Matching legacy drivers and updates may be required. |
+    | Windows 8 | Yes | Yes | Yes | Best effort. VHD/VHDX become available after the image is identified; matching drivers and updates may still be required. |
+    | Windows 8.1 | Yes | Yes | Yes | Best effort. WIMBoot remains a direct-deployment-only option; matching drivers and updates may still be required. |
+    | Windows 10/11 | Yes | Yes | Yes | Current verified normal creation scope. CompactOS is available only for these generations. |
+    | Windows Server | Yes | Yes | Server 2012+ only | Best effort. Server 2008 R2 supports VHD but not VHDX; Server 2012 and later support both. Client-only options are excluded. |
 
-    The matrix describes deployment-mode availability, not a guarantee that every USB controller, firmware combination, or Server edition will boot.
+    The matrix describes code-level image recognition and deployment-mode availability. The currently verified Windows To Go production scope is Windows 10 and Windows 11 on compatible hardware and standard images. Windows 7, Windows 8, Windows 8.1, and Windows Server may be recognized and attempted, but are not guaranteed to boot on every computer or firmware mode. Older systems commonly require version- and hardware-matched USB, chipset, storage, and boot drivers, required updates, or additional boot/repair tools. Prepare those resources before writing, test on the intended computer, and keep important data backed up elsewhere.
   - Windows To Go accepts normal Windows installation ISO layouts containing `boot.wim` and `install.wim` or `install.esd`. WIMBoot additionally requires `install.wim`; split `install.swm` images and images missing required BIOS/EFI boot files are rejected before the target disk is changed.
   - Linux To Go requires an x64 **Live USB / Live ISO**, not an installer, netinst, or DVD image. Validate supported persistent layouts for verified x64 UEFI + GPT Ubuntu/casper, Debian Live, and Deepin Live ISOs before any disk is changed.
   - Classify Linux To Go images when selected and again immediately before erasing the target. Every accepted profile requires x64 UEFI + GPT, a real kernel/initrd, Live payloads, and a GRUB entry that can be safely updated. Ubuntu/casper uses its `writable` persistence image; Debian Live and Deepin Live require `boot=live` and use their `persistence` / `persistence.conf` protocol. Deepin 25 layouts with the current Linglong marker are included.
@@ -100,6 +101,7 @@ accepted.
   - Built-in AI assistant for Windows deployment questions, log analysis, and troubleshooting suggestions.
   - For USB suitability questions and USB analysis, users can select multiple saved disk-test records. The request includes device data, run parameters, workload measurements, raw sample points, and metric definitions in plain text.
   - Displays a clear AI-generated content notice before use.
+  - Applies the same local output-safety policy to the built-in service and every custom endpoint. Provider text and source titles are buffered until the complete response passes client-side screening; blocked political, sexual, violent, hateful, extremist, illegal-drug, gambling, or explicit criminal content is never streamed into the conversation.
   - Supports any OpenAI-compatible HTTPS service endpoint configured by the user.
   - Lets users enter an API Key, keep it protected with Windows user-level encryption, and choose a model manually or from the endpoint's `/models` list.
   - Sends credentials only to the explicitly configured endpoint; the built-in service never receives a user-provided API Key. Changing or resetting the endpoint clears the saved key.
@@ -114,6 +116,7 @@ accepted.
   - Includes a production App Tour that starts automatically on first launch and once after each application version update. It highlights real navigation targets, explains each workspace and its secondary pages, then collapses into a compact guide while leaving the page interactive.
   - Lets users skip a section or end the complete tour, confirms cross-section changes, and keeps the highlighted target sharp while the surrounding workspace is de-emphasized.
   - Provides **Settings > App Tour** controls for replaying the complete tour or one selected section. A selected-section replay uses a focused end-tour flow instead of silently switching to another section.
+  - Provides **Settings > Feedback**, which opens the project's [GitHub Issue form](https://github.com/intelfans/WinDeployStudio/issues/new). A **Report this failure** action is also shown after a genuine Installation Media or To Go creation failure; successful operations and user-requested cancellations do not trigger it.
 
 - **International UI**
   - Supports 11 languages:
@@ -372,21 +375,22 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
   - Windows 安装盘可选择 UEFI + GPT、UEFI + MBR 或 Legacy BIOS，并可指定分区盘符、自定义卷标和图标。
   - 在擦除目标磁盘前验证 Linux ISOHybrid 结构，并仅显示在所选镜像中检测到的 Legacy BIOS、UEFI 与标准 EFI 回退启动文件 CPU 架构。
   - Linux 安装盘为 ISOHybrid 原样逐字节写入：保留镜像自身的分区和启动布局，不会转换 UEFI/MBR/Legacy 启动模式，也不会创建持久化或剩余空间分区。Secure Boot 兼容性取决于镜像签名和目标固件，程序不会推断或保证其可用性。
+  - 某些固件会因镜像同时提供多条启动路径，或重复枚举同一个设备，而把同一个 Linux USB 显示为两个名称相近的启动项；这不表示应用写入了两份镜像。该规则不限于某几个发行版：请选择能进入对应发行版正常安装菜单的项目；若某一项进入 `grub>`、黑屏或无法继续，请返回启动菜单尝试另一个同名项目。电脑使用 UEFI 模式时，优先选择明确带有 UEFI 标识的项目。
   - 每次破坏性操作都绑定到用户选择的外接磁盘，并在写入前再次核验。
 
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。
-  - 对标准且结构完整的 Windows 镜像，支持范围如下：
+  - 对标准且结构完整的 Windows 镜像，代码层面的识别和部署方式可用性如下：
 
     | 镜像系列 | 直接部署 | VHD | VHDX | 说明 |
     |:---|:---:|:---:|:---:|:---|
-    | Windows 7 | 支持 | 仅 Enterprise/Ultimate | 不支持 | 启动模式以 ISO 实际文件为准；缺少可验证 x64 UEFI 回退文件的原版镜像会限制为 Legacy BIOS。 |
-    | Windows 8 | 支持 | 支持 | 支持 | 正确识别为 Windows 8 后支持三种部署方式。 |
-    | Windows 8.1 | 支持 | 支持 | 支持 | WIMBoot 仅限直接部署。 |
-    | Windows 10/11 | 支持 | 支持 | 支持 | CompactOS 仅适用于这些版本。 |
-    | Windows Server | 支持 | 支持 | 仅 Server 2012 及更高版本 | Server 2008 R2 支持 VHD 但不支持 VHDX；Server 2012 及更高版本支持两者，并排除仅适用于客户端的选项。 |
+    | Windows 7 | 支持 | 仅 Enterprise/Ultimate | 不支持 | 仅尽力支持。启动模式以 ISO 实际文件为准；缺少可验证 x64 UEFI 回退文件的原版镜像会限制为 Legacy BIOS，通常还需要匹配的旧版驱动与补丁。 |
+    | Windows 8 | 支持 | 支持 | 支持 | 仅尽力支持。正确识别后开放三种部署方式，但仍可能需要匹配的驱动与补丁。 |
+    | Windows 8.1 | 支持 | 支持 | 支持 | 仅尽力支持。WIMBoot 仅限直接部署，仍可能需要匹配的驱动与补丁。 |
+    | Windows 10/11 | 支持 | 支持 | 支持 | 当前经过验证的正常制作范围；CompactOS 仅适用于这些版本。 |
+    | Windows Server | 支持 | 支持 | 仅 Server 2012 及更高版本 | 仅尽力支持。Server 2008 R2 支持 VHD 但不支持 VHDX；Server 2012 及更高版本支持两者，并排除仅适用于客户端的选项。 |
 
-    该矩阵表示部署方式的可用性，不保证每一种 USB 控制器、固件组合或 Server 版本都能成功启动。
+    该矩阵表示代码层面的镜像识别和部署方式可用性。当前经过验证、作为正常制作范围说明的是 Windows 10 和 Windows 11，并且仍要求使用结构完整的标准镜像与兼容硬件。Windows 7、Windows 8、Windows 8.1 和 Windows Server 可以被识别并尝试部署，但不保证能在每台电脑或每种启动模式下正常启动。旧系统通常需要与系统版本和目标硬件匹配的 USB、芯片组、存储与启动驱动，以及必要补丁或其他启动/修复工具。写入前应准备这些资源，完成后先在目标电脑测试，并将重要数据另行备份。
   - Windows To Go 接受包含 `boot.wim` 以及 `install.wim` 或 `install.esd` 的普通 Windows 安装 ISO；WIMBoot 还要求使用 `install.wim`。分卷 `install.swm` 镜像或缺少 BIOS/EFI 必需启动文件的镜像，会在修改目标磁盘前被拒绝。
   - Linux To Go 必须选择并下载 x64 **Live USB / Live ISO**，不能使用 installer、netinst 或 DVD 普通安装镜像；在修改磁盘前验证已通过布局检查的 x64 UEFI + GPT Ubuntu/casper、Debian Live 与 Deepin Live 持久化镜像。
   - 选择镜像时及擦除目标磁盘前都会分类检查 LTG 镜像；所有可接受配置都必须具备 x64 UEFI + GPT、真实内核/initrd、Live 文件系统和可安全注入参数的 GRUB 启动项。Ubuntu/casper 使用 `writable` 持久化镜像；Debian Live 与 Deepin Live 需要 `boot=live` 并使用独立的 `persistence` / `persistence.conf` 协议，已包含使用当前 Linglong 标记的 Deepin 25 布局。
@@ -400,6 +404,10 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
   - 为 Windows To Go 创建独立启动分区，并验证 BCD、虚拟磁盘绑定和 UEFI 回退启动文件。
   - 在清盘前重新核验磁盘号、容量、型号与总线类型，优先使用可靠硬件序列号；无法建立稳定物理身份时拒绝清盘。
   - 应用镜像阶段只显示可靠的已用时间。
+
+- **反馈**
+  - 设置中的“反馈”会直接打开项目的 [GitHub Issue 创建页面](https://github.com/intelfans/WinDeployStudio/issues/new)。
+  - 安装盘或 To Go 确实以失败状态结束时，结果页面会显示“报告此次失败”；成功完成和用户主动取消不会触发该按钮。
 
 - **原生磁盘测试**
   - 使用 Windows 原生无缓冲、写穿透 I/O，而不是容易受缓存影响的文件复制测速。
@@ -433,6 +441,7 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
   - 用于 Windows 部署问答、日志分析和排障建议。
   - 对“这个 USB 适合制作随身系统吗？”和“分析 USB”支持多选已保存的磁盘测试记录，以纯文本发送设备数据、运行参数、工作负载、采样点和指标解释。
   - 使用前显示 AI 内容提示。
+  - 内置服务和所有自定义端点均执行同一套本地输出安全策略。服务端正文与来源标题会先完整缓存在本机，只有通过客户端筛查后才会显示；政治、色情、暴力、仇恨、极端主义、非法毒品、赌博及明确犯罪内容不会以流式片段进入对话。
   - 支持用户自行配置的任意兼容 OpenAI 的 HTTPS AI 服务端点。
   - 支持填写 API Key，并使用 Windows 用户级加密保护；模型可手动输入，也可从服务端点的 `/models` 列表选择。
   - 凭据只发送到用户明确配置的端点，内置服务不会接收用户 API Key；更改或恢复默认端点会清除已保存的密钥。

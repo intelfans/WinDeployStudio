@@ -74,7 +74,10 @@ class DiskInfo {
     }
 
     for (final letter in driveLetters) {
-      final normalized = letter.trim().replaceAll(':', '').toUpperCase();
+      final normalized = letter
+          .trim()
+          .replaceAll(RegExp(r'[:\\]'), '')
+          .toUpperCase();
       if (normalized.length == 1) return normalized;
     }
     return null;
@@ -100,28 +103,32 @@ class DiskInfo {
       return false;
     }
 
+    if (!_hasMatchingModelAndBus(other)) return false;
+
+    // A selected-disk refresh can expose a different subset of Windows
+    // Storage properties (for example, Get-Disk may omit a bridge serial
+    // that was present during the initial inventory). Compare every identity
+    // that is available on both snapshots, while rejecting conflicting
+    // values. This preserves the physical-disk guard without turning a
+    // missing optional property into a false rejection.
     final thisSerial = _normalizedIdentityValue(serialNumber);
     final otherSerial = _normalizedIdentityValue(other.serialNumber);
-    if (_isReliableIdentityValue(thisSerial)) {
-      return _isReliableIdentityValue(otherSerial) &&
-          thisSerial == otherSerial &&
-          _hasMatchingModelAndBus(other);
+    if (_isReliableIdentityValue(thisSerial) &&
+        _isReliableIdentityValue(otherSerial)) {
+      return thisSerial == otherSerial;
     }
 
     final thisUniqueId = _normalizedIdentityValue(uniqueId);
     final otherUniqueId = _normalizedIdentityValue(other.uniqueId);
-    if (_isReliableIdentityValue(thisUniqueId)) {
-      return _isReliableIdentityValue(otherUniqueId) &&
-          thisUniqueId == otherUniqueId &&
-          _hasMatchingModelAndBus(other);
+    if (_isReliableIdentityValue(thisUniqueId) &&
+        _isReliableIdentityValue(otherUniqueId)) {
+      return thisUniqueId == otherUniqueId;
     }
 
     final thisPath = _normalizedIdentityValue(devicePath);
     final otherPath = _normalizedIdentityValue(other.devicePath);
-    if (_isReliableDevicePath(thisPath)) {
-      return _isReliableDevicePath(otherPath) &&
-          thisPath == otherPath &&
-          _hasMatchingModelAndBus(other);
+    if (_isReliableDevicePath(thisPath) && _isReliableDevicePath(otherPath)) {
+      return thisPath == otherPath;
     }
 
     return false;
@@ -375,6 +382,15 @@ final diskSafetyServiceProvider = Provider<DiskSafetyService>((ref) {
 });
 
 class DiskSafetyService {
+  static const _nativeDiskHelperName = 'wds_disk_diagnostics_helper.exe';
+  Process? _driveLetterEnumerationProcess;
+  Timer? _driveLetterEnumerationTimeout;
+  Completer<ProcessResult>? _driveLetterEnumerationCompleter;
+  Future<Set<String>>? _driveLetterEnumerationFuture;
+
+  static const _processCleanupTimeout = Duration(seconds: 3);
+  static const _processOutputTimeout = Duration(seconds: 2);
+
   static const _secureDirectoryAclScript = r'''
 $ErrorActionPreference = 'Stop'
 $path = $env:WDS_SECURE_PATH
@@ -592,7 +608,17 @@ Write-Output 'WDS_DISK_INITIALIZED'
     try {
       return await _queryAllDisks();
     } catch (_) {
-      return [];
+      // Storage PowerShell can be unavailable during the first seconds after
+      // a USB device is attached, or when a bridge blocks one of its cmdlets.
+      // The native helper only uses bounded read-only IOCTLs for inventory and
+      // is a reliable fallback instead of presenting a false empty list.
+      try {
+        return await _queryAllDisksWithNativeHelper();
+      } catch (_) {
+        // Keep the existing non-throwing contract for callers that render an
+        // empty state when both inventory providers are unavailable.
+        return [];
+      }
     }
   }
 
@@ -615,18 +641,112 @@ Write-Output 'WDS_DISK_INITIALIZED'
     }).toList();
   }
 
+  /// Returns drive letters currently exposed by local, virtual, and network
+  /// file-system providers. The creator uses this to avoid offering a letter
+  /// that Windows would reject during DiskPart assignment.
+  Future<Set<String>> getUsedDriveLetters() {
+    final active = _driveLetterEnumerationFuture;
+    if (active != null) return active;
+    final future = _enumerateUsedDriveLetters();
+    _driveLetterEnumerationFuture = future;
+    unawaited(
+      future.whenComplete(() {
+        if (identical(_driveLetterEnumerationFuture, future)) {
+          _driveLetterEnumerationFuture = null;
+        }
+      }),
+    );
+    return future;
+  }
+
+  Future<Set<String>> _enumerateUsedDriveLetters() async {
+    try {
+      final process = await Process.start(
+        WindowsSystemEnvironment.powerShellExecutable,
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'''@(
+  Get-Volume -ErrorAction SilentlyContinue | Where-Object DriveLetter | ForEach-Object { $_.DriveLetter }
+  Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+) | ForEach-Object { $_.ToString().ToUpperInvariant() } | Sort-Object -Unique''',
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      );
+      _driveLetterEnumerationProcess = process;
+      final stdoutFuture = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .join();
+      final stderrFuture = process.stderr
+          .transform(const SystemEncoding().decoder)
+          .join();
+      final completer = Completer<ProcessResult>();
+      _driveLetterEnumerationCompleter = completer;
+      process.exitCode.then((exitCode) async {
+        final result = ProcessResult(
+          process.pid,
+          exitCode,
+          await stdoutFuture,
+          await stderrFuture,
+        );
+        if (!completer.isCompleted) completer.complete(result);
+      });
+      _driveLetterEnumerationTimeout = Timer(const Duration(seconds: 15), () {
+        unawaited(_terminateProcessTree(process));
+        if (!completer.isCompleted) {
+          completer.complete(
+            ProcessResult(process.pid, -1, '', 'Drive-letter query timed out.'),
+          );
+        }
+      });
+      final result = await completer.future;
+      if (result.exitCode != 0) return const <String>{};
+      return result.stdout
+          .toString()
+          .split(RegExp(r'\r?\n'))
+          .map((value) => value.replaceAll(':', '').trim().toUpperCase())
+          .where((value) => RegExp(r'^[D-Z]$').hasMatch(value))
+          .toSet();
+    } catch (_) {
+      // An unavailable enumeration must not block the creator. DiskPart still
+      // validates the selected letter under the target-disk safety guard.
+      return const <String>{};
+    } finally {
+      _driveLetterEnumerationTimeout?.cancel();
+      _driveLetterEnumerationTimeout = null;
+      _driveLetterEnumerationProcess = null;
+      _driveLetterEnumerationCompleter = null;
+    }
+  }
+
+  void cancelUsedDriveLetters() {
+    _driveLetterEnumerationTimeout?.cancel();
+    _driveLetterEnumerationTimeout = null;
+    final process = _driveLetterEnumerationProcess;
+    // Cancellation is normally triggered while a widget is being disposed.
+    // Kill the short-lived query synchronously here so disposal does not leave
+    // a background taskkill process or timer behind.  Timeout paths still use
+    // _terminateProcessTree to clean up descendants.
+    if (process != null) {
+      try {
+        process.kill(ProcessSignal.sigkill);
+      } catch (_) {}
+    }
+    final completer = _driveLetterEnumerationCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(ProcessResult(0, -1, '', 'Enumeration cancelled.'));
+    }
+  }
+
   Future<SafetyCheckResult> checkDiskSafety(DiskInfo disk) async {
     try {
-      final disks = await _queryAllDisks();
-      final current = disks.where((item) => item.diskNumber == disk.diskNumber);
-      if (current.isEmpty) {
-        return const SafetyCheckResult(
-          isSafe: false,
-          reason: 'safety_disk_missing',
-        );
-      }
-
-      final currentDisk = current.single;
+      // A complete Storage inventory can block on an unrelated USB bridge.
+      // Once the user has selected a disk, query only that disk so a slow
+      // sibling cannot prevent a safe target from being selected.
+      final currentDisk = await _queryDiskByNumber(disk);
       if (!disk.hasSamePhysicalIdentity(currentDisk)) {
         return const SafetyCheckResult(
           isSafe: false,
@@ -634,11 +754,22 @@ Write-Output 'WDS_DISK_INITIALIZED'
         );
       }
 
-      return await _checkCurrentDiskSafety(currentDisk);
-    } catch (_) {
-      return const SafetyCheckResult(
+      return await _checkCurrentDiskSafety(
+        currentDisk,
+        fallbackDriveLetters: disk.driveLetters,
+      );
+    } catch (error) {
+      final detail = _formatSafetyDiagnostic(error);
+      if (detail.isEmpty) {
+        return const SafetyCheckResult(
+          isSafe: false,
+          reason: 'safety_detection_failed',
+        );
+      }
+      return SafetyCheckResult(
         isSafe: false,
-        reason: 'safety_detection_failed',
+        reason: 'safety_detection_failed_detail',
+        params: {'detail': _safetyDiagnosticToken(detail)},
       );
     }
   }
@@ -683,7 +814,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
           FileSystemEntityType.link) {
         return ProcessResult(0, -1, '', 'Secure script storage is a link.');
       }
-      final acl = await Process.run(
+      final acl = await _runProcessWithTimeout(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -696,9 +827,17 @@ Write-Output 'WDS_DISK_INITIALIZED'
         environment: WindowsSystemEnvironment.withSystemRoot({
           'WDS_SECURE_PATH': secureDirectory.path,
         }),
-      ).timeout(const Duration(seconds: 30));
+        timeout: const Duration(seconds: 30),
+        timeoutMessage: 'Secure script ACL setup timed out after 30 seconds.',
+      );
       if (acl.exitCode != 0) {
-        return ProcessResult(0, -1, '', 'Secure script ACL setup failed.');
+        final detail = _firstProcessDetail(acl);
+        return ProcessResult(
+          acl.pid,
+          -1,
+          acl.stdout.toString(),
+          detail.isEmpty ? 'Secure script ACL setup failed.' : detail,
+        );
       }
     } catch (error) {
       return ProcessResult(0, -1, '', 'Secure script setup failed: $error');
@@ -736,9 +875,8 @@ Write-Output 'WDS_DISK_INITIALIZED'
       'WDS_DISKPART_SHA256': scriptHash,
     });
 
-    Process? process;
     try {
-      process = await Process.start(
+      return await _runProcessWithTimeout(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -748,31 +886,11 @@ Write-Output 'WDS_DISK_INITIALIZED'
           _guardedDiskpartScript,
         ],
         environment: environment,
+        timeout: timeout,
+        timeoutMessage: 'DiskPart timed out.',
       );
-      final stdoutFuture = process.stdout
-          .transform(const SystemEncoding().decoder)
-          .join();
-      final stderrFuture = process.stderr
-          .transform(const SystemEncoding().decoder)
-          .join();
-      final exitCode = await process.exitCode.timeout(timeout);
-      return ProcessResult(
-        process.pid,
-        exitCode,
-        await stdoutFuture,
-        await stderrFuture,
-      );
-    } on TimeoutException {
-      if (process != null) {
-        await Process.run(
-          WindowsSystemEnvironment.taskkillExecutable,
-          ['/F', '/T', '/PID', '${process.pid}'],
-          environment: WindowsSystemEnvironment.withSystemRoot(),
-        );
-      }
-      return ProcessResult(process?.pid ?? 0, -1, '', 'DiskPart timed out.');
     } catch (error) {
-      return ProcessResult(process?.pid ?? 0, -1, '', error.toString());
+      return ProcessResult(0, -1, '', error.toString());
     } finally {
       try {
         if (await diskpartFile.exists()) await diskpartFile.delete();
@@ -809,9 +927,8 @@ Write-Output 'WDS_DISK_INITIALIZED'
       'WDS_DISK_PATH': disk.reliableDevicePath,
       'WDS_PARTITION_STYLE': targetStyle,
     });
-    Process? process;
     try {
-      process = await Process.start(
+      final result = await _runProcessWithTimeout(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -821,46 +938,29 @@ Write-Output 'WDS_DISK_INITIALIZED'
           _guardedDiskInitializationScript,
         ],
         environment: environment,
+        timeout: timeout,
+        timeoutMessage: 'Disk initialization timed out.',
       );
-      final stdoutFuture = process.stdout
-          .transform(const SystemEncoding().decoder)
-          .join();
-      final stderrFuture = process.stderr
-          .transform(const SystemEncoding().decoder)
-          .join();
-      int exitCode;
-      try {
-        exitCode = await process.exitCode.timeout(timeout);
-      } on TimeoutException {
-        await Process.run(
-          WindowsSystemEnvironment.taskkillExecutable,
-          ['/F', '/T', '/PID', '${process.pid}'],
-          environment: WindowsSystemEnvironment.withSystemRoot(),
-        );
+      final stdout = result.stdout.toString();
+      final stderr = result.stderr.toString();
+      if (result.exitCode == 0 && !stdout.contains('WDS_DISK_INITIALIZED')) {
         return ProcessResult(
-          process.pid,
-          -1,
-          await stdoutFuture,
-          '${await stderrFuture}\nDisk initialization timed out.',
-        );
-      }
-      final stdout = await stdoutFuture;
-      final stderr = await stderrFuture;
-      if (exitCode == 0 && !stdout.contains('WDS_DISK_INITIALIZED')) {
-        return ProcessResult(
-          process.pid,
+          result.pid,
           -1,
           stdout,
           '$stderr\nDisk initialization did not confirm completion.',
         );
       }
-      return ProcessResult(process.pid, exitCode, stdout, stderr);
+      return result;
     } catch (error) {
-      return ProcessResult(process?.pid ?? 0, -1, '', error.toString());
+      return ProcessResult(0, -1, '', error.toString());
     }
   }
 
-  Future<SafetyCheckResult> _checkCurrentDiskSafety(DiskInfo disk) async {
+  Future<SafetyCheckResult> _checkCurrentDiskSafety(
+    DiskInfo disk, {
+    List<String> fallbackDriveLetters = const [],
+  }) async {
     if (!_isExternalMedia(disk)) {
       return const SafetyCheckResult(
         isSafe: false,
@@ -886,14 +986,15 @@ Write-Output 'WDS_DISK_INITIALIZED'
       return const SafetyCheckResult(isSafe: false, reason: 'safety_boot_disk');
     }
 
-    final windowsDrive = await _getWindowsDriveLetter();
-    if (windowsDrive == null) {
-      return const SafetyCheckResult(
-        isSafe: false,
-        reason: 'safety_detection_failed',
-      );
-    }
-    if (disk.driveLetters.contains(windowsDrive)) {
+    final knownDriveLetters = {...disk.driveLetters, ...fallbackDriveLetters}
+        .map(
+          (letter) =>
+              letter.trim().replaceAll(RegExp(r'[:\\]'), '').toUpperCase(),
+        )
+        .where((letter) => letter.length == 1)
+        .toSet();
+    final windowsDrive = _getWindowsDriveLetter();
+    if (knownDriveLetters.contains(windowsDrive)) {
       return SafetyCheckResult(
         isSafe: false,
         reason: 'safety_windows_install',
@@ -912,32 +1013,60 @@ Write-Output 'WDS_DISK_INITIALIZED'
         disk.isRemovable;
   }
 
-  Future<String?> _getWindowsDriveLetter() async {
-    try {
-      final result = await Process.run(
-        WindowsSystemEnvironment.powerShellExecutable,
-        ['-NoProfile', '-Command', r'$env:SystemDrive'],
-        environment: WindowsSystemEnvironment.withSystemRoot(),
-      ).timeout(const Duration(seconds: 5));
-      if (result.exitCode == 0) {
-        return result.stdout.toString().trim().replaceAll(':', '');
-      }
-    } catch (_) {}
-    return null;
+  String _getWindowsDriveLetter() {
+    final candidates = <String?>[
+      Platform.environment['SystemDrive'],
+      Platform.environment['SystemRoot'],
+      Platform.environment['WINDIR'],
+      WindowsSystemEnvironment.systemRoot,
+    ];
+    for (final candidate in candidates) {
+      final normalized = candidate?.trim().replaceAll('/', '\\') ?? '';
+      final match = RegExp(r'^([A-Za-z]):(?:\\|$)').firstMatch(normalized);
+      if (match != null) return match.group(1)!.toUpperCase();
+    }
+    throw StateError('Windows system drive is unavailable.');
+  }
+
+  static String _firstProcessDetail(ProcessResult result) {
+    final stderr = result.stderr.toString().trim();
+    if (stderr.isNotEmpty) return stderr;
+    return result.stdout.toString().trim();
+  }
+
+  static String _formatSafetyDiagnostic(Object error) {
+    var detail = error.toString().trim();
+    detail = detail.replaceFirst(
+      RegExp(r'^(Bad state: |StateError: |TimeoutException: )'),
+      '',
+    );
+    detail = detail.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (detail.length > 260) {
+      detail = '${detail.substring(0, 257)}...';
+    }
+    return detail;
   }
 
   Future<List<DiskInfo>> _queryAllDisks() async {
-    final result = await Process.run(
-      WindowsSystemEnvironment.powerShellExecutable,
-      [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        _getAllDisksScript,
-      ],
-      environment: WindowsSystemEnvironment.withSystemRoot(),
-    ).timeout(const Duration(seconds: 10));
+    late final ProcessResult result;
+    try {
+      result = await _runProcessWithTimeout(
+        WindowsSystemEnvironment.powerShellExecutable,
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          _getAllDisksScript,
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+        timeout: const Duration(seconds: 10),
+        timeoutMessage: 'Disk inventory query timed out after 10 seconds.',
+      );
+    } on ProcessException catch (error) {
+      throw StateError('Disk inventory query could not start: $error');
+    }
 
     if (result.exitCode != 0) {
       throw StateError('Disk enumeration failed: ${result.stderr}');
@@ -949,7 +1078,321 @@ Write-Output 'WDS_DISK_INITIALIZED'
     return disks;
   }
 
+  Future<DiskInfo> _queryDiskByNumber(DiskInfo snapshot) async {
+    final nativeHelper = _nativeHelperFile();
+    if (await nativeHelper.exists()) {
+      return _queryDiskWithNativeHelper(nativeHelper.path, snapshot);
+    }
+    return _queryDiskByNumberWithPowerShell(snapshot.diskNumber);
+  }
+
+  File _nativeHelperFile() => File(
+    '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}$_nativeDiskHelperName',
+  );
+
+  Future<List<DiskInfo>> _queryAllDisksWithNativeHelper() async {
+    final nativeHelper = _nativeHelperFile();
+    if (!await nativeHelper.exists()) {
+      throw StateError('Native disk inventory helper is unavailable.');
+    }
+
+    late final ProcessResult result;
+    try {
+      result = await _runProcessWithTimeout(
+        nativeHelper.path,
+        const ['--inventory'],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+        timeout: const Duration(seconds: 18),
+        timeoutMessage:
+            'Native disk inventory query timed out after 18 seconds.',
+      );
+    } on ProcessException catch (error) {
+      throw StateError('Native disk inventory query could not start: $error');
+    }
+    if (result.exitCode != 0) {
+      throw StateError('Native disk inventory query failed: ${result.stderr}');
+    }
+
+    final output = result.stdout.toString().trim();
+    if (output.isEmpty) {
+      throw StateError('Native disk inventory returned no data.');
+    }
+    final decoded = jsonDecode(output);
+    if (decoded is! Map) {
+      throw StateError('Native disk inventory returned invalid data.');
+    }
+    final reports = decoded['reports'];
+    if (reports is! List) {
+      throw StateError('Native disk inventory returned no reports.');
+    }
+
+    final disks = <DiskInfo>[];
+    for (final report in reports) {
+      final disk = _parseNativeInventoryDisk(report);
+      if (disk != null) disks.add(disk);
+    }
+    if (disks.isEmpty) {
+      throw StateError('Native disk inventory returned no usable disks.');
+    }
+    return disks;
+  }
+
+  DiskInfo? _parseNativeInventoryDisk(dynamic value) {
+    if (value is! Map) return null;
+    final data = Map<String, dynamic>.from(value);
+    if (_readNullableBool(data['present']) == false) return null;
+
+    final diskNumber = _readInt(data['diskNumber']);
+    final sizeBytes = _readInt(data['sizeBytes']);
+    final model = data['model']?.toString().trim() ?? '';
+    final busType = data['busType']?.toString().trim() ?? '';
+    if (diskNumber < 0 || sizeBytes <= 0 || model.isEmpty || busType.isEmpty) {
+      return null;
+    }
+
+    final driveLetters = _parseDriveLetters(data['driveLetters']);
+    return DiskInfo(
+      diskNumber: diskNumber,
+      model: model,
+      friendlyName: model,
+      sizeBytes: sizeBytes,
+      sizeFormatted: _formatSize(sizeBytes),
+      serialNumber: data['serialNumber']?.toString() ?? '',
+      uniqueId: data['uniqueId']?.toString() ?? '',
+      devicePath: data['devicePath']?.toString() ?? '',
+      busType: busType,
+      partitionStyle: data['partitionStyle']?.toString() ?? 'Unknown',
+      isSystem: _readNullableBool(data['isSystem']) ?? false,
+      isBoot: _readNullableBool(data['isBoot']) ?? false,
+      isOffline: _readNullableBool(data['isOffline']) ?? false,
+      isRemovable:
+          _readNullableBool(data['isRemovable']) ??
+          const {'USB', 'SD', 'MMC'}.contains(busType.toUpperCase()),
+      driveLetters: driveLetters,
+    );
+  }
+
+  Future<DiskInfo> _queryDiskWithNativeHelper(
+    String helperPath,
+    DiskInfo snapshot,
+  ) async {
+    late final ProcessResult result;
+    try {
+      result = await _runProcessWithTimeout(
+        helperPath,
+        ['--identity', '${snapshot.diskNumber}'],
+        environment: WindowsSystemEnvironment.withSystemRoot({
+          'WDS_DISK_NUMBER': '${snapshot.diskNumber}',
+        }),
+        timeout: const Duration(seconds: 20),
+        timeoutMessage:
+            'Native selected disk query timed out after 20 seconds.',
+      );
+    } on ProcessException catch (error) {
+      throw StateError('Native selected disk query could not start: $error');
+    }
+
+    if (result.exitCode != 0) {
+      throw StateError('Native selected disk query failed: ${result.stderr}');
+    }
+    final output = result.stdout.toString().trim();
+    if (output.isEmpty) {
+      throw StateError('Native selected disk query returned no data');
+    }
+    try {
+      final decoded = jsonDecode(output);
+      if (decoded is! Map) throw const FormatException();
+      return _parseNativeDiskInfo(Map<String, dynamic>.from(decoded), snapshot);
+    } on FormatException {
+      throw StateError('Native selected disk query returned invalid data');
+    }
+  }
+
+  DiskInfo _parseNativeDiskInfo(Map<String, dynamic> data, DiskInfo snapshot) {
+    final diskNumber = _readInt(data['diskNumber']);
+    final sizeBytes = _readInt(data['sizeBytes']);
+    final model = data['model']?.toString().trim() ?? '';
+    final busType = data['busType']?.toString().trim() ?? '';
+    if (diskNumber != snapshot.diskNumber ||
+        sizeBytes <= 0 ||
+        model.isEmpty ||
+        busType.isEmpty) {
+      throw StateError(
+        'Native selected disk query returned incomplete identity',
+      );
+    }
+
+    final nativeDriveLetters = _parseDriveLetters(data['driveLetters']);
+    return DiskInfo(
+      diskNumber: diskNumber,
+      model: model,
+      friendlyName: model,
+      sizeBytes: sizeBytes,
+      sizeFormatted: _formatSize(sizeBytes),
+      serialNumber: data['serialNumber']?.toString() ?? '',
+      uniqueId: data['uniqueId']?.toString() ?? '',
+      devicePath: data['devicePath']?.toString() ?? '',
+      busType: busType,
+      partitionStyle:
+          data['partitionStyle']?.toString() ?? snapshot.partitionStyle,
+      isSystem: _readNullableBool(data['isSystem']) ?? snapshot.isSystem,
+      isBoot: _readNullableBool(data['isBoot']) ?? snapshot.isBoot,
+      isOffline: _readNullableBool(data['isOffline']) ?? snapshot.isOffline,
+      isRemovable:
+          _readNullableBool(data['isRemovable']) ?? snapshot.isRemovable,
+      driveLetters: nativeDriveLetters.isEmpty
+          ? snapshot.driveLetters
+          : nativeDriveLetters,
+      partitions: snapshot.partitions,
+    );
+  }
+
+  Future<DiskInfo> _queryDiskByNumberWithPowerShell(int diskNumber) async {
+    late final ProcessResult result;
+    try {
+      result = await _runProcessWithTimeout(
+        WindowsSystemEnvironment.powerShellExecutable,
+        const [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          _getDiskByNumberScript,
+        ],
+        environment: WindowsSystemEnvironment.withSystemRoot({
+          'WDS_DISK_NUMBER': '$diskNumber',
+        }),
+        timeout: const Duration(seconds: 10),
+        timeoutMessage: 'Selected disk query timed out after 10 seconds.',
+      );
+    } on ProcessException catch (error) {
+      throw StateError('Selected disk query could not start: $error');
+    }
+
+    if (result.exitCode != 0) {
+      throw StateError('Selected disk query failed: ${result.stderr}');
+    }
+    final output = result.stdout.toString().trim();
+    if (output.isEmpty) {
+      throw StateError('Selected disk query returned no data');
+    }
+    final disks = _parseDisks(output);
+    if (disks.length != 1) {
+      throw StateError('Selected disk query returned an invalid result');
+    }
+    return disks.single;
+  }
+
+  static String _safetyDiagnosticToken(String detail) {
+    final normalized = detail.toLowerCase();
+    if (normalized.contains('timed out')) {
+      return 'i18n:safety_detail_storage_timeout';
+    }
+    return 'i18n:safety_detail_storage_unavailable';
+  }
+
+  Future<ProcessResult> _runProcessWithTimeout(
+    String executable,
+    List<String> arguments, {
+    required Map<String, String> environment,
+    required Duration timeout,
+    required String timeoutMessage,
+  }) async {
+    final process = await Process.start(
+      executable,
+      arguments,
+      environment: environment,
+    );
+    final stdoutFuture = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .join();
+    final stderrFuture = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .join();
+
+    try {
+      final exitCode = await process.exitCode.timeout(timeout);
+      return ProcessResult(
+        process.pid,
+        exitCode,
+        await _readProcessOutput(stdoutFuture),
+        await _readProcessOutput(stderrFuture),
+      );
+    } on TimeoutException {
+      await _terminateProcessTree(process);
+      final stdout = await _readProcessOutput(stdoutFuture);
+      final stderr = await _readProcessOutput(stderrFuture);
+      final detail = stderr.trim();
+      return ProcessResult(
+        process.pid,
+        -1,
+        stdout,
+        detail.isEmpty ? timeoutMessage : '$detail\n$timeoutMessage',
+      );
+    }
+  }
+
+  Future<String> _readProcessOutput(Future<String> output) async {
+    try {
+      return await output.timeout(_processOutputTimeout, onTimeout: () => '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Future<void> _terminateProcessTree(Process process) async {
+    try {
+      final killer = await Process.start(
+        WindowsSystemEnvironment.taskkillExecutable,
+        ['/F', '/T', '/PID', '${process.pid}'],
+        environment: WindowsSystemEnvironment.withSystemRoot(),
+      );
+      final killerOutput = Future.wait<void>([
+        killer.stdout.drain<void>(),
+        killer.stderr.drain<void>(),
+      ]);
+      try {
+        await killer.exitCode.timeout(
+          _processCleanupTimeout,
+          onTimeout: () {
+            try {
+              killer.kill(ProcessSignal.sigkill);
+            } catch (_) {}
+            return -1;
+          },
+        );
+      } finally {
+        try {
+          await killerOutput.timeout(
+            _processCleanupTimeout,
+            onTimeout: () => <void>[],
+          );
+        } catch (_) {}
+      }
+    } catch (_) {
+      // The direct kill below still handles a PowerShell process when taskkill
+      // is unavailable or itself cannot finish within the cleanup window.
+    }
+    try {
+      process.kill(ProcessSignal.sigkill);
+    } catch (_) {}
+    try {
+      await process.exitCode.timeout(
+        _processCleanupTimeout,
+        onTimeout: () => -1,
+      );
+    } catch (_) {}
+  }
+
   static const String _getAllDisksScript = r'''
+$physicalByDevice = @{}
+try {
+  Get-PhysicalDisk -ErrorAction Stop | ForEach-Object {
+    $physicalByDevice[$_.DeviceId.ToString()] = $_
+  }
+} catch {}
+
   Get-Disk | ForEach-Object {
     $disk = $_
     $partitions = @(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue)
@@ -963,11 +1406,10 @@ Write-Output 'WDS_DISK_INITIALIZED'
         IsActive    = [bool]$_.IsActive
       }
     })
-    $serial = ''
-    try {
-      $phys = Get-PhysicalDisk | Where-Object { $_.DeviceId -eq $disk.Number.ToString() }
-      if ($phys) { $serial = $phys.SerialNumber }
-    } catch {}
+    $serial = if ($disk.SerialNumber) { $disk.SerialNumber.ToString() } else { '' }
+    if (-not $serial -and $physicalByDevice.ContainsKey($disk.Number.ToString())) {
+      $serial = $physicalByDevice[$disk.Number.ToString()].SerialNumber
+    }
     [PSCustomObject]@{
       DiskNumber    = $disk.Number
       Model         = $disk.FriendlyName
@@ -987,6 +1429,31 @@ Write-Output 'WDS_DISK_INITIALIZED'
     }
   } | ConvertTo-Json -Depth 5 -Compress
   ''';
+
+  static const String _getDiskByNumberScript = r'''
+$targetNumber = [int]$env:WDS_DISK_NUMBER
+$disk = Get-Disk -Number $targetNumber -ErrorAction Stop
+$serial = if ($disk.SerialNumber) { $disk.SerialNumber.ToString() } else { '' }
+[PSCustomObject]@{
+  DiskNumber     = $disk.Number
+  Model          = $disk.FriendlyName
+  FriendlyName   = $disk.FriendlyName
+  SizeBytes      = $disk.Size
+  SerialNumber   = $serial
+  UniqueId       = if ($disk.UniqueId) { $disk.UniqueId.ToString() } else { '' }
+  DevicePath     = if ($disk.Path) { $disk.Path.ToString() } else { '' }
+  BusType        = $disk.BusType.ToString()
+  PartitionStyle = $disk.PartitionStyle.ToString()
+  IsSystem       = $disk.IsSystem
+  IsBoot         = $disk.IsBoot
+  IsOffline      = $disk.IsOffline
+  IsRemovable    = $disk.IsRemovable
+  # Partition enumeration is deliberately excluded from the safety refresh:
+  # some USB bridges block partition enumeration even when Get-Disk is responsive.
+  DriveLetters   = @()
+  Partitions     = @()
+} | ConvertTo-Json -Depth 5 -Compress
+''';
 
   List<DiskInfo> _parseDisks(String json) {
     try {
@@ -1040,7 +1507,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
     final seen = <String>{};
     final letters = <String>[];
     for (final item in raw) {
-      final letter = item.trim().replaceAll(':', '').toUpperCase();
+      final letter = item.trim().replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
       if (letter.length == 1 && seen.add(letter)) {
         letters.add(letter);
       }
@@ -1080,6 +1547,14 @@ Write-Output 'WDS_DISK_INITIALIZED'
     if (value is bool) return value;
     final text = value?.toString().toLowerCase();
     return text == 'true' || text == '1';
+  }
+
+  bool? _readNullableBool(dynamic value) {
+    if (value is bool) return value;
+    final text = value?.toString().trim().toLowerCase();
+    if (text == 'true' || text == '1') return true;
+    if (text == 'false' || text == '0') return false;
+    return null;
   }
 
   String _formatSize(int bytes) {

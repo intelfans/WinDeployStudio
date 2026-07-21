@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/linux_media_preflight.dart';
 import '../../../core/services/bootable_usb_service.dart';
+import '../../../core/services/operation_status_service.dart';
 import '../../../shared/widgets/known_iso_verification_panel.dart';
 import '../../deployment/models/deployment_plan.dart';
 import '../../logs/services/log_center_service.dart';
@@ -15,6 +18,24 @@ import '../models/creator_progress_message.dart';
 import '../models/creator_task_progress.dart';
 
 enum _CreatorPlatform { windows, linux }
+
+List<String> availableCreatorDriveLetters({
+  required Iterable<String> usedLetters,
+  required Iterable<String> targetLetters,
+}) {
+  Set<String> normalize(Iterable<String> values) => values
+      .map(
+        (value) => value.replaceAll(RegExp(r'[:\\]'), '').trim().toUpperCase(),
+      )
+      .where((value) => RegExp(r'^[D-Z]$').hasMatch(value))
+      .toSet();
+
+  final used = normalize(usedLetters);
+  final target = normalize(targetLetters);
+  return List.generate(23, (index) => String.fromCharCode(68 + index))
+      .where((letter) => !used.contains(letter) || target.contains(letter))
+      .toList(growable: false);
+}
 
 class CreatorScreen extends ConsumerStatefulWidget {
   const CreatorScreen({super.key});
@@ -25,6 +46,7 @@ class CreatorScreen extends ConsumerStatefulWidget {
 
 class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   late final IsoParseService _isoParseService;
+  late final DiskSafetyService _diskSafetyService;
   int _currentStep = 0;
   _CreatorPlatform _platform = _CreatorPlatform.windows;
 
@@ -33,6 +55,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   List<DiskInfo> _disks = [];
   bool _isDetecting = false;
+  int _diskDetectionRequest = 0;
+  Set<String> _usedDriveLetters = {};
+  bool _driveLettersLoading = false;
 
   SafetyCheckResult? _safetyResult;
 
@@ -42,6 +67,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   bool _creationCancellable = false;
   bool _creationCancelled = false;
   bool _creationCancelRequested = false;
+  String? _volumeLabelErrorKey;
 
   DeploymentBootMode _bootMode = DeploymentBootMode.uefiGpt;
   String _preferredDriveLetter = '';
@@ -68,7 +94,79 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     // Cache the provider instance while the element is mounted. Riverpod
     // cannot be read from dispose(), after the element has been unmounted.
     _isoParseService = ref.read(isoParseServiceProvider);
+    _diskSafetyService = ref.read(diskSafetyServiceProvider);
+    _restoreInstallMediaActivity();
     _detectDisks();
+  }
+
+  void _restoreInstallMediaActivity() {
+    final activity = ref.read(
+      operationStatusProvider,
+    )[TrackedOperationKind.installMedia];
+    if (activity == null || !activity.active) return;
+    final step = CreateStep.values.firstWhere(
+      (value) => value.name == activity.phase,
+      orElse: () => CreateStep.preparing,
+    );
+    _platform = activity.isLinux
+        ? _CreatorPlatform.linux
+        : _CreatorPlatform.windows;
+    _currentStep = 3;
+    _creationRunning = true;
+    _creationService = ref.read(bootableUsbServiceProvider);
+    _createProgress = CreateProgress(
+      step: step,
+      progress: activity.progress,
+      message: activity.message,
+    );
+  }
+
+  void _applyInstallMediaActivity(
+    Map<TrackedOperationKind, OperationActivity> activities,
+  ) {
+    final activity = activities[TrackedOperationKind.installMedia];
+    if (activity == null) return;
+    final step = CreateStep.values.firstWhere(
+      (value) => value.name == activity.phase,
+      orElse: () => CreateStep.preparing,
+    );
+    if (!mounted) return;
+    if (activity.active) {
+      final next = CreateProgress(
+        step: step,
+        progress: activity.progress,
+        message: activity.message,
+      );
+      if (!_creationRunning ||
+          _createProgress?.progress != next.progress ||
+          _createProgress?.step != next.step ||
+          _createProgress?.message != next.message) {
+        setState(() {
+          _platform = activity.isLinux
+              ? _CreatorPlatform.linux
+              : _CreatorPlatform.windows;
+          _currentStep = 3;
+          _creationRunning = true;
+          _creationService = ref.read(bootableUsbServiceProvider);
+          _createProgress = next;
+          _creationCancellable = activity.cancellable;
+        });
+      }
+      return;
+    }
+    if (_createProgress == null) return;
+    if (!_creationRunning && _createProgress?.step == step) return;
+    setState(() {
+      _creationRunning = false;
+      _creationCancellable = false;
+      _creationService = null;
+      _createProgress = CreateProgress(
+        step: step,
+        progress: activity.progress,
+        message: activity.message,
+      );
+      _currentStep = step == CreateStep.complete ? 4 : 3;
+    });
   }
 
   @override
@@ -91,6 +189,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   @override
   void dispose() {
+    _diskSafetyService.cancelUsedDriveLetters();
     _cancelLinuxInspection();
     unawaited(_isoParseService.cancel());
     _volumeLabelController.dispose();
@@ -99,10 +198,18 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   bool get _isLinuxMode => _platform == _CreatorPlatform.linux;
 
+  void _resetImageOptions() {
+    _bootMode = DeploymentBootMode.uefiGpt;
+    _preferredDriveLetter = '';
+    _customIconPath = '';
+    _volumeLabelController.value = const TextEditingValue(text: 'WINDEPLOY');
+  }
+
   void _setPlatform(_CreatorPlatform platform) {
     if (_platform == platform || _creationRunning) return;
     _cancelLinuxInspection();
     unawaited(ref.read(isoParseServiceProvider).cancel());
+    _resetImageOptions();
     setState(() {
       _platform = platform;
       _currentStep = 0;
@@ -114,6 +221,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       _creationCancellable = false;
       _creationCancelled = false;
       _creationCancelRequested = false;
+      _volumeLabelErrorKey = null;
       _isParsing = false;
       _parseStepText = '';
       _parsePercent = 0;
@@ -125,14 +233,35 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   Future<void> _detectDisks() async {
-    setState(() => _isDetecting = true);
+    final detectionRequest = ++_diskDetectionRequest;
+    final previousSelected = _selectedDisk;
+    setState(() {
+      _isDetecting = true;
+      _driveLettersLoading = false;
+    });
     try {
       final safety = ref.read(diskSafetyServiceProvider);
       final disks = await safety.getRemovableDisks();
-      if (!mounted) return;
+      if (!mounted || detectionRequest != _diskDetectionRequest) return;
+      DiskInfo? refreshedSelected;
+      if (previousSelected != null) {
+        for (final candidate in disks) {
+          if (candidate.diskNumber == previousSelected.diskNumber &&
+              previousSelected.hasSamePhysicalIdentity(candidate)) {
+            refreshedSelected = candidate;
+            break;
+          }
+        }
+      }
       setState(() {
         _disks = disks;
+        if (previousSelected != null) {
+          _selectedDisk = refreshedSelected;
+          _safetyResult = null;
+        }
+        _usedDriveLetters = {};
         _isDetecting = false;
+        _driveLettersLoading = false;
       });
       final logCenter = LogCenterService();
       await logCenter.logUsb('检测到 ${disks.length} 个可移动磁盘');
@@ -143,9 +272,46 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       }
     } catch (e) {
       debugPrint('Detect disks error: $e');
-      if (!mounted) return;
-      setState(() => _isDetecting = false);
+      if (!mounted || detectionRequest != _diskDetectionRequest) return;
+      setState(() {
+        _isDetecting = false;
+        _driveLettersLoading = false;
+      });
     }
+  }
+
+  Future<void> _refreshUsedDriveLetters() async {
+    if (_driveLettersLoading) return;
+    setState(() => _driveLettersLoading = true);
+    try {
+      final usedLetters = await ref
+          .read(diskSafetyServiceProvider)
+          .getUsedDriveLetters();
+      if (!mounted) return;
+      setState(() {
+        _usedDriveLetters = usedLetters;
+        _driveLettersLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _driveLettersLoading = false);
+    }
+  }
+
+  List<String> _preferredDriveLetterOptions() {
+    final targetLetters = <String>[];
+    final selectedDisk = _selectedDisk;
+    if (selectedDisk != null) {
+      targetLetters.addAll(selectedDisk.driveLetters);
+      for (final partition in selectedDisk.partitions) {
+        final raw = partition.driveLetter;
+        if (raw != null) targetLetters.add(raw);
+      }
+    }
+    return availableCreatorDriveLetters(
+      usedLetters: _usedDriveLetters,
+      targetLetters: targetLetters,
+    );
   }
 
   Future<void> _selectIsoFile() async {
@@ -167,6 +333,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
       if (!mounted) return;
 
+      // Volume label, drive-letter preference, icon, and boot mode belong to
+      // the image currently being prepared. Never carry them into a new ISO.
+      _resetImageOptions();
       _cancelLinuxInspection();
       final selectedLinuxMode = _isLinuxMode;
       final selectionRequest = ++_isoSelectionRequest;
@@ -179,6 +348,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _parsePercent = 0;
         _isoSelectionErrorKey = null;
         _selectedIso = null;
+        _selectedDisk = null;
+        _safetyResult = null;
         _linuxIsoInspection = null;
         _knownIsoVerification = null;
       });
@@ -309,6 +480,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           _currentStep = 1;
           _isoSelectionErrorKey = null;
         });
+        unawaited(_detectDisks());
         final logCenter = LogCenterService();
         await logCenter.logIso(
           'Linux ISO 已选择 | 文件: ${linuxMetadata.fileName} | 大小: ${linuxMetadata.displaySize}',
@@ -329,7 +501,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       setState(() => _isParsing = false);
 
       if (!metadata.isValidWindowsIso) {
-        _showIsoSelectionError('creator_invalid_windows_iso');
+        _showIsoSelectionError(
+          metadata.validationErrorKey ?? 'creator_invalid_windows_iso',
+        );
         return;
       }
 
@@ -340,6 +514,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _isoSelectionErrorKey = null;
         _bootMode = _preferredBootModeForIso(metadata!);
       });
+      unawaited(_detectDisks());
       unawaited(
         _verifyKnownIso(metadata.filePath, verificationRequest, selectedLocale),
       );
@@ -375,7 +550,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     if (!iso.canBootLegacy && iso.canBootUefi) {
       return DeploymentBootMode.uefiGpt;
     }
-    return _bootMode;
+    // A new image starts from the safest broadly compatible default. The
+    // user can still choose UEFI+MBR or Legacy BIOS below for this image.
+    return DeploymentBootMode.uefiGpt;
   }
 
   void _showIsoSelectionError(String messageKey) {
@@ -436,7 +613,8 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       setState(() {
         _safetyResult = SafetyCheckResult(
           isSafe: false,
-          reason: '${tr(context, 'creator_safety_failed')}: $e',
+          reason: 'safety_detection_failed_detail',
+          params: const {'detail': 'i18n:safety_detail_storage_unavailable'},
         );
       });
     }
@@ -607,7 +785,19 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       _createProgress = terminal.progress;
       _currentStep = terminal.success ? 4 : 3;
     });
+    if (terminal.success) {
+      // Formatting and mounting can assign the final volume letter slightly
+      // after the writer reports completion. Refresh once the OS has settled
+      // so the next creation starts from current disk metadata.
+      unawaited(_refreshDisksAfterCreation());
+    }
     debugPrint('[WDS] _startCreation: final step = $_currentStep');
+  }
+
+  Future<void> _refreshDisksAfterCreation() async {
+    await Future<void>.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
+    await _detectDisks();
   }
 
   void _cancelCreation() {
@@ -629,6 +819,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<Map<TrackedOperationKind, OperationActivity>>(
+      operationStatusProvider,
+      (_, next) => _applyInstallMediaActivity(next),
+    );
     final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 900;
@@ -639,15 +833,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              tr(
-                context,
-                _isLinuxMode ? 'creator_linux_title' : 'creator_title',
-              ),
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            _buildCreatorHeader(theme, isCompact),
             const SizedBox(height: 8),
             Text(
               tr(
@@ -667,6 +853,41 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCreatorHeader(ThemeData theme, bool isCompact) {
+    final title = Text(
+      tr(context, _isLinuxMode ? 'creator_linux_title' : 'creator_title'),
+      style: theme.textTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final notice = _CreatorNotice(
+      icon: Icons.info_outline,
+      text: tr(
+        context,
+        _isLinuxMode
+            ? 'creator_linux_install_iso_required'
+            : 'creator_windows_install_iso_required',
+      ),
+    );
+    if (isCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [title, const SizedBox(height: 10), notice],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: title),
+        const SizedBox(width: 20),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: notice,
+        ),
+      ],
     );
   }
 
@@ -824,16 +1045,6 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 14),
-              _CreatorNotice(
-                icon: Icons.info_outline,
-                text: tr(
-                  context,
-                  _isLinuxMode
-                      ? 'creator_linux_install_iso_required'
-                      : 'creator_windows_install_iso_required',
-                ),
-              ),
               if (_isoSelectionErrorKey != null) ...[
                 const SizedBox(height: 16),
                 _IsoSelectionError(
@@ -866,7 +1077,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 ],
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed: () => setState(() => _currentStep = 1),
+                  onPressed: () {
+                    setState(() => _currentStep = 1);
+                    unawaited(_detectDisks());
+                  },
                   child: Text(tr(context, 'creator_next_usb')),
                 ),
               ],
@@ -957,6 +1171,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   _selectedDisk = disk;
                   _safetyResult = null; // null = checking
                 });
+                unawaited(_refreshUsedDriveLetters());
                 _checkDiskSafety(disk);
               },
             );
@@ -1061,6 +1276,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                   _LinuxIsoHybridCapabilityPanel(
                     inspection: _linuxIsoInspection!,
                   ),
+                  const SizedBox(height: 12),
                 ],
                 const Divider(),
                 _ConfirmSection(
@@ -1135,17 +1351,24 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                       ],
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        initialValue: _preferredDriveLetter,
+                        initialValue:
+                            _preferredDriveLetterOptions().contains(
+                              _preferredDriveLetter,
+                            )
+                            ? _preferredDriveLetter
+                            : '',
                         decoration: InputDecoration(
                           labelText: tr(context, 'deploy_system_letter'),
+                          helperText: _driveLettersLoading
+                              ? tr(context, 'deploy_drive_letters_checking')
+                              : null,
                         ),
                         items: [
                           DropdownMenuItem(
                             value: '',
                             child: Text(tr(context, 'deploy_auto')),
                           ),
-                          ...List.generate(23, (index) {
-                            final letter = String.fromCharCode(68 + index);
+                          ..._preferredDriveLetterOptions().map((letter) {
                             return DropdownMenuItem(
                               value: letter,
                               child: Text('$letter:'),
@@ -1162,7 +1385,19 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                         maxLength: 11,
                         decoration: InputDecoration(
                           labelText: tr(context, 'deploy_volume_label'),
+                          errorText: _volumeLabelErrorKey == null
+                              ? null
+                              : tr(context, _volumeLabelErrorKey!),
                         ),
+                        onChanged: (value) => setState(() {
+                          _volumeLabelErrorKey =
+                              DeploymentCompatibility.isVolumeLabelValid(
+                                value,
+                                maxLength: 11,
+                              )
+                              ? null
+                              : 'deploy_compat_invalid_volume_label';
+                        }),
                       ),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -1239,7 +1474,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: _showEraseConfirmation,
+                      onPressed: _volumeLabelErrorKey == null
+                          ? _showEraseConfirmation
+                          : null,
                       child: Text(tr(context, 'creator_start')),
                     ),
                   ],
@@ -1283,6 +1520,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     );
     final pct = ((progress?.progress ?? 0) * 100).toInt();
     final isFailed = progress?.step == CreateStep.failed;
+    // Cancellation is an intentional user action, not a reportable creation
+    // failure. Keep the existing failed/cancelled rendering and only add the
+    // feedback action for a genuine terminal failure.
+    final reportableFailure = isFailed && !_creationCancelled;
 
     return Center(
       child: Card(
@@ -1332,6 +1573,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                       child: Text(tr(context, 'creator_back')),
                     ),
                     const SizedBox(width: 12),
+                    if (reportableFailure) ...[
+                      OutlinedButton.icon(
+                        onPressed: _openFeedback,
+                        icon: const Icon(Icons.feedback_outlined),
+                        label: Text(tr(context, 'feedback_report_failure')),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     FilledButton.icon(
                       onPressed: _startCreation,
                       icon: const Icon(Icons.refresh),
@@ -1382,6 +1631,18 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openFeedback() async {
+    final uri = Uri.parse(AppConstants.githubFeedbackUrl);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr(context, 'detail_open_failed'))),
+      );
+    }
   }
 
   String _stepDisplayName(BuildContext context, CreateStep step) {
@@ -1463,6 +1724,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: () {
+                  _resetImageOptions();
                   setState(() {
                     _currentStep = 0;
                     _selectedIso = null;
@@ -1476,6 +1738,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                     _creationCancelled = false;
                     _creationCancelRequested = false;
                   });
+                  unawaited(_detectDisks());
                 },
                 child: Text(tr(context, 'creator_another')),
               ),
@@ -1670,6 +1933,14 @@ class _LinuxIsoHybridCapabilityPanel extends StatelessWidget {
                   height: 1.35,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                tr(context, 'linux_media_boot_menu_notice'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSecondaryContainer,
+                  height: 1.35,
+                ),
+              ),
             ],
           ),
         ),
@@ -1825,7 +2096,10 @@ class _DiskCard extends StatelessWidget {
     var localized = tr(context, result.reason);
     if (params != null) {
       for (final entry in params.entries) {
-        localized = localized.replaceAll('{${entry.key}}', entry.value);
+        final value = entry.value.startsWith('i18n:')
+            ? resolveCreatorDiagnostic(entry.value, (key) => tr(context, key))
+            : entry.value;
+        localized = localized.replaceAll('{${entry.key}}', value);
       }
     }
     return localized;
@@ -1835,6 +2109,19 @@ class _DiskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isSafe = safetyResult?.isSafe ?? true;
+    final driveLetters =
+        disk.driveLetters
+            .map(
+              (letter) =>
+                  letter.trim().replaceAll(RegExp(r'[:\\]'), '').toUpperCase(),
+            )
+            .where((letter) => letter.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final driveLettersText = driveLetters.isEmpty
+        ? tr(context, 'creator_no_drive_letter')
+        : '${tr(context, 'creator_drive_letters')} ${driveLetters.map((letter) => '$letter:').join(', ')}';
 
     return Card(
       color: isSelected
@@ -1871,6 +2158,13 @@ class _DiskCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${disk.sizeFormatted}  |  ${tr(context, 'creator_sn_prefix')} ${disk.serialNumber}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      driveLettersText,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

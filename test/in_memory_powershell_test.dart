@@ -315,6 +315,34 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
     );
   });
 
+  test('Linux raw install-media completion explains the native ISO layout', () {
+    final source = File(
+      'lib/core/services/bootable_usb_service.dart',
+    ).readAsStringSync();
+    final creationStart = source.indexOf('Future<bool> createLinuxIsoUsb');
+    final rawSuccess = source.indexOf(
+      "? 'linux_media_raw_complete'",
+      creationStart,
+    );
+
+    expect(creationStart, greaterThanOrEqualTo(0));
+    expect(rawSuccess, greaterThan(creationStart));
+    expect(
+      source.substring(creationStart, rawSuccess),
+      contains("? 'linux_complete'"),
+      reason: 'Linux To Go keeps its separate completion message',
+    );
+  });
+
+  test('Linux capability panel explains duplicate boot-menu entries', () {
+    final source = File(
+      'lib/features/creator/screens/creator_screen.dart',
+    ).readAsStringSync();
+
+    expect(source, contains("'linux_media_boot_menu_notice'"));
+    expect(source, contains("tr(context, 'linux_media_raw_write_notice')"));
+  });
+
   test('PowerShell failure summaries exclude CLIXML and stack traces', () {
     final summary = BootableUsbService.summarizePowerShellFailureForTesting(
       '''#< CLIXML

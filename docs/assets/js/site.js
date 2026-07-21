@@ -30,7 +30,7 @@
       feature_media_title: "安装介质",
       feature_media_copy: "创建 Windows 安装盘，或验证并写入 Linux ISOHybrid 镜像。",
       feature_togo_title: "To Go 工作区",
-      feature_togo_copy: "使用结构预检、磁盘身份保护和适配的启动布局创建便携工作区。",
+      feature_togo_copy: "为 Windows 10/11 创建经过验证的便携工作区；旧版 Windows 可能需要额外驱动、补丁和启动工具。",
       feature_disk_title: "磁盘分析",
       feature_disk_copy: "检测速度、稳定性、健康数据和适合随身系统的实际表现。",
       safety_eyebrow: "部署前检查",
@@ -43,6 +43,7 @@
       download_band_title: "从可信发布源获取安装包",
       download_band_action: "查看下载与更新说明",
       footer_copy: "面向 Windows 与 Linux 部署工作流的桌面工具。",
+      footer_feedback: "反馈",
       footer_license: "MIT License",
       footer_global_mirror: "SourceForge",
       downloads_eyebrow: "应用下载",
@@ -138,7 +139,7 @@
       feature_media_title: "Installation media",
       feature_media_copy: "Create Windows installation media or validate and write Linux ISOHybrid images.",
       feature_togo_title: "To Go workspaces",
-      feature_togo_copy: "Build portable workspaces with structural preflight, disk identity protection, and appropriate boot layouts.",
+      feature_togo_copy: "Build verified Windows 10/11 portable workspaces; older Windows versions may need additional drivers, updates, and boot tools.",
       feature_disk_title: "Storage analysis",
       feature_disk_copy: "Measure speed, stability, health data, and practical suitability for portable systems.",
       safety_eyebrow: "Pre-deployment checks",
@@ -151,6 +152,7 @@
       download_band_title: "Get verified installers from trusted release sources",
       download_band_action: "Downloads and release notes",
       footer_copy: "A desktop toolkit for Windows and Linux deployment workflows.",
+      footer_feedback: "Feedback",
       footer_license: "MIT License",
       footer_global_mirror: "SourceForge",
       downloads_eyebrow: "App downloads",
@@ -328,6 +330,7 @@
             <p data-i18n="footer_copy">面向 Windows 与 Linux 部署工作流的桌面工具。</p>
             <div class="footer-links">
               <a href="https://github.com/intelfans/WinDeployStudio" target="_blank" rel="noreferrer">GitHub</a>
+              <a href="https://github.com/intelfans/WinDeployStudio/issues/new" target="_blank" rel="noreferrer" data-i18n="footer_feedback">反馈</a>
               <a href="https://sourceforge.net/projects/windeploystudio/" target="_blank" rel="noreferrer" data-i18n="footer_global_mirror">SourceForge</a>
               <a href="https://github.com/intelfans/WinDeployStudio/blob/main/LICENSE" target="_blank" rel="noreferrer" data-i18n="footer_license">MIT License</a>
             </div>
@@ -446,10 +449,7 @@
         const image = document.createElement("img");
         image.src = `${getRoot()}assets/media/${slide.file}`;
         image.alt = slide.title[getLanguage()];
-        // The carousel is a deliberately finite product tour. Eager loading
-        // keeps a slide from appearing blank when the user jumps ahead or
-        // when a browser captures the page before a lazy image is promoted.
-        image.loading = "eager";
+        image.loading = index === 0 ? "eager" : "lazy";
         item.append(image);
         stage.append(item);
       });
@@ -509,23 +509,6 @@
     });
   }
 
-  function makeHeroWorkspace() {
-    const hero = document.querySelector(".hero");
-    if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const setPosition = (event) => {
-      const rect = hero.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-      const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-      hero.style.setProperty("--workspace-x", `${x.toFixed(3)}`);
-      hero.style.setProperty("--workspace-y", `${y.toFixed(3)}`);
-    };
-    hero.addEventListener("pointermove", setPosition, { passive: true });
-    hero.addEventListener("pointerleave", () => {
-      hero.style.setProperty("--workspace-x", "0");
-      hero.style.setProperty("--workspace-y", "0");
-    });
-  }
-
   const queryLanguage = new URLSearchParams(window.location.search).get("lang");
   const preferredTheme = localStorage.getItem(STORAGE.theme) || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   const preferredLanguage = queryLanguage === "en" || queryLanguage === "zh"
@@ -547,7 +530,6 @@
     applyTranslations();
     setupControls();
     makeCarousel();
-    makeHeroWorkspace();
     refreshIcons();
   });
 })();

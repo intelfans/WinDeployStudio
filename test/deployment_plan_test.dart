@@ -467,6 +467,32 @@ void main() {
         invalidIcon.errors.map((issue) => issue.code),
         contains('invalid_icon'),
       );
+      for (final character in const ['+', ',', ';', '=', '[', ']']) {
+        expect(
+          DeploymentCompatibility.isVolumeLabelValid(
+            'WDS${character}USB',
+            maxLength: 11,
+          ),
+          isFalse,
+          reason: 'character $character must be rejected immediately',
+        );
+      }
+      expect(
+        DeploymentCompatibility.isVolumeLabelValid('Win8.1', maxLength: 11),
+        isFalse,
+      );
+      expect(
+        DeploymentCompatibility.isVolumeLabelValid(
+          'Win8.1',
+          maxLength: 32,
+          allowPeriod: true,
+        ),
+        isTrue,
+      );
+      expect(
+        DeploymentCompatibility.isVolumeLabelValid('', maxLength: 11),
+        isTrue,
+      );
     });
   });
 }

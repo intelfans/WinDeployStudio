@@ -4,6 +4,20 @@ All notable changes to WinDeploy Studio are documented here.
 
 ## v2.1.0
 
+### AI Output Safety And Repository Privacy
+
+- Added provider-independent client-side output screening for the built-in AI
+  service and every custom OpenAI-compatible endpoint. Response text and
+  source titles are buffered until the complete result passes the local
+  policy, including completion, cancellation, provider-error, and exception
+  paths.
+- Added localized blocked-response guidance across all 11 UI languages and
+  regression coverage for allowed deployment terminology and prohibited
+  content categories.
+- Excluded local handover documents, agent/browser state, conversations, user
+  data, logs, attachments, symbols, temporary probes, and local synchronization
+  tooling from the public Git working tree.
+
 ### Guided Tour And Verification Baseline
 
 - Finalized the production first-run App Tour with complete and single-section
@@ -20,6 +34,25 @@ All notable changes to WinDeploy Studio are documented here.
   validation cycle and are kept isolated from the verified baseline.
 - Updated application, Windows metadata, installer metadata, AI prompt, and
   README version references to 2.1.0.
+
+### Deployment Guidance And Feedback
+
+- Clarified in the Windows To Go UI, README, maintenance notes, website copy,
+  and AI product prompt that the currently verified WTG production scope is
+  Windows 10 and Windows 11. Windows 7, Windows 8, Windows 8.1, and Server
+  images may be recognized and attempted, but can require matching USB,
+  chipset, storage, and boot drivers, system updates, or additional
+  boot/repair tools and are not guaranteed to boot on every target.
+- Added a distribution-neutral Linux installation-media notice for firmware
+  that exposes one ISOHybrid USB as two similar boot entries. The guidance
+  explains that no duplicate image was written and recommends the entry that
+  opens the distribution's normal installer.
+- Added a Settings feedback entry that opens the GitHub Issue form, plus a
+  failure-only feedback action for Installation Media and To Go. Successful
+  operations and explicit user cancellation do not show the failure action.
+- Updated the AI product knowledge so it distinguishes image recognition from
+  verified boot compatibility and points users to the in-app feedback action
+  after a genuine creation failure.
 
 ## v2.0.9
 

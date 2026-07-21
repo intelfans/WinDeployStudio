@@ -356,6 +356,9 @@ class UpdateService {
   UpdateService._();
   factory UpdateService() => _instance ??= UpdateService._();
 
+  @visibleForTesting
+  UpdateService.forTesting();
+
   String? _lastTrustedDownloadPath;
   String? _lastPublishedDownloadHash;
   int? _lastPublishedDownloadSize;

@@ -603,8 +603,11 @@ class DeploymentCompatibility {
   ) {
     final label = plan.customVolumeLabel.trim();
     final labelLimit = plan.purpose == DeploymentPurpose.installMedia ? 11 : 32;
-    if (label.length > labelLimit ||
-        RegExp(r'[\\/:*?"<>|\x00-\x1F]').hasMatch(label)) {
+    if (!isVolumeLabelValid(
+      label,
+      maxLength: labelLimit,
+      allowPeriod: plan.purpose != DeploymentPurpose.installMedia,
+    )) {
       error('invalid_volume_label', 'deploy_compat_invalid_volume_label');
     }
 
@@ -612,6 +615,24 @@ class DeploymentCompatibility {
     if (iconPath.isNotEmpty && !iconPath.toLowerCase().endsWith('.ico')) {
       error('invalid_icon', 'deploy_compat_invalid_icon');
     }
+  }
+
+  /// Validates a user supplied volume label using the intersection of the
+  /// Windows FAT/NTFS rules used by all deployment paths.  Keeping this in
+  /// the deployment model lets the editor and the final preflight agree.
+  static bool isVolumeLabelValid(
+    String value, {
+    required int maxLength,
+    bool allowPeriod = false,
+  }) {
+    final label = value.trim();
+    // Empty means "use the built-in default label" and is valid.
+    if (label.isEmpty) return true;
+    if (label.length > maxLength) return false;
+    final invalidCharacters = allowPeriod
+        ? RegExp(r'[\\/:*?"<>|+,;=\[\]\x00-\x1F]')
+        : RegExp(r'[.\\/:*?"<>|+,;=\[\]\x00-\x1F]');
+    return !invalidCharacters.hasMatch(label);
   }
 
   static bool _isSafeFileName(String value) {

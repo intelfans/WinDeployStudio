@@ -119,6 +119,49 @@ void main() {
     expect(find.byType(SnackBar), findsNothing);
   });
 
+  testWidgets('ISO mount failure is not reported as an invalid image', (
+    tester,
+  ) async {
+    final originalPicker = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = _SingleFilePicker(r'C:\test\windows 7.iso');
+    addTearDown(() => FilePickerPlatform.instance = originalPicker);
+
+    await _pumpCreator(
+      tester,
+      overrides: [
+        diskSafetyServiceProvider.overrideWithValue(_NoDisksService()),
+        isoParseServiceProvider.overrideWithValue(
+          _StaticIsoParseService(
+            const IsoMetadata(
+              filePath: r'C:\test\windows 7.iso',
+              fileName: 'windows 7.iso',
+              fileSize: 1024,
+              windowsVersion: 'Windows 7',
+              validationErrorKey: 'creator_iso_mount_failed',
+              validationErrorDetail: 'Mount-DiskImage timed out.',
+            ),
+          ),
+        ),
+      ],
+    );
+
+    await tester.tap(find.text(trByCode('zh', 'creator_select_btn')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(trByCode('zh', 'creator_iso_mount_failed')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(trByCode('zh', 'creator_invalid_windows_iso')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('creator-iso-selection-error')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'Windows creator can clear a selected drive icon and restore the default',
     (tester) async {
@@ -191,6 +234,7 @@ void main() {
       for (final key in const [
         'creator_select_iso_desc',
         'creator_parse_error',
+        'creator_iso_mount_failed',
         'creator_invalid_windows_iso',
         'creator_windows_iso_in_linux_mode',
       ]) {

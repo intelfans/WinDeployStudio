@@ -22,8 +22,9 @@ class WindowsIsoMountService {
   Future<WindowsIsoMountLease?> acquire(
     String isoPath, {
     bool Function()? isCancelled,
-    Duration mountTimeout = const Duration(seconds: 30),
+    Duration mountTimeout = const Duration(seconds: 15),
     Duration volumeTimeout = const Duration(seconds: 25),
+    int mountAttempts = 2,
   }) async {
     final source = File(p.normalize(p.absolute(isoPath)));
     if (await FileSystemEntity.type(source.path, followLinks: false) !=
@@ -45,35 +46,66 @@ class WindowsIsoMountService {
       lastDiagnostic = null;
       var ownsMount = false;
       var state = await _queryMountState(source.path);
+      bool? lastConfirmedAttached = state.querySucceeded
+          ? state.attached
+          : null;
       if (!state.attached) {
-        final mount = await _runPowerShell(
-          const [
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-Command',
-            r'Mount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction Stop | Out-Null',
-          ],
-          isoPath: source.path,
-          timeout: mountTimeout,
-        );
-        if (mount == null || mount.exitCode != 0) {
-          // Mount-DiskImage can report an "already attached" or transient
-          // storage error while the volume is being published. Re-query once
-          // before failing so the first ISO selection does not require a
-          // second click merely because the drive letter arrived late.
-          state = await _queryMountState(source.path);
-          if (!state.attached) {
-            lastDiagnostic = _processDiagnostic(
-              mount,
-              fallback: 'Windows could not mount the ISO.',
-            );
+        ProcessResult? lastMount;
+        final attempts = mountAttempts.clamp(1, 3);
+        for (var attempt = 0; attempt < attempts; attempt++) {
+          if (isCancelled?.call() ?? false) {
             releaseQueue.complete();
             return null;
           }
-        } else {
-          ownsMount = true;
+          lastMount = await _runPowerShell(
+            const [
+              '-NoProfile',
+              '-NonInteractive',
+              '-ExecutionPolicy',
+              'Bypass',
+              '-Command',
+              r'Mount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction Stop | Out-Null',
+            ],
+            isoPath: source.path,
+            timeout: mountTimeout,
+            isCancelled: isCancelled,
+          );
+          if (isCancelled?.call() ?? false) {
+            state = await _queryMountState(source.path);
+            if (state.attached) await _dismount(source.path);
+            releaseQueue.complete();
+            return null;
+          }
+          if (lastMount != null && lastMount.exitCode == 0) {
+            // A successful Mount-DiskImage call may return before the volume
+            // has a drive letter. Let the volume wait below observe it.
+            ownsMount = true;
+            lastConfirmedAttached = true;
+            break;
+          }
+
+          // A timeout or transient Storage-module error can still have
+          // attached the image. Re-query before retrying so we do not mount
+          // the same ISO twice or make the user click a second time.
+          state = await _queryMountState(source.path);
+          if (state.querySucceeded) {
+            lastConfirmedAttached = state.attached;
+          }
+          if (state.querySucceeded && state.attached) {
+            ownsMount = true;
+            break;
+          }
+          if (attempt + 1 < attempts) {
+            await Future<void>.delayed(const Duration(milliseconds: 500));
+          }
+        }
+        if (!ownsMount && state.querySucceeded && !state.attached) {
+          lastDiagnostic = _processDiagnostic(
+            lastMount,
+            fallback: 'Windows could not mount the ISO after retrying.',
+          );
+          releaseQueue.complete();
+          return null;
         }
       }
 
@@ -85,6 +117,11 @@ class WindowsIsoMountService {
           return null;
         }
         state = await _queryMountState(source.path);
+        if (!state.querySucceeded) {
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          continue;
+        }
+        lastConfirmedAttached = state.attached;
         if (state.driveLetter != null) {
           return WindowsIsoMountLease._(
             service: this,
@@ -97,9 +134,14 @@ class WindowsIsoMountService {
         await Future<void>.delayed(const Duration(milliseconds: 400));
       }
 
-      lastDiagnostic = state.attached
-          ? 'Windows mounted the ISO but did not assign a usable drive letter.'
-          : 'The ISO attachment disappeared before its volume became ready.';
+      lastDiagnostic = switch (lastConfirmedAttached) {
+        true =>
+          'Windows mounted the ISO but did not assign a usable drive letter.',
+        false =>
+          'The ISO attachment disappeared before its volume became ready.',
+        null =>
+          'Windows mounted the ISO, but its virtual drive state could not be queried.',
+      };
       if (ownsMount) await _dismount(source.path);
       releaseQueue.complete();
       return null;
@@ -114,14 +156,16 @@ class WindowsIsoMountService {
     String isoPath,
     Future<T> Function(String mountPoint) action, {
     bool Function()? isCancelled,
-    Duration mountTimeout = const Duration(seconds: 30),
+    Duration mountTimeout = const Duration(seconds: 15),
     Duration volumeTimeout = const Duration(seconds: 25),
+    int mountAttempts = 2,
   }) async {
     final lease = await acquire(
       isoPath,
       isCancelled: isCancelled,
       mountTimeout: mountTimeout,
       volumeTimeout: volumeTimeout,
+      mountAttempts: mountAttempts,
     );
     if (lease == null) return null;
     try {
@@ -172,10 +216,10 @@ $letters | ForEach-Object { Write-Output ("WDS_DRIVE:{0}" -f $_) }
 ''',
       ],
       isoPath: isoPath,
-      timeout: const Duration(seconds: 6),
+      timeout: const Duration(seconds: 12),
     );
     if (result == null || result.exitCode != 0) {
-      return const _IsoMountState(attached: false);
+      return const _IsoMountState(querySucceeded: false, attached: false);
     }
     var attached = false;
     String? driveLetter;
@@ -187,7 +231,11 @@ $letters | ForEach-Object { Write-Output ("WDS_DRIVE:{0}" -f $_) }
         if (RegExp(r'^[A-Z]$').hasMatch(value)) driveLetter ??= value;
       }
     }
-    return _IsoMountState(attached: attached, driveLetter: driveLetter);
+    return _IsoMountState(
+      querySucceeded: true,
+      attached: attached,
+      driveLetter: driveLetter,
+    );
   }
 
   Future<void> _dismount(String isoPath) async {
@@ -215,6 +263,7 @@ $letters | ForEach-Object { Write-Output ("WDS_DRIVE:{0}" -f $_) }
     List<String> arguments, {
     required String isoPath,
     required Duration timeout,
+    bool Function()? isCancelled,
   }) async {
     Process? process;
     try {
@@ -232,17 +281,36 @@ $letters | ForEach-Object { Write-Output ("WDS_DRIVE:{0}" -f $_) }
       final stderr = process.stderr
           .transform(const SystemEncoding().decoder)
           .join();
-      int exitCode;
-      try {
-        exitCode = await process.exitCode.timeout(timeout);
-      } on TimeoutException {
-        process.kill(ProcessSignal.sigkill);
-        try {
-          await process.exitCode.timeout(const Duration(seconds: 4));
-        } catch (_) {
-          // The lease still releases its queue gate and later calls can retry.
+      final exitCodeFuture = process.exitCode;
+      final deadline = DateTime.now().add(timeout);
+      int? exitCode;
+      while (exitCode == null) {
+        if (isCancelled?.call() ?? false) {
+          process.kill(ProcessSignal.sigkill);
+          try {
+            await exitCodeFuture.timeout(const Duration(seconds: 4));
+          } catch (_) {}
+          return null;
         }
-        return null;
+        final remaining = deadline.difference(DateTime.now());
+        if (remaining <= Duration.zero) {
+          process.kill(ProcessSignal.sigkill);
+          try {
+            await exitCodeFuture.timeout(const Duration(seconds: 4));
+          } catch (_) {
+            // The lease still releases its queue gate and later calls can retry.
+          }
+          return null;
+        }
+        try {
+          exitCode = await exitCodeFuture.timeout(
+            remaining.compareTo(const Duration(milliseconds: 250)) < 0
+                ? remaining
+                : const Duration(milliseconds: 250),
+          );
+        } on TimeoutException {
+          // Poll cancellation while the Storage cmdlet is running.
+        }
       }
       return ProcessResult(process.pid, exitCode, await stdout, await stderr);
     } catch (_) {
@@ -287,8 +355,13 @@ class WindowsIsoMountLease {
 }
 
 class _IsoMountState {
+  final bool querySucceeded;
   final bool attached;
   final String? driveLetter;
 
-  const _IsoMountState({required this.attached, this.driveLetter});
+  const _IsoMountState({
+    required this.querySucceeded,
+    required this.attached,
+    this.driveLetter,
+  });
 }

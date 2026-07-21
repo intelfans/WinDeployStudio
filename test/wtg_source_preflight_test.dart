@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/disk_safety_service.dart';
@@ -6,6 +8,13 @@ import 'package:win_deploy_studio/core/services/wtg_service.dart';
 import 'package:win_deploy_studio/features/deployment/models/deployment_plan.dart';
 
 void main() {
+  test('WTG image step exposes the verified-version compatibility notice', () {
+    final source = File(
+      'lib/features/wtg/screens/wtg_screen.dart',
+    ).readAsStringSync();
+    expect(source, contains("'wtg_legacy_compatibility_notice'"));
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('Windows To Go retries only transient ISO mount preflight failures', () {

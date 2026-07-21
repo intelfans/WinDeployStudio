@@ -731,6 +731,12 @@ const _en = <String, String>{
       'Another WinDeploy Studio operation is already using this disk. Wait for it to finish and try again.',
   'safety_detection_failed':
       'Disk safety information could not be verified. The operation was stopped.',
+  'safety_detection_failed_detail':
+      'Disk safety check failed: {detail}. The operation was stopped.',
+  'safety_detail_storage_timeout':
+      'Windows took too long to read the selected disk. Reconnect the USB device and try again.',
+  'safety_detail_storage_unavailable':
+      'Windows could not read the selected disk information. Reconnect the USB device and try again.',
   'safety_not_external': 'Only verified external disks can be erased.',
   'safety_disk_offline': 'The selected disk is offline and cannot be used.',
   'linux_not_isohybrid':
@@ -871,6 +877,8 @@ const _en = <String, String>{
   'creator_complete_desc': 'Your Windows installation USB is ready to use',
   'creator_another': 'Create Another',
   'creator_parse_error': 'Failed to parse ISO file',
+  'creator_iso_mount_failed':
+      'Windows could not mount this ISO. Close programs using the image and try again.',
   'creator_error': 'Error',
   'creator_checking_safety': 'Checking disk safety...',
   'creator_safety_failed': 'Safety check failed',
@@ -958,6 +966,7 @@ const _en = <String, String>{
   'close': 'Close',
   'copied': 'Copied',
   'ai_thinking': 'Thinking...',
+  'ai_answering': 'Answering...',
   'ai_sources': 'Sources',
   'easter_egg_missing': 'Easter egg image not found!',
   'intel_museum_desc': 'This is an internal build for testing purposes.',
@@ -1366,6 +1375,8 @@ const _en = <String, String>{
   // Creator extra
   'creator_disk_prefix': 'Disk',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': 'Drive letter:',
+  'creator_no_drive_letter': 'No drive letter',
   'creator_build_prefix': 'Build',
   'creator_starting': 'Starting...',
   'creator_error_prefix': 'Error:',
@@ -1424,6 +1435,8 @@ const _en = <String, String>{
   'boot_cleaning': 'Cleaning disk...',
   'boot_access_denied': 'Access denied - please run as Administrator',
   'boot_partition_failed': 'Partition failed: {error}',
+  'boot_drive_letter_in_use':
+      'The requested drive letter is already in use. Choose Auto or another letter.',
   'boot_partition_layout_not_ready':
       'The new volume did not become ready in time. Please retry.',
   'boot_format_verifying': 'Verifying format...',
@@ -1678,6 +1691,9 @@ const _zh = <String, String>{
   'safety_disk_changed': '选择后目标磁盘发生了变化，请重新连接并再次选择。',
   'safety_disk_busy': '另一个 WinDeploy Studio 任务正在使用此磁盘，请等待任务完成后重试。',
   'safety_detection_failed': '无法确认磁盘安全信息，操作已停止。',
+  'safety_detection_failed_detail': '磁盘安全检查失败：{detail} 操作已停止。',
+  'safety_detail_storage_timeout': 'Windows 读取所选磁盘信息超时。请重新连接 U 盘后重试。',
+  'safety_detail_storage_unavailable': 'Windows 无法读取所选磁盘信息。请重新连接 U 盘后重试。',
   'safety_not_external': '只能擦除已确认的外接磁盘。',
   'safety_disk_offline': '所选磁盘处于脱机状态，无法使用。',
   'linux_not_isohybrid': '此 ISO 不是可启动的 ISOHybrid 镜像，目标磁盘未被修改。',
@@ -1795,6 +1811,7 @@ const _zh = <String, String>{
   'creator_complete_desc': '您的 Windows 安装 U 盘已准备就绪',
   'creator_another': '再创建一个',
   'creator_parse_error': 'ISO 文件解析失败',
+  'creator_iso_mount_failed': 'Windows 无法挂载此 ISO。请关闭正在使用镜像的程序后重试。',
   'creator_error': '错误',
   'creator_checking_safety': '正在检查磁盘安全性...',
   'creator_safety_failed': '安全检查未通过',
@@ -1870,6 +1887,7 @@ const _zh = <String, String>{
   'close': '关闭',
   'copied': '已复制',
   'ai_thinking': '正在思考...',
+  'ai_answering': '正在回答...',
   'ai_sources': '来源',
   'easter_egg_missing': '未找到彩蛋图片！',
   'intel_museum_desc': '这是一个用于测试的内部构建版本。',
@@ -2241,6 +2259,8 @@ const _zh = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': '磁盘',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': '盘符：',
+  'creator_no_drive_letter': '无盘符',
   'creator_build_prefix': '构建',
   'creator_starting': '正在启动...',
   'creator_error_prefix': '错误：',
@@ -2287,6 +2307,7 @@ const _zh = <String, String>{
   'boot_cleaning': '正在清理磁盘...',
   'boot_access_denied': '访问被拒绝 - 请以管理员身份运行',
   'boot_partition_failed': '分区失败：{error}',
+  'boot_drive_letter_in_use': '请求的驱动器盘符已被占用，请选择自动或其他盘符。',
   'boot_partition_layout_not_ready': '新建卷未能及时就绪，请重试。',
   'boot_format_verifying': '正在验证格式...',
   'boot_format_failed': '格式化失败',
@@ -2503,6 +2524,12 @@ const _ru = <String, String>{
       'Этот диск уже используется другой операцией WinDeploy Studio. Дождитесь её завершения и повторите попытку.',
   'safety_detection_failed':
       'Не удалось проверить безопасность диска. Операция остановлена.',
+  'safety_detection_failed_detail':
+      'Проверка безопасности диска не выполнена: {detail}. Операция остановлена.',
+  'safety_detail_storage_timeout':
+      'Windows не успела прочитать выбранный диск. Переподключите USB-устройство и повторите попытку.',
+  'safety_detail_storage_unavailable':
+      'Windows не удалось прочитать сведения о выбранном диске. Переподключите USB-устройство и повторите попытку.',
   'safety_not_external': 'Стирать можно только проверенные внешние диски.',
   'safety_disk_offline': 'Выбранный диск отключен и недоступен.',
   'linux_not_isohybrid':
@@ -2632,6 +2659,8 @@ const _ru = <String, String>{
       'Ваш USB-носитель для установки Windows готов к использованию',
   'creator_another': 'Создать ещё',
   'creator_parse_error': 'Ошибка разбора файла ISO',
+  'creator_iso_mount_failed':
+      'Не удалось подключить этот ISO. Закройте программы, использующие образ, и повторите попытку.',
   'creator_error': 'Ошибка',
   'creator_checking_safety': 'Проверка безопасности диска...',
   'creator_safety_failed': 'Проверка безопасности не пройдена',
@@ -2714,6 +2743,7 @@ const _ru = <String, String>{
   'close': 'Закрыть',
   'copied': 'Скопировано',
   'ai_thinking': 'Обработка...',
+  'ai_answering': 'Формируется ответ...',
   'ai_sources': 'Источники',
   'easter_egg_missing': 'Пасхальное яйцо не найдено!',
   'intel_museum_desc': 'Это внутренняя сборка для тестирования.',
@@ -3120,6 +3150,8 @@ const _ru = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'Диск',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': 'Буква диска:',
+  'creator_no_drive_letter': 'Нет буквы диска',
   'creator_build_prefix': 'Сборка',
   'creator_starting': 'Запуск...',
   'creator_error_prefix': 'Ошибка:',
@@ -3171,6 +3203,8 @@ const _ru = <String, String>{
   'boot_cleaning': 'Очистка диска...',
   'boot_access_denied': 'Доступ запрещён — запустите от имени администратора',
   'boot_partition_failed': 'Ошибка разметки: {error}',
+  'boot_drive_letter_in_use':
+      'Запрошенная буква диска уже занята. Выберите автоматический режим или другую букву.',
   'boot_partition_layout_not_ready':
       'Новый том не был готов вовремя. Повторите попытку.',
   'boot_format_verifying': 'Проверка формата...',
@@ -3426,6 +3460,12 @@ const _fr = <String, String>{
       'Ce disque est déjà utilisé par une autre opération de WinDeploy Studio. Attendez qu’elle se termine, puis réessayez.',
   'safety_detection_failed':
       'Les informations de sécurité du disque n’ont pas pu être vérifiées. L’opération a été arrêtée.',
+  'safety_detection_failed_detail':
+      'La vérification de sécurité du disque a échoué : {detail}. L’opération a été arrêtée.',
+  'safety_detail_storage_timeout':
+      'La lecture du disque sélectionné par Windows a pris trop de temps. Reconnectez le périphérique USB, puis réessayez.',
+  'safety_detail_storage_unavailable':
+      'Windows n’a pas pu lire les informations du disque sélectionné. Reconnectez le périphérique USB, puis réessayez.',
   'safety_not_external':
       'Seuls les disques externes vérifiés peuvent être effacés.',
   'safety_disk_offline':
@@ -3561,6 +3601,8 @@ const _fr = <String, String>{
       'Votre clé USB d\'installation Windows est prête à être utilisée',
   'creator_another': 'En créer un autre',
   'creator_parse_error': 'Échec de l\'analyse du fichier ISO',
+  'creator_iso_mount_failed':
+      'Windows n\'a pas pu monter cet ISO. Fermez les programmes qui utilisent l\'image, puis réessayez.',
   'creator_error': 'Erreur',
   'creator_checking_safety': 'Vérification de la sécurité du disque...',
   'creator_safety_failed': 'Échec de la vérification de sécurité',
@@ -3644,6 +3686,7 @@ const _fr = <String, String>{
   'close': 'Fermer',
   'copied': 'Copié',
   'ai_thinking': 'Réflexion...',
+  'ai_answering': 'Réponse en cours...',
   'ai_sources': 'Sources',
   'easter_egg_missing': 'Image de l\'easter egg introuvable !',
   'intel_museum_desc': 'Ceci est une version interne à des fins de test.',
@@ -4047,6 +4090,8 @@ const _fr = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'Disque',
   'creator_sn_prefix': 'S/N :',
+  'creator_drive_letters': 'Lettre du lecteur :',
+  'creator_no_drive_letter': 'Aucune lettre de lecteur',
   'creator_build_prefix': 'Build',
   'creator_starting': 'Démarrage...',
   'creator_error_prefix': 'Erreur :',
@@ -4103,6 +4148,8 @@ const _fr = <String, String>{
   'boot_access_denied':
       'Accès refusé - veuillez exécuter en tant qu\'administrateur',
   'boot_partition_failed': 'Échec de la partition : {error}',
+  'boot_drive_letter_in_use':
+      'La lettre de lecteur demandée est déjà utilisée. Choisissez Automatique ou une autre lettre.',
   'boot_partition_layout_not_ready':
       'Le nouveau volume n\'a pas été prêt à temps. Réessayez.',
   'boot_format_verifying': 'Vérification du format...',
@@ -4364,6 +4411,11 @@ const _ja = <String, String>{
   'safety_disk_changed': '選択後に対象ディスクが変わりました。再接続して選び直してください。',
   'safety_disk_busy': '別の WinDeploy Studio の処理がこのディスクを使用中です。完了してからもう一度お試しください。',
   'safety_detection_failed': 'ディスクの安全性を確認できなかったため、処理を中止しました。',
+  'safety_detection_failed_detail': 'ディスクの安全性を確認できませんでした：{detail}。処理を中止しました。',
+  'safety_detail_storage_timeout':
+      'Windows による選択したディスクの読み取りがタイムアウトしました。USB デバイスを再接続して、もう一度お試しください。',
+  'safety_detail_storage_unavailable':
+      'Windows が選択したディスクの情報を読み取れませんでした。USB デバイスを再接続して、もう一度お試しください。',
   'safety_not_external': '消去できるのは、確認済みの外付けディスクだけです。',
   'safety_disk_offline': '選択したディスクはオフラインのため使用できません。',
   'linux_not_isohybrid':
@@ -4486,6 +4538,8 @@ const _ja = <String, String>{
   'creator_complete_desc': 'Windows インストール USB の使用準備が完了しました',
   'creator_another': 'もう一つ作成',
   'creator_parse_error': 'ISOファイルの解析に失敗しました',
+  'creator_iso_mount_failed':
+      'この ISO をマウントできませんでした。イメージを使用しているアプリを閉じて、もう一度お試しください。',
   'creator_error': 'エラー',
   'creator_checking_safety': 'ディスクの安全性を確認中...',
   'creator_safety_failed': '安全性チェックに失敗しました',
@@ -4564,6 +4618,7 @@ const _ja = <String, String>{
   'close': '閉じる',
   'copied': 'コピーしました',
   'ai_thinking': '思考中...',
+  'ai_answering': '回答中...',
   'ai_sources': '参考情報',
   'easter_egg_missing': 'イースターエッグの画像が見つかりません！',
   'intel_museum_desc': 'これはテスト用の内部ビルドです。',
@@ -4948,6 +5003,8 @@ const _ja = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'ディスク',
   'creator_sn_prefix': 'S/N：',
+  'creator_drive_letters': 'ドライブ文字：',
+  'creator_no_drive_letter': 'ドライブ文字なし',
   'creator_build_prefix': 'ビルド',
   'creator_starting': '開始中...',
   'creator_error_prefix': 'エラー：',
@@ -4995,6 +5052,7 @@ const _ja = <String, String>{
   'boot_cleaning': 'ディスクをクリーンアップ中...',
   'boot_access_denied': 'アクセスが拒否されました - 管理者として実行してください',
   'boot_partition_failed': 'パーティション作成に失敗しました：{error}',
+  'boot_drive_letter_in_use': '指定したドライブ文字はすでに使用されています。自動または別の文字を選択してください。',
   'boot_partition_layout_not_ready': '新しいボリュームの準備が時間内に完了しませんでした。再試行してください。',
   'boot_format_verifying': 'フォーマットを検証中...',
   'boot_format_failed': 'フォーマットに失敗しました',
@@ -5214,6 +5272,9 @@ const _zhTW = <String, String>{
   'safety_disk_changed': '選擇後目標磁碟發生變化，請重新連接並再次選擇。',
   'safety_disk_busy': '另一個 WinDeploy Studio 工作正在使用此磁碟，請等待工作完成後再試。',
   'safety_detection_failed': '無法確認磁碟安全資訊，操作已停止。',
+  'safety_detection_failed_detail': '磁碟安全檢查失敗：{detail}，操作已停止。',
+  'safety_detail_storage_timeout': 'Windows 讀取所選磁碟的時間過長。請重新連接 USB 裝置後再試。',
+  'safety_detail_storage_unavailable': 'Windows 無法讀取所選磁碟資訊。請重新連接 USB 裝置後再試。',
   'safety_not_external': '只能清除已確認的外接磁碟。',
   'safety_disk_offline': '所選磁碟處於離線狀態，無法使用。',
   'linux_not_isohybrid': '此 ISO 不是可開機的 ISOHybrid 映像，目標磁碟未被修改。',
@@ -5331,6 +5392,7 @@ const _zhTW = <String, String>{
   'creator_complete_desc': '您的 Windows 安裝 USB 隨身碟已準備就緒',
   'creator_another': '再建立一個',
   'creator_parse_error': 'ISO 檔案解析失敗',
+  'creator_iso_mount_failed': 'Windows 無法掛載此 ISO。請關閉正在使用映像的程式後重試。',
   'creator_error': '錯誤',
   'creator_checking_safety': '正在檢查磁碟安全性...',
   'creator_safety_failed': '安全檢查未通過',
@@ -5406,6 +5468,7 @@ const _zhTW = <String, String>{
   'close': '關閉',
   'copied': '已複製',
   'ai_thinking': '正在思考...',
+  'ai_answering': '正在回答...',
   'ai_sources': '來源',
   'easter_egg_missing': '未找到彩蛋圖片！',
   'intel_museum_desc': '這是一個用於測試的內部建構版本。',
@@ -5777,6 +5840,8 @@ const _zhTW = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': '磁碟',
   'creator_sn_prefix': 'S/N：',
+  'creator_drive_letters': '磁碟機代號：',
+  'creator_no_drive_letter': '無磁碟機代號',
   'creator_build_prefix': '建構',
   'creator_starting': '正在啟動...',
   'creator_error_prefix': '錯誤：',
@@ -5823,6 +5888,7 @@ const _zhTW = <String, String>{
   'boot_cleaning': '正在清理磁碟...',
   'boot_access_denied': '存取被拒 - 請以系統管理員身分執行',
   'boot_partition_failed': '分割區建立失敗：{error}',
+  'boot_drive_letter_in_use': '要求的磁碟機代號已被使用，請選擇自動或其他代號。',
   'boot_partition_layout_not_ready': '新建立體磁碟區未能及時就緒，請重試。',
   'boot_format_verifying': '正在驗證格式...',
   'boot_format_failed': '格式化失敗',
@@ -6038,6 +6104,12 @@ const _es = <String, String>{
       'Otra operación de WinDeploy Studio ya está usando este disco. Espera a que termine y vuelve a intentarlo.',
   'safety_detection_failed':
       'No se pudo verificar la seguridad del disco. La operación se detuvo.',
+  'safety_detection_failed_detail':
+      'No se pudo verificar la seguridad del disco: {detail}. La operación se detuvo.',
+  'safety_detail_storage_timeout':
+      'Windows tardó demasiado en leer el disco seleccionado. Vuelve a conectar el dispositivo USB e inténtalo de nuevo.',
+  'safety_detail_storage_unavailable':
+      'Windows no pudo leer la información del disco seleccionado. Vuelve a conectar el dispositivo USB e inténtalo de nuevo.',
   'safety_not_external': 'Solo se pueden borrar discos externos verificados.',
   'safety_disk_offline':
       'El disco seleccionado está sin conexión y no se puede usar.',
@@ -6173,6 +6245,8 @@ const _es = <String, String>{
       'Su USB de instalación de Windows está listo para usar',
   'creator_another': 'Crear otro',
   'creator_parse_error': 'Error al analizar el archivo ISO',
+  'creator_iso_mount_failed':
+      'Windows no pudo montar este ISO. Cierre los programas que usan la imagen y vuelva a intentarlo.',
   'creator_error': 'Error',
   'creator_checking_safety': 'Verificando seguridad del disco...',
   'creator_safety_failed': 'Verificación de seguridad fallida',
@@ -6255,6 +6329,7 @@ const _es = <String, String>{
   'close': 'Cerrar',
   'copied': 'Copiado',
   'ai_thinking': 'Pensando...',
+  'ai_answering': 'Respondiendo...',
   'ai_sources': 'Fuentes',
   'easter_egg_missing': '¡Imagen de huevo de Pascua no encontrada!',
   'intel_museum_desc': 'Esta es una compilación interna para pruebas.',
@@ -6651,6 +6726,8 @@ const _es = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'Disco',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': 'Letra de unidad:',
+  'creator_no_drive_letter': 'Sin letra de unidad',
   'creator_build_prefix': 'Compilación',
   'creator_starting': 'Iniciando...',
   'creator_error_prefix': 'Error:',
@@ -6703,6 +6780,8 @@ const _es = <String, String>{
   'boot_cleaning': 'Limpiando disco...',
   'boot_access_denied': 'Acceso denegado, ejecute como administrador',
   'boot_partition_failed': 'Error al crear partición: {error}',
+  'boot_drive_letter_in_use':
+      'La letra de unidad solicitada ya está en uso. Elige Automático u otra letra.',
   'boot_partition_layout_not_ready':
       'El nuevo volumen no estuvo listo a tiempo. Inténtalo de nuevo.',
   'boot_format_verifying': 'Verificando formato...',
@@ -6962,6 +7041,12 @@ const _ar = <String, String>{
       'تستخدم عملية أخرى في WinDeploy Studio هذا القرص حاليًا. انتظر حتى تنتهي ثم أعد المحاولة.',
   'safety_detection_failed':
       'تعذر التحقق من معلومات أمان القرص، لذلك أُوقفت العملية.',
+  'safety_detection_failed_detail':
+      'فشل التحقق من أمان القرص: {detail}. تم إيقاف العملية.',
+  'safety_detail_storage_timeout':
+      'استغرق Windows وقتًا طويلًا لقراءة القرص المحدد. أعد توصيل جهاز USB وحاول مرة أخرى.',
+  'safety_detail_storage_unavailable':
+      'تعذر على Windows قراءة معلومات القرص المحدد. أعد توصيل جهاز USB وحاول مرة أخرى.',
   'safety_not_external':
       'لا يمكن مسح إلا الأقراص الخارجية التي تم التحقق منها.',
   'safety_disk_offline': 'القرص المحدد غير متصل ولا يمكن استخدامه.',
@@ -7088,6 +7173,8 @@ const _ar = <String, String>{
   'creator_complete_desc': 'USB تثبيت Windows جاهز للاستخدام',
   'creator_another': 'إنشاء آخر',
   'creator_parse_error': 'فشل تحليل ملف ISO',
+  'creator_iso_mount_failed':
+      'تعذر على Windows تحميل ملف ISO هذا. أغلق البرامج التي تستخدم الصورة ثم أعد المحاولة.',
   'creator_error': 'خطأ',
   'creator_checking_safety': 'جاري التحقق من أمان القرص...',
   'creator_safety_failed': 'فشل التحقق الأمني',
@@ -7169,6 +7256,7 @@ const _ar = <String, String>{
   'close': 'إغلاق',
   'copied': 'تم النسخ',
   'ai_thinking': 'جاري التفكير...',
+  'ai_answering': 'جارٍ إعداد الإجابة...',
   'ai_sources': 'المصادر',
   'easter_egg_missing': 'لم يتم العثور على صورة البيضة المخفية!',
   'intel_museum_desc': 'هذا إصدار داخلي للاختبار.',
@@ -7561,6 +7649,8 @@ const _ar = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'قرص',
   'creator_sn_prefix': 'الرقم التسلسلي:',
+  'creator_drive_letters': 'حرف محرك الأقراص:',
+  'creator_no_drive_letter': 'لا يوجد حرف لمحرك الأقراص',
   'creator_build_prefix': 'البناء',
   'creator_starting': 'جاري البدء...',
   'creator_error_prefix': 'خطأ:',
@@ -7611,6 +7701,8 @@ const _ar = <String, String>{
   'boot_cleaning': 'تنظيف القرص...',
   'boot_access_denied': 'تم رفض الوصول، يرجى التشغيل كمسؤول',
   'boot_partition_failed': 'فشل إنشاء القسم: {error}',
+  'boot_drive_letter_in_use':
+      'حرف محرك الأقراص المطلوب مستخدم بالفعل. اختر تلقائيًا أو حرفًا آخر.',
   'boot_partition_layout_not_ready':
       'لم تصبح وحدة التخزين الجديدة جاهزة في الوقت المحدد. حاول مرة أخرى.',
   'boot_format_verifying': 'التحقق من التنسيق...',
@@ -7852,6 +7944,12 @@ const _pt = <String, String>{
       'Outra operação do WinDeploy Studio já está usando este disco. Aguarde a conclusão e tente novamente.',
   'safety_detection_failed':
       'Não foi possível verificar a segurança do disco. A operação foi interrompida.',
+  'safety_detection_failed_detail':
+      'Falha na verificação de segurança do disco: {detail}. A operação foi interrompida.',
+  'safety_detail_storage_timeout':
+      'O Windows demorou muito para ler o disco selecionado. Reconecte o dispositivo USB e tente novamente.',
+  'safety_detail_storage_unavailable':
+      'O Windows não conseguiu ler as informações do disco selecionado. Reconecte o dispositivo USB e tente novamente.',
   'safety_not_external':
       'Somente discos externos verificados podem ser apagados.',
   'safety_disk_offline':
@@ -7988,6 +8086,8 @@ const _pt = <String, String>{
       'Seu USB de instalação do Windows está pronto para uso',
   'creator_another': 'Criar outro',
   'creator_parse_error': 'Erro ao analisar o arquivo ISO',
+  'creator_iso_mount_failed':
+      'O Windows não conseguiu montar este ISO. Feche os programas que usam a imagem e tente novamente.',
   'creator_error': 'Erro',
   'creator_checking_safety': 'Verificando segurança do disco...',
   'creator_safety_failed': 'Verificação de segurança falhou',
@@ -8069,6 +8169,7 @@ const _pt = <String, String>{
   'close': 'Fechar',
   'copied': 'Copiado',
   'ai_thinking': 'Pensando...',
+  'ai_answering': 'Respondendo...',
   'ai_sources': 'Fontes',
   'easter_egg_missing': 'Imagem do ovo de Páscoa não encontrada!',
   'intel_museum_desc': 'Esta é uma compilação interna para testes.',
@@ -8467,6 +8568,8 @@ const _pt = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'Disco',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': 'Letra da unidade:',
+  'creator_no_drive_letter': 'Sem letra de unidade',
   'creator_build_prefix': 'Compilação',
   'creator_starting': 'Iniciando...',
   'creator_error_prefix': 'Erro:',
@@ -8520,6 +8623,8 @@ const _pt = <String, String>{
   'boot_cleaning': 'Limpando disco...',
   'boot_access_denied': 'Acesso negado, execute como administrador',
   'boot_partition_failed': 'Falha ao criar partição: {error}',
+  'boot_drive_letter_in_use':
+      'A letra de unidade solicitada já está em uso. Escolha Automático ou outra letra.',
   'boot_partition_layout_not_ready':
       'O novo volume não ficou pronto a tempo. Tente novamente.',
   'boot_format_verifying': 'Verificando formato...',
@@ -8776,6 +8881,12 @@ const _de = <String, String>{
       'Dieser Datenträger wird bereits von einem anderen Vorgang in WinDeploy Studio verwendet. Warten Sie, bis er abgeschlossen ist, und versuchen Sie es erneut.',
   'safety_detection_failed':
       'Die Sicherheitsinformationen des Datenträgers konnten nicht geprüft werden. Der Vorgang wurde beendet.',
+  'safety_detection_failed_detail':
+      'Die Sicherheitsprüfung des Datenträgers ist fehlgeschlagen: {detail}. Der Vorgang wurde beendet.',
+  'safety_detail_storage_timeout':
+      'Windows hat zu lange zum Lesen des ausgewählten Datenträgers benötigt. Verbinden Sie das USB-Gerät erneut und versuchen Sie es noch einmal.',
+  'safety_detail_storage_unavailable':
+      'Windows konnte die Informationen des ausgewählten Datenträgers nicht lesen. Verbinden Sie das USB-Gerät erneut und versuchen Sie es noch einmal.',
   'safety_not_external':
       'Nur geprüfte externe Datenträger können gelöscht werden.',
   'safety_disk_offline':
@@ -8912,6 +9023,8 @@ const _de = <String, String>{
   'creator_complete_desc': 'Ihr Windows-Installations-USB ist einsatzbereit',
   'creator_another': 'Weiteren erstellen',
   'creator_parse_error': 'ISO-Datei konnte nicht analysiert werden',
+  'creator_iso_mount_failed':
+      'Windows konnte dieses ISO nicht einbinden. Schließen Sie Programme, die das Abbild verwenden, und versuchen Sie es erneut.',
   'creator_error': 'Fehler',
   'creator_checking_safety': 'Datenträgersicherheit wird geprüft...',
   'creator_safety_failed': 'Sicherheitsprüfung fehlgeschlagen',
@@ -8995,6 +9108,7 @@ const _de = <String, String>{
   'close': 'Schließen',
   'copied': 'Kopiert',
   'ai_thinking': 'Denke nach...',
+  'ai_answering': 'Antwort wird erstellt...',
   'ai_sources': 'Quellen',
   'easter_egg_missing': 'Osterbild nicht gefunden!',
   'intel_museum_desc': 'Dies ist ein interner Build zu Testzwecken.',
@@ -9398,6 +9512,8 @@ const _de = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': 'Datenträger',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': 'Laufwerksbuchstabe:',
+  'creator_no_drive_letter': 'Kein Laufwerksbuchstabe',
   'creator_build_prefix': 'Build',
   'creator_starting': 'Startet...',
   'creator_error_prefix': 'Fehler:',
@@ -9455,6 +9571,8 @@ const _de = <String, String>{
   'boot_access_denied':
       'Zugriff verweigert – bitte als Administrator ausführen',
   'boot_partition_failed': 'Partitionierung fehlgeschlagen: {error}',
+  'boot_drive_letter_in_use':
+      'Der angeforderte Laufwerksbuchstabe wird bereits verwendet. Wählen Sie Automatisch oder einen anderen Buchstaben.',
   'boot_partition_layout_not_ready':
       'Das neue Volume war nicht rechtzeitig bereit. Bitte erneut versuchen.',
   'boot_format_verifying': 'Format wird überprüft...',
@@ -9717,6 +9835,11 @@ const _ko = <String, String>{
   'safety_disk_busy':
       '다른 WinDeploy Studio 작업에서 이 디스크를 사용 중입니다. 작업이 끝난 뒤 다시 시도해 주세요.',
   'safety_detection_failed': '디스크 안전 정보를 확인할 수 없어 작업을 중단했습니다.',
+  'safety_detection_failed_detail': '디스크 안전성 확인 실패: {detail}. 작업을 중단했습니다.',
+  'safety_detail_storage_timeout':
+      'Windows가 선택한 디스크를 읽는 데 너무 오래 걸렸습니다. USB 장치를 다시 연결한 후 다시 시도하세요.',
+  'safety_detail_storage_unavailable':
+      'Windows에서 선택한 디스크 정보를 읽을 수 없습니다. USB 장치를 다시 연결한 후 다시 시도하세요.',
   'safety_not_external': '확인된 외장 디스크만 지울 수 있습니다.',
   'safety_disk_offline': '선택한 디스크가 오프라인 상태여서 사용할 수 없습니다.',
   'linux_not_isohybrid':
@@ -9838,6 +9961,8 @@ const _ko = <String, String>{
   'creator_complete_desc': 'Windows 설치 USB가 준비되었습니다',
   'creator_another': '다른 것 만들기',
   'creator_parse_error': 'ISO 파일 분석 실패',
+  'creator_iso_mount_failed':
+      'Windows에서 이 ISO를 탑재할 수 없습니다. 이미지를 사용하는 프로그램을 닫고 다시 시도하세요.',
   'creator_error': '오류',
   'creator_checking_safety': '디스크 안전성 확인 중...',
   'creator_safety_failed': '안전성 검사 실패',
@@ -9915,6 +10040,7 @@ const _ko = <String, String>{
   'close': '닫기',
   'copied': '복사됨',
   'ai_thinking': '생각 중...',
+  'ai_answering': '답변 작성 중...',
   'ai_sources': '출처',
   'easter_egg_missing': '이스터에그 이미지를 찾을 수 없습니다!',
   'intel_museum_desc': '테스트용 내부 빌드입니다.',
@@ -10295,6 +10421,8 @@ const _ko = <String, String>{
   'intel_windows_11': 'Windows 11',
   'creator_disk_prefix': '디스크',
   'creator_sn_prefix': 'S/N:',
+  'creator_drive_letters': '드라이브 문자:',
+  'creator_no_drive_letter': '드라이브 문자 없음',
   'creator_build_prefix': '빌드',
   'creator_starting': '시작 중...',
   'creator_error_prefix': '오류:',
@@ -10342,6 +10470,7 @@ const _ko = <String, String>{
   'boot_cleaning': '디스크 정리 중...',
   'boot_access_denied': '접근 거부됨 - 관리자로 실행하세요',
   'boot_partition_failed': '파티션 생성 실패: {error}',
+  'boot_drive_letter_in_use': '요청한 드라이브 문자가 이미 사용 중입니다. 자동 또는 다른 문자를 선택하세요.',
   'boot_partition_layout_not_ready': '새 볼륨이 제시간에 준비되지 않았습니다. 다시 시도하세요.',
   'boot_format_verifying': '포맷 검증 중...',
   'boot_format_failed': '포맷 실패',

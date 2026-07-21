@@ -17,6 +17,7 @@ import 'linux_togo_image_preflight.dart';
 import 'windows_iso_mount_service.dart';
 import 'windows_iso_preflight.dart';
 import 'windows_system_environment.dart';
+import 'operation_status_service.dart';
 import '../../features/deployment/models/deployment_plan.dart';
 import '../../features/logs/services/log_center_service.dart';
 
@@ -96,12 +97,25 @@ class BootableUsbService {
     LinuxToGoImageFamily.deepinLive => 'persistence',
   };
 
+  @visibleForTesting
+  static Duration robocopyTimeoutForTesting(int totalBytes) =>
+      _robocopyTimeout(totalBytes);
+
+  @visibleForTesting
+  static bool noVolumeSelectedMessageForTesting(String output) =>
+      _containsNoVolumeSelectedMessage(output);
+
   final Ref ref;
   final List<String> _log = [];
   bool _cancelRequested = false;
   Process? _activeLinuxRawWriteProcess;
   Process? _activeLinuxUtilityProcess;
+  Process? _activeCopyProcess;
   WindowsIsoMountLease? _linuxIsoMountLease;
+  WindowsIsoMountLease? _windowsInstallIsoLease;
+  TrackedOperationKind _trackedOperationKind =
+      TrackedOperationKind.installMedia;
+  bool _trackedOperationIsLinux = false;
 
   BootableUsbService(this.ref);
 
@@ -169,6 +183,10 @@ class BootableUsbService {
   @visibleForTesting
   static String summarizePowerShellFailureForTesting(String raw) =>
       _summarizePowerShellFailure(raw, fallback: 'PowerShell command failed.');
+
+  @visibleForTesting
+  static String summarizeDiskpartFailureForTesting(String raw) =>
+      _summarizeDiskpartFailure(raw);
 
   @visibleForTesting
   static String linuxToGoVolumeLabelForTesting(String value) =>
@@ -252,6 +270,10 @@ class BootableUsbService {
   static bool isRemoteInstallMediaUncPathForTesting(String path) =>
       _isRemoteInstallMediaUncPath(path);
 
+  @visibleForTesting
+  static String? windowsDriveRootForTesting(String path) =>
+      _windowsDriveRoot(path);
+
   Future<String> saveLogToFile() async {
     try {
       final dir = await getApplicationSupportDirectory();
@@ -271,6 +293,9 @@ class BootableUsbService {
     DeploymentPlan? deploymentPlan,
     ProgressCallback? onProgress,
   }) async {
+    _cancelRequested = false;
+    _trackedOperationKind = TrackedOperationKind.installMedia;
+    _trackedOperationIsLinux = false;
     final plan = deploymentPlan;
     var windowsInstallIsoMounted = false;
 
@@ -349,12 +374,14 @@ class BootableUsbService {
       _logLine(
         'Windows installation-media preflight failed before erase: $error',
       );
+      final logPath = await saveLogToFile();
       _notify(
         onProgress,
         CreateProgress(
           step: CreateStep.failed,
-          message: 'boot_preflight_failed',
-          error: 'i18n:${mediaPreflight.messageKey ?? 'boot_preflight_failed'}',
+          message:
+              '${mediaPreflight.messageKey ?? 'boot_preflight_failed'}\n\nLog: $logPath',
+          error: mediaPreflight.messageKey == null ? error : null,
         ),
       );
       return false;
@@ -390,7 +417,11 @@ class BootableUsbService {
         _logLine('Target disk safety check failed: ${safetyResult.reason}');
         _notify(
           onProgress,
-          CreateProgress(step: CreateStep.failed, message: safetyResult.reason),
+          CreateProgress(
+            step: CreateStep.failed,
+            message: safetyResult.reason,
+            error: safetyResult.params?['detail'],
+          ),
         );
         return false;
       }
@@ -442,6 +473,10 @@ class BootableUsbService {
 
       if (!partitionResult.success) {
         final errorDetail = partitionResult.error ?? '';
+        final localizedError =
+            errorDetail == 'The requested drive letter is already in use.'
+            ? 'i18n:boot_drive_letter_in_use'
+            : errorDetail;
         _logLine('Partition FAILED: $errorDetail');
         final errorKey =
             errorDetail.contains('Access is denied') ||
@@ -455,7 +490,7 @@ class BootableUsbService {
           CreateProgress(
             step: CreateStep.failed,
             message: '$errorKey\n\nLog: $logPath',
-            error: errorDetail,
+            error: localizedError,
           ),
         );
         return false;
@@ -1008,6 +1043,7 @@ class BootableUsbService {
     int targetDiskNumber,
   ) async {
     try {
+      final sourceDrive = _windowsDriveRoot(path);
       final result = await _runPowerShell(
         const [
           '-NoProfile',
@@ -1015,15 +1051,41 @@ class BootableUsbService {
           '-ExecutionPolicy',
           'Bypass',
           '-Command',
-          r'''$volume = Get-Volume -FilePath $env:WDS_SOURCE_PATH -ErrorAction Stop
-$partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
-if ($partitions.Count -ne 1) {
-  throw "Source path did not resolve to exactly one physical partition."
+          r'''$ErrorActionPreference = 'Stop'
+$diskNumber = $null
+$drive = $env:WDS_SOURCE_DRIVE
+
+# A direct logical-disk association avoids enumerating every Storage volume.
+# This remains responsive when an unrelated USB device currently exposes a
+# RAW partition and causes Get-Volume to refresh slowly.
+if ($drive) {
+  try {
+    $links = @(Get-CimInstance -ClassName Win32_LogicalDiskToPartition -ErrorAction Stop |
+      Where-Object { $_.Dependent.DeviceID -eq $drive })
+    if ($links.Count -eq 1) {
+      $match = [regex]::Match($links[0].Antecedent.DeviceID, 'Disk #(\d+),')
+      if ($match.Success) { $diskNumber = [int]$match.Groups[1].Value }
+    }
+  } catch {}
 }
-[int]$partitions[0].DiskNumber''',
+
+if ($null -eq $diskNumber) {
+  $volume = Get-Volume -FilePath $env:WDS_SOURCE_PATH -ErrorAction Stop
+  $partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
+  if ($partitions.Count -ne 1) {
+    throw 'Source path did not resolve to exactly one physical partition.'
+  }
+  $diskNumber = [int]$partitions[0].DiskNumber
+}
+
+$diskNumber''',
         ],
-        environment: {...Platform.environment, 'WDS_SOURCE_PATH': path},
-        timeout: const Duration(seconds: 10),
+        environment: {
+          ...Platform.environment,
+          'WDS_SOURCE_PATH': path,
+          'WDS_SOURCE_DRIVE': sourceDrive ?? '',
+        },
+        timeout: const Duration(seconds: 30),
       );
       if (result.exitCode != 0) {
         _logLine('Windows ISO source disk resolution failed: ${result.stderr}');
@@ -1037,6 +1099,11 @@ if ($partitions.Count -ne 1) {
       _logLine('Windows ISO source disk resolution error: $error');
       return null;
     }
+  }
+
+  static String? _windowsDriveRoot(String path) {
+    final match = RegExp(r'^([A-Za-z]):[\\/]').firstMatch(path.trim());
+    return match == null ? null : '${match.group(1)!.toUpperCase()}:';
   }
 
   Future<String?> _findWindowsSystemTool(String executableName) async {
@@ -1081,6 +1148,10 @@ if ($partitions.Count -ne 1) {
     DeploymentPlan? deploymentPlan,
     ProgressCallback? onProgress,
   }) async {
+    _trackedOperationKind = kind == LinuxUsbKind.toGo
+        ? TrackedOperationKind.toGo
+        : TrackedOperationKind.installMedia;
+    _trackedOperationIsLinux = true;
     final diskNumber = disk.diskNumber;
     _cancelRequested = false;
     _log.clear();
@@ -1185,7 +1256,11 @@ if ($partitions.Count -ne 1) {
         _logLine('Target disk safety check failed: ${safetyResult.reason}');
         _notify(
           onProgress,
-          CreateProgress(step: CreateStep.failed, message: safetyResult.reason),
+          CreateProgress(
+            step: CreateStep.failed,
+            message: safetyResult.reason,
+            error: safetyResult.params?['detail'],
+          ),
         );
         return false;
       }
@@ -1414,7 +1489,7 @@ if ($partitions.Count -ne 1) {
         CreateProgress(
           step: finalResult.success ? CreateStep.complete : CreateStep.failed,
           message: finalResult.success
-              ? 'linux_complete'
+              ? 'linux_media_raw_complete'
               : '${finalResult.cancelled ? 'deploy_cancel_requested' : 'linux_verify_failed'}\n${finalResult.error ?? ''}',
           progress: finalResult.success ? 1.0 : 0.0,
           error: finalResult.error,
@@ -1633,7 +1708,52 @@ if ($partitions.Count -ne 1) {
         expectedPartitionNumber: 2,
         diskNumber: diskNumber,
       );
+      var repairedBoot = bootReady;
+      var repairedLive = liveReady;
       if (!bootReady || !liveReady) {
+        final refreshed = await ref
+            .read(diskSafetyServiceProvider)
+            .refreshDisk(disk);
+        if (refreshed != null) {
+          _logLine(
+            'Linux To Go partition readiness was incomplete (possibly RAW); '
+            'retrying bound formats once.',
+          );
+          if (!bootReady) {
+            await _retryBoundFormat(
+              disk: refreshed,
+              partitionNumber: 1,
+              driveLetter: bootDrive,
+              fileSystem: 'FAT32',
+              volumeLabel: 'WDS_LTG',
+            );
+            repairedBoot = await _waitForLinuxToGoPartition(
+              drive: bootDrive,
+              expectedLabel: 'WDS_LTG',
+              expectedFileSystem: 'FAT32',
+              expectedPartitionNumber: 1,
+              diskNumber: diskNumber,
+            );
+          }
+          if (!liveReady) {
+            await _retryBoundFormat(
+              disk: refreshed,
+              partitionNumber: 2,
+              driveLetter: liveDrive,
+              fileSystem: 'NTFS',
+              volumeLabel: volumeIdentity.label,
+            );
+            repairedLive = await _waitForLinuxToGoPartition(
+              drive: liveDrive,
+              expectedLabel: volumeIdentity.label,
+              expectedFileSystem: 'NTFS',
+              expectedPartitionNumber: 2,
+              diskNumber: diskNumber,
+            );
+          }
+        }
+      }
+      if (!repairedBoot || !repairedLive) {
         return const _LinuxRawWriteResult(
           success: false,
           error:
@@ -2124,13 +2244,15 @@ if ($partitions.Count -ne 1) {
       'select disk $diskNumber',
       'create partition efi size=$bootPartitionSizeMb',
       'select partition 1',
-      'format fs=fat32 label="WDS_LTG" quick',
       'assign letter=$bootLetter',
+      'select volume $bootLetter',
+      'format fs=fat32 label="WDS_LTG" quick',
       'select disk $diskNumber',
       'create partition primary',
       'select partition 2',
-      'format fs=ntfs label="$liveVolumeLabel" quick',
       'assign letter=$liveLetter',
+      'select volume $liveLetter',
+      'format fs=ntfs label="$liveVolumeLabel" quick',
       'exit',
     ];
     return '${commands.join('\n')}\n';
@@ -2153,8 +2275,23 @@ if ($partitions.Count -ne 1) {
       '拒绝访问',
       '卷大小太大',
       '没有选择卷',
+      '没有指定卷',
     ];
     return !errors.any(combined.contains);
+  }
+
+  bool _isNoVolumeSelectedFailure(ProcessResult result) {
+    return _containsNoVolumeSelectedMessage(
+      '${result.stdout}\n${result.stderr}',
+    );
+  }
+
+  static bool _containsNoVolumeSelectedMessage(String output) {
+    final combined = output.toLowerCase();
+    return combined.contains('there is no volume selected') ||
+        combined.contains('no volume selected') ||
+        combined.contains('没有选择卷') ||
+        combined.contains('没有指定卷');
   }
 
   Future<_LinuxToGoDriveLetters?> _reserveLinuxToGoDriveLetters() async {
@@ -2208,7 +2345,10 @@ $letters |
         return result.stdout
             .toString()
             .split(RegExp(r'\s+'))
-            .map((item) => item.trim().replaceAll(':', '').toUpperCase())
+            .map(
+              (item) =>
+                  item.trim().replaceAll(RegExp(r'[:\\]'), '').toUpperCase(),
+            )
             .where((item) => item.length == 1)
             .toSet();
       }
@@ -3351,6 +3491,49 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
     return fallback;
   }
 
+  /// DiskPart writes a large amount of status text to stdout, including a
+  /// repeated 0% line while a formatter is waiting on a removable-media
+  /// bridge. Keep the complete output in the log, but expose only the useful
+  /// failure to the deployment UI.
+  static String _summarizeDiskpartFailure(String raw) {
+    final normalized = raw.replaceAll('\r\n', '\n');
+    final lower = normalized.toLowerCase();
+    if (lower.contains('label is invalid') ||
+        lower.contains('invalid volume label') ||
+        lower.contains('illegal label') ||
+        normalized.contains('标签非法') ||
+        normalized.contains('标签无效') ||
+        normalized.contains('卷标无效')) {
+      return 'i18n:deploy_compat_invalid_volume_label';
+    }
+    if (lower.contains('access is denied') || normalized.contains('拒绝访问')) {
+      return 'i18n:boot_access_denied';
+    }
+
+    final useful = <String>[];
+    for (final rawLine in normalized.split('\n')) {
+      final line = rawLine.trim();
+      if (line.isEmpty ||
+          RegExp(r'^\d+\s*(?:percent|百分比)').hasMatch(line) ||
+          line.startsWith('Microsoft DiskPart') ||
+          line.startsWith('Copyright') ||
+          line.startsWith('在计算机上:') ||
+          line.startsWith('On computer:') ||
+          line.contains('现在是所选磁盘') ||
+          line.contains('现在是所选分区') ||
+          line.contains('成功地创建了指定分区') ||
+          line.contains('successfully created the specified partition')) {
+        continue;
+      }
+      useful.add(line);
+    }
+    if (useful.isEmpty) return 'i18n:boot_partition_layout_not_ready';
+    final detail = useful.length > 3
+        ? useful.sublist(useful.length - 3).join(' ')
+        : useful.join(' ');
+    return detail.length <= 480 ? detail : '${detail.substring(0, 477)}...';
+  }
+
   Future<void> _terminateProcessTree(
     Process process, {
     required String reason,
@@ -3368,7 +3551,11 @@ $volume = Get-Volume -DriveLetter $env:WDS_DRIVE_LETTER -ErrorAction Stop
         _logLine('taskkill PID ${process.pid} failed: $error');
       }
     }
-    process.kill(ProcessSignal.sigkill);
+    try {
+      process.kill(ProcessSignal.sigkill);
+    } catch (error) {
+      _logLine('Direct kill for PID ${process.pid} failed: $error');
+    }
     try {
       await process.exitCode.timeout(const Duration(seconds: 10));
     } catch (error) {
@@ -4126,12 +4313,27 @@ Write-Output "WDS_DISK_ONLINE"
         error: 'The requested drive letter is invalid.',
       );
     }
-    if (requestedLetter != null &&
-        !await _isDriveLetterAvailable(requestedLetter, diskNumber)) {
-      return const _DiskPartResult(
-        success: false,
-        error: 'The requested drive letter is already in use.',
+    if (requestedLetter != null) {
+      final availability = await _checkDriveLetterAvailability(
+        requestedLetter,
+        diskNumber,
       );
+      if (availability == _DriveLetterAvailability.occupied) {
+        return const _DiskPartResult(
+          success: false,
+          error: 'The requested drive letter is already in use.',
+        );
+      }
+      if (availability == _DriveLetterAvailability.unknown) {
+        // Storage cmdlets can be slow while Windows is refreshing a removable
+        // disk. An inconclusive read must not be reported as a confirmed
+        // conflict; the guarded DiskPart operation below remains the final
+        // authority and is still bound to the selected disk identity.
+        _logLine(
+          'Drive-letter availability check timed out; '
+          'letting guarded DiskPart validate $requestedLetter.',
+        );
+      }
     }
     final currentDisk = await ref
         .read(diskSafetyServiceProvider)
@@ -4140,6 +4342,14 @@ Write-Output "WDS_DISK_ONLINE"
       return const _DiskPartResult(
         success: false,
         error: 'Target disk identity changed before partitioning.',
+      );
+    }
+    final effectiveLetter =
+        requestedLetter ?? await _reserveInstallMediaDriveLetter();
+    if (effectiveLetter == null) {
+      return const _DiskPartResult(
+        success: false,
+        error: 'Could not reserve a safe drive letter for the new volume.',
       );
     }
     final label = _sanitizeVolumeLabel(volumeLabel, fallback: 'WDS_BOOT');
@@ -4173,7 +4383,7 @@ Write-Output "WDS_DISK_ONLINE"
       diskNumber: diskNumber,
       currentPartitionStyle: initializedDisk.partitionStyle,
       deploymentBootMode: deploymentBootMode,
-      preferredDriveLetter: requestedLetter ?? '',
+      preferredDriveLetter: effectiveLetter,
       volumeLabel: label,
       diskSizeBytes: initializedDisk.sizeBytes,
     );
@@ -4182,36 +4392,73 @@ Write-Output "WDS_DISK_ONLINE"
     final result = await diskSafety.runGuardedDiskpart(initializedDisk, script);
     _logLine('DiskPart exit: ${result.exitCode}');
 
+    var recoveredDriveLetter = false;
     if (!_diskpartSucceeded(result)) {
       final stderr = result.stderr.toString();
       final stdout = result.stdout.toString();
       _logLine('DiskPart stderr: $stderr');
       _logLine('DiskPart stdout: $stdout');
-      return _DiskPartResult(
-        success: false,
-        error: stderr.isNotEmpty ? stderr : stdout,
-      );
+      final rawError = stderr.trim().isNotEmpty ? stderr : stdout;
+      if (_isNoVolumeSelectedFailure(result)) {
+        _logLine(
+          'DiskPart created the target partition but did not expose a volume; '
+          'running an identity-bound RAW format recovery.',
+        );
+        recoveredDriveLetter = await _retryBoundFormat(
+          disk: initializedDisk,
+          partitionNumber: 1,
+          driveLetter: '$effectiveLetter:',
+          fileSystem: 'FAT32',
+          volumeLabel: label,
+          markActive: deploymentBootMode == DeploymentBootMode.legacyBios,
+        );
+      }
+      if (!recoveredDriveLetter) {
+        return _DiskPartResult(
+          success: false,
+          error: _summarizeDiskpartFailure(rawError),
+        );
+      }
     }
 
-    final driveLetter = requestedLetter == null
-        ? await _findDriveLetterForDisk(diskNumber)
-        : '$requestedLetter:';
-    if (driveLetter == null) {
-      _logLine('Could not find drive letter');
-      return _DiskPartResult(
-        success: false,
-        error: 'Could not find assigned drive letter',
-      );
-    }
+    final driveLetter = '$effectiveLetter:';
 
-    if (!await _verifyInstallMediaPartition(
+    var partitionReady = await _verifyInstallMediaPartition(
       diskNumber: diskNumber,
       driveLetter: driveLetter,
       expectedPartitionStyle: useGpt ? 'GPT' : 'MBR',
       expectedLabel: label,
-      expectedEfiSystemPartition: useGpt,
+      // Removable-media UEFI boot uses the firmware fallback path
+      // (\\EFI\\BOOT\\BOOTX64.EFI).  Some USB bridges reject formatting a
+      // GPT EFI-typed partition, so this flow deliberately uses a FAT32 GPT
+      // primary partition instead of requiring an ESP type.
+      expectedEfiSystemPartition: false,
       expectedActive: deploymentBootMode == DeploymentBootMode.legacyBios,
-    )) {
+    );
+    if (!partitionReady) {
+      _logLine(
+        'Install media volume is not ready (possibly RAW); retrying one '
+        'identity-bound FAT32 format before failing.',
+      );
+      final repaired = await _retryBoundFormat(
+        disk: initializedDisk,
+        partitionNumber: 1,
+        driveLetter: driveLetter,
+        fileSystem: 'FAT32',
+        volumeLabel: label,
+      );
+      if (repaired) {
+        partitionReady = await _verifyInstallMediaPartition(
+          diskNumber: diskNumber,
+          driveLetter: driveLetter,
+          expectedPartitionStyle: useGpt ? 'GPT' : 'MBR',
+          expectedLabel: label,
+          expectedEfiSystemPartition: false,
+          expectedActive: deploymentBootMode == DeploymentBootMode.legacyBios,
+        );
+      }
+    }
+    if (!partitionReady) {
       _logLine('Install media partition postcondition check failed');
       return const _DiskPartResult(
         success: false,
@@ -4220,6 +4467,75 @@ Write-Output "WDS_DISK_ONLINE"
     }
 
     return _DiskPartResult(success: true, driveLetter: driveLetter);
+  }
+
+  Future<bool> _retryBoundFormat({
+    required DiskInfo disk,
+    required int partitionNumber,
+    required String driveLetter,
+    required String fileSystem,
+    required String volumeLabel,
+    bool markActive = false,
+  }) async {
+    final letter = driveLetter.replaceAll(RegExp(r'[:\\]'), '').toUpperCase();
+    if (!RegExp(r'^[D-Z]$').hasMatch(letter)) return false;
+    final availability = await _checkDriveLetterAvailability(
+      letter,
+      disk.diskNumber,
+    );
+    if (availability != _DriveLetterAvailability.available) {
+      _logLine(
+        'RAW format recovery stopped because drive letter $letter could not '
+        'be bound safely to disk ${disk.diskNumber}.',
+      );
+      return false;
+    }
+    final safeLabel = volumeLabel.replaceAll('"', '');
+    final scripts = <String>[
+      [
+        'select disk ${disk.diskNumber}',
+        'select volume $letter',
+        'format fs=$fileSystem label="$safeLabel" quick',
+        if (markActive) ...['select partition $partitionNumber', 'active'],
+        'exit',
+      ].join('\n'),
+      [
+        'select disk ${disk.diskNumber}',
+        'select partition $partitionNumber',
+        'format fs=$fileSystem label="$safeLabel" quick',
+        'remove all noerr',
+        'assign letter=$letter',
+        if (markActive) ...['select partition $partitionNumber', 'active'],
+        'exit',
+      ].join('\n'),
+    ];
+    try {
+      for (var attempt = 0; attempt < scripts.length; attempt++) {
+        final result = await ref
+            .read(diskSafetyServiceProvider)
+            .runGuardedDiskpart(
+              disk,
+              '${scripts[attempt]}\n',
+              timeout: const Duration(minutes: 2),
+            );
+        if (_diskpartSucceeded(result)) {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          _logLine(
+            'Bound RAW format recovery completed for disk ${disk.diskNumber}, '
+            'partition $partitionNumber ($fileSystem), attempt ${attempt + 1}.',
+          );
+          return true;
+        }
+        _logLine(
+          'Bound RAW format recovery attempt ${attempt + 1} failed: '
+          '${result.stderr} ${result.stdout}',
+        );
+      }
+      return false;
+    } catch (error) {
+      _logLine('Bound RAW format recovery error: $error');
+      return false;
+    }
   }
 
   static String _buildInstallMediaDiskpartScript({
@@ -4231,29 +4547,78 @@ Write-Output "WDS_DISK_ONLINE"
     required int? diskSizeBytes,
   }) {
     final normalizedLetter = _normalizePreferredLetter(preferredDriveLetter);
+    // Production always supplies a reserved letter. The deterministic fallback
+    // keeps the testing helper representative without reintroducing implicit
+    // DiskPart volume selection.
+    final formatLetter = normalizedLetter ?? 'Z';
     final fat32PartitionSizeMb = _fat32PartitionSizeMbForDisk(diskSizeBytes);
-    final useGpt = deploymentBootMode == DeploymentBootMode.uefiGpt;
-    final partitionKind = useGpt ? 'efi' : 'primary';
+    // A number of removable-media bridges reject `format` on a partition
+    // created with the EFI type, even though the disk is GPT.  UEFI removable
+    // boot does not require the ESP type when the fallback boot path is used;
+    // a FAT32 primary partition on GPT is the broadly compatible layout.
+    final partitionKind = 'primary';
     final partitionCommand = fat32PartitionSizeMb == null
         ? 'create partition $partitionKind'
         : 'create partition $partitionKind size=$fat32PartitionSizeMb';
     final commands = <String>[
       'select disk $diskNumber',
-      // A UEFI + GPT installation disk uses one full-size ESP. This keeps the
-      // normal removable-media fallback path while retaining a mountable FAT32
-      // volume for the installation files.
+      // A UEFI + GPT installation disk uses one FAT32 primary volume. This
+      // keeps the removable-media fallback path while avoiding the VDS
+      // limitation that rejects formatting EFI-typed partitions on some USB
+      // bridges.
       partitionCommand,
-      // Some DiskPart builds do not select the corresponding volume after
-      // creating a partition. Select it explicitly before formatting.
+      // A newly created partition is not guaranteed to have a volume object
+      // yet. Format the selected partition first, then replace any automatic
+      // mount point with the reserved drive letter. Selecting a volume before
+      // this format fails with "No volume specified" on affected DiskPart
+      // builds and leaves the partition RAW.
       'select partition 1',
       'format fs=fat32 label="$volumeLabel" quick',
-      normalizedLetter == null ? 'assign' : 'assign letter=$normalizedLetter',
+      'remove all noerr',
+      'assign letter=$formatLetter',
       if (deploymentBootMode == DeploymentBootMode.legacyBios)
         'select partition 1',
       if (deploymentBootMode == DeploymentBootMode.legacyBios) 'active',
       'exit',
     ];
     return '${commands.join('\n')}\n';
+  }
+
+  Future<String?> _reserveInstallMediaDriveLetter() async {
+    final used = await _getUsedDriveLetters();
+    if (used == null) return null;
+    const candidates = [
+      'W',
+      'V',
+      'U',
+      'T',
+      'S',
+      'R',
+      'Q',
+      'P',
+      'O',
+      'N',
+      'M',
+      'L',
+      'K',
+      'J',
+      'I',
+      'H',
+      'G',
+      'F',
+      'E',
+      'D',
+      'X',
+      'Y',
+      'Z',
+    ];
+    for (final candidate in candidates) {
+      if (!used.contains(candidate)) {
+        _logLine('Reserved install-media drive letter: $candidate');
+        return candidate;
+      }
+    }
+    return null;
   }
 
   static int? _fat32PartitionSizeMbForDisk(int? diskSizeBytes) {
@@ -4389,7 +4754,10 @@ exit 1''',
     return RegExp(r'^[D-Z]$').hasMatch(normalized) ? normalized : null;
   }
 
-  Future<bool> _isDriveLetterAvailable(String letter, int diskNumber) async {
+  Future<_DriveLetterAvailability> _checkDriveLetterAvailability(
+    String letter,
+    int diskNumber,
+  ) async {
     try {
       final result = await _runPowerShell(
         const [
@@ -4407,73 +4775,30 @@ exit 1''',
           'WDS_LETTER': letter,
           'WDS_DISK_NUMBER': '$diskNumber',
         },
-        timeout: const Duration(seconds: 8),
+        // Get-Partition may take several seconds while Storage refreshes a
+        // removable disk. Keep the query bounded, but do not turn a timeout
+        // into a false "already in use" result.
+        timeout: const Duration(seconds: 30),
       );
-      return result.exitCode == 0;
+      if (result.exitCode == 0) return _DriveLetterAvailability.available;
+      if (result.exitCode == 1) return _DriveLetterAvailability.occupied;
+      _logLine(
+        'Drive-letter availability query inconclusive: '
+        '${_summarizePowerShellFailure(result.stderr.toString(), fallback: 'query failed')}',
+      );
+      return _DriveLetterAvailability.unknown;
     } catch (_) {
-      return false;
+      return _DriveLetterAvailability.unknown;
     }
   }
 
   String _sanitizeVolumeLabel(String value, {required String fallback}) {
     final sanitized = value
         .trim()
-        .replaceAll(RegExp(r'["*/:<>?\\|+,;=\[\]]'), '')
+        .replaceAll(RegExp(r'[."*/:<>?\\|+,;=\[\]\x00-\x1F]'), '')
         .trim();
     if (sanitized.isEmpty) return fallback;
     return sanitized.length > 11 ? sanitized.substring(0, 11) : sanitized;
-  }
-
-  Future<String?> _findDriveLetterForDisk(int diskNumber) async {
-    try {
-      final result = await _runPowerShell(
-        const [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          r'''$deadline = (Get-Date).AddSeconds(25)
-$lastError = ''
-while ((Get-Date) -lt $deadline) {
-  try {
-    $letter = Get-Partition -DiskNumber ([int]$env:WDS_DISK_NUMBER) -ErrorAction Stop |
-      Where-Object { $_.DriveLetter } |
-      Sort-Object PartitionNumber |
-      Select-Object -First 1 -ExpandProperty DriveLetter
-    if ($letter) {
-      Write-Output $letter
-      exit 0
-    }
-    $lastError = 'The new volume does not have a drive letter yet.'
-  } catch {
-    $lastError = $_.Exception.Message
-  }
-  Start-Sleep -Milliseconds 500
-}
-if ($lastError) { Write-Error $lastError }
-exit 1''',
-        ],
-        environment: {
-          ...Platform.environment,
-          'WDS_DISK_NUMBER': '$diskNumber',
-        },
-        timeout: const Duration(seconds: 35),
-      );
-      if (result.exitCode == 0) {
-        final letter = _normalizePreferredLetter(result.stdout.toString());
-        if (letter != null) return '$letter:';
-      } else {
-        _logLine(
-          'Drive-letter discovery output: '
-          '${result.stderr.toString().trim()}',
-        );
-      }
-    } catch (error) {
-      _logLine('Drive-letter discovery error: $error');
-    }
-
-    return null;
   }
 
   // --- Formatting ---
@@ -4501,88 +4826,45 @@ exit 1''',
 
   // --- ISO Mounting ---
 
-  // Windows installation-media creation needs bounded mount operations because
-  // this path has already repartitioned the selected USB drive when the second
-  // mount occurs. Keep it separate from the Linux To Go mount helper below so
-  // its behavior remains unchanged.
+  // Windows installation-media creation uses the shared read-only mount
+  // coordinator. The media-writing pipeline below remains unchanged.
   Future<String?> _mountWindowsInstallIso(String isoPath) async {
-    var mounted = false;
-    // The cleanup path must also run if the stale-mount probe itself fails.
-    // Dismount-DiskImage can time out while an existing image remains mounted.
-    var mountMayExist = true;
+    await _windowsInstallIsoLease?.release();
+    _windowsInstallIsoLease = null;
     try {
-      final escapedPath = isoPath.replaceAll("'", "''");
       _logLine('Mounting Windows installation ISO: $isoPath');
-      await _runPowerShell([
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
-      ], timeout: const Duration(seconds: 10));
-      final mountResult = await _runPowerShell([
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Mount-DiskImage -ImagePath '$escapedPath' -PassThru -ErrorAction Stop | Out-Null",
-      ], timeout: const Duration(seconds: 30));
-      if (mountResult.exitCode != 0) {
+      final lease = await WindowsIsoMountService.instance.acquire(
+        isoPath,
+        isCancelled: () => _cancelRequested,
+        mountTimeout: const Duration(seconds: 20),
+        volumeTimeout: const Duration(seconds: 30),
+        mountAttempts: 2,
+      );
+      if (lease == null) {
         _logLine(
-          'Windows installation ISO mount failed: ${mountResult.stderr}',
+          'Windows installation ISO mount failed: '
+          '${WindowsIsoMountService.instance.lastDiagnostic ?? 'Unknown error'}',
         );
-      } else {
-        mounted = true;
-        final deadline = DateTime.now().add(const Duration(seconds: 20));
-        while (DateTime.now().isBefore(deadline)) {
-          await Future<void>.delayed(const Duration(milliseconds: 400));
-          final remaining = deadline.difference(DateTime.now());
-          if (remaining <= Duration.zero) break;
-          final volumeResult = await _runPowerShell(
-            [
-              '-NoProfile',
-              '-NonInteractive',
-              '-ExecutionPolicy',
-              'Bypass',
-              '-Command',
-              "Get-DiskImage -ImagePath '$escapedPath' | Get-Volume | Select-Object -ExpandProperty DriveLetter",
-            ],
-            timeout: remaining > const Duration(seconds: 4)
-                ? const Duration(seconds: 4)
-                : remaining,
-          );
-          final letter = volumeResult.stdout.toString().trim();
-          if (volumeResult.exitCode == 0 &&
-              RegExp(r'^[A-Za-z]$').hasMatch(letter)) {
-            return '${letter.toUpperCase()}:\\';
-          }
-        }
-        _logLine(
-          'Windows installation ISO mount did not receive a drive letter.',
-        );
+        return null;
       }
+      _windowsInstallIsoLease = lease;
+      _logLine('Mounted at: ${lease.mountPoint}');
+      return lease.mountPoint;
     } catch (error) {
       _logLine('Windows installation ISO mount error: $error');
     }
-    if (mounted || mountMayExist) await _unmountWindowsInstallIso(isoPath);
     return null;
   }
 
   Future<void> _unmountWindowsInstallIso(String isoPath) async {
+    final lease = _windowsInstallIsoLease;
+    if (lease == null) return;
     try {
-      final escapedPath = isoPath.replaceAll("'", "''");
-      final result = await _runPowerShell([
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "Dismount-DiskImage -ImagePath '$escapedPath' -ErrorAction SilentlyContinue | Out-Null",
-      ], timeout: const Duration(seconds: 15));
-      if (result.exitCode != 0) {
-        _logLine('Windows installation ISO unmount warning: ${result.stderr}');
+      if (p.normalize(p.absolute(lease.isoPath)).toLowerCase() ==
+          p.normalize(p.absolute(isoPath)).toLowerCase()) {
+        await lease.release();
+        _windowsInstallIsoLease = null;
+        _logLine('Windows installation ISO unmounted.');
       }
     } catch (error) {
       _logLine('Windows installation ISO unmount error: $error');
@@ -4698,6 +4980,7 @@ exit 1''',
       onProgress?.call(0.0);
 
       final process = await Process.start('robocopy', args);
+      _activeCopyProcess = process;
       final stdoutBuffer = StringBuffer();
       final stderrBuffer = StringBuffer();
       final stdoutSub = process.stdout
@@ -4712,30 +4995,58 @@ exit 1''',
         completed = true;
         return code;
       });
-
-      if (expectedTotalBytes != null) {
-        // Keep the known copy stage visible without periodically walking the
-        // destination tree. Exact file and SHA-256 verification follows the
-        // copy using the same manifest.
-        await exitFuture;
-      } else {
-        var lastLoggedPercent = -1;
+      final copyTimer = Stopwatch()..start();
+      final copyTimeout = _robocopyTimeout(totalBytes);
+      var lastProgressAt = Duration.zero;
+      var lastCopiedBytes = -1;
+      var lastLoggedPercent = -1;
+      var terminated = false;
+      try {
         while (!completed) {
           await Future.any([
             exitFuture,
             Future<void>.delayed(const Duration(seconds: 1)),
           ]);
+          if (completed) break;
 
-          if (totalBytes <= 0) continue;
+          if (_cancelRequested) {
+            _logLine('robocopy cancelled by the user.');
+            await _terminateProcessTree(process, reason: 'robocopy cancelled');
+            terminated = true;
+            return false;
+          }
+          if (copyTimer.elapsed >= copyTimeout) {
+            _logLine(
+              'robocopy timed out after ${copyTimeout.inMinutes} minutes.',
+            );
+            await _terminateProcessTree(process, reason: 'robocopy timed out');
+            terminated = true;
+            return false;
+          }
 
+          // Linux To Go supplies a trusted source manifest and deliberately
+          // avoids repeatedly crawling a large destination tree. Other media
+          // paths use destination growth both for progress and for detecting a
+          // stalled device or file-system driver.
+          if (expectedTotalBytes != null || totalBytes <= 0) continue;
           final copiedBytes = await _directorySize(
             dstDir,
             excludedNames: excludedNames,
             excludedExtensions: normalizedExtensions,
           );
+          if (copiedBytes > lastCopiedBytes) {
+            lastCopiedBytes = copiedBytes;
+            lastProgressAt = copyTimer.elapsed;
+          } else if (copyTimer.elapsed - lastProgressAt >=
+              const Duration(minutes: 10)) {
+            _logLine('robocopy made no progress for 10 minutes.');
+            await _terminateProcessTree(process, reason: 'robocopy stalled');
+            terminated = true;
+            return false;
+          }
+
           final progress = (copiedBytes / totalBytes).clamp(0.0, 0.99);
           onProgress?.call(progress);
-
           final percent = (progress * 100).floor();
           if (percent >= lastLoggedPercent + 10) {
             lastLoggedPercent = percent;
@@ -4744,50 +5055,83 @@ exit 1''',
             );
           }
         }
-      }
 
-      final exitCode = await exitFuture;
-      await stdoutSub.cancel();
-      await stderrSub.cancel();
+        final exitCode = await exitFuture;
 
-      // Only 0-3 are accepted. Codes 4-7 report mismatched files and must fail
-      // before any later boot or content verification is trusted.
-      // 0 = no files copied (already up to date)
-      // 1 = files copied successfully
-      // 2 = extra files in destination
-      // 3 = files copied + extra files
-      _logLine('robocopy exit: $exitCode');
+        // Only 0-3 are accepted. Codes 4-7 report mismatched files and must fail
+        // before any later boot or content verification is trusted.
+        // 0 = no files copied (already up to date)
+        // 1 = files copied successfully
+        // 2 = extra files in destination
+        // 3 = files copied + extra files
+        _logLine('robocopy exit: $exitCode');
 
-      if (!isAcceptedRobocopyExitCode(exitCode)) {
-        _logLine('robocopy FAILED: ${stderrBuffer.toString().trim()}');
-        _logLine('robocopy stdout: ${stdoutBuffer.toString().trim()}');
-        return false;
-      }
-
-      if (deferContentVerification) {
-        _logLine(
-          'robocopy content verification deferred to Linux To Go manifest',
-        );
-      } else {
-        final contentVerified = await _verifyCopiedTree(
-          sourceRoot: srcDir,
-          targetRoot: dstDir,
-          excludedNames: excludedNames,
-          excludedExtensions: normalizedExtensions,
-        );
-        if (!contentVerified) {
-          _logLine('robocopy content verification FAILED');
+        if (!isAcceptedRobocopyExitCode(exitCode)) {
+          _logLine('robocopy FAILED: ${stderrBuffer.toString().trim()}');
+          _logLine('robocopy stdout: ${stdoutBuffer.toString().trim()}');
           return false;
         }
-      }
 
-      onProgress?.call(1.0);
-      _logLine('robocopy OK');
-      return true;
+        if (deferContentVerification) {
+          _logLine(
+            'robocopy content verification deferred to Linux To Go manifest',
+          );
+        } else {
+          final contentVerified = await _verifyCopiedTree(
+            sourceRoot: srcDir,
+            targetRoot: dstDir,
+            excludedNames: excludedNames,
+            excludedExtensions: normalizedExtensions,
+          );
+          if (!contentVerified) {
+            _logLine('robocopy content verification FAILED');
+            return false;
+          }
+        }
+
+        onProgress?.call(1.0);
+        _logLine('robocopy OK');
+        return true;
+      } finally {
+        copyTimer.stop();
+        try {
+          if (!completed && !terminated) {
+            await _terminateProcessTree(
+              process,
+              reason: 'robocopy cleanup after an interrupted copy',
+            );
+          }
+        } finally {
+          try {
+            await stdoutSub.cancel();
+          } catch (_) {}
+          try {
+            await stderrSub.cancel();
+          } catch (_) {}
+          if (identical(_activeCopyProcess, process)) {
+            _activeCopyProcess = null;
+          }
+        }
+      }
     } catch (e) {
       _logLine('robocopy error: $e');
       return false;
     }
+  }
+
+  static Duration _robocopyTimeout(int totalBytes) {
+    const bytesPerSecondFloor = 2 * 1024 * 1024;
+    const setupAllowanceSeconds = 20 * 60;
+    const minimumSeconds = 45 * 60;
+    const maximumSeconds = 8 * 60 * 60;
+    final transferSeconds = totalBytes <= 0
+        ? 0
+        : (totalBytes + bytesPerSecondFloor - 1) ~/ bytesPerSecondFloor;
+    final seconds = (transferSeconds + setupAllowanceSeconds).clamp(
+      minimumSeconds,
+      maximumSeconds,
+    );
+    return Duration(seconds: seconds);
   }
 
   Future<bool> _verifyCopiedTree({
@@ -5462,6 +5806,21 @@ exit 1''',
   }
 
   void _notify(ProgressCallback? callback, CreateProgress progress) {
+    ref
+        .read(operationStatusProvider.notifier)
+        .update(
+          kind: _trackedOperationKind,
+          phase: progress.step.name,
+          message: progress.message,
+          progress: progress.progress,
+          cancellable:
+              progress.step != CreateStep.complete &&
+              progress.step != CreateStep.failed,
+          active:
+              progress.step != CreateStep.complete &&
+              progress.step != CreateStep.failed,
+          isLinux: _trackedOperationIsLinux,
+        );
     callback?.call(progress);
   }
 }
@@ -5473,6 +5832,8 @@ class _DiskPartResult {
 
   const _DiskPartResult({required this.success, this.driveLetter, this.error});
 }
+
+enum _DriveLetterAvailability { available, occupied, unknown }
 
 class _WindowsInstallMediaPreflightResult {
   final String? error;

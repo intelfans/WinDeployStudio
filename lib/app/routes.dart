@@ -19,6 +19,7 @@ import '../features/logs/screens/logs_screen.dart';
 import '../features/ai_assistant/screens/ai_assistant_screen.dart';
 import '../features/tools/screens/tools_screen.dart';
 import '../shared/widgets/app_navigation_shell.dart';
+import '../shared/widgets/operation_status_overlay.dart';
 
 final _shellNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'primary-navigation-shell',
@@ -266,20 +267,28 @@ class _ScaffoldWithNavigationState
     ];
 
     return Scaffold(
-      body: AppNavigationShell(
-        selectedIndex: selectedIndex,
-        destinations: destinations,
-        onDestinationSelected: (index) {
-          // Secondary disk-tool and benchmark pages are pushed on the shell
-          // navigator. Clear that stack before changing the primary route.
-          Navigator.of(
-            context,
-            rootNavigator: true,
-          ).popUntil((route) => route.isFirst);
-          _shellNavigatorKey.currentState?.popUntil((route) => route.isFirst);
-          context.go(_paths[index]);
-        },
-        child: widget.child,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          AppNavigationShell(
+            selectedIndex: selectedIndex,
+            destinations: destinations,
+            onDestinationSelected: (index) {
+              // Secondary disk-tool and benchmark pages are pushed on the shell
+              // navigator. Clear that stack before changing the primary route.
+              Navigator.of(
+                context,
+                rootNavigator: true,
+              ).popUntil((route) => route.isFirst);
+              _shellNavigatorKey.currentState?.popUntil(
+                (route) => route.isFirst,
+              );
+              context.go(_paths[index]);
+            },
+            child: widget.child,
+          ),
+          OperationStatusOverlay(currentPath: currentPath),
+        ],
       ),
     );
   }

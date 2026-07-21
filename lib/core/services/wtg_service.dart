@@ -19,6 +19,7 @@ import 'wim_info_service.dart';
 import 'windows_iso_mount_service.dart';
 import 'windows_iso_preflight.dart';
 import 'windows_system_environment.dart';
+import 'operation_status_service.dart';
 
 enum WtgStep {
   preparing,
@@ -1588,12 +1589,95 @@ if ($partitions.Count -ne 1) {
       bootLabel: bootLabel,
       storageLabel: storageLabel,
     );
-    if (!await _verifyPartitionLayout(disk.diskNumber, layout)) {
+    var layoutReady = await _verifyPartitionLayout(disk.diskNumber, layout);
+    if (!layoutReady) {
+      _logLine(
+        'WTG partition layout is not ready (possibly RAW); retrying the '
+        'identity-bound boot/data formats once.',
+      );
+      final bootFileSystem = bootLayout == WtgBootLayout.legacyBios
+          ? 'NTFS'
+          : 'FAT32';
+      final storagePartition = bootLayout == WtgBootLayout.uefiGpt ? 3 : 2;
+      final bootRepaired = await _retryBoundFormat(
+        disk: initializedDisk,
+        partitionNumber: 1,
+        driveLetter: layout.bootDrive,
+        fileSystem: bootFileSystem,
+        volumeLabel: bootLabel,
+      );
+      final storageRepaired = await _retryBoundFormat(
+        disk: initializedDisk,
+        partitionNumber: storagePartition,
+        driveLetter: layout.storageDrive,
+        fileSystem: 'NTFS',
+        volumeLabel: storageLabel,
+      );
+      if (bootRepaired || storageRepaired) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        layoutReady = await _verifyPartitionLayout(disk.diskNumber, layout);
+      }
+    }
+    if (!layoutReady) {
       throw const _WtgPartitionFailure(
         'The target partition layout failed its postcondition check.',
       );
     }
     return layout;
+  }
+
+  Future<bool> _retryBoundFormat({
+    required DiskInfo disk,
+    required int partitionNumber,
+    required String driveLetter,
+    required String fileSystem,
+    required String volumeLabel,
+  }) async {
+    final letter = _letterOnly(driveLetter);
+    if (letter.isEmpty) return false;
+    final safeLabel = volumeLabel.replaceAll('"', '');
+    final scripts = <String>[
+      [
+        'select disk ${disk.diskNumber}',
+        'select volume $letter',
+        'format fs=$fileSystem label="$safeLabel" quick',
+        'exit',
+      ].join('\n'),
+      [
+        'select disk ${disk.diskNumber}',
+        'select partition $partitionNumber',
+        'assign letter=$letter',
+        'select volume $letter',
+        'format fs=$fileSystem label="$safeLabel" quick',
+        'exit',
+      ].join('\n'),
+    ];
+    try {
+      for (var attempt = 0; attempt < scripts.length; attempt++) {
+        final result = await ref
+            .read(diskSafetyServiceProvider)
+            .runGuardedDiskpart(
+              disk,
+              '${scripts[attempt]}\n',
+              timeout: const Duration(minutes: 2),
+            );
+        if (_diskpartSucceeded(result)) {
+          _logLine(
+            'WTG bound RAW format recovery completed for disk ${disk.diskNumber}, '
+            'partition $partitionNumber, attempt ${attempt + 1}.',
+          );
+          return true;
+        }
+        _logLine(
+          'WTG bound RAW format recovery attempt ${attempt + 1} failed: '
+          '${result.stderr} ${result.stdout}',
+        );
+      }
+      return false;
+    } catch (error) {
+      _logLine('WTG bound RAW format recovery error: $error');
+      return false;
+    }
   }
 
   @visibleForTesting
@@ -1646,8 +1730,9 @@ if ($partitions.Count -ne 1) {
           ? 'create partition efi size=300'
           : 'create partition primary size=350',
       'select partition 1',
-      'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
       'assign letter=$bootLetter',
+      'select volume $bootLetter',
+      'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
       if (!usesGpt) 'select partition 1',
       if (!usesGpt) 'active',
       'select disk $diskNumber',
@@ -1655,8 +1740,9 @@ if ($partitions.Count -ne 1) {
       if (usesGpt) 'select disk $diskNumber',
       'create partition primary',
       'select partition ${usesGpt ? 3 : 2}',
-      'format fs=ntfs label="$storageLabel" quick',
       'assign letter=$storageLetter',
+      'select volume $storageLetter',
+      'format fs=ntfs label="$storageLabel" quick',
       'exit',
     ];
     return '${commands.join('\n')}\n';
@@ -1803,8 +1889,9 @@ attach vdisk
 convert mbr
 create partition primary
 select partition 1
-format fs=ntfs label="WDS_OS" quick
 assign letter=$imageLetter
+select volume $imageLetter
+format fs=ntfs label="WDS_OS" quick
 exit
 ''';
 
@@ -2624,6 +2711,25 @@ exit
     if (_cancelled && progress.step != WtgStep.failed) return;
     final effective = preserveWtgFailureProgress(_lastProgress, progress);
     _lastProgress = effective;
+    ref
+        .read(operationStatusProvider.notifier)
+        .update(
+          kind: TrackedOperationKind.toGo,
+          phase: effective.step.name,
+          message: effective.message,
+          progress: effective.progress,
+          cancellable:
+              effective.step != WtgStep.complete &&
+              effective.step != WtgStep.failed,
+          writtenBytes: effective.writtenBytes,
+          totalBytes: effective.totalBytes,
+          speedBytesPerSecond: effective.currentSpeedBytes,
+          elapsedSeconds: effective.elapsedTime?.inSeconds ?? 0,
+          active:
+              effective.step != WtgStep.complete &&
+              effective.step != WtgStep.failed,
+          isLinux: false,
+        );
     callback?.call(effective);
   }
 

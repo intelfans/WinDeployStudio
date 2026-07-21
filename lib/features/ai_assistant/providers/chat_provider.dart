@@ -7,7 +7,9 @@ import 'package:path/path.dart' as p;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/user_data_protection_service.dart';
+import '../../../core/utils/keyed_async_queue.dart';
 import '../models/chat_models.dart';
+import '../services/ai_output_safety_filter.dart';
 import '../services/ai_service.dart';
 import '../../logs/services/log_center_service.dart';
 
@@ -57,6 +59,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   _ChatGeneration? _activeGeneration;
   int _generationRequest = 0;
   bool _disposed = false;
+  final KeyedAsyncQueue<String> _historyOperations = KeyedAsyncQueue();
 
   ChatNotifier(
     this._aiService, {
@@ -152,30 +155,34 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   Future<bool> _saveSession(ChatSession session) async {
     if (!persistHistory) return true;
-    try {
-      final dir = Directory(_storageDir);
-      if (!dir.existsSync()) dir.createSync(recursive: true);
-      final file = File(p.join(_storageDir, '${session.id}.chat'));
-      final protected = await UserDataProtectionService.protect(
-        jsonEncode(session.toJson()),
-      );
-      await file.writeAsString(protected, flush: true);
-      return true;
-    } catch (error) {
-      await LogCenterService().logError(
-        '[ChatHistory] Save failed for ${session.id}: $error',
-      );
-      return false;
-    }
+    return _historyOperations.run(session.id, () async {
+      try {
+        final dir = Directory(_storageDir);
+        if (!dir.existsSync()) dir.createSync(recursive: true);
+        final file = File(p.join(_storageDir, '${session.id}.chat'));
+        final protected = await UserDataProtectionService.protect(
+          jsonEncode(session.toJson()),
+        );
+        await file.writeAsString(protected, flush: true);
+        return true;
+      } catch (error) {
+        await LogCenterService().logError(
+          '[ChatHistory] Save failed for ${session.id}: $error',
+        );
+        return false;
+      }
+    });
   }
 
   Future<void> _deleteSessionFile(String sessionId) async {
-    for (final extension in ['chat', 'json']) {
-      final file = File(p.join(_storageDir, '$sessionId.$extension'));
-      if (file.existsSync()) {
-        await _deleteHistoryFile(file, action: 'Delete');
+    await _historyOperations.run(sessionId, () async {
+      for (final extension in ['chat', 'json']) {
+        final file = File(p.join(_storageDir, '$sessionId.$extension'));
+        if (file.existsSync()) {
+          await _deleteHistoryFile(file, action: 'Delete');
+        }
       }
-    }
+    });
   }
 
   Future<void> _deleteHistoryFile(File file, {required String action}) async {
@@ -298,23 +305,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
         onChunk: (chunk) {
           if (!_isCurrentGeneration(generation)) return;
           generation.buffer += chunk;
-          _updateMessage(
-            sessionId: generation.sessionId,
-            messageId: generation.messageId,
-            content: generation.buffer,
-            isStreaming: true,
-          );
+          // Do not expose provider text until the complete response has
+          // passed the local safety policy. This applies equally to the
+          // bundled endpoint and every custom OpenAI-compatible endpoint.
         },
         onSources: (sources) {
           if (!_isCurrentGeneration(generation)) return;
-          final sourceMaps = sources
+          generation.sources = sources
               .map((source) => {'title': source.title, 'url': source.url})
               .toList();
-          _updateMessage(
-            sessionId: generation.sessionId,
-            messageId: generation.messageId,
-            sources: sourceMaps,
-          );
         },
         onSearchStatus: (status) {
           if (!_isCurrentGeneration(generation)) return;
@@ -326,37 +325,48 @@ class ChatNotifier extends StateNotifier<ChatState> {
         },
         onComplete: () {
           if (!_isCurrentGeneration(generation)) return;
+          final screened = _screenAssistantOutput(
+            generation.buffer,
+            sources: generation.sources,
+          );
           _updateMessage(
             sessionId: generation.sessionId,
             messageId: generation.messageId,
-            content: generation.buffer,
+            content: screened.content,
             isStreaming: false,
+            sources: screened.blocked ? const [] : generation.sources,
           );
           _finishGeneration(generation);
         },
         onError: (error) {
           if (!_isCurrentGeneration(generation)) return;
           final partialResponse = generation.buffer.trimRight();
+          final combined = partialResponse.isEmpty
+              ? '${trCurrent('creator_error')}: $error'
+              : '$partialResponse\n\n${trCurrent('creator_error')}: $error';
+          final screened = _screenAssistantOutput(
+            combined,
+            sources: generation.sources,
+          );
           _updateMessage(
             sessionId: generation.sessionId,
             messageId: generation.messageId,
-            // A transport failure can arrive after the provider has already
-            // streamed useful content. Keep that response available instead
-            // of replacing it with the error state.
-            content: partialResponse.isEmpty
-                ? '${trCurrent('creator_error')}: $error'
-                : '$partialResponse\n\n${trCurrent('creator_error')}: $error',
+            content: screened.content,
             isStreaming: false,
+            sources: screened.blocked ? const [] : generation.sources,
           );
           _finishGeneration(generation);
         },
       );
     } catch (error) {
       if (!_isCurrentGeneration(generation)) return;
+      final screened = _screenAssistantOutput(
+        '${trCurrent('creator_error')}: $error',
+      );
       _updateMessage(
         sessionId: generation.sessionId,
         messageId: generation.messageId,
-        content: '${trCurrent('creator_error')}: $error',
+        content: screened.content,
         isStreaming: false,
       );
       _finishGeneration(generation);
@@ -365,6 +375,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void stopGeneration() {
     _cancelActiveGeneration();
+  }
+
+  ({String content, bool blocked}) _screenAssistantOutput(
+    String content, {
+    List<Map<String, String>> sources = const [],
+  }) {
+    final sourceText = sources.expand((source) => source.values);
+    final blocked =
+        AiOutputSafetyFilter.blocks(content) ||
+        AiOutputSafetyFilter.blocksAny(sourceText);
+    return (
+      content: blocked ? trCurrent('ai_output_safety_blocked') : content,
+      blocked: blocked,
+    );
   }
 
   void _updateSession(ChatSession session) {
@@ -400,11 +424,16 @@ class ChatNotifier extends StateNotifier<ChatState> {
     generation?.cancelToken.cancel();
 
     if (generation != null && !_disposed) {
+      final screened = _screenAssistantOutput(
+        generation.buffer,
+        sources: generation.sources,
+      );
       _updateMessage(
         sessionId: generation.sessionId,
         messageId: generation.messageId,
-        content: generation.buffer,
+        content: screened.content,
         isStreaming: false,
+        sources: screened.blocked ? const [] : generation.sources,
       );
     }
     if (!_disposed && state.isGenerating) {
@@ -477,6 +506,7 @@ class _ChatGeneration {
   final String messageId;
   final CancelToken cancelToken;
   String buffer = '';
+  List<Map<String, String>> sources = const [];
 
   _ChatGeneration({
     required this.id,

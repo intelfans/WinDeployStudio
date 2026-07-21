@@ -2802,6 +2802,58 @@ DiskReport CollectDiskReport(DWORD disk_number, bool* present) {
   return report;
 }
 
+// The deployment safety check only needs stable disk identity and basic
+// topology.  Keep this path separate from the diagnostics report so USB
+// bridges cannot delay selection while SMART/NVMe pass-through is attempted.
+DiskReport CollectDiskIdentityReport(DWORD disk_number, bool* present) {
+  DiskReport report;
+  report.disk_number = disk_number;
+  report.device_path = "\\\\.\\PhysicalDrive" + std::to_string(disk_number);
+  const std::wstring physical_path =
+      L"\\\\.\\PhysicalDrive" + std::to_wstring(disk_number);
+
+  DWORD open_error = ERROR_SUCCESS;
+  const HANDLE disk = OpenPhysicalDiskForReadOnlyQuery(physical_path, &open_error);
+  if (disk == INVALID_HANDLE_VALUE) {
+    if (IsMissingPhysicalDriveError(open_error)) {
+      report.present = false;
+      *present = false;
+      report.nvme.reason = "The physical disk is not present.";
+      report.nvme.windows_error = open_error;
+      return report;
+    }
+    *present = true;
+    report.nvme.reason =
+        "Windows could not open the physical disk for a read-only query.";
+    report.nvme.windows_error = open_error;
+    AddQueryWarning(&report, "Physical disk open", open_error);
+    return report;
+  }
+
+  *present = true;
+  PopulateDeviceDescriptor(disk, &report);
+  PopulateLength(disk, &report);
+  PopulateTopology(disk, &report);
+  PopulatePartitionStyle(disk, &report);
+  PopulateReadOnlyFlag(disk, &report);
+  if (const auto identity = QueryDiskDeviceIdentity(disk_number);
+      identity.has_value()) {
+    report.pnp_device_id = identity->pnp_device_id;
+    report.usb_bridge_identity = identity->usb_bridge;
+  }
+
+  DWORD identifier_error = ERROR_SUCCESS;
+  report.unique_id = QueryStorageIdentifier(disk, &identifier_error);
+  if (!report.unique_id.has_value() && identifier_error != ERROR_NOT_FOUND) {
+    AddQueryWarning(&report, "Storage unique identifier", identifier_error);
+  }
+  CloseHandle(disk);
+
+  report.drive_letters = FindDriveLettersForDisk(disk_number);
+  report.is_system = IsWindowsSystemDrive(report.drive_letters);
+  return report;
+}
+
 bool GetExecutablePath(std::wstring* path, DWORD* error_code) {
   std::vector<wchar_t> buffer(32768, L'\0');
   const DWORD length = GetModuleFileNameW(nullptr, buffer.data(),
@@ -2998,6 +3050,13 @@ int RunDiskMode(DWORD disk_number) {
   return present ? 0 : kDiskNotPresentExitCode;
 }
 
+int RunIdentityMode(DWORD disk_number) {
+  bool present = false;
+  const DiskReport report = CollectDiskIdentityReport(disk_number, &present);
+  std::cout << BuildDiskReportJson(report) << std::endl;
+  return present ? 0 : kDiskNotPresentExitCode;
+}
+
 int RunInventoryMode() {
   std::vector<std::string> reports;
   std::vector<std::string> warnings;
@@ -3081,8 +3140,9 @@ bool ParseDiskNumber(const wchar_t* value, DWORD* disk_number) {
 void PrintUsageError() {
   std::cout << "{\"ok\":false,\"isAdministrator\":"
             << (IsAdministrator() ? "true" : "false")
-            << ",\"reports\":[],\"warnings\":[\"Expected --inventory or "
-               "--disk <physical-disk-number>.\"]}"
+            << ",\"reports\":[],\"warnings\":[\"Expected --inventory, "
+               "--disk <physical-disk-number>, or --identity "
+               "<physical-disk-number>.\"]}"
             << std::endl;
 }
 
@@ -3097,6 +3157,11 @@ int wmain(int argc, wchar_t* argv[]) {
   if (argc == 3 && std::wstring(argv[1]) == L"--disk" &&
       ParseDiskNumber(argv[2], &disk_number)) {
     return RunDiskMode(disk_number);
+  }
+
+  if (argc == 3 && std::wstring(argv[1]) == L"--identity" &&
+      ParseDiskNumber(argv[2], &disk_number)) {
+    return RunIdentityMode(disk_number);
   }
 
   // Preserve the previous single-number form for manual diagnostics. The

@@ -22,21 +22,26 @@ String resolveCreatorProgressMessage({
 
   final localizedTemplate = translate(messageKey);
   final usesErrorPlaceholder = localizedTemplate.contains('{error}');
+  final usesDetailPlaceholder = localizedTemplate.contains('{detail}');
   final resolvedError = diagnostic?.isNotEmpty == true
-      ? _resolveCreatorDiagnostic(diagnostic!, translate)
+      ? resolveCreatorDiagnostic(diagnostic!, translate)
       : translate('creator_error');
-  var resolved = usesErrorPlaceholder
-      ? localizedTemplate.replaceAll('{error}', resolvedError)
-      : localizedTemplate;
+  var resolved = localizedTemplate
+      .replaceAll('{error}', usesErrorPlaceholder ? resolvedError : '{error}')
+      .replaceAll(
+        '{detail}',
+        usesDetailPlaceholder ? resolvedError : '{detail}',
+      );
 
   // Diagnostics are normally embedded in the localized template. For keys
   // without an error placeholder, show a separately provided diagnostic once.
   final details = <String>[
     ...inlineDetails,
     if (!usesErrorPlaceholder &&
+        !usesDetailPlaceholder &&
         inlineDetails.isEmpty &&
         diagnostic?.isNotEmpty == true)
-      diagnostic!,
+      resolvedError,
   ];
   if (details.isNotEmpty) {
     resolved = '$resolved\n${details.join('\n')}';
@@ -47,7 +52,7 @@ String resolveCreatorProgressMessage({
   return resolved;
 }
 
-String _resolveCreatorDiagnostic(
+String resolveCreatorDiagnostic(
   String diagnostic,
   String Function(String key) translate,
 ) {

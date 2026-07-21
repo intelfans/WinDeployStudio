@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
 import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
@@ -15,6 +17,7 @@ import '../../../core/services/iso_parse_service.dart';
 import '../../../core/services/linux_togo_image_preflight.dart';
 import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/wtg_service.dart';
+import '../../../core/services/operation_status_service.dart';
 import '../../../core/services/windows_iso_preflight.dart';
 import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
 import '../../../shared/widgets/known_iso_verification_panel.dart';
@@ -194,6 +197,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   String _bootLetter = '';
   String _driverDirectory = '';
   String _customIconPath = '';
+  String? _volumeLabelErrorKey;
 
   bool _running = false;
   bool _finished = false;
@@ -215,7 +219,84 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   @override
   void initState() {
     super.initState();
+    _restoreToGoActivity();
     _loadDisks();
+  }
+
+  void _restoreToGoActivity() {
+    final activity = ref.read(
+      operationStatusProvider,
+    )[TrackedOperationKind.toGo];
+    if (activity == null || !activity.active) return;
+    _platform = activity.isLinux ? _ToGoPlatform.linux : _ToGoPlatform.windows;
+    _running = true;
+    _finished = false;
+    _activeLinuxService = activity.isLinux
+        ? ref.read(bootableUsbServiceProvider)
+        : null;
+    _activeWtgService = activity.isLinux ? null : ref.read(wtgServiceProvider);
+    _taskProgress = _ToGoProgress(
+      phase: activity.phase,
+      message: activity.message,
+      progress: activity.progress,
+      cancellable: activity.cancellable,
+      writtenBytes: activity.writtenBytes,
+      totalBytes: activity.totalBytes,
+      speedBytesPerSecond: activity.speedBytesPerSecond,
+    );
+    _elapsedSeconds = activity.elapsedSeconds;
+  }
+
+  void _applyToGoActivity(
+    Map<TrackedOperationKind, OperationActivity> activities,
+  ) {
+    final activity = activities[TrackedOperationKind.toGo];
+    if (activity == null || !mounted) return;
+    final next = _ToGoProgress(
+      phase: activity.phase,
+      message: activity.message,
+      progress: activity.progress,
+      cancellable: activity.cancellable,
+      writtenBytes: activity.writtenBytes,
+      totalBytes: activity.totalBytes,
+      speedBytesPerSecond: activity.speedBytesPerSecond,
+    );
+    if (activity.active) {
+      if (!_running ||
+          _taskProgress?.progress != next.progress ||
+          _taskProgress?.phase != next.phase ||
+          _taskProgress?.message != next.message) {
+        setState(() {
+          _platform = activity.isLinux
+              ? _ToGoPlatform.linux
+              : _ToGoPlatform.windows;
+          _running = true;
+          _finished = false;
+          _activeLinuxService = activity.isLinux
+              ? ref.read(bootableUsbServiceProvider)
+              : null;
+          _activeWtgService = activity.isLinux
+              ? null
+              : ref.read(wtgServiceProvider);
+          _taskProgress = next;
+          _elapsedSeconds = activity.elapsedSeconds;
+        });
+      }
+      return;
+    }
+    if (_taskProgress == null) return;
+    if (!_running && _finished && _taskProgress?.phase == next.phase) return;
+    setState(() {
+      _running = false;
+      _finished = true;
+      _success =
+          next.phase == WtgStep.complete.name ||
+          next.phase == CreateStep.complete.name;
+      _activeLinuxService = null;
+      _activeWtgService = null;
+      _taskProgress = next;
+      _elapsedSeconds = activity.elapsedSeconds;
+    });
   }
 
   @override
@@ -288,6 +369,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _compactOs = false;
       _wimBoot = false;
       _enableNetFx3 = false;
+      _volumeLabelErrorKey = null;
     });
   }
 
@@ -485,7 +567,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     if (!safety.isSafe) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(_localizedOrRaw(safety.reason))));
+      ).showSnackBar(SnackBar(content: Text(_localizedSafetyReason(safety))));
     }
   }
 
@@ -824,6 +906,10 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<Map<TrackedOperationKind, OperationActivity>>(
+      operationStatusProvider,
+      (_, next) => _applyToGoActivity(next),
+    );
     if (_running || _finished) return _buildExecutionView();
     return Scaffold(
       body: DeploymentShell(
@@ -991,6 +1077,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 ? 'wtg_linux_live_iso_required'
                 : 'wtg_windows_install_iso_required',
           ),
+          if (!_isLinux)
+            _advancedNotice(
+              Icons.warning_amber_rounded,
+              'wtg_legacy_compatibility_notice',
+            ),
           _SelectionPanel(
             icon: Icons.disc_full_outlined,
             // Keep the empty-state prompt aligned with the selected To Go platform.
@@ -1520,8 +1611,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               maxLength: 32,
               decoration: InputDecoration(
                 labelText: tr(context, 'deploy_volume_label'),
+                errorText: _volumeLabelErrorKey == null
+                    ? null
+                    : tr(context, _volumeLabelErrorKey!),
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: (value) => setState(() {
+                _volumeLabelErrorKey =
+                    DeploymentCompatibility.isVolumeLabelValid(
+                      value,
+                      maxLength: 32,
+                      allowPeriod: true,
+                    )
+                    ? null
+                    : 'deploy_compat_invalid_volume_label';
+              }),
             ),
           ),
           ListTile(
@@ -1719,6 +1822,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final failureReason = _finished && !_success
         ? _localizedFailureReason(progress)
         : null;
+    final reportableFailure =
+        _finished &&
+        !_success &&
+        !_cancelRequested &&
+        progress?.phase == 'failed';
     final progressDescription = progress == null
         ? _localizedOrRaw('wtg_step_preparing')
         : _localizedProgressMessage(
@@ -1908,10 +2016,28 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                         label: Text(tr(context, 'cancel')),
                       )
                     else
-                      FilledButton.icon(
-                        onPressed: _reset,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(tr(context, 'creator_another')),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (reportableFailure)
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                end: 12,
+                              ),
+                              child: OutlinedButton.icon(
+                                onPressed: _openFeedback,
+                                icon: const Icon(Icons.feedback_outlined),
+                                label: Text(
+                                  tr(context, 'feedback_report_failure'),
+                                ),
+                              ),
+                            ),
+                          FilledButton.icon(
+                            onPressed: _reset,
+                            icon: const Icon(Icons.refresh),
+                            label: Text(tr(context, 'creator_another')),
+                          ),
+                        ],
                       ),
                   ],
                 ),
@@ -1921,6 +2047,18 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openFeedback() async {
+    final uri = Uri.parse(AppConstants.githubFeedbackUrl);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr(context, 'detail_open_failed'))),
+      );
+    }
   }
 
   Widget _buildGame() {
@@ -2106,6 +2244,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     return localized.isEmpty || localized == tr(context, 'translation_missing')
         ? value
         : localized;
+  }
+
+  String _localizedSafetyReason(SafetyCheckResult result) {
+    var localized = _localizedOrRaw(result.reason);
+    for (final entry
+        in result.params?.entries ?? const <MapEntry<String, String>>[]) {
+      localized = localized.replaceAll('{${entry.key}}', entry.value);
+    }
+    return localized;
   }
 
   String _localizedProgressMessage(_ToGoProgress progress, String messageKey) {
