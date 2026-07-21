@@ -1,0 +1,48 @@
+- generic [active] [ref=f3e1]:
+  - link "跳到主要内容" [ref=f3e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=f3e4]:
+    - generic [ref=f3e5]:
+      - link "WinDeploy Studio home" [ref=f3e6] [cursor=pointer]:
+        - /url: ../
+        - generic [ref=f3e7]: WinDeploy Studio
+      - navigation "Primary navigation" [ref=f3e8]:
+        - link "产品" [ref=f3e9] [cursor=pointer]:
+          - /url: ../
+        - link "下载" [ref=f3e11] [cursor=pointer]:
+          - /url: ../downloads/
+        - link "镜像" [ref=f3e13] [cursor=pointer]:
+          - /url: ../images/
+        - link "GitHub" [ref=f3e15] [cursor=pointer]:
+          - /url: https://github.com/intelfans/WinDeployStudio
+      - generic [ref=f3e17]:
+        - generic "Language" [ref=f3e18]:
+          - button "中文" [pressed] [ref=f3e19] [cursor=pointer]
+          - button "EN" [ref=f3e20] [cursor=pointer]
+        - button "切换到黑夜模式" [ref=f3e21] [cursor=pointer]
+  - main [ref=f3e24]:
+    - region [ref=f3e25]:
+      - generic [ref=f3e26]:
+        - paragraph [ref=f3e27]: 应用下载
+        - heading "最新版与更新记录" [level=1] [ref=f3e28]
+        - paragraph [ref=f3e29]: 更新说明来自 GitHub Releases；SourceForge 提供可选下载源。下载前会展示文件大小和 SHA-256 摘要。
+    - region [ref=f3e30]:
+      - generic [ref=f3e31]:
+        - generic [ref=f3e32]:
+          - paragraph [ref=f3e33]: 推荐版本
+          - heading "最新稳定版" [level=2] [ref=f3e34]
+        - generic [ref=f3e35]: 正在读取发布信息...
+    - region [ref=f3e39]:
+      - generic [ref=f3e41]:
+        - paragraph [ref=f3e42]: 发行历史
+        - heading "历史版本" [level=2] [ref=f3e43]
+  - contentinfo [ref=f3e45]:
+    - generic [ref=f3e46]:
+      - paragraph [ref=f3e47]: 面向 Windows 与 Linux 部署工作流的桌面工具。
+      - generic [ref=f3e48]:
+        - link "GitHub" [ref=f3e49] [cursor=pointer]:
+          - /url: https://github.com/intelfans/WinDeployStudio
+        - link "SourceForge" [ref=f3e50] [cursor=pointer]:
+          - /url: https://sourceforge.net/projects/windeploystudio/
+        - link "MIT License" [ref=f3e51] [cursor=pointer]:
+          - /url: https://github.com/intelfans/WinDeployStudio/blob/main/LICENSE

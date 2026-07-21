@@ -1,0 +1,122 @@
+- generic [active] [ref=f7e1]:
+  - link "跳到主要内容" [ref=f7e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=f7e4]:
+    - generic [ref=f7e5]:
+      - link "WinDeploy Studio home" [ref=f7e6] [cursor=pointer]:
+        - /url: ./
+        - generic [ref=f7e7]: WinDeploy Studio
+      - navigation "Primary navigation" [ref=f7e8]:
+        - link "产品" [ref=f7e9] [cursor=pointer]:
+          - /url: ./
+        - link "下载" [ref=f7e11] [cursor=pointer]:
+          - /url: ./downloads/
+        - link "镜像" [ref=f7e13] [cursor=pointer]:
+          - /url: ./images/
+        - link "GitHub" [ref=f7e15] [cursor=pointer]:
+          - /url: https://github.com/intelfans/WinDeployStudio
+      - generic [ref=f7e17]:
+        - generic "Language" [ref=f7e18]:
+          - button "中文" [pressed] [ref=f7e19] [cursor=pointer]
+          - button "EN" [ref=f7e20] [cursor=pointer]
+        - button "切换到黑夜模式" [ref=f7e21] [cursor=pointer]
+  - main [ref=f7e24]:
+    - region [ref=f7e25]:
+      - generic:
+        - figure
+        - figure:
+          - generic: WinDeploy Studio
+        - figure
+        - generic: Ready for the next deployment
+      - generic [ref=f7e26]:
+        - paragraph [ref=f7e27]: Windows 与 Linux 部署工具
+        - heading "WinDeploy Studio" [level=1] [ref=f7e28]
+        - paragraph [ref=f7e29]: 在一个安静、可靠的桌面工作区中创建安装介质、随身系统并检查存储设备。
+        - generic [ref=f7e30]:
+          - link "下载最新版" [ref=f7e31] [cursor=pointer]:
+            - /url: downloads/
+          - link "浏览镜像" [ref=f7e32] [cursor=pointer]:
+            - /url: images/
+        - generic [ref=f7e33]:
+          - generic [ref=f7e34]: 最新 GitHub Release
+          - strong [ref=f7e35]: "--"
+      - link "Scroll to features" [ref=f7e36] [cursor=pointer]:
+        - /url: "#capabilities"
+        - generic [ref=f7e39]: 探索功能
+    - region [ref=f7e40]:
+      - generic [ref=f7e41]:
+        - generic [ref=f7e42]:
+          - paragraph [ref=f7e43]: 核心工作流
+          - heading "从镜像到可启动设备" [level=2] [ref=f7e44]
+          - paragraph [ref=f7e45]: 清晰地组织每一步，并在破坏性操作之前保留必要的确认和校验。
+        - generic [ref=f7e46]:
+          - article [ref=f7e47]:
+            - heading "安装介质" [level=3] [ref=f7e56]
+            - paragraph [ref=f7e57]: 创建 Windows 安装盘，或验证并写入 Linux ISOHybrid 镜像。
+          - article [ref=f7e58]:
+            - heading "To Go 工作区" [level=3] [ref=f7e61]
+            - paragraph [ref=f7e62]: 使用结构预检、磁盘身份保护和适配的启动布局创建便携工作区。
+          - article [ref=f7e63]:
+            - heading "磁盘分析" [level=3] [ref=f7e66]
+            - paragraph [ref=f7e67]: 检测速度、稳定性、健康数据和适合随身系统的实际表现。
+    - region [ref=f7e68]:
+      - generic [ref=f7e69]:
+        - generic [ref=f7e70]:
+          - paragraph [ref=f7e71]: 部署前检查
+          - heading "让每一次写入都有依据" [level=2] [ref=f7e72]
+        - paragraph [ref=f7e73]: 从 ISO 结构、目标磁盘身份到写入后校验，关键步骤会在真正清除数据前重新确认。
+    - region [ref=f7e74]:
+      - generic [ref=f7e75]:
+        - generic [ref=f7e76]:
+          - generic [ref=f7e77]:
+            - paragraph [ref=f7e78]: 产品演示
+            - heading "完整工作区，一目了然" [level=2] [ref=f7e79]
+          - paragraph [ref=f7e80]: 轮播展示 WinDeploy Studio 的全部主要界面。
+        - generic [ref=f7e81]:
+          - figure [ref=f7e83]:
+            - img "首页：标题、快速开始与工作区" [ref=f7e84]
+          - generic [ref=f7e85]:
+            - generic [ref=f7e86]:
+              - heading "首页：标题、快速开始与工作区" [level=3] [ref=f7e87]
+              - paragraph [ref=f7e88]: 在首页概览主要入口、快速开始和工作区状态
+            - generic [ref=f7e89]:
+              - button "上一张演示图" [ref=f7e90] [cursor=pointer]
+              - button "暂停轮播" [ref=f7e93] [cursor=pointer]
+              - button "下一张演示图" [ref=f7e97] [cursor=pointer]
+              - generic [ref=f7e100]: 第 1 张，共 18 张
+          - generic [ref=f7e101]:
+            - button "首页：标题、快速开始与工作区 (1)" [ref=f7e102] [cursor=pointer]
+            - button "首页：关于 (2)" [ref=f7e103] [cursor=pointer]
+            - button "镜像库 (3)" [ref=f7e104] [cursor=pointer]
+            - button "Windows 安装盘 (4)" [ref=f7e105] [cursor=pointer]
+            - button "Linux 安装盘 (5)" [ref=f7e106] [cursor=pointer]
+            - button "Windows To Go (6)" [ref=f7e107] [cursor=pointer]
+            - button "Linux To Go (7)" [ref=f7e108] [cursor=pointer]
+            - button "磁盘测试 (8)" [ref=f7e109] [cursor=pointer]
+            - button "磁盘工具 (9)" [ref=f7e110] [cursor=pointer]
+            - button "磁盘诊断 (10)" [ref=f7e111] [cursor=pointer]
+            - button "BCD/EFI 启动修复 (11)" [ref=f7e112] [cursor=pointer]
+            - button "日志中心（一） (12)" [ref=f7e113] [cursor=pointer]
+            - button "日志中心（二） (13)" [ref=f7e114] [cursor=pointer]
+            - button "AI 助手 (14)" [ref=f7e115] [cursor=pointer]
+            - button "工具 (15)" [ref=f7e116] [cursor=pointer]
+            - button "设置（一） (16)" [ref=f7e117] [cursor=pointer]
+            - button "设置（二） (17)" [ref=f7e118] [cursor=pointer]
+            - button "设置（三） (18)" [ref=f7e119] [cursor=pointer]
+    - region [ref=f7e120]:
+      - generic [ref=f7e121]:
+        - generic [ref=f7e122]:
+          - paragraph [ref=f7e123]: 保持最新
+          - heading "从可信发布源获取安装包" [level=2] [ref=f7e124]
+        - link "查看下载与更新说明" [ref=f7e125] [cursor=pointer]:
+          - /url: downloads/
+  - contentinfo [ref=f7e127]:
+    - generic [ref=f7e128]:
+      - paragraph [ref=f7e129]: 面向 Windows 与 Linux 部署工作流的桌面工具。
+      - generic [ref=f7e130]:
+        - link "GitHub" [ref=f7e131] [cursor=pointer]:
+          - /url: https://github.com/intelfans/WinDeployStudio
+        - link "SourceForge" [ref=f7e132] [cursor=pointer]:
+          - /url: https://sourceforge.net/projects/windeploystudio/
+        - link "MIT License" [ref=f7e133] [cursor=pointer]:
+          - /url: https://github.com/intelfans/WinDeployStudio/blob/main/LICENSE
