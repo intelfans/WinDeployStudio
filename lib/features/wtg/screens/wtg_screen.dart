@@ -11,14 +11,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
-import '../../../core/services/bootable_usb_service.dart';
 import '../../../core/services/disk_safety_service.dart';
 import '../../../core/services/iso_parse_service.dart';
-import '../../../core/services/linux_togo_image_preflight.dart';
 import '../../../core/services/known_iso_verification_service.dart';
 import '../../../core/services/wtg_service.dart';
 import '../../../core/services/operation_status_service.dart';
-import '../../../core/services/windows_iso_preflight.dart';
 import '../../../shared/widgets/deployment_shell/deployment_shell_widgets.dart';
 import '../../../shared/widgets/known_iso_verification_panel.dart';
 import '../../deployment/models/deployment_plan.dart';
@@ -26,23 +23,8 @@ import '../../logs/services/log_center_service.dart';
 import '../models/to_go_execution_timer.dart';
 import '../models/to_go_progress_message.dart';
 
-/// Returns the localization key shown for a To Go execution phase. Linux To
-/// Go emits explicit writer statuses; preserving those keys prevents the UI
-/// from incorrectly presenting Windows image-application text.
-String toGoProgressTitleKey({
-  required bool isLinux,
-  required String phase,
-  required String message,
-}) {
-  final messageKey = message.split('\n').first.trim();
-  if (isLinux && messageKey.isNotEmpty) return messageKey;
-  if (isLinux) {
-    return switch (phase) {
-      'complete' => 'step_complete',
-      'failed' => 'step_failed',
-      _ => 'linux_preparing',
-    };
-  }
+/// Returns the localization key shown for a Windows To Go execution phase.
+String toGoProgressTitleKey({required String phase, required String message}) {
   return switch (phase) {
     'preparing' => 'wtg_step_preparing',
     'cleaningDisk' ||
@@ -60,8 +42,6 @@ String toGoProgressTitleKey({
     _ => 'wtg_step_preparing',
   };
 }
-
-enum _ToGoPlatform { windows, linux }
 
 /// Runs the Windows To Go image metadata lookup again when a freshly mounted
 /// ISO has not exposed its volume yet.  This is deliberately kept in the To
@@ -133,16 +113,6 @@ class _ToGoProgress {
           : (messageDetail.isEmpty ? null : messageDetail),
     );
   }
-
-  factory _ToGoProgress.fromLinux(CreateProgress progress) {
-    final step = progress.step;
-    return _ToGoProgress(
-      phase: step.name,
-      message: progress.message,
-      progress: progress.progress,
-      cancellable: step != CreateStep.complete && step != CreateStep.failed,
-    );
-  }
 }
 
 class WtgScreen extends ConsumerStatefulWidget {
@@ -162,14 +132,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   final _volumeLabelController = TextEditingController(text: 'WINDEPLOY');
   final _random = Random();
 
-  _ToGoPlatform _platform = _ToGoPlatform.windows;
   int _step = 0;
   IsoMetadata? _iso;
   List<Map<String, dynamic>> _images = const [];
   int? _imageIndex;
   bool _loadingImage = false;
   String _imageStatus = '';
-  LinuxToGoImageInspection? _linuxToGoInspection;
   KnownIsoVerification? _knownIsoVerification;
   int _knownIsoVerificationRequest = 0;
   Locale? _knownIsoVerificationLocale;
@@ -204,7 +172,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   bool _success = false;
   _ToGoProgress? _taskProgress;
   WtgService? _activeWtgService;
-  BootableUsbService? _activeLinuxService;
+  late final OperationStatusNotifier _operationStatusNotifier;
   final _executionTimer = ToGoExecutionTimer();
   int _elapsedSeconds = 0;
   bool _cancelRequested = false;
@@ -214,12 +182,14 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   int _gameScore = 0;
   bool _showGame = false;
 
-  bool get _isLinux => _platform == _ToGoPlatform.linux;
-
   @override
   void initState() {
     super.initState();
+    _operationStatusNotifier = ref.read(operationStatusProvider.notifier);
     _restoreToGoActivity();
+    if (_running) {
+      _startExecutionTimer(initialElapsedSeconds: _elapsedSeconds);
+    }
     _loadDisks();
   }
 
@@ -227,14 +197,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final activity = ref.read(
       operationStatusProvider,
     )[TrackedOperationKind.toGo];
-    if (activity == null || !activity.active) return;
-    _platform = activity.isLinux ? _ToGoPlatform.linux : _ToGoPlatform.windows;
-    _running = true;
-    _finished = false;
-    _activeLinuxService = activity.isLinux
-        ? ref.read(bootableUsbServiceProvider)
-        : null;
-    _activeWtgService = activity.isLinux ? null : ref.read(wtgServiceProvider);
+    if (activity == null) return;
+    _running = activity.active;
+    _finished = !activity.active;
+    _success = activity.phase == WtgStep.complete.name;
+    _activeWtgService = activity.active ? ref.read(wtgServiceProvider) : null;
     _taskProgress = _ToGoProgress(
       phase: activity.phase,
       message: activity.message,
@@ -243,8 +210,45 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       writtenBytes: activity.writtenBytes,
       totalBytes: activity.totalBytes,
       speedBytesPerSecond: activity.speedBytesPerSecond,
+      error: activity.error,
     );
-    _elapsedSeconds = activity.elapsedSeconds;
+    _elapsedSeconds = activity.effectiveElapsedSeconds;
+    _progressLog.clear();
+    _lastProgressLogKey = null;
+  }
+
+  List<String> _localizedActivityProgressLog(OperationActivity activity) {
+    final keys = activity.progressLog.isEmpty
+        ? <String>[activity.message.split('\n').first.trim()]
+        : activity.progressLog;
+    final currentKey = activity.message.split('\n').first.trim();
+    final currentProgress = _ToGoProgress(
+      phase: activity.phase,
+      message: activity.message,
+      progress: activity.progress,
+      writtenBytes: activity.writtenBytes,
+      totalBytes: activity.totalBytes,
+    );
+    return keys
+        .where((key) => key.trim().isNotEmpty)
+        .map(
+          (key) => key == currentKey
+              ? _localizedProgressMessage(currentProgress, key)
+              : _localizedOrRaw(
+                  key,
+                ).replaceAll(RegExp(r'\{[A-Za-z0-9_]+\}'), '--'),
+        )
+        .toList(growable: false);
+  }
+
+  void _restoreActivityProgressLog(OperationActivity? activity) {
+    if (activity == null) return;
+    final entries = _localizedActivityProgressLog(activity);
+    if (entries.isEmpty) return;
+    _progressLog
+      ..clear()
+      ..addAll(entries);
+    _lastProgressLogKey = activity.message.split('\n').first.trim();
   }
 
   void _applyToGoActivity(
@@ -260,27 +264,33 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       writtenBytes: activity.writtenBytes,
       totalBytes: activity.totalBytes,
       speedBytesPerSecond: activity.speedBytesPerSecond,
+      error: activity.error,
     );
+    final effectiveElapsedSeconds = activity.effectiveElapsedSeconds;
     if (activity.active) {
-      if (!_running ||
+      final shouldStartTimer = !_running || !_executionTimer.isRunning;
+      final progressChanged =
+          !_running ||
           _taskProgress?.progress != next.progress ||
           _taskProgress?.phase != next.phase ||
-          _taskProgress?.message != next.message) {
+          _taskProgress?.message != next.message ||
+          _taskProgress?.writtenBytes != next.writtenBytes ||
+          _taskProgress?.totalBytes != next.totalBytes ||
+          _taskProgress?.speedBytesPerSecond != next.speedBytesPerSecond;
+      if (progressChanged || _elapsedSeconds != effectiveElapsedSeconds) {
         setState(() {
-          _platform = activity.isLinux
-              ? _ToGoPlatform.linux
-              : _ToGoPlatform.windows;
           _running = true;
           _finished = false;
-          _activeLinuxService = activity.isLinux
-              ? ref.read(bootableUsbServiceProvider)
-              : null;
-          _activeWtgService = activity.isLinux
-              ? null
-              : ref.read(wtgServiceProvider);
+          _activeWtgService = ref.read(wtgServiceProvider);
           _taskProgress = next;
-          _elapsedSeconds = activity.elapsedSeconds;
+          _elapsedSeconds = effectiveElapsedSeconds;
+          _restoreActivityProgressLog(activity);
         });
+      } else if (_progressLog.isEmpty) {
+        setState(() => _restoreActivityProgressLog(activity));
+      }
+      if (shouldStartTimer) {
+        _startExecutionTimer(initialElapsedSeconds: _elapsedSeconds);
       }
       return;
     }
@@ -289,19 +299,24 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     setState(() {
       _running = false;
       _finished = true;
-      _success =
-          next.phase == WtgStep.complete.name ||
-          next.phase == CreateStep.complete.name;
-      _activeLinuxService = null;
+      _success = next.phase == WtgStep.complete.name;
       _activeWtgService = null;
       _taskProgress = next;
-      _elapsedSeconds = activity.elapsedSeconds;
+      _elapsedSeconds = effectiveElapsedSeconds;
+      _restoreActivityProgressLog(activity);
     });
+    _executionTimer.stop();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Localize the snapshot history only after Localizations is available.
+    // This also rebuilds the summary when the app language changes while a
+    // deployment is still running.
+    _restoreActivityProgressLog(
+      ref.read(operationStatusProvider)[TrackedOperationKind.toGo],
+    );
     final locale = Localizations.localeOf(context);
     if (_knownIsoVerificationLocale == locale) return;
     _knownIsoVerificationLocale = locale;
@@ -350,43 +365,16 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     });
   }
 
-  void _changePlatform(_ToGoPlatform platform) {
-    if (platform == _platform) return;
-    setState(() {
-      _platform = platform;
-      _step = 0;
-      _iso = null;
-      _images = const [];
-      _imageIndex = null;
-      _linuxToGoInspection = null;
-      _knownIsoVerification = null;
-      _knownIsoVerificationRequest++;
-      _isoSelectionRequest++;
-      _loadingImage = false;
-      _imageStatus = '';
-      _deploymentMode = DeploymentMode.direct;
-      _bootMode = DeploymentBootMode.uefiGpt;
-      _compactOs = false;
-      _wimBoot = false;
-      _enableNetFx3 = false;
-      _volumeLabelErrorKey = null;
-    });
-  }
-
   Future<void> _pickIso() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['iso'],
-      dialogTitle: tr(
-        context,
-        _isLinux ? 'wtg_linux_select_iso' : 'wtg_select_iso',
-      ),
+      dialogTitle: tr(context, 'wtg_select_iso'),
     );
     if (result == null) return;
     final pickedFile = result.files.single;
     final path = pickedFile.path;
     if (path == null || !mounted) return;
-    final selectedPlatform = _platform;
     final locale = Localizations.localeOf(context);
     final messenger = ScaffoldMessenger.of(context);
     final selectionRequest = ++_isoSelectionRequest;
@@ -398,87 +386,37 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _iso = null;
       _images = const [];
       _imageIndex = null;
-      _linuxToGoInspection = null;
       _knownIsoVerification = null;
     });
 
     try {
-      if (selectedPlatform == _ToGoPlatform.linux) {
-        final windowsLayout = await ref
-            .read(windowsIsoPreflightProvider)
-            .inspect(path);
-        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
-          return;
-        }
-        if (windowsLayout.isValid) {
-          throw StateError('wtg_windows_iso_in_linux_mode');
-        }
-        final inspection = await ref
-            .read(linuxToGoImagePreflightProvider)
-            .inspect(path);
-        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
-          return;
-        }
-        final iso = IsoMetadata(
-          filePath: path,
-          fileName: p.basename(path),
-          fileSize: pickedFile.size,
-          windowsVersion: 'Linux ISOHybrid',
-        );
-        setState(() {
-          _iso = iso;
-          _imageIndex = inspection.canCreate ? 1 : null;
-          _linuxToGoInspection = inspection;
-          if (inspection.canCreate &&
-              inspection.image?.supportsDriverStaging != true) {
-            _driverDirectory = '';
-          }
-        });
-        unawaited(_verifyKnownIso(path, verificationRequest, locale));
-        if (!inspection.canCreate) {
-          final messageKey =
-              inspection.messageKey ?? 'linux_togo_unsupported_iso';
-          messenger.showSnackBar(
-            SnackBar(content: Text(_localizedOrRaw(messageKey))),
-          );
-        }
-      } else {
-        // Do not route Windows To Go through the creator/installation-media
-        // parser first.  It causes three back-to-back ISO mounts and a newly
-        // inserted Tiny10 ESD ISO can be reported unavailable before Windows
-        // exposes its mounted volume.  WtgService validates the exact same
-        // Windows setup structure, with its To Go-specific mount handling.
-        final images = await retryWindowsToGoImageLookup(
-          () => ref.read(wtgServiceProvider).getWimImages(path),
-        );
-        if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
-          return;
-        }
-        if (images.isEmpty) throw StateError('wtg_invalid_windows_iso');
-        final iso = _metadataFromWindowsToGoImages(
-          path: path,
-          fileName: pickedFile.name,
-          fileSize: pickedFile.size,
-          images: images,
-        );
-        setState(() {
-          _iso = iso;
-          _images = images;
-          _imageIndex = images.first['index'] as int?;
-          _normalizeWindowsOptionsForSelectedImage();
-        });
-        if (selectedPlatform == _ToGoPlatform.windows) {
-          unawaited(_verifyKnownIso(path, verificationRequest, locale));
-        }
-      }
+      // Do not route Windows To Go through the creator/installation-media
+      // parser first. It causes repeated ISO mounts and a newly inserted ESD
+      // image can be reported unavailable before Windows exposes the volume.
+      final images = await retryWindowsToGoImageLookup(
+        () => ref.read(wtgServiceProvider).getWimImages(path),
+      );
+      if (!_isCurrentIsoSelection(selectionRequest)) return;
+      if (images.isEmpty) throw StateError('wtg_invalid_windows_iso');
+      final iso = _metadataFromWindowsToGoImages(
+        path: path,
+        fileName: pickedFile.name,
+        fileSize: pickedFile.size,
+        images: images,
+      );
+      setState(() {
+        _iso = iso;
+        _images = images;
+        _imageIndex = images.first['index'] as int?;
+        _normalizeWindowsOptionsForSelectedImage();
+      });
+      unawaited(_verifyKnownIso(path, verificationRequest, locale));
     } catch (error) {
-      if (!_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
-        return;
-      }
+      if (!_isCurrentIsoSelection(selectionRequest)) return;
       final key = error.toString().replaceFirst('Bad state: ', '');
       messenger.showSnackBar(SnackBar(content: Text(_localizedOrRaw(key))));
     } finally {
-      if (_isCurrentIsoSelection(selectionRequest, selectedPlatform)) {
+      if (_isCurrentIsoSelection(selectionRequest)) {
         setState(() {
           _loadingImage = false;
           _imageStatus = '';
@@ -487,9 +425,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     }
   }
 
-  bool _isCurrentIsoSelection(int request, _ToGoPlatform platform) {
-    return mounted && request == _isoSelectionRequest && _platform == platform;
-  }
+  bool _isCurrentIsoSelection(int request) =>
+      mounted && request == _isoSelectionRequest;
 
   IsoMetadata _metadataFromWindowsToGoImages({
     required String path,
@@ -615,7 +552,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   void _normalizeWindowsOptionsForSelectedImage() {
-    if (_isLinux) return;
     var plan = _plan;
     final availableModes = DeploymentCompatibility.deploymentModesFor(plan);
     if (!availableModes.contains(_deploymentMode)) {
@@ -646,9 +582,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final build = image?['build']?.toString() ?? _iso?.buildNumber ?? '';
     final version = image?['version']?.toString() ?? _iso?.windowsVersion ?? '';
     return DeploymentPlan(
-      platform: _isLinux
-          ? DeploymentPlatform.linux
-          : DeploymentPlatform.windows,
+      platform: DeploymentPlatform.windows,
       purpose: DeploymentPurpose.toGo,
       imagePath: _iso?.filePath ?? '',
       imageIndex: _imageIndex ?? 1,
@@ -661,33 +595,26 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         build: build,
         version: version,
       ),
-      windowsProductFamily: _isLinux
-          ? WindowsProductFamily.client
-          : _windowsProductFamilyForImage(image),
+      windowsProductFamily: _windowsProductFamilyForImage(image),
       bootMode: _bootMode,
-      deploymentMode: _isLinux ? DeploymentMode.direct : _deploymentMode,
+      deploymentMode: _deploymentMode,
       virtualDiskType: _virtualDiskType,
       virtualDiskSizeGb:
           int.tryParse(_virtualDiskSizeController.text.trim()) ?? 64,
       virtualDiskFileName: _normalizedVirtualDiskName(),
-      blockLocalDisks: !_isLinux && _blockLocalDisks,
-      skipOobe: !_isLinux && _skipOobe,
-      disableWinRe: !_isLinux && _disableWinRe,
-      disableUasp: !_isLinux && _disableUasp,
-      compactOs: !_isLinux && _compactOs,
-      wimBoot: !_isLinux && _wimBoot,
+      blockLocalDisks: _blockLocalDisks,
+      skipOobe: _skipOobe,
+      disableWinRe: _disableWinRe,
+      disableUasp: _disableUasp,
+      compactOs: _compactOs,
+      wimBoot: _wimBoot,
       fixVhdDriveLetter:
-          !_isLinux &&
-          _deploymentMode != DeploymentMode.direct &&
-          _fixVhdLetter,
-      enableNetFx3: !_isLinux && _enableNetFx3,
-      ntfsUefiSupport: !_isLinux && _bootMode != DeploymentBootMode.legacyBios,
-      preferredSystemLetter: _isLinux ? '' : _systemLetter,
-      preferredBootLetter: _isLinux ? '' : _bootLetter,
-      driverDirectory:
-          _isLinux && _linuxToGoInspection?.image?.supportsDriverStaging != true
-          ? ''
-          : _driverDirectory,
+          _deploymentMode != DeploymentMode.direct && _fixVhdLetter,
+      enableNetFx3: _enableNetFx3,
+      ntfsUefiSupport: _bootMode != DeploymentBootMode.legacyBios,
+      preferredSystemLetter: _systemLetter,
+      preferredBootLetter: _bootLetter,
+      driverDirectory: _driverDirectory,
       customIconPath: _customIconPath,
       customVolumeLabel: _volumeLabelController.text.trim(),
     );
@@ -702,13 +629,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   bool _canContinue() {
     return switch (_step) {
-      0 =>
-        _iso != null &&
-            (_isLinux
-                ? _linuxToGoInspection?.canCreate == true &&
-                      BootableUsbService
-                          .linuxPersistenceToolDistributionApproved
-                : _imageIndex != null),
+      0 => _iso != null && _imageIndex != null,
       1 => _disk != null && _diskSafety?.isSafe == true,
       2 => DeploymentCompatibility.evaluate(_plan).canDeploy,
       3 => DeploymentCompatibility.evaluate(_plan).canDeploy,
@@ -723,6 +644,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final plan = _plan;
     final compatibility = DeploymentCompatibility.evaluate(plan);
     if (!compatibility.canDeploy) return;
+    final windowsService = ref.read(wtgServiceProvider);
+    const initialProgress = _ToGoProgress(
+      phase: 'preparing',
+      message: 'wtg_step_preparing',
+      progress: 0,
+    );
 
     setState(() {
       _running = true;
@@ -730,23 +657,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _success = false;
       _cancelRequested = false;
       _elapsedSeconds = 0;
-      _taskProgress = const _ToGoProgress(
-        phase: 'preparing',
-        message: 'wtg_step_preparing',
-        progress: 0,
-      );
+      _taskProgress = initialProgress;
+      _activeWtgService = windowsService;
       _progressLog
         ..clear()
         ..add(tr(context, 'wtg_step_preparing'));
       _lastProgressLogKey = 'wtg_step_preparing';
     });
+    _publishToGoProgress(initialProgress);
     _startExecutionTimer();
 
     var success = false;
     DiskOperationLock? operationLock;
     try {
       await LogCenterService().logToGo('[DeploymentPlan] ${plan.toJson()}');
-      if (!mounted) return;
       operationLock = await DiskOperationLock.tryAcquire(disk.diskNumber);
       if (Platform.isWindows && operationLock == null) {
         _updateTaskProgress(
@@ -759,47 +683,25 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         return;
       }
 
-      if (_isLinux) {
-        final service = ref.read(bootableUsbServiceProvider);
-        _activeLinuxService = service;
-        if (_cancelRequested) service.cancel();
-        success = await service.createLinuxIsoUsb(
-          disk: disk,
-          isoPath: plan.imagePath,
-          kind: LinuxUsbKind.toGo,
-          deploymentPlan: plan,
-          onProgress: _onLinuxProgress,
+      final service = windowsService;
+      _activeWtgService = service;
+      if (_cancelRequested) service.cancel();
+      success = await service.createWtg(
+        disk: disk,
+        isoPath: plan.imagePath,
+        imageIndex: plan.imageIndex,
+        driveLetter: disk.driveLetters.isEmpty ? '' : disk.driveLetters.first,
+        deploymentPlan: plan,
+        onProgress: _onWtgProgress,
+      );
+      if (!success && service.isCancelled) {
+        _updateTaskProgress(
+          _ToGoProgress(
+            phase: 'failed',
+            message: 'deploy_cancel_requested',
+            progress: _taskProgress?.progress ?? 0,
+          ),
         );
-        if (!success && service.isCancelled) {
-          _updateTaskProgress(
-            _ToGoProgress(
-              phase: 'failed',
-              message: 'deploy_cancel_requested',
-              progress: _taskProgress?.progress ?? 0,
-            ),
-          );
-        }
-      } else {
-        final service = ref.read(wtgServiceProvider);
-        _activeWtgService = service;
-        if (_cancelRequested) service.cancel();
-        success = await service.createWtg(
-          disk: disk,
-          isoPath: plan.imagePath,
-          imageIndex: plan.imageIndex,
-          driveLetter: disk.driveLetters.isEmpty ? '' : disk.driveLetters.first,
-          deploymentPlan: plan,
-          onProgress: _onWtgProgress,
-        );
-        if (!success && service.isCancelled) {
-          _updateTaskProgress(
-            _ToGoProgress(
-              phase: 'failed',
-              message: 'deploy_cancel_requested',
-              progress: _taskProgress?.progress ?? 0,
-            ),
-          );
-        }
       }
     } catch (error) {
       _updateTaskProgress(
@@ -823,7 +725,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
           _finished = true;
           _success = success;
           _activeWtgService = null;
-          _activeLinuxService = null;
         });
       }
     }
@@ -833,15 +734,11 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     _updateTaskProgress(_ToGoProgress.fromWtg(progress));
   }
 
-  void _onLinuxProgress(CreateProgress progress) {
-    _updateTaskProgress(_ToGoProgress.fromLinux(progress));
-  }
-
-  void _startExecutionTimer() {
+  void _startExecutionTimer({int initialElapsedSeconds = 0}) {
     _executionTimer.start((elapsedSeconds) {
       if (!mounted || !_running) return;
       setState(() => _elapsedSeconds = elapsedSeconds);
-    });
+    }, initialElapsedSeconds: initialElapsedSeconds);
   }
 
   void _stopExecutionTimer() {
@@ -850,11 +747,34 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   void _updateTaskProgress(_ToGoProgress progress) {
+    final previous = _taskProgress;
+    final effective =
+        progress.phase == 'failed' &&
+            previous != null &&
+            progress.progress < previous.progress
+        ? _ToGoProgress(
+            phase: progress.phase,
+            message: progress.message,
+            progress: previous.progress,
+            cancellable: progress.cancellable,
+            writtenBytes: progress.writtenBytes > 0
+                ? progress.writtenBytes
+                : previous.writtenBytes,
+            totalBytes: progress.totalBytes > 0
+                ? progress.totalBytes
+                : previous.totalBytes,
+            speedBytesPerSecond: progress.speedBytesPerSecond > 0
+                ? progress.speedBytesPerSecond
+                : previous.speedBytesPerSecond,
+            error: progress.error,
+          )
+        : progress;
+    _publishToGoProgress(effective);
     if (!mounted) return;
     setState(() {
-      _taskProgress = progress;
-      final messageKey = progress.message.split('\n').first;
-      final message = _localizedProgressMessage(progress, messageKey);
+      _taskProgress = effective;
+      final messageKey = effective.message.split('\n').first;
+      final message = _localizedProgressMessage(effective, messageKey);
       if (_lastProgressLogKey == messageKey && _progressLog.isNotEmpty) {
         _progressLog[_progressLog.length - 1] = message;
       } else {
@@ -864,13 +784,29 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     });
   }
 
+  void _publishToGoProgress(_ToGoProgress progress) {
+    final terminal =
+        progress.phase == WtgStep.complete.name ||
+        progress.phase == WtgStep.failed.name;
+    _operationStatusNotifier.update(
+      kind: TrackedOperationKind.toGo,
+      phase: progress.phase,
+      message: progress.message,
+      progress: progress.progress,
+      cancellable: progress.cancellable,
+      writtenBytes: progress.writtenBytes,
+      totalBytes: progress.totalBytes,
+      speedBytesPerSecond: progress.speedBytesPerSecond,
+      elapsedSeconds: _elapsedSeconds,
+      error: progress.error,
+      active: !terminal,
+      isLinux: false,
+    );
+  }
+
   void _cancel() {
     if (_cancelRequested) return;
-    if (_isLinux) {
-      _activeLinuxService?.cancel();
-    } else {
-      _activeWtgService?.cancel();
-    }
+    _activeWtgService?.cancel();
     if (!mounted) return;
     setState(() {
       _cancelRequested = true;
@@ -879,12 +815,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   void _reset() {
+    _operationStatusNotifier.clear(TrackedOperationKind.toGo);
     setState(() {
       _step = 0;
       _iso = null;
       _images = const [];
       _imageIndex = null;
-      _linuxToGoInspection = null;
       _knownIsoVerification = null;
       _knownIsoVerificationRequest++;
       _isoSelectionRequest++;
@@ -913,17 +849,15 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     if (_running || _finished) return _buildExecutionView();
     return Scaffold(
       body: DeploymentShell(
-        title: Text(tr(context, _isLinux ? 'wtg_linux_title' : 'wtg_title')),
-        subtitle: Text(
-          tr(context, _isLinux ? 'wtg_linux_subtitle' : 'wtg_subtitle'),
-        ),
+        title: Text(tr(context, 'wtg_title')),
+        subtitle: Text(tr(context, 'wtg_subtitle')),
         destinations: _stepDestinations(),
         selectedIndex: _step,
         onDestinationSelected: _selectReachedStep,
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildPlatformSelector(),
+            _buildAvailabilityHeader(),
             const SizedBox(height: 24),
             DeploymentSection(
               title: Text(tr(context, _stepTitleKey(_step))),
@@ -977,9 +911,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   };
 
   String _stepDescriptionKey(int index) => switch (index) {
-    0 => 'deploy_image_desc',
+    0 => 'wtg_image_desc',
     1 => 'deploy_disk_desc',
-    2 => _isLinux ? 'deploy_linux_method_desc' : 'deploy_method_desc',
+    2 => 'deploy_method_desc',
     3 => 'deploy_advanced_desc',
     4 => 'deploy_summary_desc',
     _ => 'wtg_subtitle',
@@ -990,59 +924,38 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     setState(() => _step = index);
   }
 
-  Widget _buildPlatformSelector() {
-    return Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<_ToGoPlatform>(
-            key: const Key('wtg-platform-selector'),
-            expandedInsets: EdgeInsets.zero,
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              minimumSize: const WidgetStatePropertyAll(Size.fromHeight(60)),
-              padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              ),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: const VisualDensity(horizontal: -4),
-              iconSize: const WidgetStatePropertyAll(22),
-              textStyle: WidgetStatePropertyAll(
-                Theme.of(
-                  context,
-                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-            segments: [
-              ButtonSegment(
-                value: _ToGoPlatform.windows,
-                icon: const Icon(Icons.window_rounded),
-                label: Text(
+  Widget _buildAvailabilityHeader() {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('wtg-availability-header'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.window_rounded, color: colors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   tr(context, 'wtg_platform_windows'),
-                  key: const Key('wtg-platform-windows-label'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
-              ),
-              ButtonSegment(
-                value: _ToGoPlatform.linux,
-                icon: const Icon(Icons.terminal_rounded),
-                label: Text(
-                  tr(context, 'wtg_platform_linux'),
-                  key: const Key('wtg-platform-linux-label'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-            selected: {_platform},
-            onSelectionChanged: (value) => _changePlatform(value.first),
+                const SizedBox(height: 4),
+                Text(tr(context, 'linux_portable_future_notice')),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1072,32 +985,20 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _advancedNotice(
-            _isLinux ? Icons.usb_outlined : Icons.info_outline,
-            _isLinux
-                ? 'wtg_linux_live_iso_required'
-                : 'wtg_windows_install_iso_required',
+            Icons.info_outline,
+            'wtg_windows_install_iso_required',
           ),
-          if (!_isLinux)
-            _advancedNotice(
-              Icons.warning_amber_rounded,
-              'wtg_legacy_compatibility_notice',
-            ),
+          _advancedNotice(
+            Icons.warning_amber_rounded,
+            'wtg_legacy_compatibility_notice',
+          ),
           _SelectionPanel(
             icon: Icons.disc_full_outlined,
-            // Keep the empty-state prompt aligned with the selected To Go platform.
-            // WTG remains Windows-only; LTG should never present a Windows ISO prompt.
-            title:
-                _iso?.fileName ??
-                tr(
-                  context,
-                  _isLinux ? 'wtg_linux_select_iso' : 'wtg_select_iso',
-                ),
+            title: _iso?.fileName ?? tr(context, 'wtg_select_iso'),
             subtitle: _iso == null
                 ? tr(context, 'deploy_image_none')
                 : '${_iso!.displaySize}  •  ${_iso!.windowsVersion ?? ''}',
-            selected: _isLinux
-                ? _linuxToGoInspection?.canCreate == true
-                : _iso != null,
+            selected: _iso != null,
             trailing: FilledButton.tonalIcon(
               onPressed: _loadingImage ? null : _pickIso,
               icon: const Icon(Icons.folder_open),
@@ -1112,17 +1013,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               iso: _iso,
             ),
           ],
-          if (_isLinux && _linuxToGoInspection != null) ...[
-            const SizedBox(height: 12),
-            _buildLinuxToGoInspectionBanner(_linuxToGoInspection!),
-          ],
           if (_loadingImage) ...[
             const SizedBox(height: 12),
             LinearProgressIndicator(semanticsLabel: _imageStatus),
             const SizedBox(height: 8),
             Text(_imageStatus),
           ],
-          if (!_isLinux && _images.isNotEmpty) ...[
+          if (_images.isNotEmpty) ...[
             const SizedBox(height: 20),
             Text(
               tr(context, 'wtg_step3_title'),
@@ -1160,49 +1057,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
             }),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildLinuxToGoInspectionBanner(LinuxToGoImageInspection inspection) {
-    final layoutSupported = inspection.canCreate;
-    final supported =
-        layoutSupported &&
-        BootableUsbService.linuxPersistenceToolDistributionApproved;
-    final colorScheme = Theme.of(context).colorScheme;
-    final color = supported ? colorScheme.primary : colorScheme.error;
-    final messageKey = !layoutSupported
-        ? inspection.messageKey ?? 'linux_togo_unsupported_iso'
-        : !BootableUsbService.linuxPersistenceToolDistributionApproved
-        ? 'linux_togo_mke2fs_missing'
-        : inspection.image?.family == LinuxToGoImageFamily.debianLive
-        ? 'linux_togo_debian_image_supported'
-        : inspection.image?.family == LinuxToGoImageFamily.deepinLive
-        ? 'linux_togo_deepin_image_supported'
-        : 'linux_togo_image_supported';
-
-    return Semantics(
-      key: const Key('ltg-image-inspection'),
-      liveRegion: true,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          border: Border.all(color: color.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              supported ? Icons.verified_outlined : Icons.error_outline,
-              color: color,
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: Text(_localizedOrRaw(messageKey))),
-          ],
-        ),
       ),
     );
   }
@@ -1288,29 +1142,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   }
 
   Widget _buildDeploymentStep() {
-    if (_isLinux) {
-      return _stepContainer(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_knownIsoVerification != null) ...[
-              KnownIsoVerificationPanel(
-                verification: _knownIsoVerification,
-                iso: _iso,
-              ),
-              const SizedBox(height: 12),
-            ],
-            _OptionTile(
-              icon: Icons.terminal,
-              title: tr(context, 'deploy_direct'),
-              subtitle: tr(context, 'deploy_linux_direct_desc'),
-              selected: true,
-            ),
-          ],
-        ),
-      );
-    }
-
     final availableModes = DeploymentCompatibility.deploymentModesFor(_plan);
     if (!availableModes.contains(_deploymentMode)) {
       _deploymentMode = availableModes.first;
@@ -1450,8 +1281,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   Widget _buildAdvancedStep() {
     final plan = _plan;
-    final canStageLinuxDrivers =
-        !_isLinux || _linuxToGoInspection?.image?.supportsDriverStaging == true;
     return _stepContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1469,125 +1298,101 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               leading: const Icon(Icons.tune),
               title: Text(tr(context, 'deploy_standard_options')),
               children: [
-                if (!_isLinux) ...[
+                _switchTile(
+                  'deploy_block_local',
+                  'deploy_block_local_desc',
+                  _blockLocalDisks,
+                  (value) => _blockLocalDisks = value,
+                ),
+                _switchTile(
+                  'deploy_skip_oobe',
+                  'deploy_skip_oobe_desc',
+                  _skipOobe,
+                  (value) => _skipOobe = value,
+                ),
+                _advancedNotice(
+                  Icons.health_and_safety_outlined,
+                  'deploy_winre_preserved_notice',
+                ),
+                _switchTile(
+                  'deploy_disable_uasp',
+                  'deploy_disable_uasp_desc',
+                  _disableUasp,
+                  (value) => _disableUasp = value,
+                ),
+                if (DeploymentCompatibility.supportsCompactOs(plan))
                   _switchTile(
-                    'deploy_block_local',
-                    'deploy_block_local_desc',
-                    _blockLocalDisks,
-                    (value) => _blockLocalDisks = value,
+                    'deploy_compact_os',
+                    'deploy_compact_os_desc',
+                    _compactOs,
+                    (value) => _compactOs = value,
                   ),
+                if (_deploymentMode != DeploymentMode.direct)
                   _switchTile(
-                    'deploy_skip_oobe',
-                    'deploy_skip_oobe_desc',
-                    _skipOobe,
-                    (value) => _skipOobe = value,
+                    'deploy_fix_vhd_letter',
+                    'deploy_fix_vhd_letter_desc',
+                    _fixVhdLetter,
+                    (value) => _fixVhdLetter = value,
                   ),
-                  _advancedNotice(
-                    Icons.health_and_safety_outlined,
-                    'deploy_winre_preserved_notice',
-                  ),
-                  _switchTile(
-                    'deploy_disable_uasp',
-                    'deploy_disable_uasp_desc',
-                    _disableUasp,
-                    (value) => _disableUasp = value,
-                  ),
-                  if (DeploymentCompatibility.supportsCompactOs(plan))
-                    _switchTile(
-                      'deploy_compact_os',
-                      'deploy_compact_os_desc',
-                      _compactOs,
-                      (value) => _compactOs = value,
-                    ),
-                  if (_deploymentMode != DeploymentMode.direct)
-                    _switchTile(
-                      'deploy_fix_vhd_letter',
-                      'deploy_fix_vhd_letter_desc',
-                      _fixVhdLetter,
-                      (value) => _fixVhdLetter = value,
-                    ),
-                  _switchTile(
-                    'deploy_netfx3',
-                    _selectedImageHasNetFx3Source
-                        ? 'deploy_netfx3_desc'
-                        : 'deploy_netfx3_source_missing',
-                    _enableNetFx3,
-                    _selectedImageHasNetFx3Source
-                        ? (value) => _enableNetFx3 = value
-                        : null,
-                  ),
-                ],
-                if (canStageLinuxDrivers)
-                  ListTile(
-                    leading: const Icon(Icons.folder_copy_outlined),
-                    title: Text(tr(context, 'deploy_driver_directory')),
-                    subtitle: Text(
-                      _driverDirectory.isEmpty
-                          ? tr(
-                              context,
-                              _isLinux
-                                  ? 'deploy_linux_driver_desc'
-                                  : 'deploy_windows_driver_desc',
-                            )
-                          : _driverDirectory,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: IconButton(
-                      onPressed: _pickDriverDirectory,
-                      icon: const Icon(Icons.folder_open),
-                    ),
-                  ),
+                _switchTile(
+                  'deploy_netfx3',
+                  _selectedImageHasNetFx3Source
+                      ? 'deploy_netfx3_desc'
+                      : 'deploy_netfx3_source_missing',
+                  _enableNetFx3,
+                  _selectedImageHasNetFx3Source
+                      ? (value) => _enableNetFx3 = value
+                      : null,
+                ),
+                _driverDirectoryTile(),
               ],
             ),
           ),
-          if (!_isLinux) ...[
-            const SizedBox(height: 12),
-            Card(
-              child: ExpansionTile(
-                leading: const Icon(Icons.science_outlined),
-                title: Text(tr(context, 'deploy_expert_options')),
-                subtitle: Text(tr(context, 'deploy_expert_desc')),
-                children: [
-                  if (DeploymentCompatibility.supportsWimBoot(plan))
-                    _switchTile(
-                      'deploy_wimboot',
-                      'deploy_wimboot_desc',
-                      _wimBoot,
-                      (value) => _wimBoot = value,
-                    ),
-                  if (plan.usesNtfsUefiLayout)
-                    ListTile(
-                      leading: const Icon(Icons.verified_outlined),
-                      title: Text(tr(context, 'deploy_ntfs_uefi')),
-                      subtitle: Text(tr(context, 'deploy_ntfs_uefi_desc')),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _letterDropdown(
-                            'deploy_system_letter',
-                            _systemLetter,
-                            (value) => _systemLetter = value,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _letterDropdown(
-                            'deploy_boot_letter',
-                            _bootLetter,
-                            (value) => _bootLetter = value,
-                          ),
-                        ),
-                      ],
-                    ),
+          const SizedBox(height: 12),
+          Card(
+            child: ExpansionTile(
+              leading: const Icon(Icons.science_outlined),
+              title: Text(tr(context, 'deploy_expert_options')),
+              subtitle: Text(tr(context, 'deploy_expert_desc')),
+              children: [
+                if (DeploymentCompatibility.supportsWimBoot(plan))
+                  _switchTile(
+                    'deploy_wimboot',
+                    'deploy_wimboot_desc',
+                    _wimBoot,
+                    (value) => _wimBoot = value,
                   ),
-                ],
-              ),
+                if (plan.usesNtfsUefiLayout)
+                  ListTile(
+                    leading: const Icon(Icons.verified_outlined),
+                    title: Text(tr(context, 'deploy_ntfs_uefi')),
+                    subtitle: Text(tr(context, 'deploy_ntfs_uefi_desc')),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _letterDropdown(
+                          'deploy_system_letter',
+                          _systemLetter,
+                          (value) => _systemLetter = value,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _letterDropdown(
+                          'deploy_boot_letter',
+                          _bootLetter,
+                          (value) => _bootLetter = value,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
           const SizedBox(height: 12),
           _buildVolumeIdentityCard(),
           _buildCompatibilityNotices(),
@@ -1595,6 +1400,22 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       ),
     );
   }
+
+  Widget _driverDirectoryTile() => ListTile(
+    leading: const Icon(Icons.folder_copy_outlined),
+    title: Text(tr(context, 'deploy_driver_directory')),
+    subtitle: Text(
+      _driverDirectory.isEmpty
+          ? tr(context, 'deploy_windows_driver_desc')
+          : _driverDirectory,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    ),
+    trailing: IconButton(
+      onPressed: _pickDriverDirectory,
+      icon: const Icon(Icons.folder_open),
+    ),
+  );
 
   Widget _buildVolumeIdentityCard() {
     final hasCustomIcon = _customIconPath.trim().isNotEmpty;
@@ -1623,7 +1444,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                       allowPeriod: true,
                     )
                     ? null
-                    : 'deploy_compat_invalid_volume_label';
+                    : 'deploy_compat_invalid_togo_volume_label';
               }),
             ),
           ),
@@ -1733,10 +1554,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      tr(
-                        context,
-                        _isLinux ? 'creator_linux_warning' : 'creator_warning',
-                      ),
+                      tr(context, 'creator_warning'),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onErrorContainer,
                       ),
@@ -1967,6 +1785,9 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      if (constraints.maxHeight < 96) {
+                        return const SizedBox.shrink();
+                      }
                       final gameHeight = (constraints.maxHeight * 0.46)
                           .clamp(120.0, 250.0)
                           .toDouble();
@@ -2233,10 +2054,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   };
 
   String _phaseLabel(String phase, {required String message}) {
-    return tr(
-      context,
-      toGoProgressTitleKey(isLinux: _isLinux, phase: phase, message: message),
-    );
+    return tr(context, toGoProgressTitleKey(phase: phase, message: message));
   }
 
   String _localizedOrRaw(String value) {
@@ -2268,13 +2086,22 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   String? _localizedFailureReason(_ToGoProgress? progress) {
     if (progress == null || progress.phase != 'failed') return null;
+    String? localizedReason;
     final messageKey = progress.message.split('\n').first.trim();
     if (messageKey.isNotEmpty) {
       final localized = _localizedOrRaw(messageKey);
-      if (localized != messageKey) return localized;
+      if (localized != messageKey) localizedReason = localized;
     }
-    final detail = progress.error?.trim() ?? '';
-    return detail.isEmpty ? null : detail;
+    final rawDetail = progress.error?.trim() ?? '';
+    final detail = switch (rawDetail) {
+      _ when rawDetail.startsWith('i18n:') => _localizedOrRaw(
+        rawDetail.substring('i18n:'.length),
+      ),
+      _ => rawDetail,
+    };
+    if (localizedReason == null) return detail.isEmpty ? null : detail;
+    if (detail.isEmpty || detail == localizedReason) return localizedReason;
+    return '$localizedReason\n$detail';
   }
 
   String _formatDuration(int seconds) {

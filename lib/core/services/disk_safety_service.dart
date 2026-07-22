@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'windows_system_environment.dart';
@@ -786,6 +787,70 @@ Write-Output 'WDS_DISK_INITIALIZED'
     } catch (_) {
       return null;
     }
+  }
+
+  /// Refreshes only the selected physical disk.
+  ///
+  /// A full Storage inventory is useful for the disk picker, but it is a poor
+  /// post-operation probe: an unrelated USB bridge can block enumeration while
+  /// the selected disk is already healthy. Keep the identity guard while
+  /// avoiding that unrelated I/O.
+  Future<DiskInfo?> refreshSelectedDisk(DiskInfo snapshot) async {
+    try {
+      final current = await _queryDiskByNumber(snapshot);
+      return snapshot.hasSamePhysicalIdentity(current) ? current : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Waits for Windows Storage to publish the requested partition style.
+  ///
+  /// Clear-Disk/Initialize-Disk can complete before Get-Disk reflects the new
+  /// style. This bounded poll treats a missing or stale observation as
+  /// transient, but still fails closed when the target never reaches the
+  /// requested style or its identity no longer matches.
+  Future<DiskInfo?> waitForPartitionStyle(
+    DiskInfo snapshot, {
+    required String expectedPartitionStyle,
+    int maxAttempts = 12,
+    Duration retryDelay = const Duration(milliseconds: 750),
+    void Function(int attempt, String observedStyle)? onAttempt,
+  }) {
+    return waitForPartitionStyleWith(
+      snapshot: snapshot,
+      expectedPartitionStyle: expectedPartitionStyle,
+      refresh: refreshSelectedDisk,
+      maxAttempts: maxAttempts,
+      retryDelay: retryDelay,
+      onAttempt: onAttempt,
+    );
+  }
+
+  @visibleForTesting
+  static Future<DiskInfo?> waitForPartitionStyleWith({
+    required DiskInfo snapshot,
+    required String expectedPartitionStyle,
+    required Future<DiskInfo?> Function(DiskInfo) refresh,
+    int maxAttempts = 12,
+    Duration retryDelay = const Duration(milliseconds: 750),
+    void Function(int attempt, String observedStyle)? onAttempt,
+    Future<void> Function(Duration duration)? delay,
+  }) async {
+    final expected = expectedPartitionStyle.trim().toUpperCase();
+    final attempts = maxAttempts < 1 ? 1 : maxAttempts;
+    final wait = delay ?? (duration) => Future<void>.delayed(duration);
+    DiskInfo? latest;
+
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      latest = await refresh(snapshot);
+      final observed =
+          latest?.partitionStyle.trim().toUpperCase() ?? 'UNAVAILABLE';
+      onAttempt?.call(attempt, observed);
+      if (latest != null && observed == expected) return latest;
+      if (attempt < attempts) await wait(retryDelay);
+    }
+    return null;
   }
 
   Future<ProcessResult> runGuardedDiskpart(

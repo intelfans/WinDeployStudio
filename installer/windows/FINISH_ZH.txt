@@ -13,8 +13,8 @@ WinDeploy Studio 已成功安装。
 GitHub 主页：https://github.com/intelfans
 GitHub 仓库：https://github.com/intelfans/WinDeployStudio
 
-Linux To Go 说明：
-本发行版内置 wds_ext4_builder，它由固定的 MIT 许可 go-ext4fs 源码构建，用于通过结构预检的实验性 x64 Ubuntu/casper、Debian Live/Kali 和 Deepin Live 配置。Linux To Go 仅支持 x64 UEFI 系统和 GPT 目标磁盘，不支持 UEFI+MBR 或传统 BIOS。仍需完成真实启动和重启后持久化验证。它只接受本地盘符上的普通镜像，并会在操作目标磁盘前完成校验。详见安装目录中的 THIRD_PARTY_NOTICES.md 和 tools\ext4-builder\README.md。
+功能说明：
+Linux 便携工作环境计划在未来版本中提供，当前版本暂不可用；Linux 安装盘功能仍可正常使用。
 
 特别感谢
 

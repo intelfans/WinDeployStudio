@@ -8,7 +8,7 @@ void main() {
       final missing = trByCode(locale, 'translation_missing');
       final localized = localizeBenchmarkError(
         locale,
-        'bench_error_native_failed: The LTG volume is not writable.',
+        'bench_error_native_failed: The selected volume is not writable.',
       );
 
       expect(localized, isNotEmpty, reason: '$locale returned an empty error');
@@ -17,7 +17,7 @@ void main() {
         isNot(missing),
         reason: '$locale showed the missing marker',
       );
-      expect(localized, contains('The LTG volume is not writable.'));
+      expect(localized, contains('The selected volume is not writable.'));
     }
   });
 

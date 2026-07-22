@@ -47,7 +47,7 @@ void main() {
     expect(find.byTooltip(trCurrent('close')), findsOneWidget);
   });
 
-  testWidgets('Intel museum dialog adapts without a scroll view', (
+  testWidgets('WinDeploy Studio easter egg adapts without a scroll view', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -63,11 +63,12 @@ void main() {
           builder: (context) => Scaffold(
             body: Center(
               child: FilledButton(
-                key: const Key('open-intel-museum'),
+                key: const Key('open-product-easter-egg'),
                 onPressed: () => showDialog<void>(
                   context: context,
-                  builder: (context) =>
-                      const IntelMuseumDialog(loadSystemInfo: false),
+                  builder: (context) => const WinDeployStudioEasterEggDialog(
+                    loadSystemInfo: false,
+                  ),
                 ),
                 child: const Text('Open'),
               ),
@@ -76,7 +77,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byKey(const Key('open-intel-museum')));
+    await tester.tap(find.byKey(const Key('open-product-easter-egg')));
     await tester.pump();
 
     final dialog = find.byType(Dialog);

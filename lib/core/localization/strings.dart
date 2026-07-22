@@ -741,16 +741,6 @@ const _en = <String, String>{
   'safety_disk_offline': 'The selected disk is offline and cannot be used.',
   'linux_not_isohybrid':
       'This ISO is not a bootable ISOHybrid image. The target disk was not changed.',
-  'linux_togo_mount_preflight_failed':
-      'The Linux image could not be inspected. The target disk was not changed.',
-  'linux_togo_unsupported_iso':
-      'Persistent Linux To Go supports verified x64 Ubuntu/casper and Debian Live layouts. Use Install Media for other distributions.',
-  'linux_togo_mke2fs_missing':
-      'This build does not include a compliant Linux persistence component. The target disk was not changed.',
-  'linux_togo_boot_config_unsupported':
-      'This Live image has no supported GRUB entry for enabling persistence. The target disk was not changed.',
-  'linux_togo_boot_file_too_large':
-      'This image has a required boot file larger than FAT32 can store. The target disk was not changed.',
   'bench_error_helper_missing':
       'The native benchmark component is missing. Reinstall the application.',
   'bench_error_cleanup_failed':
@@ -762,7 +752,7 @@ const _en = <String, String>{
   'ai_privacy_continue': 'Continue and Send',
   // App
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Windows & Linux Install Media and To Go Creator',
+  'app_subtitle': 'Windows & Linux Install Media and Windows To Go Creator',
   'nav_home': 'Home',
   'nav_images': 'Images',
   'nav_creator': 'Install Media',
@@ -772,7 +762,7 @@ const _en = <String, String>{
 
   // Home
   'home_title': 'Windows & Linux Deployment Toolkit',
-  'home_subtitle': 'Windows & Linux Install Media and To Go Creator',
+  'home_subtitle': 'Windows & Linux Install Media and Windows To Go Creator',
   'home_quick_start': 'Quick Start',
   'home_image_library': 'Image Library',
   'home_image_library_desc': 'Browse Windows images and get download links',
@@ -780,7 +770,7 @@ const _en = <String, String>{
   'home_bootable_usb_desc':
       'Create Windows or Linux installation USB media from ISO files',
   'home_wtg': 'To Go Workspace',
-  'home_wtg_desc': 'Create portable Windows and Linux live workspaces',
+  'home_wtg_desc': 'Create a portable Windows workspace',
   'home_local_iso': 'Local ISO Import',
   'home_local_iso_desc': 'Import and manage local ISO files',
   'home_about': 'About',
@@ -788,7 +778,7 @@ const _en = <String, String>{
   'home_platform': 'Platform',
   'home_engine': 'Engine',
   'home_focus': 'Focus',
-  'home_focus_value': 'Install Media & To Go',
+  'home_focus_value': 'Install Media & Windows To Go',
   'home_license': 'License',
   'home_license_value': 'Open Source',
 
@@ -969,8 +959,8 @@ const _en = <String, String>{
   'ai_answering': 'Answering...',
   'ai_sources': 'Sources',
   'easter_egg_missing': 'Easter egg image not found!',
-  'intel_museum_desc': 'This is an internal build for testing purposes.',
-  'intel_museum_title': 'Intel Confidential',
+  'studio_easter_egg_desc': 'This is an internal build for testing purposes.',
+  'studio_easter_egg_title': 'WinDeploy Studio Easter Egg',
   'intel_memory': 'Memory',
   'intel_build_time': 'Build Time',
 
@@ -1073,36 +1063,6 @@ const _en = <String, String>{
 
   // Logs
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Linux To Go Creator',
-  'wtg_linux_subtitle':
-      'Create a portable persistent Ubuntu/casper Live workspace',
-  'wtg_linux_select_iso': 'Select Linux ISO',
-  'wtg_linux_select_iso_desc':
-      'Choose an x64 Ubuntu or compatible casper-based Live ISO. WinDeploy Studio will create and enable persistent storage.',
-  'wtg_linux_step1_title': 'Step 1: Select Linux ISO',
-  'wtg_linux_step1_desc':
-      'Select an x64 Ubuntu or compatible casper-based Live ISO',
-  'wtg_linux_step4_title': 'Step 2: Select Target Disk',
-  'wtg_linux_step4_desc': 'Select the external disk for Linux To Go',
-  'wtg_linux_confirm_title': 'Step 3: Confirm Linux To Go',
-  'wtg_linux_confirm_desc':
-      'Review the supported casper ISO, target disk, and persistent workspace before writing',
-  'wtg_linux_workspace_type': 'Workspace Type',
-  'wtg_linux_live_workspace': 'Persistent Ubuntu/casper Live workspace',
-  'wtg_linux_persistence': 'Persistence',
-  'wtg_linux_persistence_note':
-      'Enabled with an ext4 writable image (up to about 4 GB)',
-  'wtg_linux_step6_title': 'Step 4: Creating Linux To Go',
-  'wtg_linux_step6_desc':
-      'Please wait while the Linux ISO image is written to the target disk',
-  'wtg_linux_step_complete_title': 'Step 5: Complete',
-  'wtg_linux_step_complete_desc': 'Linux To Go has been created successfully',
-  'wtg_linux_creation_complete': 'Linux To Go Created!',
-  'wtg_linux_creation_complete_desc':
-      'Your bootable Linux live workspace is ready to use',
-  'wtg_linux_step_failed_title': 'Creation Failed',
-  'wtg_linux_step_failed_desc': 'An error occurred while creating Linux To Go',
   'logs_title': 'Log Center',
   'logs_subtitle': 'View and manage application logs',
   'logs_open_folder': 'Open Logs Folder',
@@ -1548,7 +1508,7 @@ const _en = <String, String>{
   'logs_cat_benchmark': 'Disk Test Logs',
   'bench_title': 'Drive Benchmark',
   'bench_subtitle':
-      'Measure real write behavior for Windows To Go and Linux To Go: sequential speed, 4K random writes, thread scaling, and long-write stability.',
+      'Measure real write behavior for Windows To Go: sequential speed, 4K random writes, thread scaling, and long-write stability.',
   'bench_refresh': 'Refresh',
   'bench_target_disk': 'Target Drive',
   'bench_detecting': 'Detecting removable drives...',
@@ -1561,8 +1521,7 @@ const _en = <String, String>{
   'bench_mode_extreme': 'Extreme',
   'bench_mode_full_write': 'Full Write',
   'bench_mode_quick_desc': 'A short safety check for basic To Go suitability.',
-  'bench_mode_standard_desc':
-      'Balanced coverage for daily Windows To Go and Linux To Go use.',
+  'bench_mode_standard_desc': 'Balanced coverage for daily Windows To Go use.',
   'bench_mode_extreme_desc':
       'Longer 4K and multi-thread tests for stricter judgement.',
   'bench_mode_full_write_desc':
@@ -1624,14 +1583,13 @@ const _en = <String, String>{
   'bench_result_reasons': 'Key Reasons',
   'bench_result_notes': 'Notes',
   'bench_recommend_excellent':
-      'Recommended for Windows To Go / Linux To Go, including heavier daily use.',
-  'bench_recommend_good': 'Recommended for Windows To Go / Linux To Go.',
+      'Recommended for Windows To Go, including heavier daily use.',
+  'bench_recommend_good': 'Recommended for Windows To Go.',
   'bench_recommend_usable':
       'Usable for light To Go workloads; avoid heavy updates and multitasking.',
   'bench_recommend_limited':
       'Only suitable for emergency or lightweight To Go use.',
-  'bench_recommend_not_recommended':
-      'Not recommended for Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'Not recommended for Windows To Go.',
   'bench_recommend_unmeasured': 'Run a benchmark to generate a recommendation.',
   'bench_reason_4k_strong': '4K random writes are very strong.',
   'bench_reason_4k_stable': '4K random writes are stable.',
@@ -1697,13 +1655,6 @@ const _zh = <String, String>{
   'safety_not_external': '只能擦除已确认的外接磁盘。',
   'safety_disk_offline': '所选磁盘处于脱机状态，无法使用。',
   'linux_not_isohybrid': '此 ISO 不是可启动的 ISOHybrid 镜像，目标磁盘未被修改。',
-  'linux_togo_mount_preflight_failed': '无法检查此 Linux 镜像，目标磁盘未被修改。',
-  'linux_togo_unsupported_iso':
-      '持久化 Linux To Go 支持经过验证的 x64 Ubuntu/casper 和 Debian Live 布局。其他发行版请使用“安装盘”功能。',
-  'linux_togo_mke2fs_missing': '此构建未包含符合许可证要求的 Linux 持久化组件，目标磁盘未被修改。',
-  'linux_togo_boot_config_unsupported':
-      '此 Live 镜像没有可用于启用持久化的受支持 GRUB 启动项，目标磁盘未被修改。',
-  'linux_togo_boot_file_too_large': '此镜像包含超过 FAT32 单文件容量上限的必要启动文件，目标磁盘未被修改。',
   'bench_error_helper_missing': '缺少原生磁盘测试组件，请重新安装应用。',
   'bench_error_cleanup_failed':
       '部分测试文件无法删除。请关闭正在使用该磁盘的程序，并删除 .wds_benchmark 文件夹。',
@@ -1713,7 +1664,7 @@ const _zh = <String, String>{
       '此分析会把选定的日志片段、镜像名称或设备信息发送到你配置的 AI 服务。文件内容仅限本功能读取的预览，且不会发送 USB 序列号。是否继续？',
   'ai_privacy_continue': '继续并发送',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Windows 与 Linux 安装盘和 To Go 创建工具',
+  'app_subtitle': 'Windows 与 Linux 安装盘及 Windows To Go 创建工具',
   'nav_home': '首页',
   'nav_images': '镜像',
   'nav_creator': '安装盘',
@@ -1721,14 +1672,14 @@ const _zh = <String, String>{
   'nav_logs': '日志',
   'nav_settings': '设置',
   'home_title': 'Windows 与 Linux 部署工具箱',
-  'home_subtitle': 'Windows 与 Linux 安装盘和 To Go 创建工具',
+  'home_subtitle': 'Windows 与 Linux 安装盘及 Windows To Go 创建工具',
   'home_quick_start': '快速开始',
   'home_image_library': '镜像库',
   'home_image_library_desc': '浏览 Windows 镜像并获取下载链接',
   'home_bootable_usb': '安装盘创建工具',
   'home_bootable_usb_desc': '从 ISO 创建 Windows 或 Linux 安装 U 盘',
   'home_wtg': 'To Go 工作空间',
-  'home_wtg_desc': '创建便携式 Windows 与 Linux 随身工作环境',
+  'home_wtg_desc': '创建便携式 Windows 随身工作环境',
   'home_local_iso': '本地 ISO 导入',
   'home_local_iso_desc': '导入和管理本地 ISO 文件',
   'home_about': '关于',
@@ -1736,7 +1687,7 @@ const _zh = <String, String>{
   'home_platform': '平台',
   'home_engine': '引擎',
   'home_focus': '专注',
-  'home_focus_value': '安装盘与 To Go',
+  'home_focus_value': '安装盘与 Windows To Go',
   'home_license': '许可证',
   'home_license_value': '开源',
   'images_title': '镜像库',
@@ -1890,8 +1841,8 @@ const _zh = <String, String>{
   'ai_answering': '正在回答...',
   'ai_sources': '来源',
   'easter_egg_missing': '未找到彩蛋图片！',
-  'intel_museum_desc': '这是一个用于测试的内部构建版本。',
-  'intel_museum_title': 'Intel 机密',
+  'studio_easter_egg_desc': '这是一个用于测试的内部构建版本。',
+  'studio_easter_egg_title': 'WinDeploy Studio 彩蛋',
   'intel_memory': '内存',
   'intel_build_time': '构建时间',
   'lang_select_title': '选择语言',
@@ -1985,30 +1936,6 @@ const _zh = <String, String>{
   'wtg_disk_prefix': '磁盘',
   'wtg_starting': '正在启动...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Linux To Go 创建工具',
-  'wtg_linux_subtitle': '创建可随身启动并保存更改的 Ubuntu/casper Live 工作环境',
-  'wtg_linux_select_iso': '选择 Linux ISO',
-  'wtg_linux_select_iso_desc':
-      '选择 x64 Ubuntu 或兼容的 casper Live ISO。WinDeploy Studio 将创建并启用持久化存储。',
-  'wtg_linux_step1_title': '步骤 1：选择 Linux ISO',
-  'wtg_linux_step1_desc': '选择 x64 Ubuntu 或兼容的 casper Live ISO',
-  'wtg_linux_step4_title': '步骤 2：选择目标磁盘',
-  'wtg_linux_step4_desc': '选择用于 Linux To Go 的外接磁盘',
-  'wtg_linux_confirm_title': '步骤 3：确认 Linux To Go',
-  'wtg_linux_confirm_desc': '写入前确认受支持的 casper ISO、目标磁盘和持久化工作环境',
-  'wtg_linux_workspace_type': '工作环境类型',
-  'wtg_linux_live_workspace': '持久化 Ubuntu/casper Live 工作环境',
-  'wtg_linux_persistence': '持久化',
-  'wtg_linux_persistence_note': '通过 ext4 writable 镜像启用（最大约 4 GB）',
-  'wtg_linux_step6_title': '步骤 4：正在创建 Linux To Go',
-  'wtg_linux_step6_desc': '正在将 Linux ISO 镜像写入目标磁盘，请稍候',
-  'wtg_linux_step_complete_title': '步骤 5：完成',
-  'wtg_linux_step_complete_desc': 'Linux To Go 已成功创建',
-  'wtg_linux_creation_complete': 'Linux To Go 创建完成！',
-  'wtg_linux_creation_complete_desc': '你的可启动 Linux Live 工作环境已准备就绪',
-  'wtg_linux_step_failed_title': '创建失败',
-  'wtg_linux_step_failed_desc': '创建 Linux To Go 时发生错误',
   'logs_title': '日志中心',
   'logs_subtitle': '查看和管理应用程序日志',
   'logs_open_folder': '打开日志文件夹',
@@ -2408,8 +2335,7 @@ const _zh = <String, String>{
   'home_benchmark_desc': '部署前检查 To Go 目标盘的真实性能',
   'logs_cat_benchmark': '磁盘测试日志',
   'bench_title': '磁盘性能测试',
-  'bench_subtitle':
-      '面向 Windows To Go 和 Linux To Go 的真实写入测试，覆盖顺序写入、4K 随机、多线程扩展与长时间写入稳定性。',
+  'bench_subtitle': '面向 Windows To Go  的真实写入测试，覆盖顺序写入、4K 随机、多线程扩展与长时间写入稳定性。',
   'bench_refresh': '刷新',
   'bench_target_disk': '目标磁盘',
   'bench_detecting': '正在检测可移动磁盘...',
@@ -2422,7 +2348,7 @@ const _zh = <String, String>{
   'bench_mode_extreme': '极限',
   'bench_mode_full_write': '全盘写入',
   'bench_mode_quick_desc': '用于快速判断是否基本适合 To Go 的短测试。',
-  'bench_mode_standard_desc': '覆盖日常 Windows To Go 与 Linux To Go 使用场景，耗时适中。',
+  'bench_mode_standard_desc': '覆盖日常 Windows To Go  使用场景，耗时适中。',
   'bench_mode_extreme_desc': '延长 4K 与多线程测试时间，给出更严格的判断。',
   'bench_mode_full_write_desc': '额外执行接近全盘的顺序写入，用于观察缓存掉速。',
   'bench_full_warning': '全盘写入模式会写满大部分可用空间，耗时可能较长。测试不会主动删除已有文件，但会让磁盘承受较高负载。',
@@ -2472,11 +2398,11 @@ const _zh = <String, String>{
   'bench_result_recommendation': '建议',
   'bench_result_reasons': '关键原因',
   'bench_result_notes': '注意',
-  'bench_recommend_excellent': '推荐用于 Windows To Go / Linux To Go，也适合较高负载的日常使用。',
-  'bench_recommend_good': '推荐用于 Windows To Go / Linux To Go。',
+  'bench_recommend_excellent': '推荐用于 Windows To Go，也适合较高负载的日常使用。',
+  'bench_recommend_good': '推荐用于 Windows To Go。',
   'bench_recommend_usable': '可用于轻度 To Go 场景，建议避免重负载更新和多任务。',
   'bench_recommend_limited': '仅建议应急或轻量 To Go 使用，体验可能受限。',
-  'bench_recommend_not_recommended': '不推荐用于 Windows To Go / Linux To Go。',
+  'bench_recommend_not_recommended': '不推荐用于 Windows To Go。',
   'bench_recommend_unmeasured': '运行测试后会生成建议。',
   'bench_reason_4k_strong': '4K 随机写入表现很强。',
   'bench_reason_4k_stable': '4K 随机写入稳定。',
@@ -2534,16 +2460,6 @@ const _ru = <String, String>{
   'safety_disk_offline': 'Выбранный диск отключен и недоступен.',
   'linux_not_isohybrid':
       'Этот ISO не является загрузочным образом ISOHybrid. Целевой диск не изменен.',
-  'linux_togo_mount_preflight_failed':
-      'Не удалось проверить образ Linux. Целевой диск не изменен.',
-  'linux_togo_unsupported_iso':
-      'Linux To Go с постоянным хранилищем поддерживает проверенные x64-разметки Ubuntu/casper и Debian Live. Для других дистрибутивов используйте создание установочного носителя.',
-  'linux_togo_mke2fs_missing':
-      'Эта сборка не содержит компонента постоянного хранения Linux, соответствующего лицензионным требованиям. Целевой диск не изменён.',
-  'linux_togo_boot_config_unsupported':
-      'В этом Live-образе нет поддерживаемой записи GRUB для включения постоянного хранения. Целевой диск не изменён.',
-  'linux_togo_boot_file_too_large':
-      'В образе есть обязательный загрузочный файл, превышающий допустимый для FAT32 размер. Целевой диск не изменён.',
   'bench_error_helper_missing':
       'Отсутствует нативный компонент тестирования. Переустановите приложение.',
   'bench_error_cleanup_failed':
@@ -2554,7 +2470,8 @@ const _ru = <String, String>{
       'Для анализа выбранные фрагменты журналов, имена образов или сведения об устройстве отправляются настроенному сервису ИИ. Передаются только прочитанные функцией фрагменты файлов; серийные номера USB не отправляются. Продолжить?',
   'ai_privacy_continue': 'Продолжить и отправить',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Создание установочных носителей и To Go для Windows и Linux',
+  'app_subtitle':
+      'Создание установочных носителей Windows/Linux и Windows To Go',
   'nav_home': 'Главная',
   'nav_images': 'Образы',
   'nav_creator': 'Носитель',
@@ -2563,7 +2480,7 @@ const _ru = <String, String>{
   'nav_settings': 'Настройки',
   'home_title': 'Инструменты развертывания Windows и Linux',
   'home_subtitle':
-      'Создание установочных носителей и To Go для Windows и Linux',
+      'Создание установочных носителей Windows/Linux и Windows To Go',
   'home_quick_start': 'Быстрый старт',
   'home_image_library': 'Библиотека образов',
   'home_image_library_desc': 'Просмотр образов Windows и ссылок для загрузки',
@@ -2571,7 +2488,7 @@ const _ru = <String, String>{
   'home_bootable_usb_desc':
       'Создавайте установочные USB-носители Windows или Linux из ISO-файлов',
   'home_wtg': 'Рабочая среда To Go',
-  'home_wtg_desc': 'Создавайте переносные рабочие среды Windows и Linux',
+  'home_wtg_desc': 'Создавайте переносные рабочие среды Windows',
   'home_local_iso': 'Импорт локального ISO',
   'home_local_iso_desc': 'Импорт и управление локальными файлами ISO',
   'home_about': 'О программе',
@@ -2579,7 +2496,7 @@ const _ru = <String, String>{
   'home_platform': 'Платформа',
   'home_engine': 'Движок',
   'home_focus': 'Специализация',
-  'home_focus_value': 'Install Media и To Go',
+  'home_focus_value': 'Установочные носители и Windows To Go',
   'home_license': 'Лицензия',
   'home_license_value': 'Открытый исходный код',
   'images_title': 'Библиотека образов',
@@ -2746,8 +2663,8 @@ const _ru = <String, String>{
   'ai_answering': 'Формируется ответ...',
   'ai_sources': 'Источники',
   'easter_egg_missing': 'Пасхальное яйцо не найдено!',
-  'intel_museum_desc': 'Это внутренняя сборка для тестирования.',
-  'intel_museum_title': 'Конфиденциально Intel',
+  'studio_easter_egg_desc': 'Это внутренняя сборка для тестирования.',
+  'studio_easter_egg_title': 'Пасхальное яйцо WinDeploy Studio',
   'intel_memory': 'Память',
   'intel_build_time': 'Время сборки',
   'lang_select_title': 'Выберите язык',
@@ -2845,36 +2762,6 @@ const _ru = <String, String>{
   'wtg_disk_prefix': 'Диск',
   'wtg_starting': 'Запуск...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Создание Linux To Go',
-  'wtg_linux_subtitle':
-      'Создайте переносную Ubuntu/casper Live-среду с сохранением изменений',
-  'wtg_linux_select_iso': 'Выбрать ISO Linux',
-  'wtg_linux_select_iso_desc':
-      'Выберите x64-образ Ubuntu или совместимый Live ISO на базе casper. WinDeploy Studio создаст и включит постоянное хранилище.',
-  'wtg_linux_step1_title': 'Шаг 1: выберите ISO Linux',
-  'wtg_linux_step1_desc':
-      'Выберите x64-образ Ubuntu или совместимый Live ISO на базе casper',
-  'wtg_linux_step4_title': 'Шаг 2: выберите целевой диск',
-  'wtg_linux_step4_desc': 'Выберите внешний диск для Linux To Go',
-  'wtg_linux_confirm_title': 'Шаг 3: подтвердите Linux To Go',
-  'wtg_linux_confirm_desc':
-      'Перед записью проверьте поддерживаемый casper ISO, целевой диск и постоянное хранилище',
-  'wtg_linux_workspace_type': 'Тип среды',
-  'wtg_linux_live_workspace':
-      'Ubuntu/casper Live-среда с сохранением изменений',
-  'wtg_linux_persistence': 'Сохранение изменений',
-  'wtg_linux_persistence_note': 'Включено через ext4-образ writable (до 4 ГБ)',
-  'wtg_linux_step6_title': 'Шаг 4: создание Linux To Go',
-  'wtg_linux_step6_desc':
-      'Подождите, пока ISO-образ Linux записывается на целевой диск',
-  'wtg_linux_step_complete_title': 'Шаг 5: готово',
-  'wtg_linux_step_complete_desc': 'Linux To Go успешно создан',
-  'wtg_linux_creation_complete': 'Linux To Go создан!',
-  'wtg_linux_creation_complete_desc':
-      'Ваша загрузочная Linux Live-среда готова к использованию',
-  'wtg_linux_step_failed_title': 'Создание не удалось',
-  'wtg_linux_step_failed_desc': 'При создании Linux To Go произошла ошибка',
   'logs_title': 'Центр журналов',
   'logs_subtitle': 'Просмотр и управление журналами приложения',
   'logs_open_folder': 'Открыть папку журналов',
@@ -3314,7 +3201,7 @@ const _ru = <String, String>{
   'logs_cat_benchmark': 'Журналы теста диска',
   'bench_title': 'Тест накопителя',
   'bench_subtitle':
-      'Проверяет реальную запись для Windows To Go и Linux To Go: последовательную скорость, 4K random, масштабирование потоков и устойчивость долгой записи.',
+      'Проверяет реальную запись для Windows To Go: последовательную скорость, 4K random, масштабирование потоков и устойчивость долгой записи.',
   'bench_refresh': 'Обновить',
   'bench_target_disk': 'Целевой диск',
   'bench_detecting': 'Поиск съемных дисков...',
@@ -3329,7 +3216,7 @@ const _ru = <String, String>{
   'bench_mode_full_write': 'Полная запись',
   'bench_mode_quick_desc': 'Короткая проверка базовой пригодности для To Go.',
   'bench_mode_standard_desc':
-      'Сбалансированная проверка для обычного Windows To Go и Linux To Go.',
+      'Сбалансированная проверка для обычного Windows To Go.',
   'bench_mode_extreme_desc':
       'Более долгие 4K и многопоточные тесты для строгой оценки.',
   'bench_mode_full_write_desc':
@@ -3391,14 +3278,13 @@ const _ru = <String, String>{
   'bench_result_reasons': 'Ключевые причины',
   'bench_result_notes': 'Примечания',
   'bench_recommend_excellent':
-      'Рекомендуется для Windows To Go / Linux To Go, включая более тяжелое ежедневное использование.',
-  'bench_recommend_good': 'Рекомендуется для Windows To Go / Linux To Go.',
+      'Рекомендуется для Windows To Go, включая более тяжелое ежедневное использование.',
+  'bench_recommend_good': 'Рекомендуется для Windows To Go.',
   'bench_recommend_usable':
       'Подходит для легких To Go-сценариев; лучше избегать тяжелых обновлений и многозадачности.',
   'bench_recommend_limited':
       'Подходит только для аварийного или легкого To Go-использования.',
-  'bench_recommend_not_recommended':
-      'Не рекомендуется для Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'Не рекомендуется для Windows To Go.',
   'bench_recommend_unmeasured': 'Запустите тест, чтобы получить рекомендацию.',
   'bench_reason_4k_strong': 'Случайная запись 4K очень высокая.',
   'bench_reason_4k_stable': 'Случайная запись 4K стабильна.',
@@ -3472,16 +3358,6 @@ const _fr = <String, String>{
       'Le disque sélectionné est hors ligne et inutilisable.',
   'linux_not_isohybrid':
       'Cet ISO n’est pas une image ISOHybrid amorçable. Le disque cible n’a pas été modifié.',
-  'linux_togo_mount_preflight_failed':
-      'L’image Linux n’a pas pu être inspectée. Le disque cible n’a pas été modifié.',
-  'linux_togo_unsupported_iso':
-      'Linux To Go persistant prend en charge les dispositions x64 Ubuntu/casper et Debian Live vérifiées. Pour les autres distributions, utilisez le créateur de support d’installation.',
-  'linux_togo_mke2fs_missing':
-      'Cette version ne contient pas de composant de persistance Linux conforme aux exigences de licence. Le disque cible n’a pas été modifié.',
-  'linux_togo_boot_config_unsupported':
-      'Cette image Live ne contient aucune entrée GRUB prise en charge pour activer la persistance. Le disque cible n’a pas été modifié.',
-  'linux_togo_boot_file_too_large':
-      'Cette image contient un fichier de démarrage requis trop volumineux pour FAT32. Le disque cible n’a pas été modifié.',
   'bench_error_helper_missing':
       'Le composant natif de test est manquant. Réinstallez l’application.',
   'bench_error_cleanup_failed':
@@ -3493,7 +3369,7 @@ const _fr = <String, String>{
   'ai_privacy_continue': 'Continuer et envoyer',
   'app_name': 'WinDeploy Studio',
   'app_subtitle':
-      'Créateur de supports d’installation et To Go Windows et Linux',
+      'Créateur de supports d’installation Windows/Linux et Windows To Go',
   'nav_home': 'Accueil',
   'nav_images': 'Images',
   'nav_creator': 'Support',
@@ -3502,7 +3378,7 @@ const _fr = <String, String>{
   'nav_settings': 'Paramètres',
   'home_title': 'Boîte à outils de déploiement Windows et Linux',
   'home_subtitle':
-      'Créateur de supports d’installation et To Go Windows et Linux',
+      'Créateur de supports d’installation Windows/Linux et Windows To Go',
   'home_quick_start': 'Démarrage rapide',
   'home_image_library': 'Bibliothèque d\'images',
   'home_image_library_desc':
@@ -3511,7 +3387,7 @@ const _fr = <String, String>{
   'home_bootable_usb_desc':
       'Créer des supports USB d’installation Windows ou Linux à partir de fichiers ISO',
   'home_wtg': 'Espace de travail To Go',
-  'home_wtg_desc': 'Créer des espaces de travail portables Windows et Linux',
+  'home_wtg_desc': 'Créer un espace de travail Windows portable',
   'home_local_iso': 'Import ISO local',
   'home_local_iso_desc': 'Importer et gérer les fichiers ISO locaux',
   'home_about': 'À propos',
@@ -3519,7 +3395,7 @@ const _fr = <String, String>{
   'home_platform': 'Plateforme',
   'home_engine': 'Moteur',
   'home_focus': 'Focus',
-  'home_focus_value': 'Supports d’installation et To Go',
+  'home_focus_value': 'Supports d’installation et Windows To Go',
   'home_license': 'Licence',
   'home_license_value': 'Open Source',
   'images_title': 'Bibliothèque d\'images',
@@ -3689,8 +3565,8 @@ const _fr = <String, String>{
   'ai_answering': 'Réponse en cours...',
   'ai_sources': 'Sources',
   'easter_egg_missing': 'Image de l\'easter egg introuvable !',
-  'intel_museum_desc': 'Ceci est une version interne à des fins de test.',
-  'intel_museum_title': 'Confidentiel Intel',
+  'studio_easter_egg_desc': 'Ceci est une version interne à des fins de test.',
+  'studio_easter_egg_title': 'Easter egg WinDeploy Studio',
   'intel_memory': 'Mémoire',
   'intel_build_time': 'Heure de construction',
   'lang_select_title': 'Sélectionner la langue',
@@ -3793,37 +3669,6 @@ const _fr = <String, String>{
   'wtg_disk_prefix': 'Disque',
   'wtg_starting': 'Démarrage...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Créateur Linux To Go',
-  'wtg_linux_subtitle':
-      'Créer un environnement Ubuntu/casper Live portable et persistant',
-  'wtg_linux_select_iso': 'Sélectionner l’ISO Linux',
-  'wtg_linux_select_iso_desc':
-      'Choisissez une image Ubuntu x64 ou une image Live compatible basée sur casper. WinDeploy Studio créera et activera le stockage persistant.',
-  'wtg_linux_step1_title': 'Étape 1 : sélectionner l’ISO Linux',
-  'wtg_linux_step1_desc':
-      'Sélectionnez une image Ubuntu x64 ou une image Live compatible basée sur casper',
-  'wtg_linux_step4_title': 'Étape 2 : sélectionner le disque cible',
-  'wtg_linux_step4_desc': 'Sélectionnez le disque externe pour Linux To Go',
-  'wtg_linux_confirm_title': 'Étape 3 : confirmer Linux To Go',
-  'wtg_linux_confirm_desc':
-      'Avant l’écriture, vérifiez l’ISO casper pris en charge, le disque cible et l’espace persistant',
-  'wtg_linux_workspace_type': 'Type d’espace',
-  'wtg_linux_live_workspace': 'Environnement Ubuntu/casper Live persistant',
-  'wtg_linux_persistence': 'Persistance',
-  'wtg_linux_persistence_note':
-      'Activée avec une image ext4 writable (jusqu’à environ 4 Go)',
-  'wtg_linux_step6_title': 'Étape 4 : création de Linux To Go',
-  'wtg_linux_step6_desc':
-      'Veuillez patienter pendant l’écriture de l’image ISO Linux sur le disque cible',
-  'wtg_linux_step_complete_title': 'Étape 5 : terminé',
-  'wtg_linux_step_complete_desc': 'Linux To Go a été créé avec succès',
-  'wtg_linux_creation_complete': 'Linux To Go créé !',
-  'wtg_linux_creation_complete_desc':
-      'Votre espace Linux Live amorçable est prêt',
-  'wtg_linux_step_failed_title': 'Échec de la création',
-  'wtg_linux_step_failed_desc':
-      'Une erreur s’est produite pendant la création de Linux To Go',
   'logs_title': 'Centre de journaux',
   'logs_subtitle': 'Voir et gérer les journaux d\'application',
   'logs_open_folder': 'Ouvrir le dossier des journaux',
@@ -4261,7 +4106,7 @@ const _fr = <String, String>{
   'logs_cat_benchmark': 'Journaux de test disque',
   'bench_title': 'Benchmark de disque',
   'bench_subtitle':
-      'Mesure le comportement réel en écriture pour Windows To Go et Linux To Go : séquentiel, aléatoire 4K, montée en threads et stabilité longue durée.',
+      'Mesure le comportement réel en écriture pour Windows To Go : séquentiel, aléatoire 4K, montée en threads et stabilité longue durée.',
   'bench_refresh': 'Actualiser',
   'bench_target_disk': 'Disque cible',
   'bench_detecting': 'Détection des disques amovibles...',
@@ -4277,7 +4122,7 @@ const _fr = <String, String>{
   'bench_mode_quick_desc':
       'Contrôle court pour juger une compatibilité To Go de base.',
   'bench_mode_standard_desc':
-      'Couverture équilibrée pour un usage Windows To Go et Linux To Go quotidien.',
+      'Couverture équilibrée pour un usage Windows To Go quotidien.',
   'bench_mode_extreme_desc':
       'Tests 4K et multithread plus longs pour un avis plus strict.',
   'bench_mode_full_write_desc':
@@ -4343,14 +4188,13 @@ const _fr = <String, String>{
   'bench_result_reasons': 'Raisons clés',
   'bench_result_notes': 'Notes',
   'bench_recommend_excellent':
-      'Recommandé pour Windows To Go / Linux To Go, y compris pour un usage quotidien plus exigeant.',
-  'bench_recommend_good': 'Recommandé pour Windows To Go / Linux To Go.',
+      'Recommandé pour Windows To Go, y compris pour un usage quotidien plus exigeant.',
+  'bench_recommend_good': 'Recommandé pour Windows To Go.',
   'bench_recommend_usable':
       'Utilisable pour des scénarios To Go légers; évitez les grosses mises à jour et le multitâche lourd.',
   'bench_recommend_limited':
       'À réserver au dépannage ou à un usage To Go très léger.',
-  'bench_recommend_not_recommended':
-      'Non recommandé pour Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'Non recommandé pour Windows To Go.',
   'bench_recommend_unmeasured':
       'Lancez un test pour obtenir une recommandation.',
   'bench_reason_4k_strong': 'Les écritures aléatoires 4K sont très solides.',
@@ -4420,16 +4264,6 @@ const _ja = <String, String>{
   'safety_disk_offline': '選択したディスクはオフラインのため使用できません。',
   'linux_not_isohybrid':
       'この ISO は起動可能な ISOHybrid イメージではありません。対象ディスクは変更されていません。',
-  'linux_togo_mount_preflight_failed':
-      'Linux イメージを確認できませんでした。対象ディスクは変更されていません。',
-  'linux_togo_unsupported_iso':
-      '永続化 Linux To Go は、検証済みの x64 Ubuntu/casper および Debian Live レイアウトに対応しています。その他のディストリビューションにはインストールメディア作成機能を使用してください。',
-  'linux_togo_mke2fs_missing':
-      'このビルドにはライセンス要件を満たす Linux 永続化コンポーネントが含まれていません。対象ディスクは変更されていません。',
-  'linux_togo_boot_config_unsupported':
-      'この Live イメージには、永続化を有効にできる対応 GRUB エントリがありません。対象ディスクは変更されていません。',
-  'linux_togo_boot_file_too_large':
-      'このイメージには FAT32 の単一ファイル上限を超える必須の起動ファイルがあります。対象ディスクは変更されていません。',
   'bench_error_helper_missing': 'ネイティブのディスクテストコンポーネントがありません。アプリを再インストールしてください。',
   'bench_error_cleanup_failed':
       '一部のテストファイルを削除できませんでした。ドライブを使用中のアプリを閉じ、.wds_benchmark フォルダーを削除してください。',
@@ -4439,7 +4273,7 @@ const _ja = <String, String>{
       'この解析では、選択したログの抜粋、イメージ名、またはデバイス情報を設定済みの AI サービスへ送信します。ファイル内容は本機能が読み取る範囲に限られ、USB のシリアル番号は送信されません。続行しますか？',
   'ai_privacy_continue': '続行して送信',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Windows / Linux インストールメディア & To Go 作成ツール',
+  'app_subtitle': 'Windows / Linux インストールメディア & Windows To Go 作成ツール',
   'nav_home': 'ホーム',
   'nav_images': 'イメージ',
   'nav_creator': 'インストール',
@@ -4447,14 +4281,14 @@ const _ja = <String, String>{
   'nav_logs': 'ログ',
   'nav_settings': '設定',
   'home_title': 'Windows / Linux 展開ツールキット',
-  'home_subtitle': 'Windows / Linux インストールメディア & To Go 作成ツール',
+  'home_subtitle': 'Windows / Linux インストールメディア & Windows To Go 作成ツール',
   'home_quick_start': 'クイックスタート',
   'home_image_library': 'イメージライブラリ',
   'home_image_library_desc': 'Windowsイメージを閲覧し、ダウンロードリンクを取得',
   'home_bootable_usb': 'インストールメディア作成ツール',
   'home_bootable_usb_desc': 'ISO から Windows または Linux のインストール USB を作成',
   'home_wtg': 'To Go ワークスペース',
-  'home_wtg_desc': 'ポータブルな Windows / Linux ワークスペースを作成',
+  'home_wtg_desc': 'ポータブルな Windows ワークスペースを作成',
   'home_local_iso': 'ローカルISOインポート',
   'home_local_iso_desc': 'ローカルISOファイルのインポートと管理',
   'home_about': 'バージョン情報',
@@ -4462,7 +4296,7 @@ const _ja = <String, String>{
   'home_platform': 'プラットフォーム',
   'home_engine': 'エンジン',
   'home_focus': 'フォーカス',
-  'home_focus_value': 'インストールメディア & To Go',
+  'home_focus_value': 'インストールメディア & Windows To Go',
   'home_license': 'ライセンス',
   'home_license_value': 'オープンソース',
   'images_title': 'イメージライブラリ',
@@ -4621,8 +4455,8 @@ const _ja = <String, String>{
   'ai_answering': '回答中...',
   'ai_sources': '参考情報',
   'easter_egg_missing': 'イースターエッグの画像が見つかりません！',
-  'intel_museum_desc': 'これはテスト用の内部ビルドです。',
-  'intel_museum_title': 'Intel機密',
+  'studio_easter_egg_desc': 'これはテスト用の内部ビルドです。',
+  'studio_easter_egg_title': 'WinDeploy Studio イースターエッグ',
   'intel_memory': 'メモリ',
   'intel_build_time': 'ビルド日時',
   'lang_select_title': '言語を選択',
@@ -4718,30 +4552,6 @@ const _ja = <String, String>{
   'wtg_disk_prefix': 'ディスク',
   'wtg_starting': '開始中...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Linux To Go 作成ツール',
-  'wtg_linux_subtitle': '変更を保存できる Ubuntu/casper Live 環境を作成',
-  'wtg_linux_select_iso': 'Linux ISO を選択',
-  'wtg_linux_select_iso_desc':
-      'x64 Ubuntu、または casper ベースの互換 Live ISO を選択してください。WinDeploy Studio が永続ストレージを作成して有効にします。',
-  'wtg_linux_step1_title': 'ステップ 1: Linux ISO を選択',
-  'wtg_linux_step1_desc': 'x64 Ubuntu、または casper ベースの互換 Live ISO を選択',
-  'wtg_linux_step4_title': 'ステップ 2: 対象ディスクを選択',
-  'wtg_linux_step4_desc': 'Linux To Go に使用する外部ディスクを選択',
-  'wtg_linux_confirm_title': 'ステップ 3: Linux To Go の確認',
-  'wtg_linux_confirm_desc': '書き込み前に対応 casper ISO、対象ディスク、永続環境を確認します',
-  'wtg_linux_workspace_type': 'ワークスペースの種類',
-  'wtg_linux_live_workspace': '永続化 Ubuntu/casper Live 環境',
-  'wtg_linux_persistence': '永続化',
-  'wtg_linux_persistence_note': 'ext4 writable イメージで有効化（最大約 4 GB）',
-  'wtg_linux_step6_title': 'ステップ 4: Linux To Go を作成中',
-  'wtg_linux_step6_desc': 'Linux ISO イメージを対象ディスクへ書き込んでいます',
-  'wtg_linux_step_complete_title': 'ステップ 5: 完了',
-  'wtg_linux_step_complete_desc': 'Linux To Go が正常に作成されました',
-  'wtg_linux_creation_complete': 'Linux To Go を作成しました！',
-  'wtg_linux_creation_complete_desc': '起動可能な Linux Live 環境を使用できます',
-  'wtg_linux_step_failed_title': '作成に失敗しました',
-  'wtg_linux_step_failed_desc': 'Linux To Go の作成中にエラーが発生しました',
   'logs_title': 'ログセンター',
   'logs_subtitle': 'アプリケーションログの表示と管理',
   'logs_open_folder': 'ログフォルダを開く',
@@ -5155,7 +4965,7 @@ const _ja = <String, String>{
   'logs_cat_benchmark': 'ディスクテストログ',
   'bench_title': 'ドライブベンチマーク',
   'bench_subtitle':
-      'Windows To Go と Linux To Go 向けに、シーケンシャル書き込み、4Kランダム、スレッド拡張、長時間書き込みの安定性を測定します。',
+      'Windows To Go 向けに、シーケンシャル書き込み、4Kランダム、スレッド拡張、長時間書き込みの安定性を測定します。',
   'bench_refresh': '更新',
   'bench_target_disk': '対象ドライブ',
   'bench_detecting': 'リムーバブルドライブを検出中...',
@@ -5168,7 +4978,7 @@ const _ja = <String, String>{
   'bench_mode_extreme': '極限',
   'bench_mode_full_write': '全域書き込み',
   'bench_mode_quick_desc': 'To Go に最低限向くかを短時間で確認します。',
-  'bench_mode_standard_desc': '日常的な Windows To Go と Linux To Go 用にバランスよく測定します。',
+  'bench_mode_standard_desc': '日常的な Windows To Go 用にバランスよく測定します。',
   'bench_mode_extreme_desc': '4K とマルチスレッドを長めに測り、より厳しく評価します。',
   'bench_mode_full_write_desc': '空き領域の大部分を書き込み、キャッシュ低下を確認します。',
   'bench_full_warning':
@@ -5219,12 +5029,11 @@ const _ja = <String, String>{
   'bench_result_recommendation': '推奨',
   'bench_result_reasons': '主な理由',
   'bench_result_notes': '注意',
-  'bench_recommend_excellent':
-      'Windows To Go / Linux To Go に推奨。やや重い日常利用にも向いています。',
-  'bench_recommend_good': 'Windows To Go / Linux To Go に推奨。',
+  'bench_recommend_excellent': 'Windows To Go に推奨。やや重い日常利用にも向いています。',
+  'bench_recommend_good': 'Windows To Go に推奨。',
   'bench_recommend_usable': '軽い To Go 用途なら使用可能です。重い更新や多重作業は避けるのが無難です。',
   'bench_recommend_limited': '緊急用または軽量な To Go 用途に限って推奨します。',
-  'bench_recommend_not_recommended': 'Windows To Go / Linux To Go には推奨しません。',
+  'bench_recommend_not_recommended': 'Windows To Go には推奨しません。',
   'bench_recommend_unmeasured': 'テストを実行すると推奨内容が生成されます。',
   'bench_reason_4k_strong': '4K ランダム書き込みが非常に強力です。',
   'bench_reason_4k_stable': '4K ランダム書き込みが安定しています。',
@@ -5278,13 +5087,6 @@ const _zhTW = <String, String>{
   'safety_not_external': '只能清除已確認的外接磁碟。',
   'safety_disk_offline': '所選磁碟處於離線狀態，無法使用。',
   'linux_not_isohybrid': '此 ISO 不是可開機的 ISOHybrid 映像，目標磁碟未被修改。',
-  'linux_togo_mount_preflight_failed': '無法檢查此 Linux 映像，目標磁碟未被修改。',
-  'linux_togo_unsupported_iso':
-      '持久化 Linux To Go 支援經過驗證的 x64 Ubuntu/casper 和 Debian Live 配置。其他發行版請使用「安裝盤」功能。',
-  'linux_togo_mke2fs_missing': '此建置未包含符合授權要求的 Linux 持久化元件，目標磁碟未被修改。',
-  'linux_togo_boot_config_unsupported':
-      '此 Live 映像沒有可用來啟用持久化的受支援 GRUB 啟動項，目標磁碟未被修改。',
-  'linux_togo_boot_file_too_large': '此映像包含超過 FAT32 單一檔案容量上限的必要開機檔案，目標磁碟未被修改。',
   'bench_error_helper_missing': '缺少原生磁碟測試元件，請重新安裝應用程式。',
   'bench_error_cleanup_failed':
       '部分測試檔案無法刪除。請關閉正在使用該磁碟的程式，並刪除 .wds_benchmark 資料夾。',
@@ -5294,7 +5096,7 @@ const _zhTW = <String, String>{
       '此分析會將選定的記錄片段、映像名稱或裝置資訊傳送至你設定的 AI 服務。檔案內容僅限本功能讀取的預覽，且不會傳送 USB 序號。是否繼續？',
   'ai_privacy_continue': '繼續並傳送',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Windows 與 Linux 安裝盤和 To Go 建立工具',
+  'app_subtitle': 'Windows 與 Linux 安裝盤及 Windows To Go 建立工具',
   'nav_home': '首頁',
   'nav_images': '映像',
   'nav_creator': '安裝盤',
@@ -5302,14 +5104,14 @@ const _zhTW = <String, String>{
   'nav_logs': '記錄',
   'nav_settings': '設定',
   'home_title': 'Windows 與 Linux 部署工具箱',
-  'home_subtitle': 'Windows 與 Linux 安裝盤和 To Go 建立工具',
+  'home_subtitle': 'Windows 與 Linux 安裝盤及 Windows To Go 建立工具',
   'home_quick_start': '快速開始',
   'home_image_library': '映像庫',
   'home_image_library_desc': '瀏覽 Windows 映像並取得下載連結',
   'home_bootable_usb': '安裝盤建立工具',
   'home_bootable_usb_desc': '從 ISO 建立 Windows 或 Linux 安裝 USB 隨身碟',
   'home_wtg': 'To Go 工作空間',
-  'home_wtg_desc': '建立攜帶式 Windows 與 Linux 隨身工作環境',
+  'home_wtg_desc': '建立攜帶式 Windows 隨身工作環境',
   'home_local_iso': '本機 ISO 匯入',
   'home_local_iso_desc': '匯入與管理本機 ISO 檔案',
   'home_about': '關於',
@@ -5317,7 +5119,7 @@ const _zhTW = <String, String>{
   'home_platform': '平台',
   'home_engine': '引擎',
   'home_focus': '專注',
-  'home_focus_value': '安裝盤與 To Go',
+  'home_focus_value': '安裝盤與 Windows To Go',
   'home_license': '授權',
   'home_license_value': '開源',
   'images_title': '映像庫',
@@ -5471,8 +5273,8 @@ const _zhTW = <String, String>{
   'ai_answering': '正在回答...',
   'ai_sources': '來源',
   'easter_egg_missing': '未找到彩蛋圖片！',
-  'intel_museum_desc': '這是一個用於測試的內部建構版本。',
-  'intel_museum_title': 'Intel 機密',
+  'studio_easter_egg_desc': '這是一個用於測試的內部建構版本。',
+  'studio_easter_egg_title': 'WinDeploy Studio 彩蛋',
   'intel_memory': '記憶體',
   'intel_build_time': '建構時間',
   'lang_select_title': '選擇語言',
@@ -5566,30 +5368,6 @@ const _zhTW = <String, String>{
   'wtg_disk_prefix': '磁碟',
   'wtg_starting': '正在啟動...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Linux To Go 建立工具',
-  'wtg_linux_subtitle': '建立可隨身啟動並儲存變更的 Ubuntu/casper Live 工作環境',
-  'wtg_linux_select_iso': '選擇 Linux ISO',
-  'wtg_linux_select_iso_desc':
-      '選擇 x64 Ubuntu 或相容的 casper Live ISO。WinDeploy Studio 將建立並啟用持久化儲存。',
-  'wtg_linux_step1_title': '步驟 1：選擇 Linux ISO',
-  'wtg_linux_step1_desc': '選擇 x64 Ubuntu 或相容的 casper Live ISO',
-  'wtg_linux_step4_title': '步驟 2：選擇目標磁碟',
-  'wtg_linux_step4_desc': '選擇用於 Linux To Go 的外接磁碟',
-  'wtg_linux_confirm_title': '步驟 3：確認 Linux To Go',
-  'wtg_linux_confirm_desc': '寫入前確認支援的 casper ISO、目標磁碟和持久化工作環境',
-  'wtg_linux_workspace_type': '工作環境類型',
-  'wtg_linux_live_workspace': '持久化 Ubuntu/casper Live 工作環境',
-  'wtg_linux_persistence': '持久化',
-  'wtg_linux_persistence_note': '透過 ext4 writable 映像啟用（最大約 4 GB）',
-  'wtg_linux_step6_title': '步驟 4：正在建立 Linux To Go',
-  'wtg_linux_step6_desc': '正在將 Linux ISO 映像寫入目標磁碟，請稍候',
-  'wtg_linux_step_complete_title': '步驟 5：完成',
-  'wtg_linux_step_complete_desc': 'Linux To Go 已成功建立',
-  'wtg_linux_creation_complete': 'Linux To Go 建立完成！',
-  'wtg_linux_creation_complete_desc': '你的可開機 Linux Live 工作環境已準備就緒',
-  'wtg_linux_step_failed_title': '建立失敗',
-  'wtg_linux_step_failed_desc': '建立 Linux To Go 時發生錯誤',
   'logs_title': '記錄中心',
   'logs_subtitle': '檢視與管理應用程式記錄',
   'logs_open_folder': '開啟記錄資料夾',
@@ -5987,8 +5765,7 @@ const _zhTW = <String, String>{
   'home_benchmark_desc': '部署前檢查 To Go 目標磁碟的真實效能',
   'logs_cat_benchmark': '磁碟測試記錄',
   'bench_title': '磁碟效能測試',
-  'bench_subtitle':
-      '面向 Windows To Go 與 Linux To Go 的真實寫入測試，涵蓋循序寫入、4K 隨機、多執行緒擴展與長時間寫入穩定性。',
+  'bench_subtitle': '面向 Windows To Go  的真實寫入測試，涵蓋循序寫入、4K 隨機、多執行緒擴展與長時間寫入穩定性。',
   'bench_refresh': '重新整理',
   'bench_target_disk': '目標磁碟',
   'bench_detecting': '正在偵測可移動磁碟...',
@@ -6001,7 +5778,7 @@ const _zhTW = <String, String>{
   'bench_mode_extreme': '極限',
   'bench_mode_full_write': '全碟寫入',
   'bench_mode_quick_desc': '快速判斷是否基本適合 To Go 的短測試。',
-  'bench_mode_standard_desc': '涵蓋日常 Windows To Go 與 Linux To Go 使用情境，耗時適中。',
+  'bench_mode_standard_desc': '涵蓋日常 Windows To Go  使用情境，耗時適中。',
   'bench_mode_extreme_desc': '延長 4K 與多執行緒測試時間，判斷更嚴格。',
   'bench_mode_full_write_desc': '額外執行接近全碟的循序寫入，用來觀察快取掉速。',
   'bench_full_warning': '全碟寫入模式會寫入大部分可用空間，可能需要較長時間。測試不會主動刪除既有檔案，但會讓磁碟承受較高負載。',
@@ -6051,11 +5828,11 @@ const _zhTW = <String, String>{
   'bench_result_recommendation': '建議',
   'bench_result_reasons': '關鍵原因',
   'bench_result_notes': '注意',
-  'bench_recommend_excellent': '推薦用於 Windows To Go / Linux To Go，也適合較高負載的日常使用。',
-  'bench_recommend_good': '推薦用於 Windows To Go / Linux To Go。',
+  'bench_recommend_excellent': '推薦用於 Windows To Go，也適合較高負載的日常使用。',
+  'bench_recommend_good': '推薦用於 Windows To Go。',
   'bench_recommend_usable': '可用於輕度 To Go 場景，建議避免重負載更新和多工。',
   'bench_recommend_limited': '僅建議應急或輕量 To Go 使用，體驗可能受限。',
-  'bench_recommend_not_recommended': '不推薦用於 Windows To Go / Linux To Go。',
+  'bench_recommend_not_recommended': '不推薦用於 Windows To Go。',
   'bench_recommend_unmeasured': '執行測試後會產生建議。',
   'bench_reason_4k_strong': '4K 隨機寫入表現很強。',
   'bench_reason_4k_stable': '4K 隨機寫入穩定。',
@@ -6115,16 +5892,6 @@ const _es = <String, String>{
       'El disco seleccionado está sin conexión y no se puede usar.',
   'linux_not_isohybrid':
       'Este ISO no es una imagen ISOHybrid arrancable. El disco de destino no se modificó.',
-  'linux_togo_mount_preflight_failed':
-      'No se pudo inspeccionar la imagen de Linux. El disco de destino no se modificó.',
-  'linux_togo_unsupported_iso':
-      'Linux To Go persistente admite diseños verificados de Ubuntu/casper x64 y Debian Live. Para otras distribuciones, usa el creador de medios de instalación.',
-  'linux_togo_mke2fs_missing':
-      'Esta compilación no incluye un componente de persistencia Linux que cumpla los requisitos de licencia. El disco de destino no se modificó.',
-  'linux_togo_boot_config_unsupported':
-      'Esta imagen Live no tiene una entrada de GRUB compatible para habilitar la persistencia. El disco de destino no se modificó.',
-  'linux_togo_boot_file_too_large':
-      'Esta imagen contiene un archivo de arranque necesario que supera el límite de un solo archivo de FAT32. El disco de destino no se modificó.',
   'bench_error_helper_missing':
       'Falta el componente nativo de pruebas. Vuelve a instalar la aplicación.',
   'bench_error_cleanup_failed':
@@ -6137,7 +5904,7 @@ const _es = <String, String>{
   'ai_privacy_continue': 'Continuar y enviar',
   'app_name': 'WinDeploy Studio',
   'app_subtitle':
-      'Creador de medios de instalación y To Go para Windows y Linux',
+      'Creador de medios de instalación Windows/Linux y Windows To Go',
   'nav_home': 'Inicio',
   'nav_images': 'Imágenes',
   'nav_creator': 'Medio',
@@ -6146,7 +5913,7 @@ const _es = <String, String>{
   'nav_settings': 'Ajustes',
   'home_title': 'Kit de despliegue para Windows y Linux',
   'home_subtitle':
-      'Creador de medios de instalación y To Go para Windows y Linux',
+      'Creador de medios de instalación Windows/Linux y Windows To Go',
   'home_quick_start': 'Inicio rápido',
   'home_image_library': 'Biblioteca de imágenes',
   'home_image_library_desc':
@@ -6155,7 +5922,7 @@ const _es = <String, String>{
   'home_bootable_usb_desc':
       'Crea USB de instalación de Windows o Linux desde archivos ISO',
   'home_wtg': 'Espacio de trabajo To Go',
-  'home_wtg_desc': 'Cree espacios de trabajo portátiles Windows y Linux',
+  'home_wtg_desc': 'Cree un espacio de trabajo Windows portátil',
   'home_local_iso': 'Importar ISO local',
   'home_local_iso_desc': 'Importar y gestionar archivos ISO locales',
   'home_about': 'Acerca de',
@@ -6163,7 +5930,7 @@ const _es = <String, String>{
   'home_platform': 'Plataforma',
   'home_engine': 'Motor',
   'home_focus': 'Enfoque',
-  'home_focus_value': 'Medios de instalación y To Go',
+  'home_focus_value': 'Medios de instalación y Windows To Go',
   'home_license': 'Licencia',
   'home_license_value': 'Código abierto',
   'images_title': 'Biblioteca de imágenes',
@@ -6332,8 +6099,8 @@ const _es = <String, String>{
   'ai_answering': 'Respondiendo...',
   'ai_sources': 'Fuentes',
   'easter_egg_missing': '¡Imagen de huevo de Pascua no encontrada!',
-  'intel_museum_desc': 'Esta es una compilación interna para pruebas.',
-  'intel_museum_title': 'Confidencial de Intel',
+  'studio_easter_egg_desc': 'Esta es una compilación interna para pruebas.',
+  'studio_easter_egg_title': 'Easter egg de WinDeploy Studio',
   'intel_memory': 'Memoria',
   'intel_build_time': 'Hora de compilación',
   'lang_select_title': 'Seleccionar idioma',
@@ -6434,36 +6201,6 @@ const _es = <String, String>{
   'wtg_disk_prefix': 'Disco',
   'wtg_starting': 'Iniciando...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Creador de Linux To Go',
-  'wtg_linux_subtitle':
-      'Crea un entorno Ubuntu/casper Live portátil y persistente',
-  'wtg_linux_select_iso': 'Seleccionar ISO de Linux',
-  'wtg_linux_select_iso_desc':
-      'Elige una ISO de Ubuntu x64 o una imagen Live compatible basada en casper. WinDeploy Studio creará y activará el almacenamiento persistente.',
-  'wtg_linux_step1_title': 'Paso 1: seleccionar ISO de Linux',
-  'wtg_linux_step1_desc':
-      'Selecciona una ISO de Ubuntu x64 o una imagen Live compatible basada en casper',
-  'wtg_linux_step4_title': 'Paso 2: seleccionar disco de destino',
-  'wtg_linux_step4_desc': 'Selecciona el disco externo para Linux To Go',
-  'wtg_linux_confirm_title': 'Paso 3: confirmar Linux To Go',
-  'wtg_linux_confirm_desc':
-      'Antes de escribir, revisa la ISO casper compatible, el disco de destino y el entorno persistente',
-  'wtg_linux_workspace_type': 'Tipo de entorno',
-  'wtg_linux_live_workspace': 'Entorno Ubuntu/casper Live persistente',
-  'wtg_linux_persistence': 'Persistencia',
-  'wtg_linux_persistence_note':
-      'Activada mediante una imagen ext4 writable (hasta unos 4 GB)',
-  'wtg_linux_step6_title': 'Paso 4: creando Linux To Go',
-  'wtg_linux_step6_desc':
-      'Espera mientras la imagen ISO de Linux se escribe en el disco de destino',
-  'wtg_linux_step_complete_title': 'Paso 5: completo',
-  'wtg_linux_step_complete_desc': 'Linux To Go se creó correctamente',
-  'wtg_linux_creation_complete': '¡Linux To Go creado!',
-  'wtg_linux_creation_complete_desc':
-      'Tu entorno Linux Live arrancable está listo',
-  'wtg_linux_step_failed_title': 'Error de creación',
-  'wtg_linux_step_failed_desc': 'Ocurrió un error al crear Linux To Go',
   'logs_title': 'Centro de registros',
   'logs_subtitle': 'Ver y gestionar registros de la aplicación',
   'logs_open_folder': 'Abrir carpeta de registros',
@@ -6890,7 +6627,7 @@ const _es = <String, String>{
   'logs_cat_benchmark': 'Registros de prueba de disco',
   'bench_title': 'Benchmark de unidad',
   'bench_subtitle':
-      'Mide la escritura real para Windows To Go y Linux To Go: secuencial, aleatoria 4K, escalado por hilos y estabilidad en escritura larga.',
+      'Mide la escritura real para Windows To Go: secuencial, aleatoria 4K, escalado por hilos y estabilidad en escritura larga.',
   'bench_refresh': 'Actualizar',
   'bench_target_disk': 'Unidad de destino',
   'bench_detecting': 'Detectando unidades extraíbles...',
@@ -6905,7 +6642,7 @@ const _es = <String, String>{
   'bench_mode_quick_desc':
       'Comprobación breve para una idoneidad básica de To Go.',
   'bench_mode_standard_desc':
-      'Cobertura equilibrada para uso diario de Windows To Go y Linux To Go.',
+      'Cobertura equilibrada para uso diario de Windows To Go.',
   'bench_mode_extreme_desc':
       'Pruebas 4K y multihilo más largas para un juicio más estricto.',
   'bench_mode_full_write_desc':
@@ -6970,14 +6707,13 @@ const _es = <String, String>{
   'bench_result_reasons': 'Motivos clave',
   'bench_result_notes': 'Notas',
   'bench_recommend_excellent':
-      'Recomendado para Windows To Go / Linux To Go, incluso con uso diario más exigente.',
-  'bench_recommend_good': 'Recomendado para Windows To Go / Linux To Go.',
+      'Recomendado para Windows To Go, incluso con uso diario más exigente.',
+  'bench_recommend_good': 'Recomendado para Windows To Go.',
   'bench_recommend_usable':
       'Utilizable para cargas To Go ligeras; evita actualizaciones pesadas y multitarea intensa.',
   'bench_recommend_limited':
       'Solo recomendable para emergencias o uso To Go ligero.',
-  'bench_recommend_not_recommended':
-      'No recomendado para Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'No recomendado para Windows To Go.',
   'bench_recommend_unmeasured':
       'Ejecuta una prueba para generar una recomendación.',
   'bench_reason_4k_strong': 'La escritura aleatoria 4K es muy sólida.',
@@ -7052,16 +6788,6 @@ const _ar = <String, String>{
   'safety_disk_offline': 'القرص المحدد غير متصل ولا يمكن استخدامه.',
   'linux_not_isohybrid':
       'ملف ISO هذا ليس صورة ISOHybrid قابلة للإقلاع. لم يتغير القرص الهدف.',
-  'linux_togo_mount_preflight_failed':
-      'تعذر فحص صورة Linux. لم يتغير القرص الهدف.',
-  'linux_togo_unsupported_iso':
-      'يدعم Linux To Go الدائم تخطيطات Ubuntu/casper وDebian Live التي تم التحقق منها بمعمارية x64. استخدم إنشاء وسيط التثبيت للتوزيعات الأخرى.',
-  'linux_togo_mke2fs_missing':
-      'لا يتضمن هذا الإصدار مكوّن استمرارية Linux متوافقاً مع متطلبات الترخيص. لم يتغير القرص الهدف.',
-  'linux_togo_boot_config_unsupported':
-      'لا تحتوي صورة Live هذه على إدخال GRUB مدعوم لتفعيل الاستمرارية. لم يتغير القرص الهدف.',
-  'linux_togo_boot_file_too_large':
-      'تتضمن هذه الصورة ملف إقلاع مطلوباً يتجاوز حد حجم الملف الواحد في FAT32. لم يتغير القرص الهدف.',
   'bench_error_helper_missing':
       'مكوّن اختبار القرص الأصلي مفقود. أعد تثبيت التطبيق.',
   'bench_error_cleanup_failed':
@@ -7072,7 +6798,7 @@ const _ar = <String, String>{
       'يرسل هذا التحليل مقتطفات محددة من السجلات أو أسماء الصور أو معلومات الجهاز إلى خدمة الذكاء الاصطناعي المضبوطة. تقتصر محتويات الملفات على المعاينة التي تقرؤها هذه الميزة، ولا تُرسل الأرقام التسلسلية لأجهزة USB. هل تريد المتابعة؟',
   'ai_privacy_continue': 'المتابعة والإرسال',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'أداة إنشاء وسائط تثبيت وبيئات To Go لـ Windows وLinux',
+  'app_subtitle': 'أداة إنشاء وسائط تثبيت Windows/Linux وWindows To Go',
   'nav_home': 'الرئيسية',
   'nav_images': 'الصور',
   'nav_creator': 'وسيط',
@@ -7080,14 +6806,14 @@ const _ar = <String, String>{
   'nav_logs': 'السجلات',
   'nav_settings': 'الإعدادات',
   'home_title': 'مجموعة أدوات نشر Windows وLinux',
-  'home_subtitle': 'أداة إنشاء وسائط تثبيت وبيئات To Go لـ Windows وLinux',
+  'home_subtitle': 'أداة إنشاء وسائط تثبيت Windows/Linux وWindows To Go',
   'home_quick_start': 'بدء سريع',
   'home_image_library': 'مكتبة الصور',
   'home_image_library_desc': 'تصفح صور Windows والحصول على روابط التنزيل',
   'home_bootable_usb': 'أداة إنشاء وسيط التثبيت',
   'home_bootable_usb_desc': 'إنشاء USB تثبيت Windows أو Linux من ملفات ISO',
   'home_wtg': 'بيئة عمل To Go',
-  'home_wtg_desc': 'إنشاء بيئات عمل محمولة لـ Windows وLinux',
+  'home_wtg_desc': 'إنشاء بيئة عمل Windows محمولة',
   'home_local_iso': 'استيراد ISO محلي',
   'home_local_iso_desc': 'استيراد وإدارة ملفات ISO المحلية',
   'home_about': 'حول',
@@ -7095,7 +6821,7 @@ const _ar = <String, String>{
   'home_platform': 'المنصة',
   'home_engine': 'المحرك',
   'home_focus': 'التركيز',
-  'home_focus_value': 'وسائط التثبيت و To Go',
+  'home_focus_value': 'وسائط التثبيت وWindows To Go',
   'home_license': 'الترخيص',
   'home_license_value': 'مفتوح المصدر',
   'images_title': 'مكتبة الصور',
@@ -7259,8 +6985,8 @@ const _ar = <String, String>{
   'ai_answering': 'جارٍ إعداد الإجابة...',
   'ai_sources': 'المصادر',
   'easter_egg_missing': 'لم يتم العثور على صورة البيضة المخفية!',
-  'intel_museum_desc': 'هذا إصدار داخلي للاختبار.',
-  'intel_museum_title': 'سرية Intel',
+  'studio_easter_egg_desc': 'هذا إصدار داخلي للاختبار.',
+  'studio_easter_egg_title': 'بيضة WinDeploy Studio المخفية',
   'intel_memory': 'الذاكرة',
   'intel_build_time': 'وقت البناء',
   'lang_select_title': 'اختيار اللغة',
@@ -7357,35 +7083,6 @@ const _ar = <String, String>{
   'wtg_disk_prefix': 'قرص',
   'wtg_starting': 'جاري البدء...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'أداة إنشاء Linux To Go',
-  'wtg_linux_subtitle': 'إنشاء بيئة Ubuntu/casper Live محمولة مع حفظ التغييرات',
-  'wtg_linux_select_iso': 'اختيار ISO Linux',
-  'wtg_linux_select_iso_desc':
-      'اختر ملف ISO لنظام Ubuntu x64 أو صورة Live متوافقة تعتمد على casper. سينشئ WinDeploy Studio التخزين الدائم ويفعّله.',
-  'wtg_linux_step1_title': 'الخطوة 1: اختيار ISO Linux',
-  'wtg_linux_step1_desc':
-      'اختر ملف ISO لنظام Ubuntu x64 أو صورة Live متوافقة تعتمد على casper',
-  'wtg_linux_step4_title': 'الخطوة 2: اختيار القرص الهدف',
-  'wtg_linux_step4_desc': 'اختر القرص الخارجي لـ Linux To Go',
-  'wtg_linux_confirm_title': 'الخطوة 3: تأكيد Linux To Go',
-  'wtg_linux_confirm_desc':
-      'راجع ملف casper ISO المدعوم والقرص الهدف والبيئة الدائمة قبل الكتابة',
-  'wtg_linux_workspace_type': 'نوع البيئة',
-  'wtg_linux_live_workspace': 'بيئة Ubuntu/casper Live دائمة',
-  'wtg_linux_persistence': 'الحفظ الدائم',
-  'wtg_linux_persistence_note':
-      'مفعّل عبر صورة ext4 باسم writable (حتى نحو 4 GB)',
-  'wtg_linux_step6_title': 'الخطوة 4: جاري إنشاء Linux To Go',
-  'wtg_linux_step6_desc':
-      'يرجى الانتظار أثناء كتابة صورة ISO Linux إلى القرص الهدف',
-  'wtg_linux_step_complete_title': 'الخطوة 5: اكتمل',
-  'wtg_linux_step_complete_desc': 'تم إنشاء Linux To Go بنجاح',
-  'wtg_linux_creation_complete': 'تم إنشاء Linux To Go!',
-  'wtg_linux_creation_complete_desc':
-      'أصبحت بيئة Linux Live القابلة للإقلاع جاهزة',
-  'wtg_linux_step_failed_title': 'فشل الإنشاء',
-  'wtg_linux_step_failed_desc': 'حدث خطأ أثناء إنشاء Linux To Go',
   'logs_title': 'مركز السجلات',
   'logs_subtitle': 'عرض وإدارة سجلات التطبيق',
   'logs_open_folder': 'فتح مجلد السجلات',
@@ -7805,7 +7502,7 @@ const _ar = <String, String>{
   'logs_cat_benchmark': 'سجلات اختبار القرص',
   'bench_title': 'اختبار أداء القرص',
   'bench_subtitle':
-      'يقيس سلوك الكتابة الحقيقي لـ Windows To Go وLinux To Go: الكتابة المتتابعة، و4K العشوائية، وتوسع الخيوط، وثبات الكتابة الطويلة.',
+      'يقيس سلوك الكتابة الحقيقي لـ Windows To Go: الكتابة المتتابعة، و4K العشوائية، وتوسع الخيوط، وثبات الكتابة الطويلة.',
   'bench_refresh': 'تحديث',
   'bench_target_disk': 'القرص الهدف',
   'bench_detecting': 'جار اكتشاف الأقراص القابلة للإزالة...',
@@ -7819,7 +7516,7 @@ const _ar = <String, String>{
   'bench_mode_full_write': 'كتابة كاملة',
   'bench_mode_quick_desc': 'فحص قصير لمعرفة الملاءمة الأساسية لـ To Go.',
   'bench_mode_standard_desc':
-      'تغطية متوازنة للاستخدام اليومي في Windows To Go وLinux To Go.',
+      'تغطية متوازنة للاستخدام اليومي في Windows To Go.',
   'bench_mode_extreme_desc': 'اختبارات 4K ومتعددة الخيوط لمدة أطول لتقييم أدق.',
   'bench_mode_full_write_desc':
       'يضيف كتابة شبه كاملة لكشف هبوط أداء التخزين المؤقت.',
@@ -7878,13 +7575,12 @@ const _ar = <String, String>{
   'bench_result_reasons': 'الأسباب الرئيسية',
   'bench_result_notes': 'ملاحظات',
   'bench_recommend_excellent':
-      'موصى به لـ Windows To Go / Linux To Go، بما في ذلك الاستخدام اليومي الأثقل.',
-  'bench_recommend_good': 'موصى به لـ Windows To Go / Linux To Go.',
+      'موصى به لـ Windows To Go، بما في ذلك الاستخدام اليومي الأثقل.',
+  'bench_recommend_good': 'موصى به لـ Windows To Go.',
   'bench_recommend_usable':
       'مناسب لأحمال To Go الخفيفة؛ تجنب التحديثات الثقيلة وتعدد المهام المكثف.',
   'bench_recommend_limited': 'مناسب فقط للطوارئ أو استخدام To Go الخفيف.',
-  'bench_recommend_not_recommended':
-      'غير موصى به لـ Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'غير موصى به لـ Windows To Go.',
   'bench_recommend_unmeasured': 'شغّل الاختبار لإنشاء توصية.',
   'bench_reason_4k_strong': 'كتابة 4K العشوائية قوية جدًا.',
   'bench_reason_4k_stable': 'كتابة 4K العشوائية مستقرة.',
@@ -7956,16 +7652,6 @@ const _pt = <String, String>{
       'O disco selecionado está offline e não pode ser usado.',
   'linux_not_isohybrid':
       'Este ISO não é uma imagem ISOHybrid inicializável. O disco de destino não foi alterado.',
-  'linux_togo_mount_preflight_failed':
-      'Não foi possível inspecionar a imagem do Linux. O disco de destino não foi alterado.',
-  'linux_togo_unsupported_iso':
-      'O Linux To Go persistente oferece suporte a layouts verificados do Ubuntu/casper x64 e Debian Live. Para outras distribuições, use o criador de mídia de instalação.',
-  'linux_togo_mke2fs_missing':
-      'Esta compilação não inclui um componente de persistência Linux que atenda aos requisitos de licença. O disco de destino não foi alterado.',
-  'linux_togo_boot_config_unsupported':
-      'Esta imagem Live não possui uma entrada GRUB compatível para ativar a persistência. O disco de destino não foi alterado.',
-  'linux_togo_boot_file_too_large':
-      'Esta imagem contém um arquivo de inicialização necessário maior que o limite de arquivo único do FAT32. O disco de destino não foi alterado.',
   'bench_error_helper_missing':
       'O componente nativo de teste está ausente. Reinstale o aplicativo.',
   'bench_error_cleanup_failed':
@@ -7977,7 +7663,8 @@ const _pt = <String, String>{
       'Esta análise envia trechos de logs, nomes de imagens ou dados do dispositivo ao serviço de IA configurado. Somente as prévias lidas por este recurso são enviadas; números de série USB não são enviados. Continuar?',
   'ai_privacy_continue': 'Continuar e enviar',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Criador de mídia de instalação e To Go para Windows e Linux',
+  'app_subtitle':
+      'Criador de mídia de instalação Windows/Linux e Windows To Go',
   'nav_home': 'Início',
   'nav_images': 'Imagens',
   'nav_creator': 'Mídia',
@@ -7986,7 +7673,7 @@ const _pt = <String, String>{
   'nav_settings': 'Configurações',
   'home_title': 'Kit de implantação para Windows e Linux',
   'home_subtitle':
-      'Criador de mídia de instalação e To Go para Windows e Linux',
+      'Criador de mídia de instalação Windows/Linux e Windows To Go',
   'home_quick_start': 'Início rápido',
   'home_image_library': 'Biblioteca de imagens',
   'home_image_library_desc':
@@ -7995,7 +7682,7 @@ const _pt = <String, String>{
   'home_bootable_usb_desc':
       'Crie USBs de instalação do Windows ou Linux a partir de arquivos ISO',
   'home_wtg': 'Ambiente To Go',
-  'home_wtg_desc': 'Crie ambientes de trabalho portáteis Windows e Linux',
+  'home_wtg_desc': 'Crie um ambiente de trabalho Windows portátil',
   'home_local_iso': 'Importar ISO local',
   'home_local_iso_desc': 'Importar e gerenciar arquivos ISO locais',
   'home_about': 'Sobre',
@@ -8003,7 +7690,7 @@ const _pt = <String, String>{
   'home_platform': 'Plataforma',
   'home_engine': 'Motor',
   'home_focus': 'Foco',
-  'home_focus_value': 'Mídia de instalação e To Go',
+  'home_focus_value': 'Mídia de instalação e Windows To Go',
   'home_license': 'Licença',
   'home_license_value': 'Código aberto',
   'images_title': 'Biblioteca de imagens',
@@ -8172,8 +7859,8 @@ const _pt = <String, String>{
   'ai_answering': 'Respondendo...',
   'ai_sources': 'Fontes',
   'easter_egg_missing': 'Imagem do ovo de Páscoa não encontrada!',
-  'intel_museum_desc': 'Esta é uma compilação interna para testes.',
-  'intel_museum_title': 'Confidencial Intel',
+  'studio_easter_egg_desc': 'Esta é uma compilação interna para testes.',
+  'studio_easter_egg_title': 'Easter egg do WinDeploy Studio',
   'intel_memory': 'Memória',
   'intel_build_time': 'Hora da compilação',
   'lang_select_title': 'Selecionar idioma',
@@ -8276,36 +7963,6 @@ const _pt = <String, String>{
   'wtg_disk_prefix': 'Disco',
   'wtg_starting': 'Iniciando...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Criador de Linux To Go',
-  'wtg_linux_subtitle':
-      'Crie um ambiente Ubuntu/casper Live portátil e persistente',
-  'wtg_linux_select_iso': 'Selecionar ISO do Linux',
-  'wtg_linux_select_iso_desc':
-      'Escolha uma ISO do Ubuntu x64 ou uma imagem Live compatível baseada em casper. O WinDeploy Studio criará e ativará o armazenamento persistente.',
-  'wtg_linux_step1_title': 'Etapa 1: selecionar ISO do Linux',
-  'wtg_linux_step1_desc':
-      'Selecione uma ISO do Ubuntu x64 ou uma imagem Live compatível baseada em casper',
-  'wtg_linux_step4_title': 'Etapa 2: selecionar disco de destino',
-  'wtg_linux_step4_desc': 'Selecione o disco externo para Linux To Go',
-  'wtg_linux_confirm_title': 'Etapa 3: confirmar Linux To Go',
-  'wtg_linux_confirm_desc':
-      'Antes de gravar, revise a ISO casper compatível, o disco de destino e o ambiente persistente',
-  'wtg_linux_workspace_type': 'Tipo de ambiente',
-  'wtg_linux_live_workspace': 'Ambiente Ubuntu/casper Live persistente',
-  'wtg_linux_persistence': 'Persistência',
-  'wtg_linux_persistence_note':
-      'Ativada com uma imagem ext4 writable (até cerca de 4 GB)',
-  'wtg_linux_step6_title': 'Etapa 4: criando Linux To Go',
-  'wtg_linux_step6_desc':
-      'Aguarde enquanto a imagem ISO do Linux é gravada no disco de destino',
-  'wtg_linux_step_complete_title': 'Etapa 5: concluído',
-  'wtg_linux_step_complete_desc': 'Linux To Go foi criado com sucesso',
-  'wtg_linux_creation_complete': 'Linux To Go criado!',
-  'wtg_linux_creation_complete_desc':
-      'Seu ambiente Linux Live inicializável está pronto',
-  'wtg_linux_step_failed_title': 'Falha na criação',
-  'wtg_linux_step_failed_desc': 'Ocorreu um erro ao criar Linux To Go',
   'logs_title': 'Central de registros',
   'logs_subtitle': 'Visualizar e gerenciar registros do aplicativo',
   'logs_open_folder': 'Abrir pasta de registros',
@@ -8732,7 +8389,7 @@ const _pt = <String, String>{
   'logs_cat_benchmark': 'Registros de teste de disco',
   'bench_title': 'Benchmark da unidade',
   'bench_subtitle':
-      'Mede a escrita real para Windows To Go e Linux To Go: sequencial, aleatória 4K, escala por threads e estabilidade em escrita longa.',
+      'Mede a escrita real para Windows To Go: sequencial, aleatória 4K, escala por threads e estabilidade em escrita longa.',
   'bench_refresh': 'Atualizar',
   'bench_target_disk': 'Unidade de destino',
   'bench_detecting': 'Detectando unidades removíveis...',
@@ -8746,7 +8403,7 @@ const _pt = <String, String>{
   'bench_mode_full_write': 'Escrita completa',
   'bench_mode_quick_desc': 'Verificação curta de adequação básica para To Go.',
   'bench_mode_standard_desc':
-      'Cobertura equilibrada para uso diário de Windows To Go e Linux To Go.',
+      'Cobertura equilibrada para uso diário de Windows To Go.',
   'bench_mode_extreme_desc':
       'Testes 4K e multithread mais longos para uma avaliação mais rigorosa.',
   'bench_mode_full_write_desc':
@@ -8811,14 +8468,13 @@ const _pt = <String, String>{
   'bench_result_reasons': 'Motivos principais',
   'bench_result_notes': 'Notas',
   'bench_recommend_excellent':
-      'Recomendado para Windows To Go / Linux To Go, inclusive para uso diário mais pesado.',
-  'bench_recommend_good': 'Recomendado para Windows To Go / Linux To Go.',
+      'Recomendado para Windows To Go, inclusive para uso diário mais pesado.',
+  'bench_recommend_good': 'Recomendado para Windows To Go.',
   'bench_recommend_usable':
       'Utilizável para cargas To Go leves; evite atualizações pesadas e multitarefa intensa.',
   'bench_recommend_limited':
       'Recomendado apenas para emergência ou uso To Go leve.',
-  'bench_recommend_not_recommended':
-      'Não recomendado para Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'Não recomendado para Windows To Go.',
   'bench_recommend_unmeasured': 'Execute um teste para gerar uma recomendação.',
   'bench_reason_4k_strong': 'A escrita aleatória 4K é muito forte.',
   'bench_reason_4k_stable': 'A escrita aleatória 4K é estável.',
@@ -8893,16 +8549,6 @@ const _de = <String, String>{
       'Der ausgewählte Datenträger ist offline und kann nicht verwendet werden.',
   'linux_not_isohybrid':
       'Diese ISO-Datei ist kein startfähiges ISOHybrid-Abbild. Der Zieldatenträger wurde nicht verändert.',
-  'linux_togo_mount_preflight_failed':
-      'Das Linux-Abbild konnte nicht geprüft werden. Der Zieldatenträger wurde nicht verändert.',
-  'linux_togo_unsupported_iso':
-      'Linux To Go mit Persistenz unterstützt geprüfte x64-Ubuntu/casper- und Debian-Live-Layouts. Verwenden Sie für andere Distributionen den Installationsmedien-Ersteller.',
-  'linux_togo_mke2fs_missing':
-      'Dieser Build enthält keine Linux-Persistenzkomponente, die die Lizenzanforderungen erfüllt. Der Zieldatenträger wurde nicht verändert.',
-  'linux_togo_boot_config_unsupported':
-      'Dieses Live-Abbild enthält keinen unterstützten GRUB-Eintrag zum Aktivieren der Persistenz. Der Zieldatenträger wurde nicht verändert.',
-  'linux_togo_boot_file_too_large':
-      'Dieses Abbild enthält eine erforderliche Startdatei, die das Einzeldatelimit von FAT32 überschreitet. Der Zieldatenträger wurde nicht verändert.',
   'bench_error_helper_missing':
       'Die native Testkomponente fehlt. Installieren Sie die Anwendung erneut.',
   'bench_error_cleanup_failed':
@@ -8915,7 +8561,7 @@ const _de = <String, String>{
   'ai_privacy_continue': 'Fortfahren und senden',
   'app_name': 'WinDeploy Studio',
   'app_subtitle':
-      'Ersteller für Windows- und Linux-Installationsmedien und To Go',
+      'Ersteller für Windows-/Linux-Installationsmedien und Windows To Go',
   'nav_home': 'Startseite',
   'nav_images': 'Abbilder',
   'nav_creator': 'Medium',
@@ -8924,7 +8570,7 @@ const _de = <String, String>{
   'nav_settings': 'Einstellungen',
   'home_title': 'Deployment-Werkzeugkasten für Windows und Linux',
   'home_subtitle':
-      'Ersteller für Windows- und Linux-Installationsmedien und To Go',
+      'Ersteller für Windows-/Linux-Installationsmedien und Windows To Go',
   'home_quick_start': 'Schnellstart',
   'home_image_library': 'Abbildbibliothek',
   'home_image_library_desc':
@@ -8933,7 +8579,7 @@ const _de = <String, String>{
   'home_bootable_usb_desc':
       'Windows- oder Linux-Installations-USBs aus ISO-Dateien erstellen',
   'home_wtg': 'To Go-Arbeitsbereich',
-  'home_wtg_desc': 'Portable Windows- und Linux-Arbeitsumgebungen erstellen',
+  'home_wtg_desc': 'Eine portable Windows-Arbeitsumgebung erstellen',
   'home_local_iso': 'Lokales ISO importieren',
   'home_local_iso_desc': 'Lokale ISO-Dateien importieren und verwalten',
   'home_about': 'Über',
@@ -8941,7 +8587,7 @@ const _de = <String, String>{
   'home_platform': 'Plattform',
   'home_engine': 'Engine',
   'home_focus': 'Schwerpunkt',
-  'home_focus_value': 'Installationsmedien und To Go',
+  'home_focus_value': 'Installationsmedien und Windows To Go',
   'home_license': 'Lizenz',
   'home_license_value': 'Open Source',
   'images_title': 'Abbildbibliothek',
@@ -9111,8 +8757,8 @@ const _de = <String, String>{
   'ai_answering': 'Antwort wird erstellt...',
   'ai_sources': 'Quellen',
   'easter_egg_missing': 'Osterbild nicht gefunden!',
-  'intel_museum_desc': 'Dies ist ein interner Build zu Testzwecken.',
-  'intel_museum_title': 'Intel Vertraulich',
+  'studio_easter_egg_desc': 'Dies ist ein interner Build zu Testzwecken.',
+  'studio_easter_egg_title': 'WinDeploy Studio Easter Egg',
   'intel_memory': 'Speicher',
   'intel_build_time': 'Build-Zeit',
   'lang_select_title': 'Sprache auswählen',
@@ -9215,37 +8861,6 @@ const _de = <String, String>{
   'wtg_disk_prefix': 'Datenträger',
   'wtg_starting': 'Startet...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Linux To Go erstellen',
-  'wtg_linux_subtitle':
-      'Eine portable, persistente Ubuntu/casper Live-Umgebung erstellen',
-  'wtg_linux_select_iso': 'Linux-ISO auswählen',
-  'wtg_linux_select_iso_desc':
-      'Wählen Sie eine x64-Ubuntu-ISO oder ein kompatibles casper-basiertes Live-Abbild. WinDeploy Studio erstellt und aktiviert den persistenten Speicher.',
-  'wtg_linux_step1_title': 'Schritt 1: Linux-ISO auswählen',
-  'wtg_linux_step1_desc':
-      'Wählen Sie eine x64-Ubuntu-ISO oder ein kompatibles casper-basiertes Live-Abbild',
-  'wtg_linux_step4_title': 'Schritt 2: Zieldatenträger auswählen',
-  'wtg_linux_step4_desc': 'Wählen Sie den externen Datenträger für Linux To Go',
-  'wtg_linux_confirm_title': 'Schritt 3: Linux To Go bestätigen',
-  'wtg_linux_confirm_desc':
-      'Prüfen Sie vor dem Schreiben das unterstützte casper-ISO, den Zieldatenträger und die persistente Umgebung',
-  'wtg_linux_workspace_type': 'Arbeitsumgebungstyp',
-  'wtg_linux_live_workspace': 'Persistente Ubuntu/casper Live-Umgebung',
-  'wtg_linux_persistence': 'Persistenz',
-  'wtg_linux_persistence_note':
-      'Mit einem ext4-writable-Abbild aktiviert (bis etwa 4 GB)',
-  'wtg_linux_step6_title': 'Schritt 4: Linux To Go wird erstellt',
-  'wtg_linux_step6_desc':
-      'Bitte warten Sie, während das Linux-ISO-Abbild auf den Zieldatenträger geschrieben wird',
-  'wtg_linux_step_complete_title': 'Schritt 5: abgeschlossen',
-  'wtg_linux_step_complete_desc': 'Linux To Go wurde erfolgreich erstellt',
-  'wtg_linux_creation_complete': 'Linux To Go erstellt!',
-  'wtg_linux_creation_complete_desc':
-      'Ihre bootfähige Linux Live-Arbeitsumgebung ist einsatzbereit',
-  'wtg_linux_step_failed_title': 'Erstellung fehlgeschlagen',
-  'wtg_linux_step_failed_desc':
-      'Beim Erstellen von Linux To Go ist ein Fehler aufgetreten',
   'logs_title': 'Protokollzentrale',
   'logs_subtitle': 'Anwendungsprotokolle anzeigen und verwalten',
   'logs_open_folder': 'Protokollordner öffnen',
@@ -9682,7 +9297,7 @@ const _de = <String, String>{
   'logs_cat_benchmark': 'Datenträger-Testprotokolle',
   'bench_title': 'Laufwerks-Benchmark',
   'bench_subtitle':
-      'Misst reales Schreibverhalten für Windows To Go und Linux To Go: sequenziell, zufälliges 4K, Thread-Skalierung und lange Schreibstabilität.',
+      'Misst reales Schreibverhalten für Windows To Go: sequenziell, zufälliges 4K, Thread-Skalierung und lange Schreibstabilität.',
   'bench_refresh': 'Aktualisieren',
   'bench_target_disk': 'Ziellaufwerk',
   'bench_detecting': 'Wechseldatenträger werden erkannt...',
@@ -9697,8 +9312,7 @@ const _de = <String, String>{
   'bench_mode_full_write': 'Vollschreiben',
   'bench_mode_quick_desc':
       'Kurzer Sicherheitscheck für grundlegende To Go-Eignung.',
-  'bench_mode_standard_desc':
-      'Ausgewogene Prüfung für normales Windows To Go und Linux To Go.',
+  'bench_mode_standard_desc': 'Ausgewogene Prüfung für normales Windows To Go.',
   'bench_mode_extreme_desc':
       'Längere 4K- und Multithread-Tests für ein strengeres Urteil.',
   'bench_mode_full_write_desc':
@@ -9764,14 +9378,13 @@ const _de = <String, String>{
   'bench_result_reasons': 'Wichtige Gründe',
   'bench_result_notes': 'Hinweise',
   'bench_recommend_excellent':
-      'Empfohlen für Windows To Go / Linux To Go, auch bei anspruchsvollerer täglicher Nutzung.',
-  'bench_recommend_good': 'Empfohlen für Windows To Go / Linux To Go.',
+      'Empfohlen für Windows To Go, auch bei anspruchsvollerer täglicher Nutzung.',
+  'bench_recommend_good': 'Empfohlen für Windows To Go.',
   'bench_recommend_usable':
       'Für leichte To Go-Lasten nutzbar; schwere Updates und intensives Multitasking besser vermeiden.',
   'bench_recommend_limited':
       'Nur für Notfälle oder leichte To Go-Nutzung geeignet.',
-  'bench_recommend_not_recommended':
-      'Nicht empfohlen für Windows To Go / Linux To Go.',
+  'bench_recommend_not_recommended': 'Nicht empfohlen für Windows To Go.',
   'bench_recommend_unmeasured':
       'Führen Sie einen Test aus, um eine Empfehlung zu erhalten.',
   'bench_reason_4k_strong': 'Die zufällige 4K-Schreibleistung ist sehr stark.',
@@ -9844,16 +9457,6 @@ const _ko = <String, String>{
   'safety_disk_offline': '선택한 디스크가 오프라인 상태여서 사용할 수 없습니다.',
   'linux_not_isohybrid':
       '이 ISO는 부팅 가능한 ISOHybrid 이미지가 아닙니다. 대상 디스크는 변경되지 않았습니다.',
-  'linux_togo_mount_preflight_failed':
-      'Linux 이미지를 검사할 수 없습니다. 대상 디스크는 변경되지 않았습니다.',
-  'linux_togo_unsupported_iso':
-      '영구 저장 Linux To Go는 검증된 x64 Ubuntu/casper 및 Debian Live 레이아웃을 지원합니다. 다른 배포판은 설치 미디어 만들기를 사용하세요.',
-  'linux_togo_mke2fs_missing':
-      '이 빌드에는 라이선스 요구 사항을 충족하는 Linux 영구 저장 구성 요소가 포함되어 있지 않습니다. 대상 디스크는 변경되지 않았습니다.',
-  'linux_togo_boot_config_unsupported':
-      '이 Live 이미지에는 영구 저장을 활성화할 수 있는 지원되는 GRUB 항목이 없습니다. 대상 디스크는 변경되지 않았습니다.',
-  'linux_togo_boot_file_too_large':
-      '이 이미지에는 FAT32의 단일 파일 제한을 초과하는 필수 부팅 파일이 있습니다. 대상 디스크는 변경되지 않았습니다.',
   'bench_error_helper_missing': '네이티브 디스크 테스트 구성 요소가 없습니다. 앱을 다시 설치하세요.',
   'bench_error_cleanup_failed':
       '일부 테스트 파일을 삭제하지 못했습니다. 드라이브를 사용하는 프로그램을 닫고 .wds_benchmark 폴더를 삭제하세요.',
@@ -9863,7 +9466,7 @@ const _ko = <String, String>{
       '이 분석은 선택한 로그 일부, 이미지 이름 또는 장치 정보를 설정된 AI 서비스로 전송합니다. 파일 내용은 이 기능이 읽는 미리보기로 제한되며 USB 일련번호는 전송하지 않습니다. 계속하시겠습니까?',
   'ai_privacy_continue': '계속해서 전송',
   'app_name': 'WinDeploy Studio',
-  'app_subtitle': 'Windows 및 Linux 설치 미디어와 To Go 생성 도구',
+  'app_subtitle': 'Windows/Linux 설치 미디어 및 Windows To Go 생성 도구',
   'nav_home': '홈',
   'nav_images': '이미지',
   'nav_creator': '설치 미디어',
@@ -9871,14 +9474,14 @@ const _ko = <String, String>{
   'nav_logs': '로그',
   'nav_settings': '설정',
   'home_title': 'Windows 및 Linux 배포 도구 모음',
-  'home_subtitle': 'Windows 및 Linux 설치 미디어와 To Go 생성 도구',
+  'home_subtitle': 'Windows/Linux 설치 미디어 및 Windows To Go 생성 도구',
   'home_quick_start': '빠른 시작',
   'home_image_library': '이미지 라이브러리',
   'home_image_library_desc': 'Windows 이미지 탐색 및 다운로드 링크 확인',
   'home_bootable_usb': '설치 미디어 생성 도구',
   'home_bootable_usb_desc': 'ISO 파일에서 Windows 또는 Linux 설치 USB 만들기',
   'home_wtg': 'To Go 작업 공간',
-  'home_wtg_desc': '휴대용 Windows 및 Linux 작업 환경 만들기',
+  'home_wtg_desc': '휴대용 Windows 작업 환경 만들기',
   'home_local_iso': '로컬 ISO 가져오기',
   'home_local_iso_desc': '로컬 ISO 파일 가져오기 및 관리',
   'home_about': '정보',
@@ -9886,7 +9489,7 @@ const _ko = <String, String>{
   'home_platform': '플랫폼',
   'home_engine': '엔진',
   'home_focus': '주요 기능',
-  'home_focus_value': '설치 미디어 및 To Go',
+  'home_focus_value': '설치 미디어 및 Windows To Go',
   'home_license': '라이선스',
   'home_license_value': '오픈 소스',
   'images_title': '이미지 라이브러리',
@@ -10043,8 +9646,8 @@ const _ko = <String, String>{
   'ai_answering': '답변 작성 중...',
   'ai_sources': '출처',
   'easter_egg_missing': '이스터에그 이미지를 찾을 수 없습니다!',
-  'intel_museum_desc': '테스트용 내부 빌드입니다.',
-  'intel_museum_title': 'Intel 기밀',
+  'studio_easter_egg_desc': '테스트용 내부 빌드입니다.',
+  'studio_easter_egg_title': 'WinDeploy Studio 이스터 에그',
   'intel_memory': '메모리',
   'intel_build_time': '빌드 시간',
   'lang_select_title': '언어 선택',
@@ -10139,30 +9742,6 @@ const _ko = <String, String>{
   'wtg_disk_prefix': '디스크',
   'wtg_starting': '시작 중...',
   'wtg_platform_windows': 'Windows To Go',
-  'wtg_platform_linux': 'Linux To Go',
-  'wtg_linux_title': 'Linux To Go 생성 도구',
-  'wtg_linux_subtitle': '변경 사항을 저장하는 휴대용 Ubuntu/casper Live 환경 만들기',
-  'wtg_linux_select_iso': 'Linux ISO 선택',
-  'wtg_linux_select_iso_desc':
-      'x64 Ubuntu 또는 호환되는 casper 기반 Live ISO를 선택하세요. WinDeploy Studio가 영구 저장소를 만들고 활성화합니다.',
-  'wtg_linux_step1_title': '1단계: Linux ISO 선택',
-  'wtg_linux_step1_desc': 'x64 Ubuntu 또는 호환되는 casper 기반 Live ISO를 선택하세요',
-  'wtg_linux_step4_title': '2단계: 대상 디스크 선택',
-  'wtg_linux_step4_desc': 'Linux To Go에 사용할 외장 디스크를 선택하세요',
-  'wtg_linux_confirm_title': '3단계: Linux To Go 확인',
-  'wtg_linux_confirm_desc': '쓰기 전에 지원되는 casper ISO, 대상 디스크 및 영구 환경을 확인하세요',
-  'wtg_linux_workspace_type': '작업 환경 유형',
-  'wtg_linux_live_workspace': '영구 Ubuntu/casper Live 환경',
-  'wtg_linux_persistence': '지속성',
-  'wtg_linux_persistence_note': 'ext4 writable 이미지로 활성화(최대 약 4 GB)',
-  'wtg_linux_step6_title': '4단계: Linux To Go 생성 중',
-  'wtg_linux_step6_desc': 'Linux ISO 이미지를 대상 디스크에 쓰는 동안 기다려 주세요',
-  'wtg_linux_step_complete_title': '5단계: 완료',
-  'wtg_linux_step_complete_desc': 'Linux To Go가 성공적으로 생성되었습니다',
-  'wtg_linux_creation_complete': 'Linux To Go가 생성되었습니다!',
-  'wtg_linux_creation_complete_desc': '부팅 가능한 Linux Live 작업 환경을 사용할 준비가 되었습니다',
-  'wtg_linux_step_failed_title': '생성 실패',
-  'wtg_linux_step_failed_desc': 'Linux To Go를 생성하는 중 오류가 발생했습니다',
   'logs_title': '로그 센터',
   'logs_subtitle': '애플리케이션 로그 보기 및 관리',
   'logs_open_folder': '로그 폴더 열기',
@@ -10570,7 +10149,7 @@ const _ko = <String, String>{
   'logs_cat_benchmark': '디스크 테스트 로그',
   'bench_title': '드라이브 벤치마크',
   'bench_subtitle':
-      'Windows To Go와 Linux To Go를 위해 순차 쓰기, 4K 랜덤 쓰기, 스레드 확장, 장시간 쓰기 안정성을 측정합니다.',
+      'Windows To Go를 위해 순차 쓰기, 4K 랜덤 쓰기, 스레드 확장, 장시간 쓰기 안정성을 측정합니다.',
   'bench_refresh': '새로 고침',
   'bench_target_disk': '대상 드라이브',
   'bench_detecting': '이동식 드라이브 감지 중...',
@@ -10583,8 +10162,7 @@ const _ko = <String, String>{
   'bench_mode_extreme': '극한',
   'bench_mode_full_write': '전체 쓰기',
   'bench_mode_quick_desc': 'To Go 기본 적합성을 짧게 확인합니다.',
-  'bench_mode_standard_desc':
-      '일상적인 Windows To Go와 Linux To Go 사용에 맞춘 균형 테스트입니다.',
+  'bench_mode_standard_desc': '일상적인 Windows To Go 사용에 맞춘 균형 테스트입니다.',
   'bench_mode_extreme_desc': '4K와 멀티스레드 테스트를 더 오래 실행해 더 엄격하게 판단합니다.',
   'bench_mode_full_write_desc': '거의 전체 공간을 순차 쓰기해 캐시 하락을 확인합니다.',
   'bench_full_warning':
@@ -10635,13 +10213,12 @@ const _ko = <String, String>{
   'bench_result_recommendation': '권장 사항',
   'bench_result_reasons': '주요 이유',
   'bench_result_notes': '참고',
-  'bench_recommend_excellent':
-      'Windows To Go / Linux To Go에 권장되며, 비교적 무거운 일상 사용에도 적합합니다.',
-  'bench_recommend_good': 'Windows To Go / Linux To Go에 권장됩니다.',
+  'bench_recommend_excellent': 'Windows To Go에 권장되며, 비교적 무거운 일상 사용에도 적합합니다.',
+  'bench_recommend_good': 'Windows To Go에 권장됩니다.',
   'bench_recommend_usable':
       '가벼운 To Go 작업에 사용할 수 있으며, 무거운 업데이트와 멀티태스킹은 피하는 것이 좋습니다.',
   'bench_recommend_limited': '긴급용 또는 가벼운 To Go 사용에만 권장됩니다.',
-  'bench_recommend_not_recommended': 'Windows To Go / Linux To Go에는 권장하지 않습니다.',
+  'bench_recommend_not_recommended': 'Windows To Go에는 권장하지 않습니다.',
   'bench_recommend_unmeasured': '테스트를 실행하면 권장 사항이 생성됩니다.',
   'bench_reason_4k_strong': '4K 랜덤 쓰기 성능이 매우 강합니다.',
   'bench_reason_4k_stable': '4K 랜덤 쓰기가 안정적입니다.',

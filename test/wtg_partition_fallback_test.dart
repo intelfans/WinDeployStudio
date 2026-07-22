@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:win_deploy_studio/core/services/wtg_service.dart';
 
@@ -57,4 +59,26 @@ void main() {
       );
     },
   );
+
+  test('Windows To Go executes the compatible layout after detection', () {
+    final source = File(
+      'lib/core/services/wtg_service.dart',
+    ).readAsStringSync();
+    final start = source.indexOf(
+      'Future<_WtgPartitionLayout> _partitionDisk({',
+    );
+    final end = source.indexOf(
+      'Future<_WtgPartitionLayout> _partitionDiskWithLayout({',
+      start,
+    );
+    expect(start, greaterThanOrEqualTo(0));
+    expect(end, greaterThan(start));
+    final flow = source.substring(start, end);
+
+    expect(flow, contains('shouldRetryWtgWithUefiMbr('));
+    expect(flow, contains('bootLayout: WtgBootLayout.uefiMbr'));
+    expect(flow, contains('Retrying Windows To Go with UEFI/MBR'));
+    expect(flow, contains("message: 'wtg_svc_partition_fallback_uefi_mbr'"));
+    expect(flow, isNot(contains('Automatic UEFI/MBR fallback is disabled')));
+  });
 }

@@ -395,7 +395,7 @@ void main() {
       );
     });
 
-    test('blocks virtual disk deployment for Linux', () {
+    test('fails closed for a retired Linux portable virtual-disk plan', () {
       const plan = DeploymentPlan(
         platform: DeploymentPlatform.linux,
         purpose: DeploymentPurpose.toGo,
@@ -408,11 +408,11 @@ void main() {
       expect(report.canDeploy, isFalse);
       expect(
         report.errors.map((issue) => issue.code),
-        contains('linux_virtual_disk'),
+        contains('linux_portable_future'),
       );
     });
 
-    test('blocks hidden Windows-only options for Linux', () {
+    test('fails closed before evaluating retired Linux portable options', () {
       const plan = DeploymentPlan(
         platform: DeploymentPlatform.linux,
         purpose: DeploymentPurpose.toGo,
@@ -425,7 +425,7 @@ void main() {
       expect(report.canDeploy, isFalse);
       expect(
         report.errors.map((issue) => issue.code),
-        contains('linux_windows_options'),
+        contains('linux_portable_future'),
       );
     });
 
@@ -464,6 +464,24 @@ void main() {
         contains('invalid_volume_label'),
       );
       expect(
+        invalidLabel.errors
+            .firstWhere((issue) => issue.code == 'invalid_volume_label')
+            .messageKey,
+        'deploy_compat_invalid_togo_volume_label',
+      );
+      final invalidInstallMediaLabel = DeploymentCompatibility.evaluate(
+        windowsPlan().copyWith(
+          purpose: DeploymentPurpose.installMedia,
+          customVolumeLabel: 'Win8.1',
+        ),
+      );
+      expect(
+        invalidInstallMediaLabel.errors
+            .firstWhere((issue) => issue.code == 'invalid_volume_label')
+            .messageKey,
+        'deploy_compat_invalid_volume_label',
+      );
+      expect(
         invalidIcon.errors.map((issue) => issue.code),
         contains('invalid_icon'),
       );
@@ -488,6 +506,23 @@ void main() {
           allowPeriod: true,
         ),
         isTrue,
+      );
+      expect(
+        DeploymentCompatibility.evaluate(
+          windowsPlan().copyWith(customVolumeLabel: 'WinDeploy.10'),
+        ).errors.map((issue) => issue.code),
+        isNot(contains('invalid_volume_label')),
+        reason: 'Windows To Go uses an NTFS data volume',
+      );
+      expect(
+        DeploymentCompatibility.evaluate(
+          windowsPlan().copyWith(
+            platform: DeploymentPlatform.linux,
+            customVolumeLabel: 'Deepin.25',
+          ),
+        ).errors.map((issue) => issue.code),
+        isNot(contains('invalid_volume_label')),
+        reason: 'Linux installation media uses the source layout',
       );
       expect(
         DeploymentCompatibility.isVolumeLabelValid('', maxLength: 11),

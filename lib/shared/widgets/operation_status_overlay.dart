@@ -24,11 +24,24 @@ class OperationStatusOverlay extends ConsumerStatefulWidget {
 
 class _OperationStatusOverlayState
     extends ConsumerState<OperationStatusOverlay> {
+  final GlobalKey _surfaceKey = GlobalKey();
   Offset _dragOffset = Offset.zero;
   bool _collapsed = false;
+  double _surfaceHeight = 0;
 
   void _move(DragUpdateDetails details) {
     setState(() => _dragOffset += details.delta);
+  }
+
+  void _measureSurfaceAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _surfaceKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+      final height = box.size.height;
+      if ((height - _surfaceHeight).abs() < 0.5) return;
+      setState(() => _surfaceHeight = height);
+    });
   }
 
   List<_ActivityView> _activities(BuildContext context, WidgetRef ref) {
@@ -101,13 +114,14 @@ class _OperationStatusOverlayState
     final panelWidth = (_collapsed ? 64.0 : math.min(430.0, availableWidth))
         .toDouble();
     final defaultLeft = math.max(16.0, size.width - panelWidth - 16).toDouble();
-    final maxTop = math
-        .max(12.0, size.height - (_collapsed ? 80.0 : 340.0))
-        .toDouble();
+    final estimatedHeight = _collapsed ? 64.0 : 190.0;
+    final surfaceHeight = _surfaceHeight > 0 ? _surfaceHeight : estimatedHeight;
+    final maxTop = operationOverlayMaxTop(size.height, surfaceHeight);
     final left = (defaultLeft + _dragOffset.dx)
         .clamp(16.0, math.max(16.0, size.width - panelWidth - 16))
         .toDouble();
     final top = (12.0 + _dragOffset.dy).clamp(12.0, maxTop).toDouble();
+    _measureSurfaceAfterLayout();
 
     return Positioned(
       left: left,
@@ -118,13 +132,16 @@ class _OperationStatusOverlayState
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onPanUpdate: _move,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: _collapsed
-                ? _buildOrb(context, items)
-                : _buildPanel(context, items, panelWidth),
+          child: KeyedSubtree(
+            key: _surfaceKey,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _collapsed
+                  ? _buildOrb(context, items)
+                  : _buildPanel(context, items, panelWidth),
+            ),
           ),
         ),
       ),
@@ -245,6 +262,10 @@ class _OperationStatusOverlayState
     );
   }
 }
+
+@visibleForTesting
+double operationOverlayMaxTop(double viewportHeight, double surfaceHeight) =>
+    math.max(12.0, viewportHeight - surfaceHeight - 16).toDouble();
 
 class _ActivityView {
   final IconData icon;

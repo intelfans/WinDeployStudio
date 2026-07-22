@@ -83,4 +83,4 @@ flutter:
     - data/mirrors.json
     - data/tools.json
     - assets/easter_egg/easter_egg.png
-    - assets/intel-1.jpg
+    - docs/assets/media/logo.png

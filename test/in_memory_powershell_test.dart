@@ -315,7 +315,7 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
     );
   });
 
-  test('Linux raw install-media completion explains the native ISO layout', () {
+  test('Linux raw install-media uses its dedicated completion message', () {
     final source = File(
       'lib/core/services/bootable_usb_service.dart',
     ).readAsStringSync();
@@ -329,8 +329,9 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
     expect(rawSuccess, greaterThan(creationStart));
     expect(
       source.substring(creationStart, rawSuccess),
-      contains("? 'linux_complete'"),
-      reason: 'Linux To Go keeps its separate completion message',
+      isNot(contains("? 'linux_complete'")),
+      reason:
+          'Linux installation media must not use a retired workflow message',
     );
   });
 

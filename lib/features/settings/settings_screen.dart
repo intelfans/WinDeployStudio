@@ -27,13 +27,13 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const _requiredEasterEggTaps = 5;
-  static const _requiredIntelLogoTaps = 5;
+  static const _requiredAboutLogoTaps = 5;
   static const _easterEggResetDelay = Duration(seconds: 3);
 
   Timer? _easterEggResetTimer;
-  Timer? _intelLogoResetTimer;
+  Timer? _aboutLogoResetTimer;
   int _easterEggTapCount = 0;
-  int _intelLogoTapCount = 0;
+  int _aboutLogoTapCount = 0;
   String? _aiEndpointUrl;
   bool _aiApiKeyConfigured = false;
   String? _aiModel;
@@ -50,7 +50,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void dispose() {
     _easterEggResetTimer?.cancel();
-    _intelLogoResetTimer?.cancel();
+    _aboutLogoResetTimer?.cancel();
     super.dispose();
   }
 
@@ -93,21 +93,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
-  void _handleIntelLogoTap() {
-    _intelLogoResetTimer?.cancel();
-    _intelLogoTapCount += 1;
-    if (_intelLogoTapCount >= _requiredIntelLogoTaps) {
-      _intelLogoTapCount = 0;
+  void _handleAboutLogoTap() {
+    _aboutLogoResetTimer?.cancel();
+    _aboutLogoTapCount += 1;
+    if (_aboutLogoTapCount >= _requiredAboutLogoTaps) {
+      _aboutLogoTapCount = 0;
       showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const IntelMuseumDialog(),
+        builder: (context) => const WinDeployStudioEasterEggDialog(),
       );
       return;
     }
 
-    _intelLogoResetTimer = Timer(_easterEggResetDelay, () {
-      _intelLogoTapCount = 0;
+    _aboutLogoResetTimer = Timer(_easterEggResetDelay, () {
+      _aboutLogoTapCount = 0;
     });
   }
 
@@ -540,17 +540,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
-                // Intel Logo with easter egg
                 GestureDetector(
-                  key: const Key('settings-intel-easter-egg'),
-                  onTap: _handleIntelLogoTap,
+                  key: const Key('settings-product-easter-egg'),
+                  onTap: _handleAboutLogoTap,
                   child: Container(
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       image: const DecorationImage(
-                        image: AssetImage('assets/intel-1.jpg'),
+                        image: AssetImage('docs/assets/media/logo.png'),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -1238,16 +1237,18 @@ class _EasterEggDialog extends StatelessWidget {
   }
 }
 
-class IntelMuseumDialog extends StatefulWidget {
-  const IntelMuseumDialog({super.key, this.loadSystemInfo = true});
+class WinDeployStudioEasterEggDialog extends StatefulWidget {
+  const WinDeployStudioEasterEggDialog({super.key, this.loadSystemInfo = true});
 
   final bool loadSystemInfo;
 
   @override
-  State<IntelMuseumDialog> createState() => _IntelMuseumDialogState();
+  State<WinDeployStudioEasterEggDialog> createState() =>
+      _WinDeployStudioEasterEggDialogState();
 }
 
-class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
+class _WinDeployStudioEasterEggDialogState
+    extends State<WinDeployStudioEasterEggDialog> {
   String _cpuInfo = '';
   String _gpuInfo = '';
   String _memoryInfo = '';
@@ -1328,11 +1329,19 @@ class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.memory, color: colorScheme.primary),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(7),
+                        child: Image.asset(
+                          'docs/assets/media/logo.png',
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          tr(context, 'intel_museum_title'),
+                          tr(context, 'studio_easter_egg_title'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleLarge,
@@ -1347,7 +1356,7 @@ class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
                   ),
                   SizedBox(height: compactHeight ? 4 : 8),
                   Text(
-                    tr(context, 'intel_museum_desc'),
+                    tr(context, 'studio_easter_egg_desc'),
                     maxLines: compactHeight ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -1363,7 +1372,7 @@ class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
                         for (final info in infoRows)
                           SizedBox(
                             width: (constraints.maxWidth - 12) / 2,
-                            child: _IntelInfoCard(
+                            child: _BuildInfoCard(
                               label: info.label,
                               value: info.value,
                             ),
@@ -1374,30 +1383,13 @@ class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
                     Column(
                       children: [
                         for (final info in infoRows)
-                          _IntelInfoRow(
+                          _BuildInfoRow(
                             label: info.label,
                             value: info.value,
                             compact: compactHeight,
                           ),
                       ],
                     ),
-                  SizedBox(height: compactHeight ? 8 : 16),
-                  Text(
-                    'Intel® is a trademark of Intel Corporation.',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    'This project is not affiliated with Intel.',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
                   SizedBox(height: compactHeight ? 8 : 16),
                   Align(
                     alignment: AlignmentDirectional.centerEnd,
@@ -1520,8 +1512,8 @@ class _IntelMuseumDialogState extends State<IntelMuseumDialog> {
   }
 }
 
-class _IntelInfoCard extends StatelessWidget {
-  const _IntelInfoCard({required this.label, required this.value});
+class _BuildInfoCard extends StatelessWidget {
+  const _BuildInfoCard({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1555,8 +1547,8 @@ class _IntelInfoCard extends StatelessWidget {
   }
 }
 
-class _IntelInfoRow extends StatelessWidget {
-  const _IntelInfoRow({
+class _BuildInfoRow extends StatelessWidget {
+  const _BuildInfoRow({
     required this.label,
     required this.value,
     required this.compact,

@@ -13,8 +13,8 @@ Lizenz: MIT License
 GitHub-Profil: https://github.com/intelfans
 GitHub-Repository: https://github.com/intelfans/WinDeployStudio
 
-Hinweis zu Drittanbieter-Tools:
-Diese Version enthält wds_ext4_builder, einen integrierten ext4-Persistenzabbild-Helfer aus festgeschriebenem go-ext4fs-Quellcode unter MIT-Lizenz für experimentelle, strukturell vorgeprüfte x64-Ubuntu/casper-, Debian Live/Kali- und Deepin Live-Profile. Linux To Go wird nur auf x64-UEFI-Systemen mit GPT-Zieldatenträgern unterstützt; UEFI+MBR und Legacy-BIOS werden nicht unterstützt. Eine Prüfung durch echten Bootvorgang und Persistenz nach einem Neustart ist weiterhin erforderlich. Er akzeptiert nur ein reguläres Abbild auf einem lokalen Laufwerk und wird vor Arbeiten am Zieldatenträger geprüft. Details finden Sie in THIRD_PARTY_NOTICES.md und tools\ext4-builder\README.md im Installationsverzeichnis.
+Funktionshinweis:
+Portable Linux-Arbeitsumgebungen sind für eine zukünftige Version geplant und derzeit nicht verfügbar. Linux-Installationsmedien können weiterhin erstellt werden.
 
 Besonderer Dank
 

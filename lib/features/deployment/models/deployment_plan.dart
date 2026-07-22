@@ -397,23 +397,9 @@ class DeploymentCompatibility {
     }
 
     if (plan.isLinux) {
-      if (plan.deploymentMode != DeploymentMode.direct) {
-        error('linux_virtual_disk', 'deploy_compat_linux_direct_only');
-      }
-      if (plan.wimBoot ||
-          plan.compactOs ||
-          plan.enableNetFx3 ||
-          plan.ntfsUefiSupport ||
-          plan.skipOobe ||
-          plan.disableWinRe ||
-          plan.disableUasp ||
-          plan.fixVhdDriveLetter ||
-          plan.preferredSystemLetter.isNotEmpty ||
-          plan.preferredBootLetter.isNotEmpty) {
-        error('linux_windows_options', 'deploy_compat_linux_windows_options');
-      }
-      if (plan.driverDirectory.isNotEmpty) {
-        warning('linux_driver_staging', 'deploy_compat_linux_driver_staging');
+      if (plan.isToGo) {
+        error('linux_portable_future', 'linux_portable_future_notice');
+        return DeploymentCompatibilityReport(issues);
       }
       _validateSharedIdentity(plan, error);
       return DeploymentCompatibilityReport(issues);
@@ -608,7 +594,12 @@ class DeploymentCompatibility {
       maxLength: labelLimit,
       allowPeriod: plan.purpose != DeploymentPurpose.installMedia,
     )) {
-      error('invalid_volume_label', 'deploy_compat_invalid_volume_label');
+      error(
+        'invalid_volume_label',
+        plan.purpose == DeploymentPurpose.installMedia
+            ? 'deploy_compat_invalid_volume_label'
+            : 'deploy_compat_invalid_togo_volume_label',
+      );
     }
 
     final iconPath = plan.customIconPath.trim();

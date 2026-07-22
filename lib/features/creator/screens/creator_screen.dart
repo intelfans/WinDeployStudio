@@ -63,6 +63,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
 
   CreateProgress? _createProgress;
   BootableUsbService? _creationService;
+  late final OperationStatusNotifier _operationStatusNotifier;
   bool _creationRunning = false;
   bool _creationCancellable = false;
   bool _creationCancelled = false;
@@ -95,6 +96,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     // cannot be read from dispose(), after the element has been unmounted.
     _isoParseService = ref.read(isoParseServiceProvider);
     _diskSafetyService = ref.read(diskSafetyServiceProvider);
+    _operationStatusNotifier = ref.read(operationStatusProvider.notifier);
     _restoreInstallMediaActivity();
     _detectDisks();
   }
@@ -103,7 +105,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     final activity = ref.read(
       operationStatusProvider,
     )[TrackedOperationKind.installMedia];
-    if (activity == null || !activity.active) return;
+    if (activity == null) return;
     final step = CreateStep.values.firstWhere(
       (value) => value.name == activity.phase,
       orElse: () => CreateStep.preparing,
@@ -111,9 +113,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     _platform = activity.isLinux
         ? _CreatorPlatform.linux
         : _CreatorPlatform.windows;
-    _currentStep = 3;
-    _creationRunning = true;
-    _creationService = ref.read(bootableUsbServiceProvider);
+    _currentStep = step == CreateStep.complete ? 4 : 3;
+    _creationRunning = activity.active;
+    _creationCancellable = activity.cancellable;
+    _creationService = activity.active
+        ? ref.read(bootableUsbServiceProvider)
+        : null;
     _createProgress = CreateProgress(
       step: step,
       progress: activity.progress,
@@ -657,6 +662,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         message: 'creator_starting',
       );
     });
+    _publishInstallMediaProgress(
+      const CreateProgress(
+        step: CreateStep.preparing,
+        message: 'creator_starting',
+      ),
+      isLinux: isLinuxMode,
+      active: true,
+    );
     debugPrint('[WDS] _startCreation: step set to 3');
 
     try {
@@ -710,7 +723,6 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
             ? await service.createLinuxIsoUsb(
                 disk: disk,
                 isoPath: iso.filePath,
-                kind: LinuxUsbKind.installMedia,
                 deploymentPlan: plan,
                 onProgress: _onCreationProgress,
               )
@@ -747,6 +759,16 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   void _onCreationProgress(CreateProgress progress) {
+    // The page may be disposed while the service continues. Publish before
+    // touching widget state so a recreated page can restore the latest phase.
+    final terminal =
+        progress.step == CreateStep.complete ||
+        progress.step == CreateStep.failed;
+    _publishInstallMediaProgress(
+      progress,
+      isLinux: _isLinuxMode,
+      active: !terminal,
+    );
     if (!mounted) return;
     setState(() {
       final current = _createProgress;
@@ -757,7 +779,17 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           current!.message.isNotEmpty &&
           current.message != 'creator_error';
       if (!preserveDetailedFailure) {
-        _createProgress = progress;
+        _createProgress =
+            progress.step == CreateStep.failed &&
+                current != null &&
+                progress.progress < current.progress
+            ? CreateProgress(
+                step: progress.step,
+                progress: current.progress,
+                message: progress.message,
+                error: progress.error,
+              )
+            : progress;
       }
       _creationCancellable =
           _isLinuxMode &&
@@ -771,12 +803,17 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     bool cancelRequested = false,
     CreateProgress? latestProgress,
   }) {
-    if (!mounted) return;
     final terminal = finishCreatorTask(
       success: success,
       latestProgress: latestProgress ?? _createProgress,
       cancelRequested: cancelRequested,
     );
+    _publishInstallMediaProgress(
+      terminal.progress,
+      isLinux: _isLinuxMode,
+      active: false,
+    );
+    if (!mounted) return;
     setState(() {
       _creationRunning = false;
       _creationCancellable = false;
@@ -792,6 +829,25 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       unawaited(_refreshDisksAfterCreation());
     }
     debugPrint('[WDS] _startCreation: final step = $_currentStep');
+  }
+
+  void _publishInstallMediaProgress(
+    CreateProgress progress, {
+    required bool isLinux,
+    required bool active,
+  }) {
+    _operationStatusNotifier.update(
+      kind: TrackedOperationKind.installMedia,
+      phase: progress.step.name,
+      message: progress.message,
+      progress: progress.progress,
+      cancellable:
+          active &&
+          progress.step != CreateStep.complete &&
+          progress.step != CreateStep.failed,
+      active: active,
+      isLinux: isLinux,
+    );
   }
 
   Future<void> _refreshDisksAfterCreation() async {

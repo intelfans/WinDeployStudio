@@ -15,11 +15,8 @@
   💿 安装盘创建工具  
     创建 Windows 安装介质，或写入可启动的 Linux ISOHybrid 镜像
     
-  🚀 To Go 工作环境
-    创建便携式 Windows 工作环境，并为通过结构预检的实验性 x64 Ubuntu/casper、
-    Debian Live/Kali 和 Deepin Live 配置创建持久化 Linux To Go；
-    Linux To Go 仅支持 x64 UEFI 系统和 GPT 目标磁盘，不支持 UEFI+MBR 或传统 BIOS；
-    仍需完成真实启动和重启后持久化验证
+  🚀 Windows To Go 工作环境
+    创建便携式 Windows 工作环境。Linux 便携工作环境计划在未来版本中提供。
     
   📊 原生磁盘测试
     测试顺序、4K、多线程与持续写入性能

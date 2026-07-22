@@ -15,11 +15,8 @@
   💿 安裝盤建立工具  
     建立 Windows 安裝媒體，或寫入可啟動的 Linux ISOHybrid 映像
     
-  🚀 To Go 工作環境
-    建立可攜式 Windows 工作環境，並為通過結構預檢的實驗性 x64 Ubuntu/casper、
-    Debian Live/Kali 和 Deepin Live 配置建立持久化 Linux To Go；
-    Linux To Go 僅支援 x64 UEFI 系統和 GPT 目標磁碟，不支援 UEFI+MBR 或傳統 BIOS；
-    仍需完成實際啟動和重新啟動後持久化驗證
+  🚀 Windows To Go 工作環境
+    建立可攜式 Windows 工作環境。Linux 可攜式工作環境計劃在未來版本中提供。
     
   📊 原生磁碟測試
     測試循序、4K、多執行緒與持續寫入效能

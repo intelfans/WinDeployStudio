@@ -15,11 +15,8 @@ Hauptfunktionen:
   💿 Installationsmedium erstellen  
     Windows-Medien erstellen oder bootfähige Linux-ISOHybrid-Images schreiben
     
-  🚀 To Go-Umgebungen
-    Portable Windows-Umgebungen und experimentelles persistentes Linux To Go für
-    strukturell vorgeprüfte x64 Ubuntu/casper, Debian Live/Kali und Deepin Live
-    Profile erstellen. Linux To Go wird nur auf x64-UEFI-Systemen mit GPT-Zieldatenträgern unterstützt;
-    UEFI+MBR und Legacy-BIOS werden nicht unterstützt; echter Bootvorgang und Persistenz nach Neustart sind weiter zu prüfen
+  🚀 Windows-To-Go-Umgebung
+    Eine portable Windows-Arbeitsumgebung erstellen. Portable Linux-Umgebungen sind für eine zukünftige Version geplant.
     
   📊 Nativer Laufwerkstest
     Sequenzielle, 4K-, Multithread- und Dauerschreibtests

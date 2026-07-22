@@ -4,55 +4,115 @@ All notable changes to WinDeploy Studio are documented here.
 
 ## v2.1.0
 
-### AI Output Safety And Repository Privacy
+Released: 2026-07-22
 
-- Added provider-independent client-side output screening for the built-in AI
-  service and every custom OpenAI-compatible endpoint. Response text and
-  source titles are buffered until the complete result passes the local
-  policy, including completion, cancellation, provider-error, and exception
-  paths. Saved assistant replies are screened again when chat history loads.
-- Added localized blocked-response guidance across all 11 UI languages and
-  regression coverage for allowed deployment terminology and prohibited
-  content categories.
-- Excluded local handover documents, agent/browser state, conversations, user
-  data, logs, attachments, symbols, temporary probes, and local synchronization
-  tooling from the public Git working tree.
+This is the first public feature release after v1.1.2 and includes the
+cumulative work completed across the 2.0 development series.
 
-### Guided Tour And Verification Baseline
+### Installation Media
 
-- Finalized the production first-run App Tour with complete and single-section
-  flows, free exploration time, secondary-page introductions, and correct
-  return-to-parent navigation.
-- Start the complete App Tour automatically on first launch and once after each
-  application version update, while suppressing repeat prompts after it is
-  completed or ended for the current version.
-- Simplified the Settings tour finish state: the navigation step keeps only
-  **End tour** and **Open**, while the detailed step keeps **End tour** and
-  **Start exploring**.
-- Documented the verified feature baseline. Windows/Linux Installation Media
-  and Windows/Linux To Go creation remain pending the next real-device
-  validation cycle and are kept isolated from the verified baseline.
-- Updated application, Windows metadata, installer metadata, AI prompt, and
-  README version references to 2.1.0.
+- Split Windows and Linux installation-media creation into clear, independent
+  workflows with dedicated validation, progress, safety guidance, and results.
+- Added Windows ISO preflight for real Setup layouts, WIM/ESD/SWM metadata,
+  BIOS and UEFI boot files, EFI architecture, FAT32 single-file limits, and
+  bounded mount/unmount operations.
+- Added UEFI + GPT, UEFI + MBR, and Legacy BIOS layouts for Windows media,
+  together with validated drive letters, volume labels, and custom icons.
+- Added Linux ISOHybrid structural validation, raw whole-disk writing,
+  cancellation and recovery handling, and full byte-for-byte verification.
+  Linux media preserves the image's own boot layout and does not add
+  persistence or convert firmware modes.
+- Added clearer Linux boot-capability reporting and guidance for firmware that
+  lists one USB through multiple similar boot entries.
 
-### Deployment Guidance And Feedback
+### Windows To Go
 
-- Clarified in the Windows To Go UI, README, maintenance notes, website copy,
-  and AI product prompt that the currently verified WTG production scope is
-  Windows 10 and Windows 11. Windows 7, Windows 8, Windows 8.1, and Server
-  images may be recognized and attempted, but can require matching USB,
-  chipset, storage, and boot drivers, system updates, or additional
-  boot/repair tools and are not guaranteed to boot on every target.
-- Added a distribution-neutral Linux installation-media notice for firmware
-  that exposes one ISOHybrid USB as two similar boot entries. The guidance
-  explains that no duplicate image was written and recommends the entry that
-  opens the distribution's normal installer.
-- Added a Settings feedback entry that opens the GitHub Issue form, plus a
-  failure-only feedback action for Installation Media and To Go. Successful
-  operations and explicit user cancellation do not show the failure action.
-- Updated the AI product knowledge so it distinguishes image recognition from
-  verified boot compatibility and points users to the in-app feedback action
-  after a genuine creation failure.
+- Rebuilt Windows To Go as a guided image, disk, deployment, options, summary,
+  and execution workflow with compatibility checks before destructive work.
+- Added direct, dynamic/fixed VHD, and dynamic/fixed VHDX deployment where the
+  selected Windows generation supports them, including virtual-disk BCD
+  binding and optional drive-letter repair.
+- Added guarded settings for local-disk visibility, simplified first run,
+  UASP fallback, CompactOS, WIMBoot, .NET Framework 3.5, driver injection, and
+  deployment drive letters, with incompatible combinations blocked early.
+- Added independent elapsed-time tracking, resilient progress restoration when
+  navigating away, and a draggable/collapsible global operation-status panel.
+- Clarified that Windows 10 and Windows 11 are the currently verified normal
+  creation scope. Windows 7/8/8.1 and Server remain best-effort and may need
+  matching drivers, updates, firmware modes, or recovery tools.
+- Portable Linux workspaces are planned for a future release and are not
+  available in this version. Linux installation-media creation remains
+  available.
+
+### Drive Testing And Disk Tools
+
+- Added a native unbuffered, write-through benchmark with Quick, Standard,
+  Extreme, and Full Write modes; sequential, 4K, multithread, mixed-load,
+  latency, stability, and cache-behavior analysis; and live workload charts.
+- Added saved history, date filtering, multi-selection, cross-drive comparison,
+  selected-record deletion, and localized CSV, JSON, and self-contained HTML
+  exports with device identity, complete data, and separated charts.
+- Added read-only disk diagnostics for Windows storage, ATA SMART, NVMe health,
+  and supported USB bridge paths, with honest Unknown/N/A fallbacks when the
+  controller does not expose data.
+- Added guarded BCD/EFI repair for revalidated external non-system Windows
+  disks, including typed confirmation, backup, rollback, and post-repair checks.
+
+### Home, Images, And Downloads
+
+- Redesigned Home with a denser quick-start layout, recent images, storage
+  overview, clear-history action, and user-selectable/reorderable modules.
+- Expanded Image Library metadata, source and experience classifications,
+  language notices, local ISO discovery, published SHA-256/MD5 values, and
+  silent known-image identification in Installation Media and Windows To Go.
+- Added Microsoft official download routing, 123 Cloud options for Chinese
+  users, and managed Global Mirror downloads with an in-app destination picker,
+  progress, cancellation, resume checks, and trusted HTTPS boundaries.
+- Added a bilingual light/dark project website with responsive image and
+  release download pages, Markdown release notes, screenshots, and direct
+  access to the same published resources.
+
+### AI Assistant And Updates
+
+- Added provider-neutral OpenAI-compatible configuration for a custom HTTPS
+  endpoint, protected API key, and model selection while retaining a built-in
+  default service with locked default fields.
+- Improved streaming and non-streaming protocol compatibility, cancellation,
+  network/proxy discovery, tool-call handling, bounded public web search,
+  source filtering, Markdown normalization, and removal of raw tool/citation
+  artifacts from user-facing replies.
+- Updated product knowledge and first-choice guidance for current Image
+  Library, Installation Media, Windows To Go, Disk Test, Disk Tools, feedback,
+  and App Tour behavior.
+- Added provider-independent client-side output screening and Windows DPAPI
+  protection for locally stored AI configuration and chat data.
+- Rebuilt update discovery around GitHub Releases with Global Mirror and GitHub
+  download choices, bilingual release-note selection, resilient metadata
+  fallback, and visible download progress.
+- Added HTTPS allowlists, concurrent-download isolation, published SHA-256
+  verification, file-size checks, and Authenticode status checks before an
+  update installer is launched.
+
+### Experience, Localization, And Safety
+
+- Added a production first-run App Tour with complete and single-section replay,
+  secondary-page guidance, free exploration time, and automatic display on the
+  first launch of each app version.
+- Refined the Windows 11-inspired responsive interface, navigation, typography,
+  card density, title bar, narrow-screen layouts, animations, and waiting views.
+- Completed application and installer coverage for all 11 supported languages:
+  Simplified Chinese, Traditional Chinese, English, French, German, Spanish,
+  Portuguese, Russian, Arabic, Korean, and Japanese.
+- Added Settings feedback and failure-only reporting actions that open the
+  project's GitHub Issue form without automatically uploading private data.
+- Added physical-disk identity revalidation, per-disk operation locks,
+  in-memory PowerShell execution, explicit Windows system environments,
+  timeouts, cancellation, RAW-volume recovery, structured logs, and safer
+  cleanup across deployment workflows.
+- The Windows application now requests administrator approval at startup so
+  destructive workflows do not need scattered elevation buttons or prompts.
+- Updated user documentation, third-party notices, website copy, installer
+  text, AI guidance, tests, and version metadata for the current feature set.
 
 ## v2.0.9
 
@@ -80,45 +140,9 @@ All notable changes to WinDeploy Studio are documented here.
   automated-update integrity model.
 - Clarified that the released Windows application requests UAC approval at
   startup and performs its disk and boot operations in one elevated process.
-- Retained the documented Linux To Go support boundary: verified x64 UEFI + GPT
-  Ubuntu/casper, Debian Live, and Deepin Live profiles only. Arch, openSUSE,
-  KIWI, BIOS, UEFI + MBR, and ARM Linux To Go creation remain unsupported.
-
 ## v2.0.6
 
 - Updated the application, Windows metadata, installer, build script, and documentation to version 2.0.6.
-
-## v2.0.5
-
-### Linux To Go and Licensing
-
-- Added a dedicated Deepin Live Linux To Go profile. It requires the audited
-  `live/vmlinuz.efi`, `live/initrd`, `live/filesystem.squashfs`, x64 UEFI,
-  `boot=live union=overlay`, live-boot, and NTFS contract before a target disk
-  can be changed; Deepin installer and ISO-check entries are never patched.
-- Added a code-owned profile identity for Ubuntu/casper, Debian Live/Kali, and
-  Deepin so write-time boot configuration uses the same narrowly scoped entry
-  rule as the read-only preflight.
-- Added a separate Debian Live Linux To Go profile: x64 UEFI, `boot=live`, a
-  patchable GRUB entry, an NTFS-capable initrd, and the Debian
-  `persistence` / `/persistence.conf` contract are now validated before any
-  destructive operation.
-- Kept Ubuntu/casper and Debian live-boot persistence layouts separate. Casper
-  uses `writable` / `persistent`; Debian Live/Kali and the validated Deepin
-  profile use `persistence` with `/ union` in `persistence.conf`.
-- Removed the previously bundled Google/AOSP `mke2fs.exe` from source, release
-  output, and installer packaging. Its complete corresponding GPLv2 source and
-  static build inputs were not available to this project.
-- Added `wds_ext4_builder.exe`, a narrow Go helper built from pinned,
-  vendored MIT-licensed `go-ext4fs` source. It creates only local regular ext4
-  persistence images and is hash-checked before any target-disk operation.
-- Integrated experimental persistent Linux To Go creation for structurally
-  checked x64 Ubuntu/casper, Debian Live/Kali, and Deepin Live profiles.
-  Debian live-boot profiles receive only the fixed `/ union`
-  `persistence.conf` marker; real boot and second-boot persistence validation
-  remains required before claiming production support.
-- Added the helper source, local UUID collision fix, reproducible build script,
-  Go runtime notice, README, installer notices, and 11-language UI messaging.
 
 ## v2.0.0
 
@@ -128,28 +152,18 @@ All notable changes to WinDeploy Studio are documented here.
 - Added explicit UEFI + GPT, UEFI + MBR, and Legacy BIOS selection for Windows installation media and To Go, together with preferred partition drive letters and custom volume labels/icons.
 - Added direct, dynamic/fixed VHD, and dynamic/fixed VHDX Windows To Go deployment with compatibility checks, virtual-disk BCD binding, and optional stale drive-letter repair.
 - Made Windows To Go policies configurable: local-disk SAN policy, OOBE/Audit behavior, WinRE, UASP, CompactOS, WIMBoot, and .NET Framework 3.5. UEFI deployments automatically use NTFS Windows storage backed by a separate FAT32 EFI partition.
-- Added verified offline Windows INF injection and optional first-boot staging of vetted Linux packages, matching kernel modules, and explicit scripts for supported x64 Ubuntu/casper Linux To Go images. This does not add arbitrary-distribution Linux To Go support.
 - Added one consistent Windows 11-inspired interface with aligned native title-bar styling and responsive deployment navigation.
 - Added a top-level Disk Tools workspace with read-only Windows/NVMe diagnostics and guarded external-disk UEFI/BIOS boot repair with preflight, typed confirmation, BCD backup, and post-repair verification.
 - Added automatic benchmark history, detail views, date filtering, two-result comparison, deletion controls, and CSV/JSON export.
 
 ### Improvements
 
-- Added typed Linux To Go image classification at selection time and immediately before erase. The workflow now explicitly validates x64 casper Live layouts and reports missing EFI, kernel, initrd, payload, or patchable-GRUB requirements.
-- Debian Live layouts now use their separate persistence protocol; unsupported
-  distributions can no longer appear selectable for Linux To Go.
 - Expanded the native benchmark protocol with sequential and 4K random reads, mixed read/write scenarios, IOPS, latency percentiles, and cache-behavior analysis while retaining unbuffered, write-through I/O.
 - Added compatibility blockers for unsupported deployment combinations, including Windows 7 VHDX, Windows 7 native VHD outside Enterprise/Ultimate, x86 Windows 7 UEFI, WIMBoot outside direct Windows 8.1 deployment, CompactOS outside Windows 10/11, and virtual disks below 32 GB.
 - Added a dedicated responsive deployment shell and clearer top-level navigation for advanced deployment and disk-management workflows.
-- Made the Windows To Go / Linux To Go mode selector more prominent and placed it directly in the workflow path.
 
 ### Fixes
 
-- Fixed Linux To Go creation failing when a modern Ubuntu ISO contains a squashfs file larger than the FAT32 single-file limit.
-- Replaced the single FAT32 LTG layout with a dedicated FAT32 boot/persistence partition and an NTFS Live-data partition.
-- Added pre-erase validation for the bundled persistence-image helper,
-  patchable casper GRUB entries, FAT32 boot-file limits, and target capacity.
-- Added partition-identity checks and per-file copy verification for both LTG partitions.
 - Added fail-closed physical disk identity checks using serial number, device path, and UniqueId fallbacks, plus per-disk operation locks.
 - Added language-independent partition-layout postconditions before Windows/Linux media deployment continues.
 - Changed Linux ISOHybrid verification from sampled blocks to a full byte-for-byte comparison of the written image.

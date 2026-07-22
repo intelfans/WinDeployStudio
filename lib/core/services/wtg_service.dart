@@ -605,6 +605,7 @@ class WtgService {
         disk: disk,
         plan: source.plan,
         letters: letters,
+        onProgress: onProgress,
       );
       await _requireSafeDisk(disk);
       _throwIfCancelled();
@@ -1382,19 +1383,36 @@ if ($actual.Count -ne 2 -or @($actual | Where-Object { $_ -notin $allowed }).Cou
           '-ExecutionPolicy',
           'Bypass',
           '-Command',
-          r'''$item = Get-Item -LiteralPath $env:WDS_SOURCE_PATH -Force -ErrorAction Stop
-$volume = Get-Volume -FilePath $item.FullName -ErrorAction Stop
-$partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
-if ($partitions.Count -ne 1) {
-  throw "Source path did not resolve to exactly one physical partition."
+          r'''$root = [IO.Path]::GetPathRoot($env:WDS_SOURCE_PATH)
+if ($root -notmatch '^[A-Za-z]:\\$') {
+  throw "Source path is not on a local drive-letter volume."
 }
-[int]$partitions[0].DiskNumber''',
+$deviceId = $root.Substring(0, 2).ToUpperInvariant()
+try {
+  $escaped = $deviceId.Replace("'", "''")
+  $logical = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$escaped'" -ErrorAction Stop
+  $partitions = @(Get-CimAssociatedInstance -InputObject $logical -Association Win32_LogicalDiskToPartition -ErrorAction Stop)
+  $diskNumbers = @($partitions | Select-Object -ExpandProperty DiskIndex -Unique)
+  if ($diskNumbers.Count -eq 1) {
+    [int]$diskNumbers[0]
+    exit 0
+  }
+} catch {
+  # Fall through to the Storage module for unusual volume providers.
+}
+$volume = Get-Volume -DriveLetter $deviceId.Substring(0, 1) -ErrorAction Stop
+$partitions = @(Get-Partition -Volume $volume -ErrorAction Stop)
+$diskNumbers = @($partitions | Select-Object -ExpandProperty DiskNumber -Unique)
+if ($diskNumbers.Count -ne 1) {
+  throw "Source path did not resolve to exactly one physical disk."
+}
+[int]$diskNumbers[0]''',
         ],
         environment: {
           ...Platform.environment,
           'WDS_SOURCE_PATH': p.normalize(p.absolute(path)),
         },
-        timeout: const Duration(seconds: 10),
+        timeout: const Duration(seconds: 30),
       );
       return result.exitCode == 0
           ? int.tryParse(result.stdout.toString().trim())
@@ -1489,6 +1507,7 @@ if ($partitions.Count -ne 1) {
     required DiskInfo disk,
     required DeploymentPlan plan,
     required _WtgDriveLetters letters,
+    WtgProgressCallback? onProgress,
   }) async {
     final requestedLayout = switch (plan.bootMode) {
       DeploymentBootMode.uefiGpt => WtgBootLayout.uefiGpt,
@@ -1513,13 +1532,31 @@ if ($partitions.Count -ne 1) {
         diskpartOutput: failure.output,
       )) {
         _logLine(
-          'WTG GPT partitioning hit a removable-media limitation. '
-          'Automatic UEFI/MBR fallback is disabled to preserve the user-selected layout.',
+          'WTG GPT partitioning hit the confirmed removable-media limitation: '
+          '${failure.detail}',
         );
-        throw _WtgFailure(
-          'wtg_svc_partition_failed',
-          'The target rejected UEFI/GPT. Choose UEFI/MBR manually only if the target firmware is known to support it: ${failure.detail}',
+        _logLine(
+          'Retrying Windows To Go with UEFI/MBR. The retry reinitializes '
+          'the same identity-checked target before creating any partitions.',
         );
+        _notify(
+          onProgress,
+          const WtgProgress(
+            step: WtgStep.partitioningDisk,
+            message: 'wtg_svc_partition_fallback_uefi_mbr',
+            progress: 0.08,
+          ),
+        );
+        try {
+          return await _partitionDiskWithLayout(
+            disk: disk,
+            bootLayout: WtgBootLayout.uefiMbr,
+            letters: letters,
+            storageLabel: storageLabel,
+          );
+        } on _WtgPartitionFailure catch (fallbackFailure) {
+          throw _WtgFailure('wtg_svc_partition_failed', fallbackFailure.detail);
+        }
       }
       throw _WtgFailure('wtg_svc_partition_failed', failure.detail);
     }
@@ -1536,7 +1573,7 @@ if ($partitions.Count -ne 1) {
         ? 'WDS_BOOT'
         : 'WDS_EFI';
     final diskSafety = ref.read(diskSafetyServiceProvider);
-    final currentDisk = await diskSafety.refreshDisk(disk);
+    final currentDisk = await diskSafety.refreshSelectedDisk(disk);
     if (currentDisk == null) {
       throw const _WtgPartitionFailure(
         'Target disk identity changed before partitioning.',
@@ -1553,9 +1590,15 @@ if ($partitions.Count -ne 1) {
         '${_trimOutput(initialization.stdout)}',
       );
     }
-    final initializedDisk = await diskSafety.refreshDisk(currentDisk);
-    if (initializedDisk == null ||
-        initializedDisk.partitionStyle.toUpperCase() != targetStyle) {
+    final initializedDisk = await diskSafety.waitForPartitionStyle(
+      currentDisk,
+      expectedPartitionStyle: targetStyle,
+      onAttempt: (attempt, observedStyle) => _logLine(
+        'WTG initialization verification attempt $attempt/$targetStyle: '
+        'observed=$observedStyle.',
+      ),
+    );
+    if (initializedDisk == null) {
       throw const _WtgPartitionFailure(
         'Target disk initialization could not be verified.',
       );
@@ -1730,9 +1773,8 @@ if ($partitions.Count -ne 1) {
           ? 'create partition efi size=300'
           : 'create partition primary size=350',
       'select partition 1',
-      'assign letter=$bootLetter',
-      'select volume $bootLetter',
       'format fs=${bootLayout == WtgBootLayout.legacyBios ? 'ntfs' : 'fat32'} label="$bootLabel" quick',
+      'assign letter=$bootLetter',
       if (!usesGpt) 'select partition 1',
       if (!usesGpt) 'active',
       'select disk $diskNumber',
@@ -1740,9 +1782,8 @@ if ($partitions.Count -ne 1) {
       if (usesGpt) 'select disk $diskNumber',
       'create partition primary',
       'select partition ${usesGpt ? 3 : 2}',
-      'assign letter=$storageLetter',
-      'select volume $storageLetter',
       'format fs=ntfs label="$storageLabel" quick',
+      'assign letter=$storageLetter',
       'exit',
     ];
     return '${commands.join('\n')}\n';
@@ -2725,6 +2766,7 @@ exit
           totalBytes: effective.totalBytes,
           speedBytesPerSecond: effective.currentSpeedBytes,
           elapsedSeconds: effective.elapsedTime?.inSeconds ?? 0,
+          error: effective.error,
           active:
               effective.step != WtgStep.complete &&
               effective.step != WtgStep.failed,

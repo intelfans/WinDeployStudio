@@ -22,8 +22,8 @@ class WindowsIsoMountService {
   Future<WindowsIsoMountLease?> acquire(
     String isoPath, {
     bool Function()? isCancelled,
-    Duration mountTimeout = const Duration(seconds: 15),
-    Duration volumeTimeout = const Duration(seconds: 25),
+    Duration mountTimeout = const Duration(seconds: 30),
+    Duration volumeTimeout = const Duration(seconds: 45),
     int mountAttempts = 2,
   }) async {
     final source = File(p.normalize(p.absolute(isoPath)));
@@ -156,8 +156,8 @@ class WindowsIsoMountService {
     String isoPath,
     Future<T> Function(String mountPoint) action, {
     bool Function()? isCancelled,
-    Duration mountTimeout = const Duration(seconds: 15),
-    Duration volumeTimeout = const Duration(seconds: 25),
+    Duration mountTimeout = const Duration(seconds: 30),
+    Duration volumeTimeout = const Duration(seconds: 45),
     int mountAttempts = 2,
   }) async {
     final lease = await acquire(
@@ -216,7 +216,7 @@ $letters | ForEach-Object { Write-Output ("WDS_DRIVE:{0}" -f $_) }
 ''',
       ],
       isoPath: isoPath,
-      timeout: const Duration(seconds: 12),
+      timeout: const Duration(seconds: 30),
     );
     if (result == null || result.exitCode != 0) {
       return const _IsoMountState(querySucceeded: false, attached: false);
@@ -249,7 +249,7 @@ $letters | ForEach-Object { Write-Output ("WDS_DRIVE:{0}" -f $_) }
         r'Dismount-DiskImage -ImagePath $env:WDS_ISO -ErrorAction SilentlyContinue | Out-Null',
       ],
       isoPath: isoPath,
-      timeout: const Duration(seconds: 15),
+      timeout: const Duration(seconds: 30),
     );
     if (result == null || result.exitCode != 0) {
       lastDiagnostic = _processDiagnostic(

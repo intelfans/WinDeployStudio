@@ -102,6 +102,7 @@ void main() {
       'linux_iso_not_found',
       'linux_access_denied',
       'linux_write_failed',
+      'linux_verify_failed',
     ];
 
     for (final locale in supportedLocaleCodes) {

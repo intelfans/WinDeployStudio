@@ -269,4 +269,73 @@ void main() {
       expect(initializer, contains("stdout.contains('WDS_DISK_INITIALIZED')"));
     },
   );
+
+  test(
+    'partition-style verification tolerates delayed Storage enumeration',
+    () async {
+      final observations = <String>[];
+      var calls = 0;
+      final initialized = DiskInfo(
+        diskNumber: base.diskNumber,
+        model: base.model,
+        friendlyName: base.friendlyName,
+        sizeBytes: base.sizeBytes,
+        sizeFormatted: base.sizeFormatted,
+        serialNumber: base.serialNumber,
+        uniqueId: base.uniqueId,
+        devicePath: base.devicePath,
+        busType: base.busType,
+        partitionStyle: 'GPT',
+        isRemovable: true,
+      );
+
+      final result = await DiskSafetyService.waitForPartitionStyleWith(
+        snapshot: base,
+        expectedPartitionStyle: 'GPT',
+        maxAttempts: 4,
+        retryDelay: Duration.zero,
+        delay: (_) async {},
+        refresh: (_) async {
+          calls++;
+          if (calls < 3) return null;
+          return initialized;
+        },
+        onAttempt: (_, observed) => observations.add(observed),
+      );
+
+      expect(result?.partitionStyle, 'GPT');
+      expect(calls, 3);
+      expect(observations, ['UNAVAILABLE', 'UNAVAILABLE', 'GPT']);
+    },
+  );
+
+  test('partition-style verification fails after bounded retries', () async {
+    var calls = 0;
+    final result = await DiskSafetyService.waitForPartitionStyleWith(
+      snapshot: base,
+      expectedPartitionStyle: 'GPT',
+      maxAttempts: 3,
+      retryDelay: Duration.zero,
+      delay: (_) async {},
+      refresh: (_) async {
+        calls++;
+        return const DiskInfo(
+          diskNumber: 4,
+          model: 'Portable SSD',
+          friendlyName: 'Portable SSD USB Device',
+          sizeBytes: 1000204886016,
+          sizeFormatted: '931 GB',
+          serialNumber: 'SERIAL-1234',
+          uniqueId: 'USB-UNIQUE-1234',
+          devicePath: r'\\?\PhysicalDrive4',
+          busType: 'USB',
+          partitionStyle: 'RAW',
+          isRemovable: true,
+        );
+      },
+    );
+
+    expect(result, isNull);
+    expect(calls, 3);
+  });
 }

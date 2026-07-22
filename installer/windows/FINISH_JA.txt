@@ -13,8 +13,8 @@ WinDeploy Studio が正常にインストールされました。
 GitHub プロフィール: https://github.com/intelfans
 GitHub リポジトリ: https://github.com/intelfans/WinDeployStudio
 
-第三者ツールに関するお知らせ:
-このリリースには、構造チェックを通過した実験的な x64 Ubuntu/casper、Debian Live/Kali、Deepin Live プロファイル向けに、固定した MIT ライセンスの go-ext4fs ソースから構築した ext4 永続化イメージヘルパー wds_ext4_builder が含まれます。Linux To Go は GPT ターゲットディスクを使用する x64 UEFI システムでのみサポートされ、UEFI+MBR とレガシー BIOS はサポートされません。実機起動と再起動後の永続化の検証が引き続き必要です。ローカルドライブ上の通常のイメージのみを受け付け、対象ディスクの操作前に検証されます。インストール先の THIRD_PARTY_NOTICES.md と tools\ext4-builder\README.md を参照してください。
+機能に関するお知らせ:
+Linux のポータブルワークスペースは将来のリリースで提供予定で、現在は利用できません。Linux インストールメディアの作成は引き続き利用できます。
 
 特別感謝
 

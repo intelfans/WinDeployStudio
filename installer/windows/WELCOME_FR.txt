@@ -15,11 +15,8 @@ Fonctionnalités principales :
   💿 Créateur de support d'installation  
     Créer un support Windows ou écrire une image Linux ISOHybrid amorçable
     
-  🚀 Environnements To Go
-    Créer des environnements Windows portables et des Linux To Go persistants expérimentaux
-    pour les profils x64 Ubuntu/casper, Debian Live/Kali et Deepin Live prévalidés.
-    Linux To Go n'est pris en charge que sur les systèmes UEFI x64 avec des disques cibles GPT ;
-    UEFI+MBR et le BIOS hérité ne sont pas pris en charge ; un démarrage réel et une persistance après redémarrage doivent encore être vérifiés
+  🚀 Environnement Windows To Go
+    Créer un espace de travail Windows portable. Les espaces Linux portables sont prévus pour une future version.
     
   📊 Test natif des disques
     Mesurer l'écriture séquentielle, 4K, multithread et soutenue

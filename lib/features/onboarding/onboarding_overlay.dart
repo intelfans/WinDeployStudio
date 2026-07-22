@@ -1419,9 +1419,9 @@ const _guideEn = <String, _GuideContent>{
     ],
   ),
   'togo-page': _GuideContent(
-    'To Go creates a portable Windows or Linux workspace. WTG and LTG have separate preflight checks for image type, firmware layout, drivers, and the target disk so an unsupported combination is rejected before writing.',
+    'To Go creates a portable Windows workspace. It validates Windows image metadata, firmware layout, supported options, drivers, and the target disk before writing. Linux portable workspaces are planned for a future release; use Linux Installation Media when you need a bootable Linux installer now.',
     [
-      'Switch between WTG and LTG to compare their source and compatibility guidance.',
+      'Select a Windows ISO and review the detected edition and compatibility guidance.',
       'Open advanced options and read the firmware, filesystem, and driver notes without starting a deployment.',
     ],
   ),
@@ -1504,8 +1504,8 @@ const _guideZh = <String, _GuideContent>{
     ['点击镜像区域查看校验和错误提示，再了解如何选择目标设备。', '浏览分区和文件系统选项，导览期间不要执行最后的写入操作。'],
   ),
   'togo-page': _GuideContent(
-    'To Go 用于创建便携式 Windows 或 Linux 工作区。WTG 和 LTG 会分别检查镜像类型、固件布局、驱动和目标磁盘，不符合条件时会在写入前拒绝。',
-    ['切换 WTG 与 LTG，比较它们的镜像和兼容性提示。', '打开高级选项，阅读固件、文件系统和驱动说明，但不要开始制作。'],
+    'To Go 用于创建便携式 Windows 工作区。写入前会检查 Windows 镜像元数据、固件布局、可用选项、驱动和目标磁盘。Linux 便携工作区将在后续版本提供；当前需要 Linux 启动设备时，请使用 Linux 安装盘。',
+    ['选择 Windows ISO，查看识别出的版本和兼容性提示。', '打开高级选项，阅读固件、文件系统和驱动说明，但不要开始制作。'],
   ),
   'benchmark-page': _GuideContent(
     '磁盘测试会以清晰的进度状态测量顺序和随机负载。结果会绑定磁盘身份保存，之后可以比较不同设备，而不是只看一个孤立数字。',
@@ -1559,8 +1559,8 @@ const _guideZhTw = <String, _GuideContent>{
     ['點擊映像區域查看校驗和錯誤提示，再了解如何選擇目標裝置。', '瀏覽分割區和檔案系統選項，導覽期間不要執行最後的寫入操作。'],
   ),
   'togo-page': _GuideContent(
-    'To Go 用於建立可攜式 Windows 或 Linux 工作區。WTG 和 LTG 會分別檢查映像類型、韌體配置、驅動程式和目標磁碟，不符合條件時會在寫入前拒絕。',
-    ['切換 WTG 與 LTG，比較它們的映像和相容性提示。', '開啟進階選項，閱讀韌體、檔案系統和驅動程式說明，但不要開始製作。'],
+    'To Go 用於建立可攜式 Windows 工作空間。寫入前會檢查 Windows 映像中繼資料、韌體配置、可用選項、驅動程式和目標磁碟。Linux 可攜式工作空間將於後續版本提供；目前需要 Linux 開機裝置時，請使用 Linux 安裝碟。',
+    ['選擇 Windows ISO，查看識別出的版本和相容性提示。', '開啟進階選項，閱讀韌體、檔案系統和驅動程式說明，但不要開始製作。'],
   ),
   'benchmark-page': _GuideContent(
     '磁碟測試會以清晰的進度狀態測量順序和隨機負載。結果會繫結磁碟身分保存，之後可以比較不同裝置，而不是只看一個孤立數字。',

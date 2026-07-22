@@ -149,20 +149,6 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
-set(WDS_TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools")
-if(EXISTS "${WDS_TOOLS_DIR}")
-  # Keep the excluded GPL e2fsprogs binary out of the bundle. The separately
-  # vendored MIT-licensed ext4 builder is installed with its pinned source and
-  # notices under tools/ext4-builder.
-  install(CODE "file(REMOVE \"${CMAKE_INSTALL_PREFIX}/tools/e2fsprogs/mke2fs.exe\")"
-    COMPONENT Runtime)
-  install(DIRECTORY "${WDS_TOOLS_DIR}"
-    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-    COMPONENT Runtime
-    REGEX "/e2fsprogs/.*\\.(exe|dll)$" EXCLUDE
-    )
-endif()
-
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

@@ -32,10 +32,7 @@ void main() {
       expect(text, contains('samples=2'));
       expect(text, contains('[CHART SUMMARIES]'));
       expect(text, contains('Sequential read: points=1'));
-      expect(
-        text,
-        contains('Raw samples and chart points are summarized'),
-      );
+      expect(text, contains('Raw samples and chart points are summarized'));
       expect(text, isNot(contains('sample 1:')));
       expect(text, isNot(contains('point 1:')));
       expect(text, isNot(contains('SERIAL-1234')));

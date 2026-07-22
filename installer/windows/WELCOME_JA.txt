@@ -15,11 +15,8 @@ WinDeploy Studio をお選びいただきありがとうございます！
   💿 インストールメディア作成ツール  
     Windows メディアを作成、または起動可能な Linux ISOHybrid を書き込み
     
-  🚀 To Go 環境
-    ポータブル Windows 環境と、構造チェックを通過した x64 Ubuntu/casper、
-    Debian Live/Kali、Deepin Live 向けの実験的な永続化 Linux To Go を作成します。
-    Linux To Go は GPT ターゲットディスクを使用する x64 UEFI システムでのみサポートされ、UEFI+MBR とレガシー BIOS はサポートされません。
-    実機起動と再起動後の永続化の検証が引き続き必要です
+  🚀 Windows To Go 環境
+    ポータブル Windows ワークスペースを作成します。Linux のポータブル環境は将来のリリースで提供予定です。
     
   📊 ネイティブドライブテスト
     シーケンシャル、4K、マルチスレッド、持続書き込みを測定

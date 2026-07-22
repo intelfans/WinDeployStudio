@@ -38,6 +38,28 @@ void main() {
     timer.dispose();
     expect(scheduledTimer.isActive, isFalse);
   });
+
+  test('timer resumes from a persisted elapsed duration', () {
+    var elapsed = 0;
+    late _ManualTimer scheduledTimer;
+    late void Function(Timer) tick;
+    final reported = <int>[];
+    final timer = ToGoExecutionTimer(
+      elapsedSecondsReader: () => elapsed,
+      periodicTimerFactory: (_, callback) {
+        tick = callback;
+        scheduledTimer = _ManualTimer();
+        return scheduledTimer;
+      },
+    );
+
+    timer.start(reported.add, initialElapsedSeconds: 12);
+    elapsed = 3;
+    scheduledTimer.fire(tick);
+
+    expect(reported, <int>[15]);
+    expect(timer.elapsedSeconds, 15);
+  });
 }
 
 class _ManualTimer implements Timer {

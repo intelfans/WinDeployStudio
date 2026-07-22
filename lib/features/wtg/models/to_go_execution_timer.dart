@@ -15,6 +15,7 @@ class ToGoExecutionTimer {
 
   Timer? _ticker;
   int _lastReportedSeconds = 0;
+  int _baseSeconds = 0;
 
   factory ToGoExecutionTimer({
     Stopwatch? stopwatch,
@@ -33,16 +34,21 @@ class ToGoExecutionTimer {
   );
 
   int get elapsedSeconds =>
-      _elapsedSecondsReader?.call() ?? _stopwatch.elapsed.inSeconds;
+      _baseSeconds +
+      (_elapsedSecondsReader?.call() ?? _stopwatch.elapsed.inSeconds);
 
   bool get isRunning => _stopwatch.isRunning;
 
-  void start(void Function(int elapsedSeconds) onTick) {
+  void start(
+    void Function(int elapsedSeconds) onTick, {
+    int initialElapsedSeconds = 0,
+  }) {
     stop();
+    _baseSeconds = initialElapsedSeconds < 0 ? 0 : initialElapsedSeconds;
     _stopwatch
       ..reset()
       ..start();
-    _lastReportedSeconds = 0;
+    _lastReportedSeconds = _baseSeconds;
     _ticker = _periodicTimerFactory(const Duration(seconds: 1), (_) {
       final seconds = elapsedSeconds;
       if (seconds == _lastReportedSeconds) return;
@@ -61,6 +67,7 @@ class ToGoExecutionTimer {
     stop();
     _stopwatch.reset();
     _lastReportedSeconds = 0;
+    _baseSeconds = 0;
   }
 
   void dispose() => reset();
