@@ -1203,6 +1203,11 @@ const _en = <String, String>{
   'ai_error_tls':
       'AI service TLS connection failed. Check system time, trusted certificates, or the AI service endpoint.',
   'ai_error_connection': 'AI service connection failed: {error}',
+  'ai_disabled_by_installer':
+      'Remote AI and web search are disabled by the installer privacy option.',
+  'ai_disabled_title': 'Remote AI is disabled',
+  'ai_disabled_message':
+      'Remote AI and web search were disabled by an installer privacy option. This is not a connection failure and the app will not send AI or search requests. To restore these optional features, run the installer again and clear “Disable optional remote AI and web search.”',
   'settings_edit': 'Edit',
   'settings_save': 'Save',
   'settings_reset_default': 'Reset to Default',
@@ -2071,6 +2076,10 @@ const _zh = <String, String>{
       '无法连接 AI 服务。请检查网络、Windows 网络设置，或在设置中配置可用的 AI 服务端点后重试。',
   'ai_error_tls': 'AI 服务 TLS 连接失败。请检查系统时间、受信任证书或 AI 服务端点。',
   'ai_error_connection': 'AI \u670D\u52A1\u8FDE\u63A5\u5931\u8D25\uFF1A{error}',
+  'ai_disabled_by_installer': '安装时的隐私选项已禁用远程 AI 和联网搜索。',
+  'ai_disabled_title': '远程 AI 已禁用',
+  'ai_disabled_message':
+      '远程 AI 和联网搜索已由安装时的隐私选项禁用。这不是连接故障，应用不会发送 AI 或搜索请求。若要恢复这些可选功能，请重新运行安装程序并取消“禁用可选的远程 AI 和联网搜索”。',
   'settings_edit': '\u7F16\u8F91',
   'settings_save': '\u4FDD\u5B58',
   'settings_reset_default': '\u6062\u590D\u9ED8\u8BA4',
@@ -2907,6 +2916,11 @@ const _ru = <String, String>{
       'TLS-\u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443 \u0441\u0431\u043E\u0439\u043D\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F, \u0441\u0435\u0442\u0435\u0432\u043E\u0439 \u043F\u0440\u043E\u043A\u0441\u0438 \u0438\u043B\u0438 URL AI-\u043F\u0440\u043E\u043A\u0441\u0438.',
   'ai_error_connection':
       '\u0421\u0431\u043E\u0439 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u044F \u043A AI-\u0441\u0435\u0440\u0432\u0438\u0441\u0443: {error}',
+  'ai_disabled_by_installer':
+      'Удалённый AI и веб-поиск отключены параметром конфиденциальности установщика.',
+  'ai_disabled_title': 'Удалённый AI отключён',
+  'ai_disabled_message':
+      'Удалённый AI и веб-поиск отключены параметром конфиденциальности установщика. Это не ошибка подключения: приложение не отправляет запросы к AI или поиску. Чтобы вернуть эти дополнительные функции, снова запустите установщик и снимите параметр отключения удалённого AI и веб-поиска.',
   'settings_edit': '\u0418\u0437\u043C\u0435\u043D\u0438\u0442\u044C',
   'settings_save': '\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C',
   'settings_reset_default': '\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C',
@@ -3815,6 +3829,11 @@ const _fr = <String, String>{
   'ai_error_tls':
       'Echec de la connexion TLS au service IA. Verifiez l heure systeme, les certificats approuves ou le point de terminaison du service IA.',
   'ai_error_connection': 'Echec de connexion au service IA : {error}',
+  'ai_disabled_by_installer':
+      'L’IA distante et la recherche web sont désactivées par l’option de confidentialité de l’installation.',
+  'ai_disabled_title': 'IA distante désactivée',
+  'ai_disabled_message':
+      'L’IA distante et la recherche web ont été désactivées par une option de confidentialité de l’installation. Il ne s’agit pas d’un échec de connexion : l’application n’envoie aucune requête IA ou de recherche. Pour rétablir ces fonctions facultatives, relancez l’installation et désactivez cette option.',
   'settings_edit': 'Modifier',
   'settings_save': 'Enregistrer',
   'settings_reset_default': 'Reinitialiser',
@@ -4698,6 +4717,10 @@ const _ja = <String, String>{
       'AI サービスの TLS 接続に失敗しました。システム時刻、信頼できる証明書、または AI サービスエンドポイントを確認してください。',
   'ai_error_connection':
       'AI \u30B5\u30FC\u30D3\u30B9\u63A5\u7D9A\u5931\u6557\uFF1A{error}',
+  'ai_disabled_by_installer': 'インストーラーのプライバシー設定により、リモート AI とウェブ検索は無効です。',
+  'ai_disabled_title': 'リモート AI は無効です',
+  'ai_disabled_message':
+      'インストーラーのプライバシー設定により、リモート AI とウェブ検索は無効です。接続障害ではなく、アプリは AI または検索リクエストを送信しません。これらのオプション機能を戻すには、インストーラーを再実行して無効化の選択を解除してください。',
   'settings_edit': '\u7DE8\u96C6',
   'settings_save': '\u4FDD\u5B58',
   'settings_reset_default': '\u65E2\u5B9A\u306B\u623B\u3059',
@@ -5507,6 +5530,10 @@ const _zhTW = <String, String>{
       '無法連線 AI 服務。請檢查網路、Windows 網路設定，或在設定中配置可用的 AI 服務端點後重試。',
   'ai_error_tls': 'AI 服務 TLS 連線失敗。請檢查系統時間、受信任憑證或 AI 服務端點。',
   'ai_error_connection': 'AI \u670D\u52D9\u9023\u7DDA\u5931\u6557\uFF1A{error}',
+  'ai_disabled_by_installer': '安裝程式的隱私選項已停用遠端 AI 與網路搜尋。',
+  'ai_disabled_title': '遠端 AI 已停用',
+  'ai_disabled_message':
+      '遠端 AI 與網路搜尋已由安裝程式的隱私選項停用。這不是連線故障，應用程式不會傳送 AI 或搜尋請求。若要恢復這些選用功能，請重新執行安裝程式並取消停用選項。',
   'settings_edit': '\u7DE8\u8F2F',
   'settings_save': '\u5132\u5B58',
   'settings_reset_default': '\u6062\u5FA9\u9810\u8A2D',
@@ -6346,6 +6373,11 @@ const _es = <String, String>{
   'ai_error_tls':
       'Fallo la conexion TLS del servicio de IA. Revisa la hora del sistema, los certificados de confianza o el punto de conexion del servicio de IA.',
   'ai_error_connection': 'Error de conexion del servicio de IA: {error}',
+  'ai_disabled_by_installer':
+      'La IA remota y la búsqueda web están desactivadas por la opción de privacidad del instalador.',
+  'ai_disabled_title': 'La IA remota está desactivada',
+  'ai_disabled_message':
+      'La IA remota y la búsqueda web se desactivaron mediante una opción de privacidad del instalador. No es un fallo de conexión: la aplicación no enviará solicitudes de IA ni de búsqueda. Para restaurar estas funciones opcionales, ejecuta de nuevo el instalador y desmarca la opción de desactivación.',
   'settings_edit': 'Editar',
   'settings_save': 'Guardar',
   'settings_reset_default': 'Restablecer',
@@ -7228,6 +7260,11 @@ const _ar = <String, String>{
   'ai_error_tls':
       'AI service TLS connection failed. Check system time, trusted certificates, or the AI service endpoint.',
   'ai_error_connection': 'AI service connection failed: {error}',
+  'ai_disabled_by_installer':
+      'تم تعطيل الذكاء الاصطناعي عن بُعد والبحث على الويب بواسطة خيار الخصوصية في برنامج التثبيت.',
+  'ai_disabled_title': 'تم تعطيل الذكاء الاصطناعي عن بُعد',
+  'ai_disabled_message':
+      'تم تعطيل الذكاء الاصطناعي عن بُعد والبحث على الويب بواسطة خيار خصوصية في برنامج التثبيت. لا يمثل ذلك فشلًا في الاتصال، ولن يرسل التطبيق طلبات AI أو البحث. لاستعادة هذه الميزات الاختيارية، شغّل برنامج التثبيت مجددًا وأزل خيار التعطيل.',
   'settings_edit': 'Edit',
   'settings_save': 'Save',
   'settings_reset_default': 'Reset to Default',
@@ -8110,6 +8147,11 @@ const _pt = <String, String>{
   'ai_error_tls':
       'Falha na conexao TLS do servico de IA. Verifique a hora do sistema, certificados confiaveis ou o endpoint do servico de IA.',
   'ai_error_connection': 'Falha na conexao do servico de IA: {error}',
+  'ai_disabled_by_installer':
+      'A IA remota e a pesquisa na web foram desativadas pela opção de privacidade do instalador.',
+  'ai_disabled_title': 'IA remota desativada',
+  'ai_disabled_message':
+      'A IA remota e a pesquisa na web foram desativadas por uma opção de privacidade do instalador. Isso não é uma falha de conexão: o aplicativo não enviará solicitações de IA ou pesquisa. Para restaurar esses recursos opcionais, execute o instalador novamente e desmarque a opção de desativação.',
   'settings_edit': 'Editar',
   'settings_save': 'Salvar',
   'settings_reset_default': 'Redefinir',
@@ -9013,6 +9055,11 @@ const _de = <String, String>{
   'ai_error_tls':
       'TLS-Verbindung zum KI-Dienst fehlgeschlagen. Pruefen Sie Systemzeit, vertrauenswuerdige Zertifikate oder den KI-Dienst-Endpunkt.',
   'ai_error_connection': 'Verbindung zum KI-Dienst fehlgeschlagen: {error}',
+  'ai_disabled_by_installer':
+      'Remote-KI und Websuche wurden durch die Datenschutzoption des Installationsprogramms deaktiviert.',
+  'ai_disabled_title': 'Remote-KI ist deaktiviert',
+  'ai_disabled_message':
+      'Remote-KI und Websuche wurden durch eine Datenschutzoption des Installationsprogramms deaktiviert. Dies ist kein Verbindungsfehler: Die Anwendung sendet keine KI- oder Suchanfragen. Um diese optionalen Funktionen wiederherzustellen, starten Sie das Installationsprogramm erneut und heben Sie die Deaktivierungsoption auf.',
   'settings_edit': 'Bearbeiten',
   'settings_save': 'Speichern',
   'settings_reset_default': 'Zuruecksetzen',
@@ -9892,6 +9939,10 @@ const _ko = <String, String>{
       'AI 서비스 TLS 연결에 실패했습니다. 시스템 시간, 신뢰할 수 있는 인증서 또는 AI 서비스 엔드포인트를 확인하세요.',
   'ai_error_connection':
       'AI \uC11C\uBE44\uC2A4 \uC5F0\uACB0 \uC2E4\uD328: {error}',
+  'ai_disabled_by_installer': '설치 프로그램의 개인정보 보호 옵션으로 원격 AI 및 웹 검색이 비활성화되었습니다.',
+  'ai_disabled_title': '원격 AI가 비활성화되었습니다',
+  'ai_disabled_message':
+      '설치 프로그램의 개인정보 보호 옵션으로 원격 AI 및 웹 검색이 비활성화되었습니다. 연결 오류가 아니며, 앱은 AI 또는 검색 요청을 보내지 않습니다. 이 선택 기능을 다시 사용하려면 설치 프로그램을 다시 실행한 뒤 비활성화 옵션을 해제하세요.',
   'settings_edit': '\uD3B8\uC9D1',
   'settings_save': '\uC800\uC7A5',
   'settings_reset_default': '\uAE30\uBCF8\uAC12 \uBCF5\uC6D0',

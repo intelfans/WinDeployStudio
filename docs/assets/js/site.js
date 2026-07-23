@@ -45,12 +45,14 @@
       footer_copy: "面向 Windows 与 Linux 部署工作流的桌面工具。",
       footer_feedback: "反馈",
       footer_privacy: "隐私政策",
+      footer_signing_policy: "代码签名政策",
       footer_license: "MIT License",
       footer_global_mirror: "SourceForge",
       downloads_eyebrow: "应用下载",
       downloads_title: "最新版与更新记录",
       downloads_copy: "更新说明来自 GitHub Releases；SourceForge 提供可选下载源。下载前会展示文件大小和 SHA-256 摘要。",
       downloads_signing_notice: "Windows 发布版二进制文件通过 SignPath Foundation 计划进行代码签名。",
+      code_signing_policy_link: "代码签名政策（Code signing policy）",
       latest_eyebrow: "推荐版本",
       latest_title: "最新稳定版",
       history_eyebrow: "发行历史",
@@ -155,12 +157,14 @@
       footer_copy: "A desktop toolkit for Windows and Linux deployment workflows.",
       footer_feedback: "Feedback",
       footer_privacy: "Privacy Policy",
+      footer_signing_policy: "Code signing policy",
       footer_license: "MIT License",
       footer_global_mirror: "SourceForge",
       downloads_eyebrow: "App downloads",
       downloads_title: "Latest builds and release history",
       downloads_copy: "Release notes come from GitHub Releases, with SourceForge available as an optional download source. File size and SHA-256 are shown before download.",
       downloads_signing_notice: "Windows release binaries are code signed through the SignPath Foundation program.",
+      code_signing_policy_link: "Code signing policy",
       latest_eyebrow: "Recommended build",
       latest_title: "Latest stable release",
       history_eyebrow: "Release history",
@@ -333,6 +337,7 @@
               <a href="https://github.com/intelfans/WinDeployStudio" target="_blank" rel="noreferrer">GitHub</a>
               <a href="https://github.com/intelfans/WinDeployStudio/issues/new" target="_blank" rel="noreferrer" data-i18n="footer_feedback">反馈</a>
               <a href="${root}privacy.html" data-i18n="footer_privacy">隐私政策</a>
+              <a href="${root}code-signing-policy.html" data-i18n="footer_signing_policy">代码签名政策</a>
               <a href="https://sourceforge.net/projects/windeploystudio/" target="_blank" rel="noreferrer" data-i18n="footer_global_mirror">SourceForge</a>
               <a href="https://github.com/intelfans/WinDeployStudio/blob/main/LICENSE" target="_blank" rel="noreferrer" data-i18n="footer_license">MIT License</a>
             </div>

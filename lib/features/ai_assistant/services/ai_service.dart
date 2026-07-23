@@ -593,6 +593,10 @@ class AiService implements AiMessageService {
     SearchMode searchMode = SearchMode.off,
     CancelToken? cancelToken,
   }) async {
+    if (AiConfig.isRemoteAiDisabled()) {
+      onError(trCurrent('ai_disabled_by_installer'));
+      return;
+    }
     final endpointUrl = await AiConfig.getEndpointUrl();
     final chatUrl = AiConfig.chatCompletionsUri(endpointUrl);
     final responsesUrl = AiConfig.responsesUri(endpointUrl);

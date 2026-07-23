@@ -91,6 +91,30 @@ stronger downloads and updates, and complete 11-language coverage.
   download choices, bilingual release notes, SHA-256 and file-size validation,
   Authenticode status checks, and resilient download progress.
 
+## 🔐 Privacy, Trust, And Release Policy
+
+- Added a bilingual privacy policy describing local data, optional AI and
+  diagnostic requests, web search, update checks, and third-party AI endpoints:
+  <https://intelfans.github.io/WinDeployStudio/privacy.html>
+- The Microsoft Store edition has a separate privacy boundary and does not
+  include a remote AI service.
+- Added an installer option to disable optional remote AI and web search. When
+  disabled, the application explains that this is an intentional privacy
+  choice, not a connection failure, and blocks related network requests.
+- Added a bilingual **Code signing policy** page covering source provenance,
+  build rules, release approval, maintainer roles, and the SignPath Foundation
+  program: <https://intelfans.github.io/WinDeployStudio/code-signing-policy.html>
+- Published installer integrity information so downloaded files can be checked
+  before installation.
+
+### Installer Integrity
+
+- File: `WinDeployStudio_Setup_2.1.0.exe`
+- Size: `49.56 MB`
+- SHA-256: `F80A0A2C8C467CD6AFDD6C816C658609D4FBC8031BD43AD2249FC277BCF687DD`
+- This build is currently unsigned. Check the code-signing status before
+  redistribution.
+
 ## 🧭 Experience, Localization, And Safety
 
 - The production App Tour starts on first launch and after an app-version
@@ -193,6 +217,26 @@ stronger downloads and updates, and complete 11-language coverage.
   不会把尚未提供的功能描述为可用。
 - 更新检查使用 GitHub Release 元数据，提供 Global Mirror 与 GitHub 两种下载方式，
   支持中英文更新说明、SHA-256 与文件大小校验、Authenticode 状态检查和可靠进度。
+
+## 🔐 隐私、信任与发布政策
+
+- 新增双语隐私政策，说明本地数据、可选 AI 与诊断请求、联网搜索、更新检查和
+  第三方 AI 服务端点：
+  <https://intelfans.github.io/WinDeployStudio/privacy.html>
+- Microsoft Store 版有独立的隐私边界，不包含远程 AI 服务。
+- 安装程序新增禁用可选远程 AI 和联网搜索的隐私选项。禁用后，应用会明确说明
+  这是用户主动选择的隐私设置，不是连接故障，并阻止相关网络请求。
+- 新增双语《代码签名政策》，说明源码来源、构建规则、发布审批、维护者角色和
+  SignPath Foundation 计划：
+  <https://intelfans.github.io/WinDeployStudio/code-signing-policy.html>
+- 新增安装包完整性信息，方便用户在安装前校验下载文件。
+
+### 安装包完整性
+
+- 文件：`WinDeployStudio_Setup_2.1.0.exe`
+- 大小：`49.56 MB`
+- SHA-256：`F80A0A2C8C467CD6AFDD6C816C658609D4FBC8031BD43AD2249FC277BCF687DD`
+- 当前构建未签名，重新分发前应确认代码签名状态。
 
 ## 🧭 体验、多语言与安全
 

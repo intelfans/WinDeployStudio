@@ -24,6 +24,7 @@ class AiConfig {
   };
 
   static const defaultModel = 'mimo-v2.5-pro';
+  static const remoteAiDisabledMarkerFileName = 'remote-ai-disabled.flag';
   static const maxModelListResponseBytes = 2 * 1024 * 1024;
   static const connectionTimeout = Duration(seconds: 15);
   // Gateways are allowed a little longer to return response headers. This is
@@ -288,6 +289,24 @@ class AiConfig {
     final normalized = normalizeEndpointUrl(endpointUrl);
     return normalized != defaultEndpointUrl &&
         !_isRetiredBuiltInEndpoint(normalized);
+  }
+
+  /// The installer can opt the machine out of all remote AI and web-search
+  /// traffic by placing this marker beside the installed executable.
+  ///
+  /// Keep this check local and synchronous so no network or preferences are
+  /// touched before the opt-out is honored.
+  static bool isRemoteAiDisabled() {
+    try {
+      final executable = File(Platform.resolvedExecutable);
+      final marker = File(
+        '${executable.parent.path}${Platform.pathSeparator}'
+        '$remoteAiDisabledMarkerFileName',
+      );
+      return marker.existsSync();
+    } catch (_) {
+      return false;
+    }
   }
 
   static String normalizeEndpointUrl(String value) {

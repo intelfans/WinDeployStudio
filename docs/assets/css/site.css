@@ -752,6 +752,19 @@ p {
   font-weight: 650;
 }
 
+.page-intro .download-signing-notice a,
+.code-signing-inline a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.code-signing-inline {
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
 .policy-content {
   max-width: var(--narrow-width);
 }

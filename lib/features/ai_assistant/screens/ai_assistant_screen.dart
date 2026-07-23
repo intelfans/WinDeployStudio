@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme.dart';
 import '../../../app/typography.dart';
+import '../../../core/config/ai_config.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/ai_benchmark_strings.dart';
 import '../../../core/localization/strings.dart';
@@ -124,6 +125,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final session = chatState.activeSession;
     final messages = session?.messages ?? [];
+    final remoteAiDisabled = AiConfig.isRemoteAiDisabled();
 
     ref.listen<ChatState>(chatProvider, (prev, next) {
       if (next.activeSession?.messages.length !=
@@ -152,11 +154,17 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                       chatState,
                       colorScheme,
                       compact: compact,
+                      remoteAiDisabled: remoteAiDisabled,
                     ),
                     const Divider(height: 1),
-                    if (_showNotice) _buildAiNotice(context, colorScheme),
+                    if (remoteAiDisabled)
+                      _buildRemoteAiDisabledNotice(context, colorScheme)
+                    else if (_showNotice)
+                      _buildAiNotice(context, colorScheme),
                     Expanded(
-                      child: messages.isEmpty
+                      child: remoteAiDisabled
+                          ? _buildRemoteAiDisabledState(context, colorScheme)
+                          : messages.isEmpty
                           ? Column(
                               children: [
                                 Expanded(
@@ -177,7 +185,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                           : _buildMessageList(messages, colorScheme),
                     ),
                     ChatInput(
-                      enabled: !chatState.isGenerating,
+                      enabled: !remoteAiDisabled && !chatState.isGenerating,
                       onSend: _handleSend,
                     ),
                   ],
@@ -223,11 +231,70 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     );
   }
 
+  Widget _buildRemoteAiDisabledNotice(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 0),
+      child: AppInfoBox(
+        icon: Icons.privacy_tip_outlined,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              tr(context, 'ai_disabled_title'),
+              style: AppTypography.cardTitleWith(colorScheme.onSurface),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              tr(context, 'ai_disabled_message'),
+              style: AppTypography.bodyWith(colorScheme.onSurface),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRemoteAiDisabledState(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: AppInfoBox(
+            icon: Icons.shield_outlined,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr(context, 'ai_disabled_title'),
+                  style: AppTypography.sectionTitleWith(colorScheme.onSurface),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  tr(context, 'ai_disabled_message'),
+                  style: AppTypography.bodyWith(colorScheme.onSurface),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(
     BuildContext context,
     ChatState chatState,
     ColorScheme colorScheme, {
     required bool compact,
+    required bool remoteAiDisabled,
   }) {
     final tokens = AppVisualTokens.of(context);
     return LayoutBuilder(
@@ -258,8 +325,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
+                  decoration: BoxDecoration(
+                    color: remoteAiDisabled
+                        ? colorScheme.onSurfaceVariant
+                        : Colors.green,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -286,6 +355,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
                 chatState.searchMode,
                 colorScheme,
                 compact: compact,
+                enabled: !remoteAiDisabled,
               ),
               if (!veryCompact && chatState.activeSession != null)
                 IconButton(
@@ -312,18 +382,20 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     SearchMode mode,
     ColorScheme colorScheme, {
     required bool compact,
+    required bool enabled,
   }) {
     return PopupMenuButton<SearchMode>(
+      enabled: enabled,
       onSelected: (m) => ref.read(chatProvider.notifier).setSearchMode(m),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: mode != SearchMode.off
+          color: enabled && mode != SearchMode.off
               ? colorScheme.primaryContainer
               : colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: mode != SearchMode.off
+            color: enabled && mode != SearchMode.off
                 ? colorScheme.primary
                 : colorScheme.outlineVariant,
           ),
@@ -334,7 +406,7 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
             Icon(
               Icons.language_rounded,
               size: 16,
-              color: mode != SearchMode.off
+              color: enabled && mode != SearchMode.off
                   ? colorScheme.onPrimaryContainer
                   : colorScheme.onSurfaceVariant,
             ),

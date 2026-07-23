@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="WinDeploy Studio code signing policy." />
+    <meta name="theme-color" content="#f5f5f7" />
+    <title>代码签名政策 - WinDeploy Studio</title>
+    <link rel="icon" href="assets/media/logo.png" />
+    <link rel="stylesheet" href="assets/css/site.css" />
+  </head>
+  <body data-page="signing-policy" data-root="./">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <div id="site-header"></div>
+
+    <main id="main-content">
+      <section class="page-intro section-canvas" aria-labelledby="signing-title">
+        <div class="content-width narrow-content">
+          <p class="eyebrow eyebrow-accent" data-signing-language="zh">发布与信任</p>
+          <p class="eyebrow eyebrow-accent" data-signing-language="en" hidden>Release and trust</p>
+          <h1 id="signing-title" data-signing-language="zh">代码签名政策</h1>
+          <h1 data-signing-language="en" hidden>Code signing policy</h1>
+          <p data-signing-language="zh">WinDeploy Studio 的 Windows 发布包遵循公开源码、可追溯构建和人工发布审批流程。</p>
+          <p data-signing-language="en" hidden>WinDeploy Studio Windows releases follow a public-source, traceable-build, and manual release-approval process.</p>
+        </div>
+      </section>
+
+      <section class="section section-surface" aria-label="Code signing policy">
+        <div class="content-width narrow-content policy-content">
+          <div data-signing-language="zh">
+            <section class="policy-section">
+              <h2>签名服务</h2>
+              <p><strong>免费代码签名由 SignPath.io 提供，证书由 SignPath Foundation 提供。</strong></p>
+              <p>签名证书属于 SignPath Foundation。SignPath Foundation 可以根据其项目条款暂停服务或撤销证书；签名不代表 Microsoft 对本项目提供担保或官方认可。</p>
+            </section>
+            <section class="policy-section">
+              <h2>构建与发布</h2>
+              <p>签名文件必须由 WinDeploy Studio 自有公开源代码和构建脚本生成。发布前会核对版本、源代码、构建产物和 SHA-256；每个发布版本都需要人工批准。</p>
+              <p>本项目不会使用本项目订阅为其他项目的上游二进制文件签名。运行时使用的 Windows 系统组件和未重新分发的系统库不属于本项目签名范围。</p>
+            </section>
+            <section class="policy-section">
+              <h2>团队角色</h2>
+              <p>当前公开仓库由 GitHub 用户 <a href="https://github.com/intelfans" target="_blank" rel="noreferrer">intelfans</a> 维护。角色映射如下：</p>
+              <ul>
+                <li><strong>Authors / Committers：</strong>intelfans，负责维护源代码和构建脚本。</li>
+                <li><strong>Reviewers：</strong>项目维护者负责审阅来自非提交者的变更。</li>
+                <li><strong>Approver：</strong>intelfans，负责在签名请求中确认发布内容。</li>
+              </ul>
+              <p>SignPath 团队权限、GitHub 权限和发布审批权限应保持一致，并启用多因素认证。</p>
+            </section>
+            <section class="policy-section">
+              <h2>用户数据与隐私</h2>
+              <p>标准版的可选 AI、诊断和联网搜索功能只在用户主动使用或确认后发起远程请求。安装程序提供禁用远程 AI 和联网搜索的隐私选项。详情请参阅<a href="privacy.html">隐私政策</a>。</p>
+            </section>
+            <section class="policy-section policy-contact">
+              <h2>发布页面</h2>
+              <p>安装包、更新说明和 SHA-256 信息发布在<a href="downloads/">应用下载页面</a>及公开 GitHub Releases 中。</p>
+            </section>
+          </div>
+
+          <div data-signing-language="en" hidden>
+            <section class="policy-section">
+              <h2>Signing service</h2>
+              <p><strong>Free code signing provided by SignPath.io, certificate by SignPath Foundation.</strong></p>
+              <p>The signing certificate belongs to SignPath Foundation. SignPath Foundation may pause the service or revoke the certificate under its project terms. A signature does not imply endorsement or warranty by Microsoft.</p>
+            </section>
+            <section class="policy-section">
+              <h2>Builds and releases</h2>
+              <p>Signed files must be produced from WinDeploy Studio's own public source code and build scripts. Before release, the version, source, build output, and SHA-256 are checked; every release requires manual approval.</p>
+              <p>This project does not use its subscription to sign upstream binaries from other projects. Windows system components and system libraries that are not redistributed are outside this project's signing scope.</p>
+            </section>
+            <section class="policy-section">
+              <h2>Team roles</h2>
+              <p>The public repository is maintained by GitHub user <a href="https://github.com/intelfans" target="_blank" rel="noreferrer">intelfans</a>. The role mapping is:</p>
+              <ul>
+                <li><strong>Authors / Committers:</strong> intelfans, responsible for source code and build scripts.</li>
+                <li><strong>Reviewers:</strong> project maintainers review changes proposed by non-committers.</li>
+                <li><strong>Approver:</strong> intelfans, responsible for approving signing requests.</li>
+              </ul>
+              <p>SignPath, GitHub, and release-approval permissions should remain aligned, with multi-factor authentication enabled.</p>
+            </section>
+            <section class="policy-section">
+              <h2>User data and privacy</h2>
+              <p>The standard edition's optional AI, diagnostic, and web-search features make remote requests only after the user invokes or confirms them. The installer provides a privacy option to disable remote AI and web search. See the <a href="privacy.html">Privacy Policy</a> for details.</p>
+            </section>
+            <section class="policy-section policy-contact">
+              <h2>Release pages</h2>
+              <p>Installers, release notes, and SHA-256 information are published on the <a href="downloads/">app download page</a> and public GitHub Releases.</p>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="site-footer"></div>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="assets/js/site.js"></script>
+    <script>
+      (() => {
+        const updateSigningLanguage = () => {
+          const language = window.WDS?.getLanguage?.() || "zh";
+          document.querySelectorAll("[data-signing-language]").forEach((section) => {
+            section.hidden = section.dataset.signingLanguage !== language;
+          });
+        };
+        updateSigningLanguage();
+        document.addEventListener("wds:languagechange", updateSigningLanguage);
+      })();
+    </script>
+  </body>
+</html>

@@ -4,10 +4,25 @@ All notable changes to WinDeploy Studio are documented here.
 
 ## v2.1.0
 
-Released: 2026-07-22
+Released: 2026-07-23
 
 This is the first public feature release after v1.1.2 and includes the
 cumulative work completed across the 2.0 development series.
+
+### Privacy, Trust, And Release Policy
+
+- Added a bilingual privacy policy covering the standard edition's optional
+  AI, diagnostic, web-search, update, local-data, and third-party service
+  behavior, with a separate boundary for the Microsoft Store edition.
+- Added an installer privacy option to disable remote AI and web search. The
+  installed application now explains that this is an intentional privacy
+  choice, blocks the related network requests, and describes how to restore
+  the optional features.
+- Added a public bilingual **Code signing policy** page with the SignPath.io
+  service disclosure, SignPath Foundation certificate attribution, source and
+  build provenance rules, release approval flow, and maintainer role mapping.
+- Added policy links from the project homepage, downloads page, installer
+  privacy notice, and application privacy settings.
 
 ### Installation Media
 
