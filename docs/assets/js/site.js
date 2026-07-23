@@ -44,6 +44,7 @@
       download_band_action: "查看下载与更新说明",
       footer_copy: "面向 Windows 与 Linux 部署工作流的桌面工具。",
       footer_feedback: "反馈",
+      footer_privacy: "隐私政策",
       footer_license: "MIT License",
       footer_global_mirror: "SourceForge",
       downloads_eyebrow: "应用下载",
@@ -152,6 +153,7 @@
       download_band_action: "Downloads and release notes",
       footer_copy: "A desktop toolkit for Windows and Linux deployment workflows.",
       footer_feedback: "Feedback",
+      footer_privacy: "Privacy Policy",
       footer_license: "MIT License",
       footer_global_mirror: "SourceForge",
       downloads_eyebrow: "App downloads",
@@ -328,6 +330,7 @@
             <div class="footer-links">
               <a href="https://github.com/intelfans/WinDeployStudio" target="_blank" rel="noreferrer">GitHub</a>
               <a href="https://github.com/intelfans/WinDeployStudio/issues/new" target="_blank" rel="noreferrer" data-i18n="footer_feedback">反馈</a>
+              <a href="${root}privacy.html" data-i18n="footer_privacy">隐私政策</a>
               <a href="https://sourceforge.net/projects/windeploystudio/" target="_blank" rel="noreferrer" data-i18n="footer_global_mirror">SourceForge</a>
               <a href="https://github.com/intelfans/WinDeployStudio/blob/main/LICENSE" target="_blank" rel="noreferrer" data-i18n="footer_license">MIT License</a>
             </div>

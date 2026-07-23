@@ -8,6 +8,8 @@ class AppConstants {
   static const String licenseName = 'MIT License';
   static const String officialWebsite =
       'https://intelfans.github.io/WinDeployStudio/';
+  static const String privacyPolicyUrl =
+      'https://intelfans.github.io/WinDeployStudio/privacy.html';
   static const String githubRepository =
       'https://github.com/intelfans/WinDeployStudio';
   static const String githubFeedbackUrl =

@@ -8,6 +8,25 @@ translations for readers of this project.
 本文说明与源代码和所分发应用有关的第三方项目及许可材料。下方英文许可证
 原文仍为具有约束力的许可证文本；中文内容仅为便于本项目读者理解的说明性翻译。
 
+## Windows system APIs / Windows 系统组件
+
+The image conversion helper uses Windows components that are part of the
+operating system: DISM/WIMGAPI for Windows image metadata and IMAPI2FS for ISO
+file-system mastering. WinDeploy Studio does not redistribute those Microsoft
+system binaries. Their availability and licensing are governed by the Windows
+installation on which the application runs.
+
+镜像格式转换助手使用 Windows 操作系统自带的 DISM/WIMGAPI（读取 Windows
+镜像信息）和 IMAPI2FS（制作 ISO 文件系统）。WinDeploy Studio 不重新分发这些
+Microsoft 系统二进制文件；其可用性与许可由运行应用的 Windows 安装负责。
+
+No GPL image-mastering binary such as `wimlib`, `xorriso`, or `mkisofs` is
+bundled with the application. Linux RAW/IMG/ISOHybrid media is written by the
+existing byte-for-byte media workflow and is not converted by this helper.
+
+应用不捆绑 `wimlib`、`xorriso` 或 `mkisofs` 等 GPL 镜像制作二进制文件。Linux
+RAW/IMG/ISOHybrid 介质由现有的逐字节写盘流程处理，不会交给该转换助手转换。
+
 ## CrystalDiskInfo / CrystalDiskInfo
 
 Portions of the disk diagnostics bridge-compatibility logic were derived from

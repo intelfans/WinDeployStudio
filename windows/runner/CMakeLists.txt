@@ -34,6 +34,18 @@ add_executable(wds_disk_diagnostics_helper
 apply_standard_settings(wds_disk_diagnostics_helper)
 target_compile_definitions(wds_disk_diagnostics_helper PRIVATE "NOMINMAX")
 
+add_executable(wds_iso_builder_helper
+  "../iso_builder_helper/main.cpp"
+)
+apply_standard_settings(wds_iso_builder_helper)
+target_compile_definitions(wds_iso_builder_helper PRIVATE "NOMINMAX")
+target_link_libraries(wds_iso_builder_helper PRIVATE
+  "ole32.lib"
+  "oleaut32.lib"
+  "shlwapi.lib"
+  "uuid.lib"
+)
+
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})

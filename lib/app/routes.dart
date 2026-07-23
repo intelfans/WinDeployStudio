@@ -14,6 +14,7 @@ import '../features/benchmark_history/screens/benchmark_history_screen.dart';
 import '../features/disk_tools/screens/disk_tools_screen.dart';
 import '../features/disk_tools/screens/disk_diagnostics_screen.dart';
 import '../features/disk_tools/screens/boot_repair_screen.dart';
+import '../features/disk_tools/screens/image_converter_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/logs/screens/logs_screen.dart';
 import '../features/ai_assistant/screens/ai_assistant_screen.dart';
@@ -47,13 +48,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/creator',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: CreatorScreen()),
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: CreatorScreen(
+                initialIsoPath: state.uri.queryParameters['iso'],
+              ),
+            ),
           ),
           GoRoute(
             path: '/wtg',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: WtgScreen()),
+            pageBuilder: (context, state) => NoTransitionPage(
+              child: WtgScreen(
+                initialIsoPath: state.uri.queryParameters['iso'],
+              ),
+            ),
           ),
           GoRoute(
             path: '/benchmark',
@@ -81,6 +88,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'boot-repair',
                 pageBuilder: (context, state) =>
                     const NoTransitionPage(child: BootRepairScreen()),
+              ),
+              GoRoute(
+                path: 'image-converter',
+                pageBuilder: (context, state) => NoTransitionPage(
+                  child: ImageConverterScreen(
+                    returnTarget: state.uri.queryParameters['return'],
+                  ),
+                ),
               ),
             ],
           ),

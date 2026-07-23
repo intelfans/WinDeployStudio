@@ -738,6 +738,40 @@ p {
   font-size: 19px;
 }
 
+.policy-content {
+  max-width: var(--narrow-width);
+}
+
+.policy-section {
+  padding: 28px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.policy-section:first-child {
+  padding-top: 0;
+}
+
+.policy-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.policy-section h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+}
+
+.policy-section p:last-child {
+  margin-bottom: 0;
+}
+
+.policy-contact a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 .release-panel,
 .release-record {
   border: 1px solid var(--line);

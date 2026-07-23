@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/localization/strings.dart';
@@ -38,7 +39,9 @@ List<String> availableCreatorDriveLetters({
 }
 
 class CreatorScreen extends ConsumerStatefulWidget {
-  const CreatorScreen({super.key});
+  final String? initialIsoPath;
+
+  const CreatorScreen({super.key, this.initialIsoPath});
 
   @override
   ConsumerState<CreatorScreen> createState() => _CreatorScreenState();
@@ -99,6 +102,12 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     _operationStatusNotifier = ref.read(operationStatusProvider.notifier);
     _restoreInstallMediaActivity();
     _detectDisks();
+    final initialIsoPath = widget.initialIsoPath?.trim();
+    if (initialIsoPath != null && initialIsoPath.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadIsoPath(initialIsoPath));
+      });
+    }
   }
 
   void _restoreInstallMediaActivity() {
@@ -320,20 +329,22 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   }
 
   Future<void> _selectIsoFile() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['iso'],
+      dialogTitle: tr(
+        context,
+        _isLinuxMode ? 'creator_linux_select_iso' : 'creator_select_iso',
+      ),
+    );
+    final path = result?.files.single.path;
+    if (path != null) await _loadIsoPath(path);
+  }
+
+  Future<void> _loadIsoPath(String path) async {
     int? activeSelectionRequest;
     bool? activeLinuxMode;
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['iso'],
-        dialogTitle: tr(
-          context,
-          _isLinuxMode ? 'creator_linux_select_iso' : 'creator_select_iso',
-        ),
-      );
-
-      if (result == null || result.files.single.path == null) return;
-      final path = result.files.single.path!;
       debugPrint('ISO selected: $path');
 
       if (!mounted) return;
@@ -1113,6 +1124,18 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
                 icon: const Icon(Icons.folder_open),
                 label: Text(tr(context, 'creator_select_btn')),
               ),
+              if (!_isLinuxMode) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _creationRunning
+                      ? null
+                      : () => context.go(
+                          '/disk-tools/image-converter?return=creator',
+                        ),
+                  icon: const Icon(Icons.transform_outlined),
+                  label: Text(tr(context, 'creator_convert_other_image')),
+                ),
+              ],
               if (_selectedIso != null && _isoSelectionErrorKey == null) ...[
                 const SizedBox(height: 16),
                 const Divider(),

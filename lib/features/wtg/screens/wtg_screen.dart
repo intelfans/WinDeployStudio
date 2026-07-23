@@ -116,7 +116,9 @@ class _ToGoProgress {
 }
 
 class WtgScreen extends ConsumerStatefulWidget {
-  const WtgScreen({super.key});
+  final String? initialIsoPath;
+
+  const WtgScreen({super.key, this.initialIsoPath});
 
   @override
   ConsumerState<WtgScreen> createState() => _WtgScreenState();
@@ -191,6 +193,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       _startExecutionTimer(initialElapsedSeconds: _elapsedSeconds);
     }
     _loadDisks();
+    final initialIsoPath = widget.initialIsoPath?.trim();
+    if (initialIsoPath != null && initialIsoPath.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_loadIsoPath(initialIsoPath));
+      });
+    }
   }
 
   void _restoreToGoActivity() {
@@ -371,12 +379,26 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       allowedExtensions: const ['iso'],
       dialogTitle: tr(context, 'wtg_select_iso'),
     );
-    if (result == null) return;
-    final pickedFile = result.files.single;
-    final path = pickedFile.path;
-    if (path == null || !mounted) return;
+    final pickedFile = result?.files.single;
+    final path = pickedFile?.path;
+    if (path == null || pickedFile == null || !mounted) return;
+    await _loadIsoPath(
+      path,
+      fileName: pickedFile.name,
+      fileSize: pickedFile.size,
+    );
+  }
+
+  Future<void> _loadIsoPath(
+    String path, {
+    String? fileName,
+    int? fileSize,
+  }) async {
+    if (!mounted) return;
     final locale = Localizations.localeOf(context);
     final messenger = ScaffoldMessenger.of(context);
+    final effectiveFileName = fileName ?? p.basename(path);
+    final effectiveFileSize = fileSize ?? await File(path).length();
     final selectionRequest = ++_isoSelectionRequest;
     final verificationRequest = ++_knownIsoVerificationRequest;
 
@@ -400,8 +422,8 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       if (images.isEmpty) throw StateError('wtg_invalid_windows_iso');
       final iso = _metadataFromWindowsToGoImages(
         path: path,
-        fileName: pickedFile.name,
-        fileSize: pickedFile.size,
+        fileName: effectiveFileName,
+        fileSize: effectiveFileSize,
         images: images,
       );
       setState(() {
@@ -1005,6 +1027,17 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               label: Text(tr(context, 'creator_select_btn')),
             ),
             stackTrailingNarrowly: true,
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: _running
+                  ? null
+                  : () => context.go('/disk-tools/image-converter?return=wtg'),
+              icon: const Icon(Icons.transform_outlined),
+              label: Text(tr(context, 'wtg_convert_other_image')),
+            ),
           ),
           if (_knownIsoVerification != null) ...[
             const SizedBox(height: 12),

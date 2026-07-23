@@ -123,6 +123,9 @@ install(TARGETS wds_wim_info_helper RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}
 install(TARGETS wds_disk_diagnostics_helper RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
+install(TARGETS wds_iso_builder_helper RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
+  COMPONENT Runtime)
+
 if(CMAKE_GENERATOR MATCHES "Ninja" AND
    EXISTS "${WDS_WEBVIEW2_PACKAGE_DIR}/runtimes/win-x64/native/WebView2Loader.dll")
   install(FILES

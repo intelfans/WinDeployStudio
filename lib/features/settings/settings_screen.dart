@@ -464,6 +464,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   _SettingsTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: tr(context, 'privacy_policy_title'),
+                    subtitle: AppConstants.privacyPolicyUrl,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      onPressed: () => _launchUrl(AppConstants.privacyPolicyUrl),
+                    ),
+                  ),
+                  _SettingsTile(
                     icon: Icons.code_outlined,
                     title: tr(context, 'about_github_repository'),
                     subtitle: AppConstants.githubRepository,

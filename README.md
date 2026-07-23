@@ -42,6 +42,26 @@ accepted.
   - Some firmware lists the same Linux USB twice because the image exposes multiple boot paths or the firmware enumerates one device more than once. The two names do not mean two copies were written. For any distribution, choose the entry that opens its normal installer; if one entry opens `grub>`, shows a blank screen, or cannot continue, return to the boot menu and try the similar USB entry. Prefer an entry explicitly marked UEFI when the computer is using UEFI mode.
   - Bind every destructive operation to the selected external disk and revalidate it immediately before writing.
 
+- **Image Format Conversion (Disk Tools)**
+  - Open **Disk Tools > Image format conversion**, or use the shortcut below the
+    ISO selector in Installation Media or Windows To Go.
+  - Convert a complete Windows Setup folder, or replace `install.wim`,
+    `install.esd`, or a matched set of `install*.swm` files in compatible base
+    Windows Setup media. The base ISO/folder must match the image architecture
+    and Windows generation; the original source is never modified.
+  - A VHD/VHDX is mounted read-only and accepted only when it contains a
+    complete Windows Setup layout. Existing ISO files can be used directly and
+    are not wrapped again.
+  - Linux Live USB, ISOHybrid, RAW, IMG, and DD images are intentionally
+    rejected by this converter. Write those images byte-for-byte through Linux
+    Installation Media so their hybrid boot layout is preserved.
+  - The converter creates a new ISO with Windows IMAPI2FS, adds the BIOS and
+    UEFI boot entries found in the source, atomically publishes the output, then
+    mounts it again for layout validation and calculates its SHA-256. A failed
+    or cancelled conversion removes the partial output.
+  - The helper uses Windows DISM/WIMGAPI and IMAPI2FS APIs already provided by
+    Windows; no GPL image-mastering binary is bundled.
+
 - **To Go Workspace Creator**
   - Create portable Windows To Go workspaces.
   - Code-level image recognition and deployment-mode availability follow this matrix for standard compatible images:
@@ -371,6 +391,21 @@ WinDeploy Studio 是一款运行于 Windows 的现代化部署工具，面向 Wi
   - Linux 安装盘为 ISOHybrid 原样逐字节写入：保留镜像自身的分区和启动布局，不会转换 UEFI/MBR/Legacy 启动模式，也不会创建持久化或剩余空间分区。Secure Boot 兼容性取决于镜像签名和目标固件，程序不会推断或保证其可用性。
   - 某些固件会因镜像同时提供多条启动路径，或重复枚举同一个设备，而把同一个 Linux USB 显示为两个名称相近的启动项；这不表示应用写入了两份镜像。该规则不限于某几个发行版：请选择能进入对应发行版正常安装菜单的项目；若某一项进入 `grub>`、黑屏或无法继续，请返回启动菜单尝试另一个同名项目。电脑使用 UEFI 模式时，优先选择明确带有 UEFI 标识的项目。
   - 每次破坏性操作都绑定到用户选择的外接磁盘，并在写入前再次核验。
+
+- **镜像格式转换（磁盘工具）**
+  - 打开“磁盘工具 > 镜像格式转换”，也可以使用安装盘或 Windows To Go
+    ISO 选择区下方的快捷入口。
+  - 支持完整 Windows 安装源文件夹，以及在匹配的 Windows 基础介质中替换
+    `install.wim`、`install.esd` 或成套的 `install*.swm`。基础 ISO/文件夹必须
+    与源镜像的架构和 Windows 代际匹配，原始源文件不会被修改。
+  - VHD/VHDX 只以只读方式挂载，并且仅在包含完整 Windows 安装布局时接受。
+    已经是 ISO 的文件可以直接使用，不会重复封装。
+  - Linux Live USB、ISOHybrid、RAW、IMG 和 DD 镜像会被明确拒绝。请在 Linux
+    安装盘流程中原样写入，以保留其混合启动布局。
+  - 转换器使用 Windows 自带的 IMAPI2FS 创建新的 ISO，保留源中检测到的 BIOS
+    与 UEFI 启动项，原子发布输出文件；随后重新挂载验证布局并计算 SHA-256。
+    转换失败或取消时会删除残留的部分文件。
+  - 内置组件调用 Windows 自带的 DISM/WIMGAPI 与 IMAPI2FS，不捆绑 GPL 镜像制作二进制文件。
 
 - **To Go 工作环境创建工具**
   - 创建便携式 Windows To Go 工作空间。

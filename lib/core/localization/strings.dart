@@ -7,6 +7,7 @@ import 'deployment_strings.dart';
 import 'visual_style_strings.dart';
 import 'ai_benchmark_strings.dart';
 import 'ai_settings_strings.dart';
+import 'image_conversion_strings.dart';
 
 const _prefKey = 'language_code';
 
@@ -154,6 +155,7 @@ Map<String, String> _withDeploymentStrings(
   ...deploymentStringsForCode(code),
   ...debugDialogStringsForCode(code),
   ...aiBenchmarkStringsForCode(code),
+  ...imageConversionStringsForCode(code),
 });
 
 Map<String, String> aiSearchStatusStringsForCode(String code) {
@@ -941,6 +943,7 @@ const _en = <String, String>{
   'settings_built_with': 'Built with:',
   'settings_copyright': '©2026 Bob Steve. Released under the MIT License.',
   'about_official_website': 'Official Website',
+  'privacy_policy_title': 'Privacy Policy',
   'about_github_repository': 'GitHub Repository',
   'sourceforge_repository_title': 'SourceForge Repository',
   'special_thanks_title': 'Special Thanks',
@@ -1827,6 +1830,7 @@ const _zh = <String, String>{
   'settings_built_with': '构建工具：',
   'settings_copyright': '©2026 Bob Steve. 基于 MIT License 发布。',
   'about_official_website': '官方网站',
+  'privacy_policy_title': '隐私政策',
   'about_github_repository': 'GitHub 仓库',
   'sourceforge_repository_title': 'SourceForge 仓库',
   'special_thanks_title': '特别感谢',
@@ -2645,6 +2649,7 @@ const _ru = <String, String>{
   'settings_built_with': 'Создано с помощью:',
   'settings_copyright': '©2026 Bob Steve. Распространяется по лицензии MIT.',
   'about_official_website': 'Официальный сайт',
+  'privacy_policy_title': 'Политика конфиденциальности',
   'about_github_repository': 'Репозиторий GitHub',
   'sourceforge_repository_title': 'Репозиторий SourceForge',
   'special_thanks_title': 'Особая благодарность',
@@ -3546,6 +3551,7 @@ const _fr = <String, String>{
   'settings_built_with': 'Construit avec :',
   'settings_copyright': '©2026 Bob Steve. Distribué sous licence MIT.',
   'about_official_website': 'Site officiel',
+  'privacy_policy_title': 'Politique de confidentialité',
   'about_github_repository': 'Dépôt GitHub',
   'sourceforge_repository_title': 'Dépôt SourceForge',
   'special_thanks_title': 'Remerciements',
@@ -4439,6 +4445,7 @@ const _ja = <String, String>{
   'settings_built_with': '使用ツール：',
   'settings_copyright': '©2026 Bob Steve. MIT License の下で配布されています。',
   'about_official_website': '公式サイト',
+  'privacy_policy_title': 'プライバシーポリシー',
   'about_github_repository': 'GitHub リポジトリ',
   'sourceforge_repository_title': 'SourceForge リポジトリ',
   'special_thanks_title': '特別な感謝',
@@ -5259,6 +5266,7 @@ const _zhTW = <String, String>{
   'settings_built_with': '建構工具：',
   'settings_copyright': '©2026 Bob Steve. 基於 MIT License 發行。',
   'about_official_website': '官方網站',
+  'privacy_policy_title': '隱私權政策',
   'about_github_repository': 'GitHub 儲存庫',
   'sourceforge_repository_title': 'SourceForge 儲存庫',
   'special_thanks_title': '特別感謝',
@@ -6080,6 +6088,7 @@ const _es = <String, String>{
   'settings_built_with': 'Construido con:',
   'settings_copyright': '©2026 Bob Steve. Publicado bajo la licencia MIT.',
   'about_official_website': 'Sitio web oficial',
+  'privacy_policy_title': 'Política de privacidad',
   'about_github_repository': 'Repositorio de GitHub',
   'sourceforge_repository_title': 'Repositorio de SourceForge',
   'special_thanks_title': 'Agradecimientos especiales',
@@ -6967,6 +6976,7 @@ const _ar = <String, String>{
   'settings_built_with': 'بُني بواسطة:',
   'settings_copyright': '©2026 Bob Steve. يُوزَّع بموجب ترخيص MIT.',
   'about_official_website': 'الموقع الرسمي',
+  'privacy_policy_title': 'سياسة الخصوصية',
   'about_github_repository': 'مستودع GitHub',
   'sourceforge_repository_title': 'مستودع SourceForge',
   'special_thanks_title': 'شكر خاص',
@@ -7841,6 +7851,7 @@ const _pt = <String, String>{
   'settings_built_with': 'Construído com:',
   'settings_copyright': '©2026 Bob Steve. Distribuído sob a Licença MIT.',
   'about_official_website': 'Site oficial',
+  'privacy_policy_title': 'Política de privacidade',
   'about_github_repository': 'Repositório GitHub',
   'sourceforge_repository_title': 'Repositório SourceForge',
   'special_thanks_title': 'Agradecimentos especiais',
@@ -8739,6 +8750,7 @@ const _de = <String, String>{
   'settings_built_with': 'Erstellt mit:',
   'settings_copyright': '©2026 Bob Steve. Veröffentlicht unter der MIT-Lizenz.',
   'about_official_website': 'Offizielle Website',
+  'privacy_policy_title': 'Datenschutzerklärung',
   'about_github_repository': 'GitHub-Repository',
   'sourceforge_repository_title': 'SourceForge-Repository',
   'special_thanks_title': 'Besonderer Dank',
@@ -9630,6 +9642,7 @@ const _ko = <String, String>{
   'settings_built_with': '빌드 도구:',
   'settings_copyright': '©2026 Bob Steve. MIT License에 따라 배포됩니다.',
   'about_official_website': '공식 웹사이트',
+  'privacy_policy_title': '개인정보 처리방침',
   'about_github_repository': 'GitHub 저장소',
   'sourceforge_repository_title': 'SourceForge 저장소',
   'special_thanks_title': '특별 감사',

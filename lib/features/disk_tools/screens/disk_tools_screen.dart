@@ -61,6 +61,15 @@ class DiskToolsScreen extends StatelessWidget {
                             onOpen: () => context.go('/disk-tools/boot-repair'),
                           ),
                         ),
+                        SizedBox(
+                          width: width,
+                          child: _ToolEntry(
+                            icon: Icons.transform_outlined,
+                            titleKey: 'disk_tools_converter_title',
+                            descriptionKey: 'disk_tools_converter_desc',
+                            onOpen: () => context.go('/disk-tools/image-converter'),
+                          ),
+                        ),
                       ],
                     );
                   },

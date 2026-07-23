@@ -57,6 +57,13 @@ cumulative work completed across the 2.0 development series.
   controller does not expose data.
 - Added guarded BCD/EFI repair for revalidated external non-system Windows
   disks, including typed confirmation, backup, rollback, and post-repair checks.
+- Added a Windows image-format conversion assistant under Disk Tools. It can
+  rebuild a verified ISO from a complete Setup folder, replace compatible
+  WIM/ESD/SWM install images using matching base media, and read VHD/VHDX
+  sources in read-only mode. Linux Live/ISOHybrid/RAW/IMG/DD images are
+  intentionally rejected and remain on the byte-for-byte installation-media
+  path. The result is remounted, validated, hashed, and available directly to
+  Installation Media or Windows To Go.
 
 ### Home, Images, And Downloads
 
