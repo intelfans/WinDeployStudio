@@ -738,6 +738,20 @@ p {
   font-size: 19px;
 }
 
+.page-intro .download-signing-notice {
+  display: inline-block;
+  max-width: 690px;
+  margin-top: 22px;
+  margin-bottom: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
+
 .policy-content {
   max-width: var(--narrow-width);
 }

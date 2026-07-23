@@ -32,78 +32,92 @@
         <div class="content-width narrow-content policy-content">
           <div data-policy-language="zh">
             <section class="policy-section">
-              <h2>1. 我们收集的信息</h2>
-              <p>WinDeploy Studio（Microsoft Store 版）由 Bob Steve 提供。本应用不要求创建账户，也不会主动收集、上传、出售或共享个人信息。</p>
-              <p>Store 版不包含广告、遥测、行为分析、崩溃上报或远程 AI 服务。应用设置、日志、磁盘测试历史和导出的报告仅保存在用户自己的 Windows 设备上。</p>
-              <p>本地记录可能包含用户主动操作产生的磁盘型号、容量、序列号、接口信息、测试结果、文件路径和时间。除非用户主动导出或分享，这些信息不会离开设备。</p>
+              <h2>1. 适用范围与版本</h2>
+              <p>本政策适用于由 Bob Steve 提供的 WinDeploy Studio 标准版和 Microsoft Store 版。两者均不要求创建账户，不包含广告、行为分析或自动崩溃上报。</p>
+              <p>标准版包含可选的 AI 助手和联网搜索功能；Microsoft Store 版不包含远程 AI 服务。以下内容会明确说明两种版本的差异。</p>
             </section>
             <section class="policy-section">
-              <h2>2. 磁盘操作</h2>
-              <p>应用需要管理员权限才能执行磁盘检测、分区、格式化、安装介质创建和 Windows To Go 等操作。破坏性操作会在应用中提示，并要求用户确认。</p>
-              <p>应用不会自动上传磁盘内容、ISO 内容或个人文件。</p>
+              <h2>2. 本地数据</h2>
+              <p>应用设置、操作日志、聊天记录、磁盘测试历史和导出的报告默认保存在用户自己的 Windows 设备上。本地记录可能包含磁盘型号、容量、序列号、接口信息、测试结果、文件路径、时间和用户输入的内容。</p>
+              <p>应用不会自动上传磁盘内容、ISO 内容或个人文件。除非用户主动使用下述远程功能、导出或分享，这些数据不会离开设备。</p>
             </section>
             <section class="policy-section">
-              <h2>3. 外部网站</h2>
-              <p>当用户主动点击 Microsoft 官方下载页、GitHub 反馈、SourceForge 仓库或其他外部链接时，系统浏览器会打开相应网站。此后产生的数据由对应网站按照其自身隐私政策处理，WinDeploy Studio 不控制这些网站。</p>
+              <h2>3. 标准版的可选 AI 服务</h2>
+              <p>只有在用户主动发送 AI 对话、确认诊断分析或启用联网搜索时，标准版才会向当前配置的 AI 服务端点发送请求。请求通常包含用户消息、为维持对话所需的近期聊天内容、选定模型和应用的固定指令。</p>
+              <p>用户确认“诊断分析”后，应用还可能发送用户同意分析的近期错误日志摘要和已连接可移动磁盘的基本信息。日志或用户消息中可能含有路径、设备信息或其他用户自行输入的内容；提交前请删除不希望提供给服务提供方的信息。</p>
+              <p>用户可以使用内置端点，或在设置中配置兼容的第三方 AI 服务端点。第三方端点由用户自行选择，其数据处理适用该服务提供方的隐私政策和条款。WinDeploy Studio 不出售、出租或将这些请求用于广告画像。</p>
+              <p>自定义端点的 API Key 仅保存在本机，并使用当前 Windows 用户的 DPAPI 保护。内置端点不会接收用户填写的 API Key。</p>
             </section>
             <section class="policy-section">
-              <h2>4. 信息共享</h2>
-              <p>WinDeploy Studio 不会将本地日志、磁盘信息、测试记录或文件内容出售、出租或自动共享给第三方。</p>
+              <h2>4. 联网搜索、更新与外部网站</h2>
+              <p>启用联网搜索时，应用会向 AI 服务提供方或公共搜索服务发送经过简化的公开查询。应用的搜索逻辑会避免将日志、磁盘信息或完整聊天上下文作为搜索关键词；服务提供方仍可能根据其自身政策处理网络请求数据。</p>
+              <p>当用户主动检查更新、查看发布信息、下载文件，或点击 Microsoft、GitHub、SourceForge 及其他外部链接时，应用或系统浏览器会连接相应服务。此后产生的数据由对应网站按照其自身隐私政策处理，WinDeploy Studio 不控制这些网站。</p>
             </section>
             <section class="policy-section">
-              <h2>5. 本地数据保留与删除</h2>
-              <p>应用日志和测试历史保存在本地应用数据目录中。日志会按应用设置自动清理；用户也可以在应用中删除测试记录和日志，或通过 Windows 删除应用数据。</p>
-              <p>卸载应用不会保证自动删除用户主动生成的导出文件。</p>
+              <h2>5. Microsoft Store 版</h2>
+              <p>Microsoft Store 版不提供远程 AI 服务、用户配置的 AI 端点或联网搜索。其应用设置、日志、磁盘测试历史和导出的报告仅保存在本地；只有用户主动打开外部链接或下载页面时，才会连接相应网站。</p>
             </section>
             <section class="policy-section">
-              <h2>6. 安全</h2>
-              <p>应用使用 Windows 文件权限和管理员权限机制保护本地数据。用户应避免将包含磁盘序列号、路径或测试信息的报告公开分享。</p>
+              <h2>6. 磁盘操作</h2>
+              <p>应用需要管理员权限才能执行磁盘检测、分区、格式化、安装介质创建和 Windows To Go 等操作。破坏性操作会在应用中提示，并要求用户确认。管理员权限用于本机操作，不会因此自动传输数据。</p>
             </section>
             <section class="policy-section">
-              <h2>7. 政策变更</h2>
+              <h2>7. 保留、删除与安全</h2>
+              <p>应用日志会按应用设置自动清理。用户可以在应用中删除聊天记录、测试记录和日志，也可以通过 Windows 删除应用数据。卸载应用不会保证删除用户主动导出的文件。</p>
+              <p>应用依赖 Windows 文件权限、管理员控制和 DPAPI 保护本地数据。请避免公开分享包含 API Key、密码、磁盘序列号、路径或测试信息的日志和报告。</p>
+            </section>
+            <section class="policy-section">
+              <h2>8. 政策变更</h2>
               <p>如果应用的数据处理方式发生变化，我们会更新本页面的生效日期和内容。</p>
             </section>
             <section class="policy-section policy-contact">
-              <h2>8. 联系方式</h2>
-              <p>如需反馈，请访问 <a href="https://github.com/intelfans/WinDeployStudio/issues" target="_blank" rel="noreferrer">GitHub Issues</a>。请不要在公开 Issue 中提交 API 密钥、密码、序列号或其他敏感信息。</p>
+              <h2>9. 联系方式</h2>
+              <p>如需反馈，请访问 <a href="https://github.com/intelfans/WinDeployStudio/issues" target="_blank" rel="noreferrer">GitHub Issues</a>。请不要在公开 Issue 中提交 API Key、密码、序列号或其他敏感信息。</p>
             </section>
           </div>
 
           <div data-policy-language="en" hidden>
             <section class="policy-section">
-              <h2>1. Information we collect</h2>
-              <p>WinDeploy Studio (Microsoft Store edition) is provided by Bob Steve. The application does not require an account and does not actively collect, upload, sell, or share personal information.</p>
-              <p>The Store edition contains no advertising, telemetry, analytics, crash reporting, or remote AI service. Application settings, logs, disk benchmark history, and exported reports are stored locally on the user's Windows device.</p>
-              <p>Local records may contain disk model, capacity, serial number, interface information, benchmark results, file paths, and timestamps created by the user's actions. These records do not leave the device unless the user explicitly exports or shares them.</p>
+              <h2>1. Scope and editions</h2>
+              <p>This policy applies to the standard and Microsoft Store editions of WinDeploy Studio, provided by Bob Steve. Neither edition requires an account or includes advertising, behavioral analytics, or automatic crash reporting.</p>
+              <p>The standard edition includes optional AI Assistant and web-search features. The Microsoft Store edition does not include a remote AI service. The sections below explain the difference.</p>
             </section>
             <section class="policy-section">
-              <h2>2. Disk operations</h2>
-              <p>The application requires administrator permission for disk inspection, partitioning, formatting, installation-media creation, and Windows To Go operations. Destructive operations are explained in the application and require user confirmation.</p>
-              <p>The application does not automatically upload disk contents, ISO contents, or personal files.</p>
+              <h2>2. Local data</h2>
+              <p>Application settings, operation logs, chat history, disk benchmark history, and exported reports are stored on the user's Windows device by default. Local records can include disk model, capacity, serial number, interface information, benchmark results, file paths, timestamps, and user-provided content.</p>
+              <p>The application does not automatically upload disk contents, ISO contents, or personal files. This data does not leave the device unless the user uses an optional remote feature described below, exports it, or shares it.</p>
             </section>
             <section class="policy-section">
-              <h2>3. External websites</h2>
-              <p>When the user opens a Microsoft download page, GitHub feedback page, SourceForge repository, or another external link, the system browser opens that website. The website then processes information under its own privacy policy; WinDeploy Studio does not control those websites.</p>
+              <h2>3. Optional AI service in the standard edition</h2>
+              <p>The standard edition sends a request to the currently configured AI endpoint only when the user sends an AI message, confirms diagnostic analysis, or enables web search. Requests normally contain the user's message, recent chat content needed to preserve the conversation, the selected model, and fixed application instructions.</p>
+              <p>After the user confirms diagnostic analysis, the application can also send the approved summary of recent error logs and basic information about connected removable disks. Logs or user messages may contain paths, device details, or other user-provided information. Remove information you do not want to provide to the service before submitting it.</p>
+              <p>Users may use the built-in endpoint or configure a compatible third-party AI endpoint in Settings. A third-party endpoint is chosen by the user and processes data under that provider's own privacy policy and terms. WinDeploy Studio does not sell, rent, or use these requests for advertising profiles.</p>
+              <p>API keys for custom endpoints are stored only on the local device and protected with the current Windows user's DPAPI. The built-in endpoint does not receive an API key entered by the user.</p>
             </section>
             <section class="policy-section">
-              <h2>4. Sharing</h2>
-              <p>WinDeploy Studio does not sell, rent, or automatically share local logs, disk information, benchmark records, or file contents with third parties.</p>
+              <h2>4. Web search, updates, and external websites</h2>
+              <p>When web search is enabled, the application sends a simplified public query to the AI provider or public search services. Its search logic avoids using logs, disk details, or complete chat context as search terms; the relevant provider can still process network-request data under its own policy.</p>
+              <p>When the user checks for updates, views release information, downloads a file, or opens a Microsoft, GitHub, SourceForge, or other external link, the application or system browser connects to the relevant service. That service then processes information under its own privacy policy; WinDeploy Studio does not control those services.</p>
             </section>
             <section class="policy-section">
-              <h2>5. Local retention and deletion</h2>
-              <p>Application logs and benchmark history are stored in the local application-data directory. Logs are cleaned according to the application settings. Users can delete benchmark records and logs in the application or remove the application data through Windows.</p>
-              <p>Uninstalling the application does not guarantee removal of files that the user explicitly exported.</p>
+              <h2>5. Microsoft Store edition</h2>
+              <p>The Microsoft Store edition does not offer a remote AI service, user-configured AI endpoints, or web search. Its settings, logs, disk benchmark history, and exported reports remain local; it connects to external websites only when the user deliberately opens an external link or download page.</p>
             </section>
             <section class="policy-section">
-              <h2>6. Security</h2>
-              <p>The application relies on Windows file permissions and administrator controls to protect local data. Avoid publicly sharing reports that contain disk serial numbers, paths, or benchmark details.</p>
+              <h2>6. Disk operations</h2>
+              <p>The application requires administrator permission for disk inspection, partitioning, formatting, installation-media creation, and Windows To Go operations. Destructive operations are explained in the application and require confirmation. Administrator permission is used for local operations and does not itself transmit data.</p>
             </section>
             <section class="policy-section">
-              <h2>7. Changes to this policy</h2>
+              <h2>7. Retention, deletion, and security</h2>
+              <p>Application logs are cleaned according to application settings. Users can delete chat history, benchmark records, and logs in the application, or remove application data through Windows. Uninstalling the application does not guarantee removal of files that the user explicitly exported.</p>
+              <p>The application relies on Windows file permissions, administrator controls, and DPAPI to protect local data. Do not publicly share logs or reports containing API keys, passwords, disk serial numbers, paths, or benchmark information.</p>
+            </section>
+            <section class="policy-section">
+              <h2>8. Changes to this policy</h2>
               <p>If the application's data practices change, we will update this page and its effective date.</p>
             </section>
             <section class="policy-section policy-contact">
-              <h2>8. Contact</h2>
+              <h2>9. Contact</h2>
               <p>For feedback, visit <a href="https://github.com/intelfans/WinDeployStudio/issues" target="_blank" rel="noreferrer">GitHub Issues</a>. Do not post API keys, passwords, serial numbers, or other sensitive information in public issues.</p>
             </section>
           </div>
