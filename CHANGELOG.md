@@ -18,11 +18,8 @@ cumulative work completed across the 2.0 development series.
   installed application now explains that this is an intentional privacy
   choice, blocks the related network requests, and describes how to restore
   the optional features.
-- Added a public bilingual **Code signing policy** page with the SignPath.io
-  service disclosure, SignPath Foundation certificate attribution, source and
-  build provenance rules, release approval flow, and maintainer role mapping.
-- Added policy links from the project homepage, downloads page, installer
-  privacy notice, and application privacy settings.
+- Added privacy-policy links from the project website, installer privacy
+  notice, and application privacy settings.
 
 ### Installation Media
 

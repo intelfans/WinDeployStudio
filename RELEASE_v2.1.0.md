@@ -101,9 +101,6 @@ stronger downloads and updates, and complete 11-language coverage.
 - Added an installer option to disable optional remote AI and web search. When
   disabled, the application explains that this is an intentional privacy
   choice, not a connection failure, and blocks related network requests.
-- Added a bilingual **Code signing policy** page covering source provenance,
-  build rules, release approval, maintainer roles, and the SignPath Foundation
-  program: <https://intelfans.github.io/WinDeployStudio/code-signing-policy.html>
 - Published installer integrity information so downloaded files can be checked
   before installation.
 
@@ -112,8 +109,6 @@ stronger downloads and updates, and complete 11-language coverage.
 - File: `WinDeployStudio_Setup_2.1.0.exe`
 - Size: `49.56 MB`
 - SHA-256: `F80A0A2C8C467CD6AFDD6C816C658609D4FBC8031BD43AD2249FC277BCF687DD`
-- This build is currently unsigned. Check the code-signing status before
-  redistribution.
 
 ## 🧭 Experience, Localization, And Safety
 
@@ -226,9 +221,6 @@ stronger downloads and updates, and complete 11-language coverage.
 - Microsoft Store 版有独立的隐私边界，不包含远程 AI 服务。
 - 安装程序新增禁用可选远程 AI 和联网搜索的隐私选项。禁用后，应用会明确说明
   这是用户主动选择的隐私设置，不是连接故障，并阻止相关网络请求。
-- 新增双语《代码签名政策》，说明源码来源、构建规则、发布审批、维护者角色和
-  SignPath Foundation 计划：
-  <https://intelfans.github.io/WinDeployStudio/code-signing-policy.html>
 - 新增安装包完整性信息，方便用户在安装前校验下载文件。
 
 ### 安装包完整性
@@ -236,7 +228,6 @@ stronger downloads and updates, and complete 11-language coverage.
 - 文件：`WinDeployStudio_Setup_2.1.0.exe`
 - 大小：`49.56 MB`
 - SHA-256：`F80A0A2C8C467CD6AFDD6C816C658609D4FBC8031BD43AD2249FC277BCF687DD`
-- 当前构建未签名，重新分发前应确认代码签名状态。
 
 ## 🧭 体验、多语言与安全
 
