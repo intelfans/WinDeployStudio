@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -374,6 +375,93 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       final isoService = ref.read(isoParseServiceProvider);
       IsoMetadata? metadata;
 
+      if (selectedLinuxMode) {
+        final inspectionCancellation =
+            LinuxIsoHybridInspectionCancellationToken();
+        _linuxInspectionCancellation = inspectionCancellation;
+        setState(() {
+          // Keep the existing cancellable progress surface visible while the
+          // Linux ISOHybrid structure is inspected. This inspection only reads
+          // bounded portions of the image, but may still wait on slow media.
+          _parseStepText = tr(context, 'creator_parsing');
+          _parsePercent = 100;
+        });
+        final linuxInspection =
+            await LinuxIsoHybridInspector.inspect(
+              path,
+              cancellationToken: inspectionCancellation,
+            ).timeout(
+              const Duration(seconds: 30),
+              onTimeout: () {
+                inspectionCancellation.cancel();
+                return const LinuxIsoHybridInspection.failure(
+                  'ISOHybrid structure inspection timed out.',
+                );
+              },
+            );
+        if (identical(_linuxInspectionCancellation, inspectionCancellation)) {
+          _linuxInspectionCancellation = null;
+        }
+        if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
+          return;
+        }
+        if (linuxInspection.wasCancelled) return;
+        debugPrint(
+          'Linux ISOHybrid inspection: valid=${linuxInspection.isValid}, '
+          'error=${linuxInspection.error}',
+        );
+        if (linuxInspection.isValid) {
+          final file = File(path);
+          final fileName = path.split(RegExp(r'[\\/]+')).last;
+          final fileSize = await file.length();
+          if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
+            return;
+          }
+          final linuxMetadata = IsoMetadata(
+            filePath: path,
+            fileName: fileName,
+            fileSize: fileSize,
+            windowsVersion: 'Linux ISOHybrid',
+          );
+          setState(() {
+            _isParsing = false;
+            _selectedIso = linuxMetadata;
+            _linuxIsoInspection = linuxInspection;
+            _currentStep = 1;
+            _isoSelectionErrorKey = null;
+          });
+          unawaited(_detectDisks());
+          final logCenter = LogCenterService();
+          await logCenter.logIso(
+            'Linux ISO 已选择 | 文件: ${linuxMetadata.fileName} | 大小: ${linuxMetadata.displaySize}',
+          );
+          if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
+            return;
+          }
+          unawaited(
+            _verifyKnownIso(
+              linuxMetadata.filePath,
+              verificationRequest,
+              selectedLocale,
+            ),
+          );
+          return;
+        }
+
+        // A valid Linux image never needs a Windows mount. Only inspect a
+        // failed candidate with the Windows parser when it plausibly is a
+        // Windows ISO (or cannot be read at all), so an ordinary Linux image
+        // is not held behind Mount-DiskImage and WIM metadata timeouts.
+        if (!_shouldCheckFailedLinuxCandidateAsWindows(path, linuxInspection)) {
+          debugPrint(
+            'Linux ISOHybrid inspection rejected $path: '
+            '${linuxInspection.error}',
+          );
+          _showIsoSelectionError('linux_not_isohybrid');
+          return;
+        }
+      }
+
       try {
         metadata = await isoService
             .parseIso(
@@ -409,9 +497,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
               },
             )
             .timeout(
-              selectedLinuxMode
-                  ? const Duration(seconds: 60)
-                  : const Duration(seconds: 120),
+              const Duration(seconds: 120),
               onTimeout: () async {
                 debugPrint('ISO parse overall timeout');
                 if (_isCurrentIsoSelection(
@@ -441,75 +527,14 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       }
 
       if (selectedLinuxMode) {
-        if (metadata.isValidWindowsIso) {
-          _showIsoSelectionError('creator_windows_iso_in_linux_mode');
-          return;
-        }
-        final inspectionCancellation =
-            LinuxIsoHybridInspectionCancellationToken();
-        _linuxInspectionCancellation = inspectionCancellation;
-        setState(() {
-          // Keep the existing cancellable progress surface visible while the
-          // Linux ISOHybrid structure is inspected. This inspection only reads
-          // bounded portions of the image, but may still wait on slow media.
-          _parseStepText = tr(context, 'creator_parsing');
-          _parsePercent = 100;
-        });
-        final linuxInspection =
-            await LinuxIsoHybridInspector.inspect(
-              path,
-              cancellationToken: inspectionCancellation,
-            ).timeout(
-              const Duration(seconds: 30),
-              onTimeout: () {
-                inspectionCancellation.cancel();
-                return const LinuxIsoHybridInspection.failure(
-                  'ISOHybrid structure inspection timed out.',
-                );
-              },
-            );
-        if (identical(_linuxInspectionCancellation, inspectionCancellation)) {
-          _linuxInspectionCancellation = null;
-        }
-        if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
-          return;
-        }
-        setState(() => _isParsing = false);
-        if (linuxInspection.wasCancelled) return;
-        if (!linuxInspection.isValid) {
-          debugPrint(
-            'Linux ISOHybrid inspection rejected $path: '
-            '${linuxInspection.error}',
-          );
-          _showIsoSelectionError('linux_not_isohybrid');
-          return;
-        }
-        final linuxMetadata = IsoMetadata(
-          filePath: metadata.filePath,
-          fileName: metadata.fileName,
-          fileSize: metadata.fileSize,
-          windowsVersion: 'Linux ISOHybrid',
+        debugPrint(
+          'Linux ISO fallback Windows inspection: '
+          'validWindows=${metadata.isValidWindowsIso}',
         );
-        setState(() {
-          _selectedIso = linuxMetadata;
-          _linuxIsoInspection = linuxInspection;
-          _currentStep = 1;
-          _isoSelectionErrorKey = null;
-        });
-        unawaited(_detectDisks());
-        final logCenter = LogCenterService();
-        await logCenter.logIso(
-          'Linux ISO 已选择 | 文件: ${linuxMetadata.fileName} | 大小: ${linuxMetadata.displaySize}',
-        );
-        if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
-          return;
-        }
-        unawaited(
-          _verifyKnownIso(
-            linuxMetadata.filePath,
-            verificationRequest,
-            selectedLocale,
-          ),
+        _showIsoSelectionError(
+          metadata.isValidWindowsIso
+              ? 'creator_windows_iso_in_linux_mode'
+              : 'linux_not_isohybrid',
         );
         return;
       }
@@ -557,6 +582,19 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
     return mounted &&
         request == _isoSelectionRequest &&
         _isLinuxMode == isLinuxMode;
+  }
+
+  bool _shouldCheckFailedLinuxCandidateAsWindows(
+    String path,
+    LinuxIsoHybridInspection inspection,
+  ) {
+    final normalizedName = path.split(RegExp(r'[\\/]+')).last.toLowerCase();
+    if (RegExp(r'(^|[^a-z])(win(dows)?|server|tiny10|tiny11)([^a-z]|$)')
+        .hasMatch(normalizedName)) {
+      return true;
+    }
+    return inspection.error == 'ISOHybrid image does not exist.' ||
+        inspection.error == 'ISOHybrid source must be a regular file.';
   }
 
   DeploymentBootMode _preferredBootModeForIso(IsoMetadata iso) {

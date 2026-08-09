@@ -81,6 +81,7 @@ void main() {
     await tester.tap(find.text(trByCode('zh', 'creator_platform_linux')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(trByCode('zh', 'creator_select_btn')));
+    await _waitForFileInspection(tester);
     await tester.pumpAndSettle();
 
     expect(
@@ -109,6 +110,7 @@ void main() {
     );
 
     await tester.tap(find.text(trByCode('zh', 'creator_select_btn')));
+    await _waitForFileInspection(tester);
     await tester.pumpAndSettle();
 
     expect(find.text(trByCode('zh', 'creator_parse_error')), findsOneWidget);
@@ -265,6 +267,12 @@ Future<void> _pumpCreator(
   );
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 100));
+}
+
+Future<void> _waitForFileInspection(WidgetTester tester) {
+  return tester.runAsync(
+    () => Future<void>.delayed(const Duration(milliseconds: 50)),
+  );
 }
 
 class _NoDisksService extends DiskSafetyService {
