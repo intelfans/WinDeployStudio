@@ -33,7 +33,6 @@ class ChatState {
     return sessions.where((s) => s.id == activeSessionId).firstOrNull;
   }
 
-  bool get canSend => !isGenerating;
 
   ChatState copyWith({
     List<ChatSession>? sessions,
@@ -56,6 +55,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final AiMessageService _aiService;
   final bool persistHistory;
   CancelToken? _cancelToken;
+
+  /// Supplied by the chat screen so a search query can be shown to the user
+  /// immediately before it leaves the device. Left null in tests and in any
+  /// headless use, where the search proceeds as before.
+  SearchConfirmationCallback? _searchConfirmation;
+
   _ChatGeneration? _activeGeneration;
   int _generationRequest = 0;
   bool _disposed = false;
@@ -239,6 +244,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(searchMode: mode);
   }
 
+  /// Registers or clears the confirmation shown before a web search is sent.
+  void setSearchConfirmation(SearchConfirmationCallback? callback) {
+    _searchConfirmation = callback;
+  }
+
   Future<void> sendMessage(
     String content, {
     String? systemPrompt,
@@ -307,6 +317,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         messages: apiMessages,
         cancelToken: cancelToken,
         searchMode: selectedSearchMode,
+        confirmSearch: _searchConfirmation,
         onChunk: (chunk) {
           if (!_isCurrentGeneration(generation)) return;
           generation.buffer += chunk;

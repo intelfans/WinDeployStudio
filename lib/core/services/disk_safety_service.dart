@@ -382,8 +382,39 @@ final diskSafetyServiceProvider = Provider<DiskSafetyService>((ref) {
   return DiskSafetyService();
 });
 
+/// Runs an external command and collects its output.
+///
+/// Injecting this is what makes the destructive path testable: the production
+/// implementation starts a real process, while a test can replay a recorded
+/// PowerShell/helper transcript and assert what the service does with it.
+typedef DiskSafetyProcessRunner =
+    Future<ProcessResult> Function(
+      String executable,
+      List<String> arguments, {
+      required Map<String, String> environment,
+      required Duration timeout,
+      required String timeoutMessage,
+    });
+
 class DiskSafetyService {
   static const _nativeDiskHelperName = 'wds_disk_diagnostics_helper.exe';
+
+  final DiskSafetyProcessRunner _processRunner;
+
+  DiskSafetyService({DiskSafetyProcessRunner? processRunner})
+    : _processRunner =
+          processRunner ??
+          ((executable, arguments, {
+            required Map<String, String> environment,
+            required Duration timeout,
+            required String timeoutMessage,
+          }) => _runManagedProcess(
+            executable,
+            arguments,
+            environment: environment,
+            timeout: timeout,
+            timeoutMessage: timeoutMessage,
+          ));
   Process? _driveLetterEnumerationProcess;
   Timer? _driveLetterEnumerationTimeout;
   Completer<ProcessResult>? _driveLetterEnumerationCompleter;
@@ -879,7 +910,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
           FileSystemEntityType.link) {
         return ProcessResult(0, -1, '', 'Secure script storage is a link.');
       }
-      final acl = await _runProcessWithTimeout(
+      final acl = await _processRunner(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -941,7 +972,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
     });
 
     try {
-      return await _runProcessWithTimeout(
+      return await _processRunner(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -993,7 +1024,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
       'WDS_PARTITION_STYLE': targetStyle,
     });
     try {
-      final result = await _runProcessWithTimeout(
+      final result = await _processRunner(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -1115,7 +1146,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
   Future<List<DiskInfo>> _queryAllDisks() async {
     late final ProcessResult result;
     try {
-      result = await _runProcessWithTimeout(
+      result = await _processRunner(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -1163,7 +1194,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
 
     late final ProcessResult result;
     try {
-      result = await _runProcessWithTimeout(
+      result = await _processRunner(
         nativeHelper.path,
         const ['--inventory'],
         environment: WindowsSystemEnvironment.withSystemRoot(),
@@ -1216,6 +1247,18 @@ Write-Output 'WDS_DISK_INITIALIZED'
     }
 
     final driveLetters = _parseDriveLetters(data['driveLetters']);
+    // Fail closed on the *system* flag: Get-Disk reports it reliably, so a
+    // missing value means the disk could not be classified and must not be
+    // treated as a safe external target.
+    //
+    // The boot flag is deliberately not treated the same way. Get-Disk returns
+    // IsBoot = null for ordinary removable media (observed on a USB stick:
+    // isSystem = false, isBoot = null), so defaulting it to true would reject
+    // every USB disk and make media creation impossible. Every real boot disk
+    // is also the system disk, which the fail-closed system flag already
+    // catches, so the boot check remains an extra signal rather than the gate.
+    final systemFlag = _readNullableBool(data['isSystem']);
+    final bootFlag = _readNullableBool(data['isBoot']);
     return DiskInfo(
       diskNumber: diskNumber,
       model: model,
@@ -1227,8 +1270,8 @@ Write-Output 'WDS_DISK_INITIALIZED'
       devicePath: data['devicePath']?.toString() ?? '',
       busType: busType,
       partitionStyle: data['partitionStyle']?.toString() ?? 'Unknown',
-      isSystem: _readNullableBool(data['isSystem']) ?? false,
-      isBoot: _readNullableBool(data['isBoot']) ?? false,
+      isSystem: systemFlag ?? true,
+      isBoot: bootFlag ?? false,
       isOffline: _readNullableBool(data['isOffline']) ?? false,
       isRemovable:
           _readNullableBool(data['isRemovable']) ??
@@ -1243,7 +1286,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
   ) async {
     late final ProcessResult result;
     try {
-      result = await _runProcessWithTimeout(
+      result = await _processRunner(
         helperPath,
         ['--identity', '${snapshot.diskNumber}'],
         environment: WindowsSystemEnvironment.withSystemRoot({
@@ -1315,7 +1358,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
   Future<DiskInfo> _queryDiskByNumberWithPowerShell(int diskNumber) async {
     late final ProcessResult result;
     try {
-      result = await _runProcessWithTimeout(
+      result = await _processRunner(
         WindowsSystemEnvironment.powerShellExecutable,
         const [
           '-NoProfile',
@@ -1357,7 +1400,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
     return 'i18n:safety_detail_storage_unavailable';
   }
 
-  Future<ProcessResult> _runProcessWithTimeout(
+  static Future<ProcessResult> _runManagedProcess(
     String executable,
     List<String> arguments, {
     required Map<String, String> environment,
@@ -1398,7 +1441,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
     }
   }
 
-  Future<String> _readProcessOutput(Future<String> output) async {
+  static Future<String> _readProcessOutput(Future<String> output) async {
     try {
       return await output.timeout(_processOutputTimeout, onTimeout: () => '');
     } catch (_) {
@@ -1406,7 +1449,7 @@ Write-Output 'WDS_DISK_INITIALIZED'
     }
   }
 
-  Future<void> _terminateProcessTree(Process process) async {
+  static Future<void> _terminateProcessTree(Process process) async {
     try {
       final killer = await Process.start(
         WindowsSystemEnvironment.taskkillExecutable,
@@ -1556,7 +1599,9 @@ $serial = if ($disk.SerialNumber) { $disk.SerialNumber.ToString() } else { '' }
       devicePath: data['DevicePath']?.toString() ?? '',
       busType: data['BusType']?.toString() ?? 'Unknown',
       partitionStyle: data['PartitionStyle']?.toString() ?? 'Unknown',
-      isSystem: _readBool(data['IsSystem']),
+      // Same fail-closed rule as the native parser: an absent or unparseable
+      // system flag means the disk could not be classified, not that it is safe.
+      isSystem: _readNullableBool(data['IsSystem']) ?? true,
       isBoot: _readBool(data['IsBoot']),
       isOffline: _readBool(data['IsOffline']),
       isRemovable: _readBool(data['IsRemovable']),

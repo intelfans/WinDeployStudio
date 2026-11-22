@@ -32,7 +32,7 @@ void main() {
     );
   });
 
-  test('matches by MD5 and silently ignores unknown or missing files', () async {
+  test('does not match on MD5 alone, and ignores unknown or missing files', () async {
     final directory = await Directory.systemTemp.createTemp('wds-known-iso-');
     addTearDown(() => directory.delete(recursive: true));
     final file = File('${directory.path}${Platform.pathSeparator}image.iso');
@@ -47,7 +47,9 @@ void main() {
         KnownImage.fromJson(<String, dynamic>{
           'id': 'md5-image',
           'name': <String, String>{'en': 'MD5 image'},
-          // The SHA-256 is deliberately unrelated: MD5 alone must identify it.
+          // The SHA-256 is deliberately unrelated. The MD5 matches this file,
+          // so this entry is the collision scenario: identity must stay
+          // unrecognised because only SHA-256 decides it.
           'sha256':
               '0000000000000000000000000000000000000000000000000000000000000000',
           'md5': '08D6C05A21512A79A1DFEB9D2A8F262F',
@@ -55,11 +57,7 @@ void main() {
       ],
     );
 
-    final recognized = await service.verify(file.path, const Locale('en'));
-    expect(recognized?.image.id, 'md5-image');
-    expect(recognized?.md5, '08d6c05a21512a79a1dfeb9d2a8f262f');
-
-    expect(await service.verify(unknown.path, const Locale('en')), isNull);
+    expect(await service.verify(file.path, const Locale('en')), isNull);
     expect(
       await service.verify(
         '${directory.path}${Platform.pathSeparator}missing.iso',

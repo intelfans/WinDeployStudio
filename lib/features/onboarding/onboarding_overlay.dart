@@ -517,7 +517,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
     final width = compact ? size.width - 32 : 500.0;
     return Positioned(
       left: (size.width - width) / 2,
-      top: (size.height - 270).clamp(80.0, size.height - 220),
+      top: _clampTop(size.height - 270, size.height, 80.0, 220),
       width: width,
       child: AnimatedScale(
         scale: _switchPromptOpen ? 1 : 0.96,
@@ -651,10 +651,10 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
     final top = compact
         ? size.height - 360.0
         : targetRect != null
-        ? (targetRect.center.dy - 110).clamp(80.0, size.height - 300)
+        ? _clampTop(targetRect.center.dy - 110, size.height, 80.0, 300)
         : 110.0;
 
-    final topPosition = top.clamp(76.0, size.height - 220);
+    final topPosition = _clampTop(top, size.height, 76.0, 220);
     return AnimatedPositioned(
       key: ValueKey('onboarding-position-${_step.id}'),
       duration: tokens.motionDuration,
@@ -857,6 +857,22 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
     );
   }
 
+  /// Clamps a top offset without ever producing an inverted range.
+  ///
+  /// `num.clamp` throws when its lower bound exceeds its upper bound, and the
+  /// upper bound here shrinks with the window. On a short window the two bounds
+  /// crossed and the first-run tour crashed inside build.
+  static double _clampTop(
+    double value,
+    double extent,
+    double minimum,
+    double bottomReserve,
+  ) {
+    final upper = extent - bottomReserve;
+    final lower = upper < minimum ? upper : minimum;
+    return value.clamp(lower, upper);
+  }
+
   double _guideCardLeft(Size size, Rect targetRect, double maxWidth) {
     final rightCandidate = targetRect.right + 20;
     if (rightCandidate + maxWidth <= size.width - 20) {
@@ -864,7 +880,9 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
     }
     final leftCandidate = targetRect.left - maxWidth - 20;
     if (leftCandidate >= 20) return leftCandidate;
-    return (size.width - maxWidth - 32).clamp(20.0, size.width - maxWidth - 20);
+    final upper = size.width - maxWidth - 20;
+    final lower = upper < 20.0 ? upper : 20.0;
+    return (size.width - maxWidth - 32).clamp(lower, upper);
   }
 
   Widget _buildStepDetails(BuildContext context) {

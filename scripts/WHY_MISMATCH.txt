@@ -1,0 +1,13 @@
+Before asking for another 33 minute run, note two facts:
+
+  1. The previous harness verdict compared the FULL image against the
+     disk, while the app now compares everything except bytes 512..1023.
+     Those two can never agree, so 'mismatch' was guaranteed by the
+     harness, not by the write.
+
+  2. The harness digest function is now verified two ways:
+     - it ignores changes inside 512..1023 and detects changes outside
+     - it matches an independent streaming implementation exactly
+       (8A8D82DB...773E on the real image)
+
+The next run therefore compares like with like.

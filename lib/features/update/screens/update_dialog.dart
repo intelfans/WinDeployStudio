@@ -47,11 +47,20 @@ class UpdateDialog extends ConsumerWidget {
       return _InstallDialog(
         info: state.info!,
         error: state.error,
+        unsignedPending: state.unsignedInstallPending,
         releasePageUrl: ref.read(updateProvider.notifier).releasePageUrl,
         onInstall: () async {
           final success = await ref
               .read(updateProvider.notifier)
               .installUpdate();
+          if (success && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        onInstallUnsigned: () async {
+          final success = await ref
+              .read(updateProvider.notifier)
+              .installUpdate(allowUnsigned: true);
           if (success && context.mounted) {
             Navigator.of(context).pop();
           }
@@ -565,15 +574,19 @@ class _DownloadingDialogState extends State<_DownloadingDialog>
 class _InstallDialog extends StatelessWidget {
   final UpdateInfo info;
   final String? error;
+  final bool unsignedPending;
   final String releasePageUrl;
   final VoidCallback onInstall;
+  final VoidCallback onInstallUnsigned;
   final VoidCallback onLater;
 
   const _InstallDialog({
     required this.info,
     this.error,
+    this.unsignedPending = false,
     required this.releasePageUrl,
     required this.onInstall,
+    required this.onInstallUnsigned,
     required this.onLater,
   });
 
@@ -639,8 +652,13 @@ class _InstallDialog extends StatelessWidget {
             ),
             FilledButton.icon(
               icon: const Icon(Icons.install_desktop_rounded, size: 18),
-              onPressed: onInstall,
-              label: Text(tr(context, 'update_install')),
+              onPressed: unsignedPending ? onInstallUnsigned : onInstall,
+              label: Text(
+                tr(
+                  context,
+                  unsignedPending ? 'update_install_anyway' : 'update_install',
+                ),
+              ),
             ),
           ],
         ),

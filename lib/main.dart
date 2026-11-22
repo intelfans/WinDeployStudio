@@ -9,9 +9,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final preferences = await SharedPreferences.getInstance();
-  final appearance = AppAppearanceSettings.fromPreferences(
-    preferences,
-  ).copyWith(visualStyle: VisualStyle.win11);
+  // Honour the saved skin. Forcing Windows 11 here made the other three skins
+  // unreachable and their translations dead.
+  final appearance = AppAppearanceSettings.fromPreferences(preferences);
   final languageCode = preferences.getString('language_code');
   final startupLocale = languageCode == null || languageCode.isEmpty
       ? null

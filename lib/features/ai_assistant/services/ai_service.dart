@@ -8,6 +8,8 @@ import 'package:http/io_client.dart';
 import 'package:xml/xml.dart';
 import '../../../core/config/ai_config.dart';
 import '../../../core/localization/strings.dart';
+import '../../../core/services/ai_install_id.dart';
+import '../../../core/services/ai_search_budget.dart';
 import '../../logs/services/log_center_service.dart';
 import '../models/chat_models.dart';
 import 'ai_system_proxy_resolver.dart';
@@ -24,6 +26,15 @@ class SearchSource {
 ///
 /// Keeping this narrow makes request ownership testable without allowing a
 /// stale stream to mutate the currently selected chat session.
+/// Asked immediately before a query is allowed to leave the device.
+///
+/// [query] is the exact text that would be sent and [provider] names the
+/// service that would receive it, so the caller can show both to the user.
+/// Returning false suppresses the search entirely; the conversation continues
+/// without web results.
+typedef SearchConfirmationCallback =
+    Future<bool> Function(String query, String provider);
+
 abstract class AiMessageService {
   Future<void> sendMessage({
     required List<Map<String, String>> messages,
@@ -34,6 +45,7 @@ abstract class AiMessageService {
     required void Function(AiSearchStatus status) onSearchStatus,
     SearchMode searchMode = SearchMode.off,
     CancelToken? cancelToken,
+    SearchConfirmationCallback? confirmSearch,
   });
 }
 
@@ -592,6 +604,7 @@ class AiService implements AiMessageService {
     required void Function(AiSearchStatus status) onSearchStatus,
     SearchMode searchMode = SearchMode.off,
     CancelToken? cancelToken,
+    SearchConfirmationCallback? confirmSearch,
   }) async {
     if (AiConfig.isRemoteAiDisabled()) {
       onError(trCurrent('ai_disabled_by_installer'));
@@ -617,6 +630,7 @@ class AiService implements AiMessageService {
 
     try {
       final model = await AiConfig.getModel();
+      final askBeforeSearch = confirmSearch;
       final outboundMessages = prepareMessagesForTransport(messages);
       final outboundCharacters = outboundMessages.fold<int>(
         0,
@@ -637,6 +651,7 @@ class AiService implements AiMessageService {
         String accept = 'text/event-stream, application/json;q=0.9',
         bool includeAuthorization = true,
         Duration? responseTimeout,
+        Map<String, String>? extraHeaders,
       }) async {
         final route = await AiSystemNetworkResolver.resolveFor(requestUrl);
         Future<http.StreamedResponse> sendOnce(AiNetworkRoute candidate) {
@@ -652,6 +667,9 @@ class AiService implements AiMessageService {
           }
           request.headers['Accept'] = accept;
           request.headers['Cache-Control'] = 'no-cache';
+          if (extraHeaders != null) {
+            request.headers.addAll(extraHeaders);
+          }
           if (includeAuthorization) {
             request.headers.addAll(buildAuthorizationHeaders(configuredKey));
           }
@@ -1309,7 +1327,142 @@ class AiService implements AiMessageService {
         return results;
       }
 
+      /// Asks the gateway to search on our behalf.
+      ///
+      /// Only used when the active endpoint is not a user's private provider:
+      /// the gateway route belongs to this application, and sending a query to
+      /// a third party the user did not configure would be a surprise.
+      Future<List<_WebSearchResult>> searchThroughGateway(String query) async {
+        if (AiConfig.shouldSendApiKey(endpointUrl)) {
+          // A user-configured provider has no /search route.
+          return const [];
+        }
+        if (!await AiSearchBudget.tryConsume()) {
+          LogCenterService().logSystem(
+            '[AI]\nSearchBackend=Gateway\nSearchBackendSuccess=false\n'
+            'Reason=BudgetExhausted',
+          );
+          return const [];
+        }
+        var refunded = false;
+        Future<void> refund() async {
+          if (refunded) return;
+          refunded = true;
+          await AiSearchBudget.refund();
+        }
+
+        final searchUrl = Uri.parse(endpointUrl).resolve('search');
+        // The server keeps its own allowance keyed by this value, so a cleared
+        // app-data folder cannot silently reset the operator's cost control.
+        final installId = await AiInstallId.get();
+        final response = await sendRequest(
+          searchUrl,
+          body: <String, dynamic>{'query': query, 'max_results': 5},
+          accept: 'application/json',
+          includeAuthorization: false,
+          extraHeaders: <String, String>{'X-WDS-Install-Id': installId},
+        );
+        if (!_isSuccessfulHttpStatus(response.statusCode)) {
+          try {
+            await response.stream.drain<void>().timeout(
+              AiConfig.errorResponseTimeout,
+            );
+          } on TimeoutException {
+            // An unavailable search must not break ordinary chat.
+          }
+          // 404 (route missing), 501 (provider credential absent) and 429 (the
+          // server's own allowance) are all answered by our worker before it
+          // contacts the provider, so the request cost nothing and must not
+          // consume the user's local allowance.
+          if (response.statusCode == 404 ||
+              response.statusCode == 501 ||
+              response.statusCode == 429) {
+            await refund();
+          }
+          LogCenterService().logSystem(
+            '[AI]\nSearchBackend=Gateway\n'
+            'SearchBackendSuccess=false\nStatusCode=${response.statusCode}',
+          );
+          return const [];
+        }
+        if ((response.contentLength ?? -1) > 1024 * 1024) {
+          await response.stream.drain<void>().timeout(
+            AiConfig.errorResponseTimeout,
+            onTimeout: () {},
+          );
+          return const [];
+        }
+        final payload = jsonDecode(
+          await _readBoundedUtf8(
+            response.stream,
+            maxBytes: 1024 * 1024,
+            timeout: AiConfig.errorResponseTimeout,
+          ),
+        );
+        if (payload is! Map) return const [];
+        final rawResults = payload['results'];
+        if (rawResults is! List) return const [];
+
+        final results = <_WebSearchResult>[];
+        for (final item in rawResults) {
+          if (results.length >= 5) break;
+          if (item is! Map) continue;
+          final result = _createWebSearchResult(
+            title: item['title'],
+            url: item['url'],
+            snippet: item['snippet'],
+          );
+          if (result != null &&
+              !results.any((entry) => entry.url == result.url)) {
+            results.add(result);
+          }
+        }
+        LogCenterService().logSystem(
+          '[AI]\nSearchBackend=Gateway\n'
+          'SearchBackendSuccess=true\nResultCount=${results.length}',
+        );
+        return results;
+      }
+
       Future<List<_WebSearchResult>> searchPublicWeb(String query) async {
+        // Decide the route before asking for confirmation so the dialog names
+        // the service that would actually receive the text.
+        final gatewayEligible = !AiConfig.shouldSendApiKey(endpointUrl);
+        final gatewayHasBudget =
+            gatewayEligible && await AiSearchBudget.hasCapacity();
+        final providerLabel = gatewayHasBudget
+            ? 'Tavily'
+            : 'Bing / DuckDuckGo';
+
+        // The query is about to leave the device. Show the exact text first;
+        // a declined search is dropped rather than rerouted, because every
+        // route transmits the same text.
+        if (askBeforeSearch != null) {
+          final approved = await askBeforeSearch(query, providerLabel);
+          if (!approved) {
+            LogCenterService().logSystem(
+              '[AI]\nSearchBackend=Declined\nSearchBackendSuccess=false',
+            );
+            onSearchStatus(AiSearchStatus.notUsed);
+            return const [];
+          }
+        }
+
+        // Prefer the configured gateway. It returns structured results and
+        // keeps the provider credential server-side, so the client never ships
+        // a search key. When the allowance is spent, or the endpoint is a
+        // user's own provider, the keyless sources below still apply.
+        if (gatewayHasBudget) {
+          try {
+            final viaGateway = await searchThroughGateway(query);
+            if (viaGateway.isNotEmpty) return viaGateway;
+          } catch (error) {
+            LogCenterService().logSystem(
+              '[AI]\nSearchBackend=Gateway\n'
+              'SearchBackendSuccess=false\nFailureCategory=${networkErrorKey(error)}',
+            );
+          }
+        }
         try {
           // Bing's RSS endpoint is a small, keyless, structured response and
           // is reachable in more desktop network environments. DuckDuckGo's

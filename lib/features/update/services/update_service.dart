@@ -1192,7 +1192,21 @@ class UpdateService {
     return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(1)} MB/s';
   }
 
-  Future<bool> installUpdate(String filePath) async {
+  /// Whether the last install attempt was stopped only because the downloaded
+  /// installer carries no trusted publisher signature.
+  ///
+  /// The releases are not Authenticode-signed, so this state is expected rather
+  /// than exceptional: the caller asks the user for explicit consent and then
+  /// retries with [allowUnsigned]. The GitHub release digest is still a hard
+  /// requirement in both paths, so consent only waives publisher identity, not
+  /// file integrity.
+  bool lastInstallBlockedBySignature = false;
+
+  Future<bool> installUpdate(
+    String filePath, {
+    bool allowUnsigned = false,
+  }) async {
+    lastInstallBlockedBySignature = false;
     final log = LogCenterService();
     log.logUpdate('[Update] InstallStart\nPath=$filePath');
 
@@ -1225,10 +1239,12 @@ class UpdateService {
             signature.subjectCommonName == signature.publisherCommonName &&
             _isTrustedPublisher(signature.publisherCommonName);
 
-        // Public project installers are not necessarily Authenticode-signed.
-        // The file has already been bound to the selected release URL, length,
-        // and, when available, the release SHA-256. Record signature status
-        // for diagnostics but do not block a verified unsigned installer.
+        // The release digest proves the bytes match the release record; it
+        // says nothing about *who* produced them. Authenticode would, but the
+        // published installers are unsigned, so a missing signature cannot be a
+        // permanent hard stop: that would disable updates entirely. Instead the
+        // first attempt reports the condition, the UI asks the user, and only an
+        // explicit consent retries with allowUnsigned.
         log.logUpdate(
           '[Update] InstallerTrust\n'
           'ReleaseDigest=${_lastPublishedDownloadHash == null ? 'Unavailable' : 'Valid'}\n'
@@ -1240,6 +1256,20 @@ class UpdateService {
           'Thumbprint=${signature.thumbprint}\n'
           'Error=${signature.error}',
         );
+
+        if (!signatureTrusted && !allowUnsigned) {
+          lastInstallBlockedBySignature = true;
+          log.logUpdate(
+            '[Update] InstallBlocked: Publisher signature is not trusted; '
+            'awaiting user consent',
+          );
+          return false;
+        }
+        if (!signatureTrusted) {
+          log.logUpdate(
+            '[Update] InstallProceed: user accepted an unsigned installer',
+          );
+        }
 
         try {
           await Process.start(filePath, [

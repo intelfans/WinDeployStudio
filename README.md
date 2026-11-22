@@ -5,11 +5,11 @@ Windows desktop toolkit for Windows/Linux installation media, portable Windows T
 ![Platform](https://img.shields.io/badge/Platform-Windows-blue?logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Flutter](https://img.shields.io/badge/Flutter-Windows-02569B?logo=flutter)
-![Version](https://img.shields.io/badge/Version-2.1.0-orange)
+![Version](https://img.shields.io/badge/Version-3.0.0-orange)
 
 ## Overview
 
-WinDeploy Studio v2.1.0 is the production Windows desktop application for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, native drive testing, trusted image source navigation, deployment utilities, logs, an interactive first-run tour, and clear safety notices for advanced tools.
+WinDeploy Studio v3.0.0 is the production Windows desktop application for practical Windows and Linux deployment workflows. It combines Windows installation media creation, Linux ISOHybrid writing, Windows To Go, native drive testing, trusted image source navigation, deployment utilities, logs, an interactive first-run tour, and clear safety notices for advanced tools.
 
 The project is distributed under the MIT License.
 
@@ -31,6 +31,20 @@ shared services must be regression-tested against the frozen areas before it is
 accepted.
 
 ## Highlights
+
+- **AI Assistant On A New Platform**
+  - Runs on the current provider model (`mimo-v2.6-pro`). Retired model names are rewritten automatically, both in the application and at the project gateway, so an installed build keeps working without a manual settings change.
+  - Web search is served by the project gateway rather than by scraping public pages. The search credential stays on the server, the client never ships one, and a rolling hourly allowance bounds the cost. When the allowance is spent, search falls back to keyless sources instead of failing.
+  - Every web search shows the exact text that will be sent and the service that will receive it. Declining drops the search rather than silently rerouting it.
+
+- **Trust And Verification**
+  - Update installation keeps the release SHA-256 digest as a hard requirement. Because published installers are not Authenticode-signed, the application now states that the publisher cannot be verified and requests explicit consent instead of failing silently. Consent waives publisher identity only.
+  - Downloads enforce HTTPS and refuse loopback, link-local, and RFC1918 targets on every redirect hop.
+  - Known-image identification uses SHA-256 alone; a matching MD5 no longer qualifies.
+  - Linux installation media verifies the written device again after the disk returns online, so the reported result describes the media the user keeps.
+
+- **Selectable Appearance**
+  - Settings offers four skins: Auto, Windows 11, Windows 10, and Windows 7. Default behaviour follows the operating system, and the Windows 11 skin remains the fallback on unsupported systems.
 
 - **Installation Media Creator**
   - Create Windows installation USB drives and write bootable Linux ISOHybrid images.
@@ -273,6 +287,12 @@ application process. If UAC approval is cancelled, the application does not
 start.
 
 ## Download
+
+The current release is **v3.0.0**.
+
+- Installer: `WinDeployStudio_Setup_3.0.0.exe`
+- Size: `48.38 MB`
+- SHA-256: `9337FB02777FFF9347CC032377640909146078E229D0F9137213ECDE59FB12BF`
 
 Download releases from:
 

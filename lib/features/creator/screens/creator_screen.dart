@@ -278,11 +278,21 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
         _isDetecting = false;
         _driveLettersLoading = false;
       });
+      // Structured, language-neutral records: these lines are exported for
+      // support and fed verbatim to the AI assistant, so they must not depend
+      // on the UI language.
       final logCenter = LogCenterService();
-      await logCenter.logUsb('检测到 ${disks.length} 个可移动磁盘');
+      await logCenter.logUsb('removable.disks detect count=${disks.length}');
       for (final disk in disks) {
         await logCenter.logUsb(
-          '  磁盘 ${disk.diskNumber}: ${disk.model} | 容量: ${disk.sizeFormatted} | 总线: ${disk.busType} | 序列号: ${disk.serialNumber} | 分区表: ${disk.partitionStyle} | 盘符: ${disk.driveLetters.join(", ")}',
+          'removable.disk'
+          ' number=${disk.diskNumber}'
+          ' model="${disk.model}"'
+          ' size=${disk.sizeFormatted}'
+          ' bus=${disk.busType}'
+          ' serial="${disk.serialNumber}"'
+          ' partitionStyle=${disk.partitionStyle}'
+          ' letters=${disk.driveLetters.join(",")}',
         );
       }
     } catch (e) {
@@ -433,7 +443,9 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           unawaited(_detectDisks());
           final logCenter = LogCenterService();
           await logCenter.logIso(
-            'Linux ISO 已选择 | 文件: ${linuxMetadata.fileName} | 大小: ${linuxMetadata.displaySize}',
+            'iso.selected platform=linux'
+            ' file="${linuxMetadata.fileName}"'
+            ' size=${linuxMetadata.displaySize}',
           );
           if (!_isCurrentIsoSelection(selectionRequest, selectedLinuxMode)) {
             return;
@@ -561,7 +573,10 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
       );
       final logCenter = LogCenterService();
       await logCenter.logIso(
-        'ISO 已选择 | 文件: ${metadata.fileName} | 版本: ${metadata.windowsVersion ?? "未知"} | 构建: ${metadata.buildNumber ?? "未知"}',
+        'iso.selected platform=windows'
+        ' file="${metadata.fileName}"'
+        ' version="${metadata.windowsVersion ?? "unknown"}"'
+        ' build="${metadata.buildNumber ?? "unknown"}"',
       );
     } catch (e) {
       debugPrint('ISO select error: $e');
@@ -1871,9 +1886,13 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
   void _showEraseConfirmation() {
     final controller = TextEditingController();
     final confirmWord = tr(context, 'erase_confirm_word');
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
+    // The dialog owns the controller's lifetime, exactly like the boot-repair
+    // confirmation; without this the listeners and the EditableText state leak
+    // on every open.
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
         bool matches() =>
             controller.text.trim().toUpperCase() == confirmWord.toUpperCase();
         return AlertDialog(
@@ -1933,6 +1952,7 @@ class _CreatorScreenState extends ConsumerState<CreatorScreen> {
           ],
         );
       },
+      ).whenComplete(controller.dispose),
     );
   }
 }

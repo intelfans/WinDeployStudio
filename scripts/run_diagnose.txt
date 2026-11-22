@@ -1,0 +1,34 @@
+HOW TO RUN THE DISK DIAGNOSTIC
+
+1. Open PowerShell as administrator.
+   (Start menu -> type PowerShell -> right click -> Run as administrator)
+
+2. Change to the project folder:
+
+       cd D:/Dev/WinDeployStudio
+
+3. Run the diagnostic (read only, changes nothing):
+
+       & ./scripts/diagnose_disk_mismatch.ps1 -DiskNumber 1 -IsoPath 'D:/Dev/Linux/Custom Linux.iso'
+
+   PowerShell accepts forward slashes in paths, so the command above is
+   safe to copy and paste without any escaping.
+
+4. Paste the whole output back.
+
+WHAT IT REPORTS
+
+  - how many bytes differ and what percentage
+  - the first differing offset and its ISO sector number
+  - up to 20 contiguous differing ranges
+  - a 64 byte hex comparison around the first difference
+
+HOW TO READ IT
+
+  first mismatch below 512      -> Windows rewrote the boot sector
+                                   after the disk came online
+                                   (image itself is fine)
+
+  mismatches spread across      -> the device dropped or never flushed
+  the whole written region         the writes
+                                   (the app reported success wrongly)

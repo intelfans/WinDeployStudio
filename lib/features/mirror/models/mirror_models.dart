@@ -277,12 +277,26 @@ class KnownImage {
         (code.contains('_') && allowedLocales.contains(locale.languageCode));
   }
 
-  bool matches({required String sha256, required String md5}) {
-    final normalizedSha256 = this.sha256.trim().toLowerCase();
-    final normalizedMd5 = this.md5.trim().toLowerCase();
-    return (normalizedSha256.isNotEmpty &&
-            normalizedSha256 == sha256.trim().toLowerCase()) ||
-        (normalizedMd5.isNotEmpty && normalizedMd5 == md5.trim().toLowerCase());
+  /// Whether a local file is this catalog entry.
+  ///
+  /// Only SHA-256 identifies the file. MD5 was previously accepted on its own,
+  /// which makes a chosen-prefix collision enough to label an attacker's image
+  /// as a known-good Windows ISO. Every catalog entry publishes a SHA-256, so
+  /// dropping the MD5 branch removes that shortcut without losing recognition.
+  /// The MD5 is still reported alongside the result for transparency.
+  bool matches({required String sha256, required String md5}) =>
+      matchesSha256(sha256);
+
+  /// Identity decision on its own, so callers cannot accidentally keep the
+  /// weaker MD5 behaviour by passing argument names.
+  bool matchesSha256(String value) {
+    final expected = sha256.trim().toLowerCase();
+    final actual = value.trim().toLowerCase();
+    if (expected.isEmpty || actual.isEmpty) return false;
+    // A complete lowercase hex SHA-256 is required on both sides.
+    final hex = RegExp(r'^[0-9a-f]{64}$');
+    if (!hex.hasMatch(expected) || !hex.hasMatch(actual)) return false;
+    return expected == actual;
   }
 
   factory KnownImage.fromJson(Map<String, dynamic> json) {

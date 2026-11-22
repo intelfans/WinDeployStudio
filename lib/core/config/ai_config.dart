@@ -23,7 +23,30 @@ class AiConfig {
     '/models',
   };
 
-  static const defaultModel = 'mimo-v2.5-pro';
+  static const defaultModel = 'mimo-v2.6-pro';
+
+  /// Model identifiers the bundled gateway has retired. A value restored from
+  /// an older build must be migrated before the request leaves the process,
+  /// otherwise it is forwarded upstream and rejected with a 4xx that reads to
+  /// the user as "the assistant is broken".
+  ///
+  /// Source: provider deprecation notice — mimo-v2.5-pro → mimo-v2.6-pro,
+  /// mimo-v2.5 → mimo-v2.6-flash (2026-10-21).
+  static const _retiredModelIds = <String, String>{
+    'mimo-v2.5-pro': 'mimo-v2.6-pro',
+    'mimo-v2.5': 'mimo-v2.6-flash',
+    'mimo-v2-pro': 'mimo-v2.6-pro',
+    'mimo-v2-omni': 'mimo-v2.6-flash',
+    'mimo-v2-flash': 'mimo-v2.6-flash',
+  };
+
+  /// Rewrites a retired upstream model ID to its live replacement. The
+  /// function is total: unknown or custom IDs are returned unchanged so a
+  /// user-configured provider keeps working.
+  static String migrateRetiredModelId(String value) {
+    final normalized = value.trim();
+    return _retiredModelIds[normalized.toLowerCase()] ?? normalized;
+  }
   static const remoteAiDisabledMarkerFileName = 'remote-ai-disabled.flag';
   static const maxModelListResponseBytes = 2 * 1024 * 1024;
   static const connectionTimeout = Duration(seconds: 15);
@@ -237,6 +260,11 @@ class AiConfig {
       if (saved != null) await clearModel();
       return endpoint == defaultEndpointUrl ? defaultModel : '';
     }
+    final migrated = migrateRetiredModelId(saved);
+    if (migrated != saved && isValidModelId(migrated)) {
+      await setModel(migrated, endpointUrl: endpoint);
+      return migrated;
+    }
     final boundEndpoint = prefs.getString(_prefKeyModelEndpoint);
     if (boundEndpoint == null ||
         normalizeEndpointUrl(boundEndpoint) != endpoint) {
@@ -291,12 +319,23 @@ class AiConfig {
         !_isRetiredBuiltInEndpoint(normalized);
   }
 
-  /// The installer can opt the machine out of all remote AI and web-search
-  /// traffic by placing this marker beside the installed executable.
+  /// Registry location the installer writes the machine-wide privacy policy to.
+  static const remoteAiPolicyRegistryPath =
+      r'HKEY_LOCAL_MACHINE\Software\WinDeploy Studio';
+
+  /// The installer can opt the machine out of every remote AI, web-search and
+  /// geolocation request.
+  ///
+  /// Two sources are honoured, in this order:
+  /// 1. the machine-wide HKLM value written by setup — a per-user install
+  ///    cannot be overridden by deleting a file the user owns;
+  /// 2. the marker file beside the executable, which keeps portable and
+  ///    unpacked runs working.
   ///
   /// Keep this check local and synchronous so no network or preferences are
-  /// touched before the opt-out is honored.
+  /// touched before the opt-out is honoured.
   static bool isRemoteAiDisabled() {
+    if (_registryPolicyDisabled()) return true;
     try {
       final executable = File(Platform.resolvedExecutable);
       final marker = File(
@@ -305,6 +344,32 @@ class AiConfig {
       );
       return marker.existsSync();
     } catch (_) {
+      return false;
+    }
+  }
+
+  static bool _registryPolicyDisabled() {
+    if (!Platform.isWindows) return false;
+    try {
+      final result = Process.runSync(
+        '${Platform.environment['SystemRoot'] ?? 'C:\\Windows'}\\System32\\reg.exe',
+        const [
+          'query',
+          remoteAiPolicyRegistryPath,
+          '/v',
+          'RemoteAiDisabled',
+        ],
+        stdoutEncoding: const SystemEncoding(),
+        stderrEncoding: const SystemEncoding(),
+      );
+      if (result.exitCode != 0) return false;
+      return result.stdout
+          .toString()
+          .toLowerCase()
+          .contains(RegExp(r'remoteaidisabled\s+reg_sz\s+1'));
+    } catch (_) {
+      // A missing reg.exe must never lift the opt-out on its own; fall through
+      // to the marker check instead of throwing.
       return false;
     }
   }

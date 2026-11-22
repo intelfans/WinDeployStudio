@@ -1,6 +1,6 @@
-﻿#define MyAppName "WinDeploy Studio"
-#define MyAppVersion "2.1.0"
-#define MyAppFileVersion "2.1.0.0"
+#define MyAppName "WinDeploy Studio"
+#define MyAppVersion "3.0.0"
+#define MyAppFileVersion "3.0.0.0"
 #define MyAppPublisher "Bob Steve"
 #define MyAppPublisherZH "Bob Steve"
 #define MyAppExeName "win_deploy_studio.exe"
@@ -22,7 +22,7 @@ AppCopyright=© 2026 {#MyAppPublisher}. Released under the MIT License.
 DefaultDirName={autopf}\WinDeploy Studio
 DefaultGroupName=WinDeploy Studio
 OutputDir=..\..\dist\windows
-OutputBaseFilename=WinDeployStudio_Setup_2.1.0
+OutputBaseFilename=WinDeployStudio_Setup_3.0.0
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
@@ -31,6 +31,16 @@ UninstallDisplayName=WinDeploy Studio
 WizardStyle=modern
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
+; The payload edits partitions and requires an elevated token. Refuse older
+; Windows builds instead of installing something that cannot run.
+MinVersion=10.0.17763
+; Installing over a running instance used to fail on file-in-use without any
+; prompt; the app holds a single-instance mutex.
+CloseApplications=yes
+RestartApplications=no
+; Signing is wired through scripts/build_installer.ps1 (ISCC /Ssigntool=...).
+; Keep the uninstall metadata inside the same registry root Inno owns.
+ChangesAssociations=no
 WizardImageFile=wizardimage.bmp
 WizardSmallImageFile=wizardsmallimage.bmp
 SetupIconFile=icon.ico
@@ -61,12 +71,30 @@ Name: "disable_remote_ai"; Description: "{cm:DisableRemoteAi}"; GroupDescription
 [Files]
 Source: "MIT_LICENSE.txt"; Flags: dontcopy
 Source: "MIT_LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Only the runner output is shipped. The Flutter release directory also holds
+; build metadata and PDBs; a wildcard copy published them to every user.
+Source: "..\..\build\windows\x64\runner\Release\win_deploy_studio.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\build\windows\x64\runner\Release\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\build\windows\x64\runner\Release\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\..\build\windows\x64\runner\Release\*.exe"; DestDir: "{app}"; Flags: ignoreversion; Excludes: "win_deploy_studio.exe"
 
 [Icons]
 Name: "{group}\WinDeploy Studio"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,WinDeploy Studio}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\WinDeploy Studio"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Registry]
+; Machine-wide privacy policy. A per-user marker beside the executable can be
+; deleted by the same user, which silently re-enabled remote AI.
+Root: HKLM64; Subkey: "Software\WinDeploy Studio"; ValueType: string; ValueName: "RemoteAiDisabled"; ValueData: "1"; Flags: uninsdeletevalue; Tasks: disable_remote_ai
+Root: HKLM64; Subkey: "Software\WinDeploy Studio"; ValueType: string; ValueName: "InstalledVersion"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletevalue
+
+[UninstallDelete]
+; The privacy marker and the per-user caches the app writes are not owned by
+; an [Files] entry, so they survived an uninstall.
+Type: files; Name: "{app}\remote-ai-disabled.flag"
+Type: filesandordirs; Name: "{app}\data"
+Type: dirifempty; Name: "{app}"
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,WinDeploy Studio}"; Flags: nowait postinstall skipifsilent shellexec runasoriginaluser

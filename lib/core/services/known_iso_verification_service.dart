@@ -44,10 +44,14 @@ class _DigestSink implements Sink<crypto.Digest> {
   void close() {}
 }
 
-/// Silently identifies a local ISO if either of its streamed checksums is
-/// present in the bundled image catalog. Digesting runs in a worker isolate so
-/// a multi-gigabyte ISO never blocks Flutter's UI isolate. It deliberately
-/// does not treat an unknown image or an I/O error as a failed validation.
+/// Silently identifies a local ISO by its SHA-256 in the bundled catalog.
+///
+/// The streamed MD5 is computed and reported but never decides identity: MD5
+/// collisions are practical to construct, so accepting one would let a forged
+/// image be presented as a known-good release. Digesting runs in a worker
+/// isolate so a multi-gigabyte ISO never blocks Flutter's UI isolate. It
+/// deliberately does not treat an unknown image or an I/O error as a failed
+/// validation.
 class KnownIsoVerificationService {
   final KnownImagesLoader? knownImagesLoader;
   Future<List<KnownImage>>? _knownImages;

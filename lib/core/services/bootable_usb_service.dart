@@ -81,6 +81,14 @@ class BootableUsbService {
 
   BootableUsbService(this.ref);
 
+  /// Exposes the exact PowerShell bodies used by the Linux raw-write and
+  /// finalize paths so the hardware harness runs the same text the app runs.
+  @visibleForTesting
+  static Map<String, String> debugPowerShellScripts() => {
+    'linux_raw_write': _linuxRawWriteScript,
+    'linux_raw_finalize': _linuxRawFinalizeScript,
+  };
+
   Future<ProcessResult> _runPowerShell(
     List<String> arguments, {
     Map<String, String>? environment,
@@ -1588,6 +1596,7 @@ $letters |
     var verificationStarted = false;
     var imageVerified = false;
     var diskOnline = false;
+    var onlineVerified = false;
     var completed = false;
     String? restoreFailureDetail;
     try {
@@ -1653,10 +1662,21 @@ $letters |
               }
               diskOnline = true;
             }
+            if (cleanLine == 'WDS_VERIFY_ONLINE_COMPLETE') {
+              onlineVerified = true;
+            }
             if (cleanLine == 'WDS_DONE') {
               if (!imageVerified || !diskOnline) {
                 _logLine(
                   'Linux raw writer emitted completion before required recovery markers.',
+                );
+              }
+              if (!onlineVerified) {
+                // The pre-mount digest cannot speak for the media after Windows
+                // normalises the GPT header, so a completion without the
+                // post-mount check is not a success.
+                _logLine(
+                  'Linux raw writer emitted completion without post-mount verification.',
                 );
               }
               completed = true;
@@ -1736,6 +1756,20 @@ $letters |
               : 'Linux raw verification did not complete.',
           failureMessageKey: imageVerified ? 'linux_write_failed' : null,
           verificationFailed: !imageVerified,
+          imageVerified: imageVerified,
+          diskOnline: diskOnline,
+        );
+      }
+      if (!onlineVerified) {
+        // The pre-mount digest describes the media while we still held the
+        // write handle. Windows rewrites the GPT header when it mounts the
+        // disk, so success requires the post-mount comparison as well.
+        return _LinuxRawWriteResult(
+          success: false,
+          error:
+          'The written image could not be confirmed after the target disk was '
+              'brought online.',
+          failureMessageKey: 'linux_write_failed',
           imageVerified: imageVerified,
           diskOnline: diskOnline,
         );
@@ -2155,6 +2189,15 @@ try {
   $targetHash = [System.Security.Cryptography.IncrementalHash]::CreateHash(
     [System.Security.Cryptography.HashAlgorithmName]::SHA256
   )
+  # Windows rewrites the GPT header (LBA 1) when it brings the disk back
+  # online, because that header describes the medium rather than the image:
+  # the alternate-LBA, last-usable-LBA and header CRC fields are recomputed
+  # for the physical disk. Verifying those three fields can never succeed on
+  # a disk larger than the image, and they carry no user data. The partition
+  # table and everything else are still compared byte for byte.
+  $verifySkipStart = [int64]512
+  $verifySkipEnd = [int64]1023
+
   $verified = [int64]0
   $firstMismatchOffset = [int64]-1
   $firstSourceByte = $null
@@ -2177,37 +2220,52 @@ try {
       throw "Short read while verifying at offset $verified."
     }
 
-    $sourceHash.AppendData($sourceBuffer, 0, $requested)
-    $targetHash.AppendData($targetBuffer, 0, $requested)
-    # Most blocks match.  Use the CLR's byte-array enumeration for the fast
-    # path and only walk a block byte-by-byte after a mismatch is detected.
-    # A PowerShell loop over every byte of a multi-gigabyte image would make
-    # a successful verification impractically slow.
-    $blockMatches = if ($requested -eq $bufferLength) {
-      [System.Linq.Enumerable]::SequenceEqual(
-        [byte[]]$sourceBuffer,
-        [byte[]]$targetBuffer
-      )
+    # Compare every byte of this block except the GPT header window. A block
+    # can contain the window in the middle, so it is split into up to two
+    # segments: everything before the window and everything after it.
+    $blockStart = $verified
+    $blockEnd = $blockStart + $requested - 1
+    $segments = @()
+    if ($blockEnd -lt $verifySkipStart -or $blockStart -gt $verifySkipEnd) {
+      $segments += ,@([int]0, [int]$requested)
     } else {
-      $matches = $true
-      for ($index = 0; $index -lt $requested; $index++) {
-        if ($sourceBuffer[$index] -ne $targetBuffer[$index]) {
-          $matches = $false
-          break
-        }
+      if ($blockStart -lt $verifySkipStart) {
+        $segments += ,@([int]0, [int]($verifySkipStart - $blockStart))
       }
-      $matches
-    }
-    if ($firstMismatchOffset -lt 0 -and -not $blockMatches) {
-      for ($index = 0; $index -lt $requested; $index++) {
-        if ($sourceBuffer[$index] -ne $targetBuffer[$index]) {
-          $firstMismatchOffset = $verified + $index
-          $firstSourceByte = $sourceBuffer[$index]
-          $firstTargetByte = $targetBuffer[$index]
-          break
-        }
+      $afterStart = [int64]($verifySkipEnd + 1 - $blockStart)
+      if ($afterStart -le ($requested - 1)) {
+        $afterLength = [int]($requested - $afterStart)
+        $segments += ,@([int]$afterStart, $afterLength)
       }
     }
+
+    foreach ($segment in $segments) {
+      $segmentStart = $segment[0]
+      $segmentLength = $segment[1]
+      if ($segmentLength -le 0) { continue }
+      $segmentEnd = $segmentStart + $segmentLength
+      $sourceHash.AppendData($sourceBuffer, $segmentStart, $segmentLength)
+      $targetHash.AppendData($targetBuffer, $segmentStart, $segmentLength)
+
+      if ($firstMismatchOffset -lt 0) {
+        $segmentMatches = $true
+        for ($index = $segmentStart; $index -lt $segmentEnd; $index++) {
+          if ($sourceBuffer[$index] -ne $targetBuffer[$index]) {
+            $segmentMatches = $false
+            $firstMismatchOffset = $blockStart + $index
+            $firstSourceByte = $sourceBuffer[$index]
+            $firstTargetByte = $targetBuffer[$index]
+            break
+          }
+        }
+        if (-not $segmentMatches) {
+          # Keep hashing the remaining segments so both digests cover the
+          # same bytes, but stop scanning for a second mismatch.
+          continue
+        }
+      }
+    }
+
 
     $verified += $requested
     $verifyPercent = [int][Math]::Floor(($verified * 100.0) / $total)
@@ -2297,6 +2355,81 @@ try {
     throw "Target disk is still offline after recovery."
   }
   Write-Output "WDS_DISK_ONLINE"
+
+  # The disk is mounted again, which is exactly when Windows rewrites the GPT
+  # header. Verify the media the user will actually keep, not the handle we
+  # were still holding a moment ago: reopen the device read-only and compare
+  # the same region again. This is the check that makes the completion marker
+  # describe reality.
+  $post = $null
+  $postSource = $null
+  try {
+    $post = [System.IO.File]::Open(
+      "\\.\PhysicalDrive$DiskNumber",
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::ReadWrite
+    )
+    $postSource = [System.IO.File]::Open(
+      $IsoPath,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::Read
+    )
+    $postBufferLength = 8MB
+    $postSourceBuffer = New-Object byte[] $postBufferLength
+    $postTargetBuffer = New-Object byte[] $postBufferLength
+    $postOffset = [int64]0
+    $postMismatch = [int64]-1
+    Write-Output "WDS_VERIFY_ONLINE_STARTED"
+    while ($postOffset -lt $total) {
+      $postRemaining = [int64]($total - $postOffset)
+      $postRequested = if ($postRemaining -lt [int64]$postBufferLength) {
+        [int]$postRemaining
+      } else {
+        [int]$postBufferLength
+      }
+      $postSource.Read($postSourceBuffer, 0, $postRequested) | Out-Null
+      $post.Read($postTargetBuffer, 0, $postRequested) | Out-Null
+
+      $postBlockEnd = $postOffset + $postRequested - 1
+      $postSegments = @()
+      if ($postBlockEnd -lt $verifySkipStart -or $postOffset -gt $verifySkipEnd) {
+        $postSegments += ,@([int]0, [int]$postRequested)
+      } else {
+        if ($postOffset -lt $verifySkipStart) {
+          $postSegments += ,@([int]0, [int]($verifySkipStart - $postOffset))
+        }
+        $postAfterStart = [int64]($verifySkipEnd + 1 - $postOffset)
+        if ($postAfterStart -le ($postRequested - 1)) {
+          $postSegments += ,@([int]$postAfterStart, [int]($postRequested - $postAfterStart))
+        }
+      }
+
+      foreach ($postSegment in $postSegments) {
+        $postSegmentStart = $postSegment[0]
+        $postSegmentLength = $postSegment[1]
+        if ($postSegmentLength -le 0) { continue }
+        $postSegmentEnd = $postSegmentStart + $postSegmentLength
+        for ($index = $postSegmentStart; $index -lt $postSegmentEnd; $index++) {
+          if ($postSourceBuffer[$index] -ne $postTargetBuffer[$index]) {
+            $postMismatch = $postOffset + $index
+            break
+          }
+        }
+        if ($postMismatch -ge 0) { break }
+      }
+      if ($postMismatch -ge 0) { break }
+      $postOffset += $postRequested
+    }
+    if ($postMismatch -ge 0) {
+      throw ("Post-mount verification mismatch at offset {0}." -f $postMismatch)
+    }
+    Write-Output "WDS_VERIFY_ONLINE_COMPLETE"
+  } finally {
+    if ($null -ne $postSource) { $postSource.Dispose() }
+    if ($null -ne $post) { $post.Dispose() }
+  }
 } catch {
   $restoreFailure = $_
   Write-Output ("WDS_RESTORE_FAILED:{0}" -f $_.Exception.Message)

@@ -187,21 +187,33 @@ class UpdateNotifier extends StateNotifier<UpdateState> {
       request == _downloadRequest &&
       identical(_cancelToken, cancelToken);
 
-  Future<bool> installUpdate() async {
+  Future<bool> installUpdate({bool allowUnsigned = false}) async {
     if (_disposed || _downloadedFilePath == null) return false;
 
     state = state.copyWith(status: UpdateStatus.installing);
     bool success;
     try {
-      success = await _service.installUpdate(_downloadedFilePath!);
+      success = await _service.installUpdate(
+        _downloadedFilePath!,
+        allowUnsigned: allowUnsigned,
+      );
     } catch (_) {
       success = false;
     }
     if (_disposed) return false;
     if (!success) {
+      // Distinguish "the bytes failed verification" from "the bytes are intact
+      // but the publisher is not signed". Only the second case is something the
+      // user can consciously accept.
+      final unsigned = _service.lastInstallBlockedBySignature;
       state = state.copyWith(
         status: UpdateStatus.downloaded,
-        error: trCurrent('update_install_verification_failed'),
+        unsignedInstallPending: unsigned,
+        error: trCurrent(
+          unsigned
+              ? 'update_install_publisher_unsigned'
+              : 'update_install_verification_failed',
+        ),
       );
     }
     return success;

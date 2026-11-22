@@ -2,6 +2,64 @@
 
 All notable changes to WinDeploy Studio are documented here.
 
+## v3.0.0
+
+Released: 2026-11-22
+
+Replaces the retired AI model, moves web search behind the project gateway,
+adds explicit consent wherever data leaves the machine, and fixes defects
+found during a full audit of the deployment, update, and localization paths.
+
+### AI Assistant
+
+- Default model is now `mimo-v2.6-pro`. Retired identifiers are rewritten to
+  their replacements in the application and at the gateway.
+- Web search prefers the project gateway, which holds the search credential
+  server-side. A rolling hourly allowance bounds cost, with automatic fallback
+  to keyless sources when it is spent or unavailable.
+- A confirmation dialog shows the exact query text and the recipient before any
+  search leaves the device. Declining drops the search.
+
+### Trust And Privacy
+
+- Release digest and file size remain hard requirements. Unsigned installers
+  now require explicit user consent instead of failing silently; consent waives
+  publisher identity only.
+- Download redirects enforce HTTPS and refuse loopback, link-local, and RFC1918
+  targets on every hop.
+- Known-image identity is decided by SHA-256 alone.
+- The installer privacy option is enforced through a machine-wide policy and
+  now also covers the geolocation request used for mirror selection.
+
+### Installation Media
+
+- Linux raw-write verification excludes the GPT header, which Windows rewrites
+  with the physical disk geometry when the disk returns online.
+- The written device is compared again after it is online, from a fresh handle.
+- Disk safety fails closed: an unknown system-disk flag is treated as a system
+  disk.
+
+### Interface
+
+- All four appearance skins are selectable in Settings.
+- The first-run tour no longer throws on a short window.
+- The Tools page reports a load failure instead of showing an endless spinner.
+
+### Localization And Logs
+
+- Benchmark result labels are translated in all 11 languages.
+- Diagnostic logs are structured `key=value` records and no longer depend on
+  the interface language.
+
+### Build And Packaging
+
+- The installer records a machine-wide AI opt-out policy, cleans up on
+  uninstall, installs only the application payload, and requires Windows 10
+  1809 or later.
+- The release script runs the test suite before packaging and refuses to delete
+  directories outside the repository.
+- Removed four unused dependencies and several unreferenced source files.
+
 ## v2.1.0
 
 Released: 2026-07-23

@@ -281,6 +281,21 @@ class UpdateInfo {
   /// preserved verbatim.
   String bodyForLocale(String localeCode) {
     final normalized = localeCode.replaceAll('-', '_').toLowerCase();
+
+    // Releases authored with explicit `<!-- wds:lang=xx -->` markers are the
+    // canonical form: the project site already reads them this way, so the
+    // application uses the same rule instead of guessing from character sets.
+    // The markers themselves are removed before rendering.
+    final marked = _markedSections();
+    if (marked.isNotEmpty) {
+      final preferred = normalized.startsWith('zh')
+          ? (marked['zh'] ?? marked['en'])
+          : (marked['en'] ?? marked['zh']);
+      if (preferred != null && preferred.trim().isNotEmpty) {
+        return preferred.trim();
+      }
+    }
+
     final sections = body
         .split(
           RegExp(
@@ -306,6 +321,19 @@ class UpdateInfo {
       );
     }
     return sections.first;
+  }
+
+  /// Release-note sections declared with `<!-- wds:lang=... -->` markers.
+  Map<String, String> _markedSections() {
+    final sections = <String, String>{};
+    final pattern = RegExp(
+      r'<!--\s*wds:lang=(zh|en)\s*-->\s*([\s\S]*?)(?=<!--\s*wds:lang=(?:zh|en)\s*-->|$)',
+      caseSensitive: false,
+    );
+    for (final match in pattern.allMatches(body)) {
+      sections[match.group(1)!.toLowerCase()] = match.group(2) ?? '';
+    }
+    return sections;
   }
 }
 
@@ -358,6 +386,10 @@ class UpdateState {
   final String? ignoredVersion;
   final UpdateDownloadSource downloadSource;
 
+  /// True when the downloaded installer carries no trusted publisher
+  /// signature, so the user must confirm before it may run.
+  final bool unsignedInstallPending;
+
   const UpdateState({
     this.status = UpdateStatus.idle,
     this.info,
@@ -372,6 +404,7 @@ class UpdateState {
     this.channel = UpdateChannel.stable,
     this.ignoredVersion,
     this.downloadSource = UpdateDownloadSource.sourceForge,
+    this.unsignedInstallPending = false,
   });
 
   UpdateState copyWith({
@@ -388,6 +421,7 @@ class UpdateState {
     UpdateChannel? channel,
     String? ignoredVersion,
     UpdateDownloadSource? downloadSource,
+    bool? unsignedInstallPending,
   }) {
     return UpdateState(
       status: status ?? this.status,
@@ -403,6 +437,8 @@ class UpdateState {
       channel: channel ?? this.channel,
       ignoredVersion: ignoredVersion ?? this.ignoredVersion,
       downloadSource: downloadSource ?? this.downloadSource,
+      unsignedInstallPending:
+          unsignedInstallPending ?? this.unsignedInstallPending,
     );
   }
 

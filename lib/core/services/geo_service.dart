@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/ai_config.dart';
+
 class GeoResult {
   final String countryCode;
   final String countryName;
@@ -22,8 +24,19 @@ class GeoService {
 
   static GeoResult? _cached;
 
+  /// Whether this build may contact the geolocation endpoint.
+  ///
+  /// The installer privacy option must cover *every* remote call, not just the
+  /// assistant: a plain language-country probe still discloses the user's IP
+  /// to a third party on the first download click. Exposed for tests.
+  @visibleForTesting
+  static bool remoteLookupAllowed() => !AiConfig.isRemoteAiDisabled();
+
   static Future<GeoResult?> getCountry({bool forceRefresh = false}) async {
     if (_cached != null && !forceRefresh) return _cached;
+    if (!remoteLookupAllowed()) {
+      return _cachedFromCache();
+    }
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -46,8 +59,18 @@ class GeoService {
       final response = await http.get(Uri.parse(_apiUrl)).timeout(_timeout);
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final code = json['country_code'] as String? ?? 'US';
-        final name = json['country_name'] as String? ?? code;
+        // A missing country must not be silently treated as the United States:
+        // that flipped the mirror recommendation for every other region.
+        final rawCode = json['country_code'];
+        final code = rawCode is String ? rawCode.trim().toUpperCase() : '';
+        if (code.isEmpty) {
+          debugPrint('[GeoService] Response carried no country code');
+          return _cachedFromCache();
+        }
+        final rawName = json['country_name'];
+        final name = rawName is String && rawName.trim().isNotEmpty
+            ? rawName.trim()
+            : code;
 
         await prefs.setString(_cacheKeyCountryCode, code);
         await prefs.setString(_cacheKeyCountryName, name);
@@ -79,6 +102,21 @@ class GeoService {
     } catch (_) {}
 
     return null;
+  }
+
+  /// Returns the last stored country without touching the network.
+  static Future<GeoResult?> _cachedFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedCode = prefs.getString(_cacheKeyCountryCode);
+      if (cachedCode == null || cachedCode.trim().isEmpty) return null;
+      return GeoResult(
+        countryCode: cachedCode,
+        countryName: prefs.getString(_cacheKeyCountryName) ?? cachedCode,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   static void clearCache() {

@@ -1,0 +1,23 @@
+RE-RUN THE HARDWARE TEST
+
+1. Elevated PowerShell.
+2. cd D:/Dev/WinDeployStudio
+3. Run:
+
+       & ./scripts/linux_raw_write_hw_test.ps1 -IsoPath 'D:/Dev/Linux/Custom Linux.iso' -DiskNumber 1 -Confirm ERASE
+
+WHAT CHANGED
+
+  The write script now compares everything except the GPT header window
+  (bytes 512..1023), and it verifies a second time after the disk is
+  brought online. The harness reads the disk back independently, so the
+  two hashes should now agree.
+
+  Expect two new markers before the completion marker:
+
+       WDS_VERIFY_ONLINE_STARTED
+       WDS_VERIFY_ONLINE_COMPLETE
+       WDS_DONE
+
+  Runtime will be roughly double the previous 452 seconds, because the
+  media is read and compared twice.

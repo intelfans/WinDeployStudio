@@ -101,6 +101,10 @@ abstract final class BenchmarkHistoryKeys {
       'benchmark_history_workload_full_sequential_write';
   static const fullWriteP10 = 'benchmark_history_full_write_p10';
   static const fullWriteScope = 'benchmark_full_write_scope';
+  static const saveFailed = 'benchmark_history_save_failed';
+  static const threadMultiplier = 'benchmark_thread_multiplier';
+  static const threadRetention = 'benchmark_thread_retention';
+  static const threadEfficiency = 'benchmark_thread_efficiency';
 
   static String workload(BenchmarkWorkload workload) {
     return switch (workload) {
@@ -203,4 +207,8 @@ const benchmarkHistoryLocalizationKeys = <String>[
   BenchmarkHistoryKeys.workloadFullSequentialWrite,
   BenchmarkHistoryKeys.fullWriteP10,
   BenchmarkHistoryKeys.fullWriteScope,
+  BenchmarkHistoryKeys.saveFailed,
+  BenchmarkHistoryKeys.threadMultiplier,
+  BenchmarkHistoryKeys.threadRetention,
+  BenchmarkHistoryKeys.threadEfficiency,
 ];

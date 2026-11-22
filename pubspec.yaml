@@ -1,7 +1,7 @@
 name: win_deploy_studio
 description: "Windows desktop toolkit for Windows/Linux installation media, To Go workspaces, and drive benchmarks"
 publish_to: 'none'
-version: 2.1.0
+version: 3.0.0
 
 environment:
   sdk: ^3.12.0
@@ -23,9 +23,6 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
 
-  # Logging
-  logger: ^2.4.0
-
   # File Picker (local ISO import)
   file_picker: ^11.0.2
 
@@ -44,14 +41,9 @@ dependencies:
   # WebView (in-app browser)
   webview_windows: ^0.4.0
 
-  # UI
-  fluentui_system_icons: ^1.1.256
-
   # Utilities
   intl: ^0.20.2
-  collection: ^1.19.1
   uuid: ^4.5.1
-  filesize: ^2.0.1
   flutter_markdown_plus: ^1.0.12
   xml: ^7.0.1
 

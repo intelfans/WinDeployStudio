@@ -157,7 +157,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
   bool _skipOobe = false;
   // Offline WinRE removal is deliberately not offered for To Go. Preserving
   // recovery tools is safer than assuming a fixed WinRE layout in every ISO.
-  final bool _disableWinRe = false;
   bool _disableUasp = false;
   bool _compactOs = false;
   bool _wimBoot = false;
@@ -398,7 +397,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final locale = Localizations.localeOf(context);
     final messenger = ScaffoldMessenger.of(context);
     final effectiveFileName = fileName ?? p.basename(path);
-    final effectiveFileSize = fileSize ?? await File(path).length();
     final selectionRequest = ++_isoSelectionRequest;
     final verificationRequest = ++_knownIsoVerificationRequest;
 
@@ -412,6 +410,12 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     });
 
     try {
+      // Probing the file length must stay inside the guarded region: this
+      // method is reachable from the /wtg?iso= query parameter and from the
+      // image converter, so a stale path is an ordinary failure mode. Throwing
+      // above the try used to leave _loadingImage true for the rest of the
+      // session and disable the picker.
+      final effectiveFileSize = fileSize ?? await File(path).length();
       // Do not route Windows To Go through the creator/installation-media
       // parser first. It causes repeated ISO mounts and a newly inserted ESD
       // image can be reported unavailable before Windows exposes the volume.
@@ -626,7 +630,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
       virtualDiskFileName: _normalizedVirtualDiskName(),
       blockLocalDisks: _blockLocalDisks,
       skipOobe: _skipOobe,
-      disableWinRe: _disableWinRe,
       disableUasp: _disableUasp,
       compactOs: _compactOs,
       wimBoot: _wimBoot,
@@ -1176,9 +1179,13 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
 
   Widget _buildDeploymentStep() {
     final availableModes = DeploymentCompatibility.deploymentModesFor(_plan);
-    if (!availableModes.contains(_deploymentMode)) {
-      _deploymentMode = availableModes.first;
-    }
+    // `_normalizeWindowsOptionsForSelectedImage` already clamps the mode when
+    // the image changes. Mutating state here (during build) left widgets built
+    // earlier in the same frame — the header, the summary and the notices —
+    // rendering the previous plan until some unrelated rebuild happened.
+    final effectiveMode = availableModes.contains(_deploymentMode)
+        ? _deploymentMode
+        : availableModes.first;
     return _stepContainer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1248,7 +1255,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
                   },
                   title: _deploymentModeLabel(mode),
                   subtitle: _deploymentModeDescription(mode),
-                  selected: mode == _deploymentMode,
+                  selected: mode == effectiveMode,
                   onTap: () {
                     setState(() {
                       _deploymentMode = mode;
@@ -1261,7 +1268,7 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
               );
             }).toList(),
           ),
-          if (_deploymentMode != DeploymentMode.direct) ...[
+          if (effectiveMode != DeploymentMode.direct) ...[
             const SizedBox(height: 20),
             Card(
               child: Padding(
@@ -2052,7 +2059,6 @@ class _WtgScreenState extends ConsumerState<WtgScreen> {
     final values = <String>[];
     if (plan.blockLocalDisks) values.add(tr(context, 'deploy_block_local'));
     if (plan.skipOobe) values.add(tr(context, 'deploy_skip_oobe'));
-    if (plan.disableWinRe) values.add(tr(context, 'deploy_disable_winre'));
     if (plan.disableUasp) values.add(tr(context, 'deploy_disable_uasp'));
     if (plan.compactOs) values.add('CompactOS');
     if (plan.wimBoot) values.add('WIMBoot');

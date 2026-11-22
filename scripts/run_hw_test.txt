@@ -1,0 +1,15 @@
+==========================================================
+Step 1 - DRY RUN (no write). Run in a normal PowerShell:
+==========================================================
+
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/linux_raw_write_hw_test.ps1 -IsoPath 'D:\Dev\Linux\Custom Linux.iso' -DiskNumber 1 -Confirm ERASE -DryRun
+
+
+==========================================================
+Step 2 - REAL WRITE (wipes the USB). Elevated PowerShell:
+==========================================================
+
+& .\scripts\linux_raw_write_hw_test.ps1 -IsoPath 'D:\Dev\Linux\Custom Linux.iso' -DiskNumber 1 -Confirm ERASE
+
+(If your prompt is not elevated, right-click PowerShell -> Run as administrator,
+ cd to D:\Dev\WinDeployStudio first, then run the line above.)

@@ -127,64 +127,82 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/mirror/:id',
-        builder: (context, state) {
-          final item = state.extra as MirrorItem?;
-          final locale = Localizations.localeOf(context);
-          final blocked = item != null && !item.isVisibleInLocale(locale);
-          if (item != null && !blocked) {
-            return MirrorDetailScreen(item: item);
-          }
-
-          // Try to find item by ID from provider
-          final id = state.pathParameters['id'];
-          final mirrorState = ref.watch(mirrorProvider);
-
-          // If data not loaded yet, trigger load
-          if (mirrorState.status == MirrorLoadStatus.initial ||
-              mirrorState.status == MirrorLoadStatus.loading) {
-            // Trigger load if not already loading
-            if (mirrorState.status == MirrorLoadStatus.initial) {
-              Future.microtask(
-                () => ref.read(mirrorProvider.notifier).loadBuiltInMirrors(),
-              );
-            }
-            return Scaffold(
-              appBar: AppBar(),
-              body: const Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (mirrorState.status == MirrorLoadStatus.error) {
-            return Scaffold(
-              appBar: AppBar(),
-              body: Center(
-                child: Text(
-                  mirrorState.error == null
-                      ? tr(context, 'images_error')
-                      : '${tr(context, 'mirror_error_loading')} ${mirrorState.error}',
-                ),
-              ),
-            );
-          }
-
-          final items = mirrorState.data?.items ?? [];
-          final foundItem = items.where((i) => i.id == id).firstOrNull;
-
-          final foundBlocked =
-              foundItem != null && !foundItem.isVisibleInLocale(locale);
-          if (foundItem != null && !foundBlocked) {
-            return MirrorDetailScreen(item: foundItem);
-          }
-
-          return Scaffold(
-            appBar: AppBar(),
-            body: Center(child: Text(tr(context, 'mirror_not_found'))),
-          );
-        },
+        // The builder runs after the router provider is built, so it must not
+        // touch `ref`: watching `mirrorProvider` there either asserts or makes
+        // the router itself a dependent of the mirror state, which rebuilds the
+        // GoRouter (and tears down the navigation stack) on every emission.
+        // Provider access lives in the ConsumerWidget below instead.
+        builder: (context, state) => MirrorDetailRoute(
+          id: state.pathParameters['id'] ?? '',
+          item: state.extra as MirrorItem?,
+        ),
       ),
     ],
   );
 });
+
+/// Resolves `/mirror/:id` without putting provider access in the router.
+///
+/// `MirrorDetailScreen` is only built once the item actually exists, so the
+/// detail page never has to handle a half-loaded catalogue.
+class MirrorDetailRoute extends ConsumerWidget {
+  const MirrorDetailRoute({super.key, required this.id, this.item});
+
+  final String id;
+  final MirrorItem? item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = Localizations.localeOf(context);
+    final provided = item;
+    if (provided != null && provided.isVisibleInLocale(locale)) {
+      return MirrorDetailScreen(item: provided);
+    }
+
+    final mirrorState = ref.watch(mirrorProvider);
+    if (mirrorState.status == MirrorLoadStatus.initial) {
+      // Trigger the load from a post-frame callback: the state write must not
+      // happen while this widget is building.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        ref.read(mirrorProvider.notifier).loadBuiltInMirrors();
+      });
+    }
+
+    if (mirrorState.status == MirrorLoadStatus.initial ||
+        mirrorState.status == MirrorLoadStatus.loading) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (mirrorState.status == MirrorLoadStatus.error) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Text(
+            mirrorState.error == null
+                ? tr(context, 'images_error')
+                : '${tr(context, 'mirror_error_loading')} ${mirrorState.error}',
+          ),
+        ),
+      );
+    }
+
+    final found = (mirrorState.data?.items ?? const <MirrorItem>[])
+        .where((candidate) => candidate.id == id)
+        .firstOrNull;
+    if (found != null && found.isVisibleInLocale(locale)) {
+      return MirrorDetailScreen(item: found);
+    }
+
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(child: Text(tr(context, 'mirror_not_found'))),
+    );
+  }
+}
 
 class ScaffoldWithNavigation extends ConsumerStatefulWidget {
   final Widget child;

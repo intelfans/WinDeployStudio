@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +29,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
   static const double _toolCardHeight = 320;
 
   ToolsData? _data;
+  String? _error;
   bool _loading = true;
   String _searchQuery = '';
   List<ToolItem> _featuredTools = [];
@@ -59,13 +61,21 @@ class _ToolsScreenState extends State<ToolsScreen> {
 
   Future<void> _loadData() async {
     _lastLocale = normalizeLocaleCode(L.currentLocale);
-    final data = await (widget.dataLoader?.call() ?? ToolsData.load());
-    if (mounted) {
+    try {
+      final data = await (widget.dataLoader?.call() ?? ToolsData.load());
+      if (!mounted) return;
       setState(() {
         _data = data;
-        _loading = false;
+        _error = null;
         _shuffleFeatured();
       });
+    } catch (error) {
+      // Without this the page rendered a spinner forever: _loading was only
+      // cleared on the success path.
+      if (!mounted) return;
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -74,7 +84,10 @@ class _ToolsScreenState extends State<ToolsScreen> {
     final locale = Localizations.localeOf(context);
     final currentLocale = normalizeLocaleCode(localeCodeFromLocale(locale));
     if (currentLocale != _lastLocale && !_loading) {
-      _loadData();
+      // build must not mutate state directly; refresh after the frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_loading) unawaited(_loadData());
+      });
     }
     final colorScheme = Theme.of(context).colorScheme;
     final tokens = AppVisualTokens.of(context);
@@ -82,6 +95,13 @@ class _ToolsScreenState extends State<ToolsScreen> {
     return Scaffold(
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _error != null && _data == null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(tr(context, 'tools_load_failed')),
+              ),
+            )
           : LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
                 padding: EdgeInsets.all(

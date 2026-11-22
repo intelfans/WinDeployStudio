@@ -14,6 +14,58 @@ void main() {
     expect(cleared.activeSessionId, isNull);
   });
 
+  test('the search confirmation callback reaches the service', () async {
+    final service = _ControlledAiService();
+    final notifier = ChatNotifier(
+      service,
+      loadHistory: false,
+      persistHistory: false,
+    );
+    addTearDown(notifier.dispose);
+    notifier.createNewSession();
+
+    Future<bool> confirm(String query, String provider) async {
+      expect(query, 'are you there');
+      expect(provider, isNotEmpty);
+      return false;
+    }
+
+    notifier.setSearchConfirmation(confirm);
+    final done = notifier.sendMessage('are you there');
+    await _waitForRequests(service, 1);
+
+    expect(service.requests[0].confirmSearch, isNotNull);
+    expect(
+      await service.requests[0].confirmSearch!('are you there', 'Tavily'),
+      isFalse,
+    );
+
+    service.requests[0].addChunk('answer without search');
+    service.requests[0].complete();
+    await done;
+  });
+
+  test('clearing the confirmation callback stops it reaching the service', () async {
+    final service = _ControlledAiService();
+    final notifier = ChatNotifier(
+      service,
+      loadHistory: false,
+      persistHistory: false,
+    );
+    addTearDown(notifier.dispose);
+    notifier.createNewSession();
+
+    notifier.setSearchConfirmation((_, _) async => true);
+    notifier.setSearchConfirmation(null);
+
+    final done = notifier.sendMessage('hello');
+    await _waitForRequests(service, 1);
+    expect(service.requests[0].confirmSearch, isNull);
+
+    service.requests[0].complete();
+    await done;
+  });
+
   test('stopped stream callbacks cannot overwrite a later response', () async {
     final service = _ControlledAiService();
     final notifier = ChatNotifier(
@@ -246,6 +298,7 @@ class _ControlledAiService implements AiMessageService {
     required void Function(AiSearchStatus status) onSearchStatus,
     SearchMode searchMode = SearchMode.off,
     CancelToken? cancelToken,
+    SearchConfirmationCallback? confirmSearch,
   }) {
     final request = _ControlledRequest(
       onChunk: onChunk,
@@ -255,6 +308,7 @@ class _ControlledAiService implements AiMessageService {
       onSearchStatus: onSearchStatus,
       searchMode: searchMode,
       cancelToken: cancelToken,
+      confirmSearch: confirmSearch,
     );
     requests.add(request);
     return request.done.future;
@@ -269,6 +323,7 @@ class _ControlledRequest {
   final void Function(AiSearchStatus status) _onSearchStatus;
   final SearchMode searchMode;
   final CancelToken? cancelToken;
+  final SearchConfirmationCallback? confirmSearch;
   final Completer<void> done = Completer<void>();
 
   _ControlledRequest({
@@ -279,6 +334,7 @@ class _ControlledRequest {
     required this._onSearchStatus,
     required this.searchMode,
     required this.cancelToken,
+    required this.confirmSearch,
   });
 
   void addChunk(String chunk) => _onChunk(chunk);

@@ -128,18 +128,16 @@ Write-Output ("{0}|{1}" -f $DiskNumber, $requested)
       expect(write, contains('WDS_VERIFY_PROGRESS:0'));
       expect(write, contains('WDS_VERIFY_COMPLETE'));
       expect(write, contains('WDS_DISK_ONLINE'));
+      // Verification compares the media but skips the GPT header window, which
+      // Windows rewrites when it brings the disk back online.
+      expect(write, contains(r'$verifySkipStart = [int64]512'));
+      expect(write, contains(r'$verifySkipEnd = [int64]1023'));
+      expect(write, contains(r'$segments += ,@'));
       expect(
-        write,
-        contains(r'$blockMatches = if ($requested -eq $bufferLength)'),
+        write.indexOf(r'$sourceHash.AppendData($sourceBuffer, $segmentStart'),
+        greaterThan(write.indexOf(r'$segments += ,@')),
       );
-      expect(
-        write.indexOf(r'$blockMatches = if ($requested -eq $bufferLength)'),
-        lessThan(
-          write.indexOf(
-            r'if ($firstMismatchOffset -lt 0 -and -not $blockMatches)',
-          ),
-        ),
-      );
+      expect(write, contains(r'$firstMismatchOffset = $blockStart + $index'));
       expect(
         write,
         contains('Full-stream SHA-256 verification mismatch at offset'),

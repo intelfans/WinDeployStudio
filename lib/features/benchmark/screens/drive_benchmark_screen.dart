@@ -95,11 +95,14 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
       _error = null;
     });
 
-    await _logCenter.logBenchmark(
-      '[DriveBenchmark]\nDisk=${disk.diskNumber}\nMode=${_mode.name}\nStatus=Started',
-    );
-
     try {
+      // Telemetry must never stand between the user and the operation: this
+      // write used to sit above the try, so a locked or read-only log
+      // directory left _isRunning true forever and disabled the Start button.
+      await _logCenter.logBenchmark(
+        '[DriveBenchmark]\nDisk=${disk.diskNumber}\nMode=${_mode.name}\nStatus=Started',
+      );
+
       final result = await ref
           .read(driveBenchmarkServiceProvider)
           .run(
@@ -843,20 +846,18 @@ class _DriveBenchmarkScreenState extends ConsumerState<DriveBenchmarkScreen> {
     ).replaceAll('{volume}', volume);
   }
 
-  String _historySaveFailureText(BuildContext context) {
-    if (Localizations.localeOf(context).languageCode == 'zh') {
-      return '测试已完成，但历史记录保存失败。';
-    }
-    return 'The benchmark completed, but its history record could not be saved.';
-  }
+  String _historySaveFailureText(BuildContext context) =>
+      tr(context, BenchmarkHistoryKeys.saveFailed);
 
   String _threadMetricLabel(BuildContext context, String metric) {
-    final chinese = Localizations.localeOf(context).languageCode == 'zh';
-    return switch (metric) {
-      'multiplier' => chinese ? '多线程倍率' : 'Thread multiplier',
-      'retention' => chinese ? '峰值保持率' : 'Peak retention',
-      _ => chinese ? '归一化效率' : 'Normalized efficiency',
-    };
+    return tr(
+      context,
+      switch (metric) {
+        'multiplier' => BenchmarkHistoryKeys.threadMultiplier,
+        'retention' => BenchmarkHistoryKeys.threadRetention,
+        _ => BenchmarkHistoryKeys.threadEfficiency,
+      },
+    );
   }
 
   String _slcStatusText(BuildContext context, BenchmarkResult result) {

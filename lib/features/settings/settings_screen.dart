@@ -156,6 +156,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: tr(context, 'settings_appearance'),
                 children: [
                   _SettingsTile(
+                    icon: Icons.desktop_windows_outlined,
+                    title: tr(
+                      context,
+                      VisualStyleLocalizationKeys.settingLabel,
+                    ),
+                    subtitle: tr(
+                      context,
+                      ref.watch(visualStyleProvider).descriptionKey,
+                    ),
+                    trailing: DropdownButton<VisualStyle>(
+                      value: ref.watch(visualStyleProvider),
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        for (final style in VisualStyle.values)
+                          DropdownMenuItem(
+                            value: style,
+                            child: Text(tr(context, style.labelKey)),
+                          ),
+                      ],
+                      onChanged: (style) {
+                        if (style == null) return;
+                        ref.read(visualStyleProvider.notifier).setStyle(style);
+                        LogCenterService().logSystem(
+                          '[Settings] VisualStyle=${style.name}',
+                        );
+                      },
+                    ),
+                  ),
+                  _SettingsTile(
                     icon: Icons.palette_outlined,
                     title: tr(context, 'settings_theme'),
                     subtitle: _themeModeName(themeMode),

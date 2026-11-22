@@ -40,9 +40,17 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
   bool _initialPromptSent = false;
   bool _showNotice = false;
 
+  /// Held for the widget's lifetime so [dispose] never needs `ref`: Riverpod
+  /// rejects `ref` once the widget is deactivated.
+  ChatNotifier? _chatNotifier;
+
   @override
   void initState() {
     super.initState();
+    // The provider cannot show UI itself, so the screen supplies the dialog.
+    final notifier = ref.read(chatProvider.notifier);
+    notifier.setSearchConfirmation(_confirmSearchQuery);
+    _chatNotifier = notifier;
     _loadNoticePreference();
   }
 
@@ -80,6 +88,74 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
     });
   }
 
+  /// Shows the exact text that is about to leave the device.
+  ///
+  /// Every search route transmits the same query, so a refusal drops the
+  /// search instead of rerouting it to a different provider.
+  Future<bool> _confirmSearchQuery(String query, String provider) async {
+    if (!mounted) return false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: Text(tr(dialogContext, 'ai_search_confirm_title')),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr(dialogContext, 'ai_search_confirm_body')),
+                const SizedBox(height: 12),
+                Text(
+                  tr(dialogContext, 'ai_search_confirm_provider').replaceAll(
+                    '{provider}',
+                    provider,
+                  ),
+                  style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  tr(dialogContext, 'ai_search_confirm_query_label'),
+                  style: Theme.of(dialogContext).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.outlineVariant),
+                  ),
+                  child: SelectableText(
+                    query,
+                    style: Theme.of(dialogContext).textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(tr(dialogContext, 'ai_search_confirm_cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(tr(dialogContext, 'ai_search_confirm_send')),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed ?? false;
+  }
+
   Future<bool> _confirmSensitiveAnalysis() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -103,6 +179,10 @@ class _AiAssistantScreenState extends ConsumerState<AiAssistantScreen> {
 
   @override
   void dispose() {
+    // Clear first: a search still in flight must not call back into a context
+    // that is being torn down.
+    _chatNotifier?.setSearchConfirmation(null);
+    _chatNotifier = null;
     _scrollController.dispose();
     super.dispose();
   }

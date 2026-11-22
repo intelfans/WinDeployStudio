@@ -11,14 +11,20 @@ String _loc(dynamic json, String key) {
   if (json is Map) {
     final locale = normalizeLocaleCode(L.currentLocale);
     final language = locale.split('_').first;
-    final isSupported = isSupportedLocaleCode(locale);
-    final localized = isSupported && locale.contains('_')
+    // Fall back down the chain instead of returning an empty string for a
+    // supported locale whose tag is absent from the catalogue: an empty name
+    // rendered a blank card and made the entry unsearchable.
+    final localized = locale.contains('_')
         ? json['${key}_$locale'] as String?
-        : json['${key}_$locale'] as String? ??
-              json['${key}_$language'] as String?;
-    if (localized != null) return localized;
-    if (isSupported) return '';
-    return json[key] as String? ?? '';
+        : null;
+    if (localized != null && localized.trim().isNotEmpty) return localized;
+    final byLanguage = json['${key}_$language'] as String?;
+    if (byLanguage != null && byLanguage.trim().isNotEmpty) return byLanguage;
+    final base = json[key] as String?;
+    if (base != null && base.trim().isNotEmpty) return base;
+    final english = json['${key}_en'] as String?;
+    if (english != null && english.trim().isNotEmpty) return english;
+    return '';
   }
   if (json is String) return json;
   return '';
@@ -29,13 +35,18 @@ List<String> _locList(dynamic json, String key) {
   if (json is Map) {
     final locale = normalizeLocaleCode(L.currentLocale);
     final language = locale.split('_').first;
-    final isSupported = isSupportedLocaleCode(locale);
-    final list = isSupported && locale.contains('_')
-        ? json['${key}_$locale'] as List?
-        : json['${key}_$locale'] as List? ?? json['${key}_$language'] as List?;
-    if (list != null) return list.cast<String>();
-    if (isSupported) return [];
-    return (json[key] as List?)?.cast<String>() ?? [];
+    List<String>? asList(Object? value) => value is List
+        ? value.map((item) => item.toString()).toList(growable: false)
+        : null;
+    if (locale.contains('_')) {
+      final exact = asList(json['${key}_$locale']);
+      if (exact != null && exact.isNotEmpty) return exact;
+    }
+    final byLanguage = asList(json['${key}_$language']);
+    if (byLanguage != null && byLanguage.isNotEmpty) return byLanguage;
+    final base = asList(json[key]);
+    if (base != null && base.isNotEmpty) return base;
+    return asList(json['${key}_en']) ?? const <String>[];
   }
   if (json is List) return json.cast<String>();
   return [];

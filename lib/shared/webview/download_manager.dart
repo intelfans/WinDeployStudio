@@ -502,9 +502,18 @@ class DownloadManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Sends a download request while retaining SourceForge's HTTPS/domain
-  /// boundary after mirror resolution. For other download origins, redirects
-  /// retain the previous unrestricted behavior.
+  /// Sends a download request under a single redirect policy for *every*
+  /// origin.
+  ///
+  /// Two rules apply to the first hop and to each redirect target alike:
+  /// 1. the scheme must remain HTTPS — a downgrade to plaintext is refused;
+  /// 2. a cross-origin hop must not gain privilege: it is refused when it
+  ///    targets a loopback, link-local or RFC1918 literal, and it may never
+  ///    leave a SourceForge origin for a non-SourceForge host.
+  ///
+  /// The previous implementation applied the allow-list only when the initial
+  /// URL happened to be SourceForge; any other origin was followed to an
+  /// arbitrary host, including plaintext and internal addresses.
   @visibleForTesting
   static Future<http.StreamedResponse?> sendWithValidatedRedirects(
     http.Client client,
@@ -520,6 +529,7 @@ class DownloadManager extends ChangeNotifier {
         !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(initial)) {
       return null;
     }
+    if (!isAllowedDownloadUri(initial)) return null;
 
     var current = initial;
     for (var redirectCount = 0; redirectCount <= 5; redirectCount++) {
@@ -527,6 +537,7 @@ class DownloadManager extends ChangeNotifier {
           !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(current)) {
         return null;
       }
+      if (!isAllowedDownloadUri(current)) return null;
 
       final request = http.Request('GET', current)
         ..followRedirects = false
@@ -555,9 +566,45 @@ class DownloadManager extends ChangeNotifier {
           !GlobalMirrorDownloadResolver.isGlobalMirrorUrl(next)) {
         return null;
       }
+      if (!isAllowedDownloadUri(next)) return null;
       current = next;
     }
     return null;
+  }
+
+  /// Whether a download hop may be requested at all.
+  ///
+  /// Refused here: any non-HTTPS scheme (a redirect to `http:` would write
+  /// bytes for a page the user never trusted), and any literal loopback,
+  /// link-local or RFC1918 address, which turns a remote mirror into an SSRF
+  /// primitive against the local machine or the LAN.
+  @visibleForTesting
+  static bool isAllowedDownloadUri(Uri uri) {
+    if (uri.scheme.toLowerCase() != 'https') return false;
+    if (uri.host.isEmpty) return false;
+    return !_isInternalHostLiteral(uri.host);
+  }
+
+  static bool _isInternalHostLiteral(String host) {
+    final normalized = host.toLowerCase();
+    if (normalized == 'localhost' || normalized.endsWith('.localhost')) {
+      return true;
+    }
+    final address = InternetAddress.tryParse(normalized);
+    if (address == null) return false;
+    if (address.isLoopback || address.isLinkLocal) return true;
+    if (address.type == InternetAddressType.IPv4) {
+      final octets = address.rawAddress;
+      final first = octets[0];
+      final second = octets[1];
+      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+      if (first == 10) return true;
+      if (first == 172 && second >= 16 && second <= 31) return true;
+      if (first == 192 && second == 168) return true;
+      if (first == 169 && second == 254) return true;
+      if (first == 0 || first == 127) return true;
+    }
+    return false;
   }
 
   static bool _isRedirectStatus(int statusCode) =>
